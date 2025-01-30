@@ -1,7 +1,11 @@
+// src/pages/Login.tsx
+// Version: 1.3.0
+// Last Modified: 30-01-2025 15:00 IST
+
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Mail, KeyRound } from 'lucide-react';
+import { Mail } from 'lucide-react';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -12,7 +16,7 @@ export default function Login() {
   const [showVerification, setShowVerification] = useState(false);
   const { signInWithEmail, verifyOtp } = useAuth();
 
-  const handleEmailSubmit = async (e: React.FormEvent) => {
+  const handleSignInSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
@@ -28,7 +32,7 @@ export default function Login() {
       setShowVerification(true);
     } catch (err) {
       setError('An unexpected error occurred. Please try again later.');
-      console.error('Login error:', err);
+      console.error('Sign in error:', err);
     } finally {
       setIsLoading(false);
     }
@@ -61,11 +65,7 @@ export default function Login() {
       <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-lg shadow">
         <div>
           <div className="mx-auto h-12 w-12 flex items-center justify-center rounded-full bg-indigo-100">
-            {showVerification ? (
-              <KeyRound className="h-6 w-6 text-indigo-600" />
-            ) : (
-              <Mail className="h-6 w-6 text-indigo-600" />
-            )}
+            <Mail className="h-6 w-6 text-indigo-600" />
           </div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
             {showVerification ? 'Enter verification code' : 'Sign in to your account'}
@@ -73,7 +73,7 @@ export default function Login() {
           <p className="mt-2 text-center text-sm text-gray-600">
             {showVerification 
               ? 'Check your email for the verification code'
-              : 'We\'ll send you a verification code'}
+              : 'We\'ll send a verification code to your email'}
           </p>
         </div>
 
@@ -129,7 +129,7 @@ export default function Login() {
             </div>
           </form>
         ) : (
-          <form className="mt-8 space-y-6" onSubmit={handleEmailSubmit}>
+          <form className="mt-8 space-y-6" onSubmit={handleSignInSubmit}>
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">
                 Email address
@@ -158,6 +158,15 @@ export default function Login() {
               >
                 {isLoading ? 'Sending code...' : 'Send verification code'}
               </button>
+            </div>
+
+            <div className="text-center">
+              <p className="text-sm text-gray-600">
+                Don't have an account?{' '}
+                <Link to="/register" className="text-indigo-600 hover:text-indigo-500">
+                  Register here
+                </Link>
+              </p>
             </div>
           </form>
         )}

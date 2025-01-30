@@ -1,203 +1,200 @@
+// src/components/property/AmenitiesSection.tsx
+// Version: 1.1.0
+// Last Modified: 2025-01-30T17:30:00+05:30 (IST)
+// Author: Bhoomitalli Team
+
 import React from 'react';
 import { FormSection } from '@/components/FormSection';
-import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { FormSectionProps } from './types';
 import { cn } from '@/lib/utils';
-import { AMENITIES_LIST, PROPERTY_SHOW_OPTIONS, PROPERTY_CONDITION_OPTIONS } from './constants';
+import { RequiredLabel } from '@/components/ui/RequiredLabel';
+import { Minus, Plus, Phone } from 'lucide-react';
+import { 
+  AMENITIES_LIST, 
+  PROPERTY_SHOW_OPTIONS, 
+  PROPERTY_CONDITION_OPTIONS 
+} from './constants';
 
 export function AmenitiesSection({ form }: FormSectionProps) {
   const { watch, setValue, register, formState: { errors } } = form;
 
-  // Initialize bathrooms and balconies to 0 if not set
-  React.useEffect(() => {
-    if (!watch('bathrooms')) setValue('bathrooms', '0');
-    if (!watch('balconies')) setValue('balconies', '0');
-  }, [watch, setValue]);
+  const handleNumberChange = (type: 'bathrooms' | 'balconies', action: 'increment' | 'decrement') => {
+    const current = parseInt(watch(type) || '0');
+    if (action === 'increment') {
+      setValue(type, (current + 1).toString());
+    } else if (current > 0) {
+      setValue(type, (current - 1).toString());
+    }
+  };
 
   return (
     <FormSection
-      title="Amenities & Additional Details"
-      description="Specify amenities and other important details about your property."
+      title="Amenities & Features"
+      description="What does your property offer?"
     >
-      <div className="space-y-8">
-        {/* Bathroom and Balcony Counters */}
-        <div className="grid grid-cols-2 gap-6">
+      <div className="space-y-4">
+        {/* Bathrooms and Balconies Counter - Two Column */}
+        <div className="grid grid-cols-2 gap-4">
+          {/* Bathrooms Counter */}
           <div>
-            <Label htmlFor="bathrooms">Number of Bathrooms</Label>
-            <div className="flex items-center space-x-4 mt-2">
+            <RequiredLabel required>Bathrooms</RequiredLabel>
+            <div className="flex items-center h-11">
               <button
                 type="button"
-                onClick={() => {
-                  const current = parseInt(watch('bathrooms') || '0');
-                  if (current > 0) setValue('bathrooms', (current - 1).toString());
-                }}
-                className="w-10 h-10 flex items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
+                onClick={() => handleNumberChange('bathrooms', 'decrement')}
+                className="h-full aspect-square flex items-center justify-center rounded-l-xl border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                disabled={parseInt(watch('bathrooms') || '0') <= 0}
               >
-                -
+                <Minus className="h-4 w-4" />
               </button>
               <Input
-                id="bathrooms"
-                type="number"
-                min="0"
-                className="text-center"
-                {...register('bathrooms')}
+                type="text"
+                className="h-full text-center rounded-none border-x-0 text-base"
+                value={watch('bathrooms') || '0'}
+                readOnly
               />
               <button
                 type="button"
-                onClick={() => {
-                  const current = parseInt(watch('bathrooms') || '0');
-                  setValue('bathrooms', (current + 1).toString());
-                }}
-                className="w-10 h-10 flex items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
+                onClick={() => handleNumberChange('bathrooms', 'increment')}
+                className="h-full aspect-square flex items-center justify-center rounded-r-xl border border-slate-200 text-slate-600 hover:bg-slate-50"
               >
-                +
+                <Plus className="h-4 w-4" />
               </button>
             </div>
           </div>
 
+          {/* Balconies Counter */}
           <div>
-            <Label htmlFor="balconies">Number of Balconies</Label>
-            <div className="flex items-center space-x-4 mt-2">
+            <RequiredLabel>Balconies</RequiredLabel>
+            <div className="flex items-center h-11">
               <button
                 type="button"
-                onClick={() => {
-                  const current = parseInt(watch('balconies') || '0');
-                  if (current > 0) setValue('balconies', (current - 1).toString());
-                }}
-                className="w-10 h-10 flex items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
+                onClick={() => handleNumberChange('balconies', 'decrement')}
+                className="h-full aspect-square flex items-center justify-center rounded-l-xl border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                disabled={parseInt(watch('balconies') || '0') <= 0}
               >
-                -
+                <Minus className="h-4 w-4" />
               </button>
               <Input
-                id="balconies"
-                type="number"
-                min="0"
-                className="text-center"
-                {...register('balconies')}
+                type="text"
+                className="h-full text-center rounded-none border-x-0 text-base"
+                value={watch('balconies') || '0'}
+                readOnly
               />
               <button
                 type="button"
-                onClick={() => {
-                  const current = parseInt(watch('balconies') || '0');
-                  setValue('balconies', (current + 1).toString());
-                }}
-                className="w-10 h-10 flex items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
+                onClick={() => handleNumberChange('balconies', 'increment')}
+                className="h-full aspect-square flex items-center justify-center rounded-r-xl border border-slate-200 text-slate-600 hover:bg-slate-50"
               >
-                +
+                <Plus className="h-4 w-4" />
               </button>
             </div>
           </div>
         </div>
 
-        {/* Yes/No Options */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-          <div className="flex items-center space-x-3 p-4 rounded-xl border border-slate-200 bg-white">
-            <Checkbox
-              id="hasGym"
-              checked={watch('hasGym')}
-              onCheckedChange={(checked) => setValue('hasGym', checked)}
-            />
-            <label
-              htmlFor="hasGym"
-              className="text-base font-medium text-slate-700 cursor-pointer"
+        {/* Quick Amenities - Three Column */}
+        <div className="grid grid-cols-3 gap-3">
+          {['hasGym', 'nonVegAllowed', 'gatedSecurity'].map((amenity) => (
+            <div
+              key={amenity}
+              className="flex items-center space-x-3 p-3 rounded-xl border border-slate-200 bg-white hover:border-slate-300 transition-colors"
             >
-              Gym
-            </label>
-          </div>
-
-          <div className="flex items-center space-x-3 p-4 rounded-xl border border-slate-200 bg-white">
-            <Checkbox
-              id="nonVegAllowed"
-              checked={watch('nonVegAllowed')}
-              onCheckedChange={(checked) => setValue('nonVegAllowed', checked)}
-            />
-            <label
-              htmlFor="nonVegAllowed"
-              className="text-base font-medium text-slate-700 cursor-pointer"
-            >
-              Non-Veg Allowed
-            </label>
-          </div>
-
-          <div className="flex items-center space-x-3 p-4 rounded-xl border border-slate-200 bg-white">
-            <Checkbox
-              id="gatedSecurity"
-              checked={watch('gatedSecurity')}
-              onCheckedChange={(checked) => setValue('gatedSecurity', checked)}
-            />
-            <label
-              htmlFor="gatedSecurity"
-              className="text-base font-medium text-slate-700 cursor-pointer"
-            >
-              Gated Security
-            </label>
-          </div>
+              <Checkbox
+                id={amenity}
+                checked={watch(amenity)}
+                onCheckedChange={(checked) => setValue(amenity, checked)}
+              />
+              <label
+                htmlFor={amenity}
+                className="text-base text-slate-700 cursor-pointer"
+              >
+                {amenity === 'hasGym' ? 'Gym'
+                  : amenity === 'nonVegAllowed' ? 'Non-Veg Allowed'
+                  : 'Gated Security'}
+              </label>
+            </div>
+          ))}
         </div>
 
-        {/* Property Show and Condition Options - Side by Side */}
-        <div className="grid grid-cols-2 gap-6">
+        {/* Property Show and Condition - Two Column */}
+        <div className="grid grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="propertyShowOption">Who will show the property?</Label>
+            <RequiredLabel required>Who Shows Property?</RequiredLabel>
             <Select 
               value={watch('propertyShowOption')} 
               onValueChange={value => setValue('propertyShowOption', value)}
             >
-              <SelectTrigger>
-                <SelectValue placeholder="Select who will show the property" />
+              <SelectTrigger className="h-11 text-base">
+                <SelectValue placeholder="Select who shows" />
               </SelectTrigger>
               <SelectContent>
                 {PROPERTY_SHOW_OPTIONS.map(option => (
-                  <SelectItem key={option} value={option}>{option}</SelectItem>
+                  <SelectItem key={option} value={option} className="text-base">{option}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            {errors.propertyShowOption && (
+              <p className="text-sm text-red-600 mt-0.5">{errors.propertyShowOption.message}</p>
+            )}
           </div>
 
           <div>
-            <Label htmlFor="propertyCondition">Current Property Condition</Label>
+            <RequiredLabel required>Property Condition</RequiredLabel>
             <Select 
               value={watch('propertyCondition')} 
               onValueChange={value => setValue('propertyCondition', value)}
             >
-              <SelectTrigger>
-                <SelectValue placeholder="Select current property condition" />
+              <SelectTrigger className="h-11 text-base">
+                <SelectValue placeholder="Select condition" />
               </SelectTrigger>
               <SelectContent>
                 {PROPERTY_CONDITION_OPTIONS.map(option => (
-                  <SelectItem key={option} value={option}>{option}</SelectItem>
+                  <SelectItem key={option} value={option} className="text-base">{option}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            {errors.propertyCondition && (
+              <p className="text-sm text-red-600 mt-0.5">{errors.propertyCondition.message}</p>
+            )}
           </div>
         </div>
 
-        {/* Secondary Number */}
-        <div>
-          <Label htmlFor="secondaryNumber">Secondary Contact Number</Label>
-          <div className="relative">
-            <span className="absolute left-0 inset-y-0 flex items-center pl-4 text-gray-500 pointer-events-none">
-              +91
-            </span>
+        {/* Contact and Direction - Two Column */}
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <RequiredLabel>Alternate Contact</RequiredLabel>
+            <div className="relative">
+              <span className="absolute left-3 inset-y-0 flex items-center text-slate-400">
+                <Phone className="h-4 w-4" />
+              </span>
+              <span className="absolute left-9 inset-y-0 flex items-center text-slate-400">
+                +91
+              </span>
+              <Input
+                type="tel"
+                className="h-11 pl-16 text-base"
+                maxLength={10}
+                {...register('secondaryNumber')}
+                placeholder="Additional contact number"
+              />
+            </div>
+          </div>
+
+          <div>
+            <RequiredLabel>Directions</RequiredLabel>
             <Input
-              id="secondaryNumber"
-              type="tel"
-              className="pl-12"
-              maxLength={10}
-              pattern="[0-9]{10}"
-              {...register('secondaryNumber')}
-              placeholder="Enter 10-digit mobile number"
+              className="h-11 text-base"
+              {...register('direction')}
+              placeholder="How to reach the property?"
             />
           </div>
-          {errors.secondaryNumber && (
-            <p className="text-sm text-red-600 mt-1">{errors.secondaryNumber.message}</p>
-          )}
         </div>
 
-        {/* Similar Units */}
-        <div className="flex items-center space-x-3 p-4 rounded-xl border border-slate-200 bg-white">
+        {/* Similar Units Checkbox */}
+        <div className="flex items-center space-x-3 p-3 rounded-xl border border-slate-200 bg-white hover:border-slate-300 transition-colors">
           <Checkbox
             id="hasSimilarUnits"
             checked={watch('hasSimilarUnits')}
@@ -205,56 +202,49 @@ export function AmenitiesSection({ form }: FormSectionProps) {
           />
           <label
             htmlFor="hasSimilarUnits"
-            className="text-base font-medium text-slate-700 cursor-pointer"
+            className="text-base text-slate-700 cursor-pointer"
           >
-            Do you have more similar units/properties available?
+            Have similar units available?
           </label>
         </div>
 
-        {/* Direction */}
+        {/* Other Amenities Grid */}
         <div>
-          <Label htmlFor="direction">Direction</Label>
-          <Input
-            id="direction"
-            {...register('direction')}
-            placeholder="e.g., Take the second left after the main signal, building is on the right"
-          />
-        </div>
-
-        {/* Other Amenities */}
-        <div>
-          <Label className="mb-4">Other Amenities</Label>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+          <RequiredLabel required>Other Amenities</RequiredLabel>
+          <div className="grid grid-cols-3 gap-3 mt-2">
             {AMENITIES_LIST.map((amenity) => (
               <div
                 key={amenity}
                 className={cn(
-                  "flex items-center space-x-3 p-4 rounded-xl border border-slate-200 bg-white",
-                  "transition-all hover:border-slate-300",
-                  "shadow-[0_2px_4px_rgba(0,0,0,0.02)]"
+                  "flex items-center space-x-3 p-3 rounded-xl border border-slate-200 bg-white",
+                  "transition-colors hover:border-slate-300",
+                  "shadow-[0_1px_2px_rgba(0,0,0,0.02)]"
                 )}
               >
                 <Checkbox
                   id={`amenity-${amenity}`}
                   checked={watch('amenities')?.includes(amenity)}
                   onCheckedChange={(checked) => {
-                    const currentAmenities = watch('amenities') || [];
+                    const current = watch('amenities') || [];
                     if (checked) {
-                      setValue('amenities', [...currentAmenities, amenity]);
+                      setValue('amenities', [...current, amenity]);
                     } else {
-                      setValue('amenities', currentAmenities.filter(a => a !== amenity));
+                      setValue('amenities', current.filter(a => a !== amenity));
                     }
                   }}
                 />
                 <label
                   htmlFor={`amenity-${amenity}`}
-                  className="text-base font-medium text-slate-700 cursor-pointer"
+                  className="text-base text-slate-700 cursor-pointer"
                 >
                   {amenity}
                 </label>
               </div>
             ))}
           </div>
+          {errors.amenities && (
+            <p className="text-sm text-red-600 mt-0.5">{errors.amenities.message}</p>
+          )}
         </div>
       </div>
     </FormSection>

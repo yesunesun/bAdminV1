@@ -1,191 +1,271 @@
+// src/components/property/PropertySummary.tsx
+// Version: 1.2.0
+// Last Modified: 2025-01-30T18:45:00+05:30 (IST)
+// Author: Bhoomitalli Team
+
 import React from 'react';
 import { FormSection } from '@/components/FormSection';
 import { FormData } from './types';
-import { IndianRupee } from 'lucide-react';
+import { 
+  IndianRupee, 
+  Home, 
+  MapPin, 
+  Key, 
+  Check,  
+  CalendarDays,
+  Users,
+  Palette,
+  Car
+} from 'lucide-react';
 
 interface PropertySummaryProps {
   formData: FormData;
   onSaveForLater: () => void;
   onPublish: () => void;
   onPrevious: () => void;
+  saving?: boolean;
 }
 
-export function PropertySummary({ formData, onSaveForLater, onPublish, onPrevious }: PropertySummaryProps) {
+const InfoItem = ({ label, value, icon: Icon }: { 
+  label: string; 
+  value: React.ReactNode;
+  icon?: React.ComponentType<any>;
+}) => (
+  <div className="space-y-1">
+    <div className="flex items-center gap-1.5 text-sm text-slate-500">
+      {Icon && <Icon className="h-4 w-4" />}
+      {label}
+    </div>
+    <div className="font-medium text-slate-900">{value || '-'}</div>
+  </div>
+);
+
+export function PropertySummary({ 
+  formData, 
+  onSaveForLater, 
+  onPublish, 
+  onPrevious,
+  saving = false 
+}: PropertySummaryProps) {
+  // Format date to Indian format (DD/MM/YYYY)
+  const formatDate = (dateStr: string | undefined) => {
+    if (!dateStr) return '-';
+    try {
+      const date = new Date(dateStr);
+      return date.toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
+    } catch {
+      return '-';
+    }
+  };
+
+  // Format currency in Indian format
+  const formatCurrency = (amount: string | undefined) => {
+    if (!amount) return '-';
+    const numAmount = parseFloat(amount);
+    if (isNaN(numAmount)) return '-';
+    return numAmount.toLocaleString('en-IN');
+  };
+
+  // Check if a value exists and is valid
+  const hasValue = (value: any) => {
+    return value !== undefined && value !== null && value !== '';
+  };
+
   return (
     <FormSection
-      title="Property Summary"
-      description="Review your property details before saving or publishing."
+      title="Review Property Details"
+      description="Verify all details before publishing"
     >
-      <div className="space-y-8">
-        <div className="border-b pb-6">
-          <h4 className="font-medium text-lg mb-4">Property Details</h4>
-          <dl className="grid grid-cols-2 gap-4">
-            <div>
-              <dt className="text-sm text-gray-500">Property Type</dt>
-              <dd className="mt-1 font-medium">{formData.propertyType}</dd>
-            </div>
-            <div>
-              <dt className="text-sm text-gray-500">BHK Type</dt>
-              <dd className="mt-1 font-medium">{formData.bhkType}</dd>
-            </div>
-            <div>
-              <dt className="text-sm text-gray-500">Floor</dt>
-              <dd className="mt-1 font-medium">{formData.floor}</dd>
-            </div>
-            <div>
-              <dt className="text-sm text-gray-500">Total Floors</dt>
-              <dd className="mt-1 font-medium">{formData.totalFloors}</dd>
-            </div>
-            <div>
-              <dt className="text-sm text-gray-500">Property Age</dt>
-              <dd className="mt-1 font-medium">{formData.propertyAge}</dd>
-            </div>
-            <div>
-              <dt className="text-sm text-gray-500">Facing</dt>
-              <dd className="mt-1 font-medium">{formData.facing}</dd>
-            </div>
-            <div>
-              <dt className="text-sm text-gray-500">Built Up Area</dt>
-              <dd className="mt-1 font-medium">{formData.builtUpArea} sq ft</dd>
-            </div>
-          </dl>
+      <div className="space-y-6">
+        {/* Quick Overview */}
+        <div className="bg-slate-50 p-4 rounded-xl space-y-4">
+          <h3 className="font-medium flex items-center gap-2 text-slate-700">
+            <Home className="h-4 w-4" />
+            Property Overview
+          </h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <InfoItem 
+              label="Property Type" 
+              value={hasValue(formData.propertyType) && hasValue(formData.bhkType) 
+                ? `${formData.bhkType} ${formData.propertyType}`
+                : '-'}
+            />
+            <InfoItem 
+              label="Built-up Area" 
+              value={hasValue(formData.builtUpArea) 
+                ? `${formData.builtUpArea} sq ft`
+                : '-'}
+            />
+            <InfoItem 
+              label="Floor" 
+              value={hasValue(formData.floor) && hasValue(formData.totalFloors)
+                ? `${formData.floor} of ${formData.totalFloors}`
+                : '-'}
+            />
+            <InfoItem 
+              label="Age" 
+              value={formData.propertyAge || '-'}
+            />
+          </div>
         </div>
 
-        <div className="border-b pb-6">
-          <h4 className="font-medium text-lg mb-4">Location Details</h4>
-          <dl className="space-y-4">
-            <div>
-              <dt className="text-sm text-gray-500">Zone</dt>
-              <dd className="mt-1 font-medium">{formData.zone}</dd>
+        {/* Location Details */}
+        <div className="bg-slate-50 p-4 rounded-xl space-y-4">
+          <h3 className="font-medium flex items-center gap-2 text-slate-700">
+            <MapPin className="h-4 w-4" />
+            Location
+          </h3>
+          <div className="grid grid-cols-2 gap-4">
+            <InfoItem 
+              label="Zone" 
+              value={formData.zone || '-'}
+            />
+            <InfoItem 
+              label="Locality" 
+              value={formData.locality || '-'}
+            />
+            <div className="col-span-2">
+              <InfoItem 
+                label="Complete Address" 
+                value={formData.address || '-'}
+              />
             </div>
-            <div>
-              <dt className="text-sm text-gray-500">Locality</dt>
-              <dd className="mt-1 font-medium">{formData.locality}</dd>
-            </div>
-            <div>
-              <dt className="text-sm text-gray-500">Landmark</dt>
-              <dd className="mt-1 font-medium">{formData.landmark}</dd>
-            </div>
-            <div>
-              <dt className="text-sm text-gray-500">Complete Address</dt>
-              <dd className="mt-1 font-medium">{formData.address}</dd>
-            </div>
-            <div>
-              <dt className="text-sm text-gray-500">PIN Code</dt>
-              <dd className="mt-1 font-medium">{formData.pinCode}</dd>
-            </div>
-          </dl>
+          </div>
         </div>
 
-        <div className="border-b pb-6">
-          <h4 className="font-medium text-lg mb-4">Rental Details</h4>
-          <dl className="grid grid-cols-2 gap-4">
-            <div>
-              <dt className="text-sm text-gray-500">Rental Type</dt>
-              <dd className="mt-1 font-medium capitalize">{formData.rentalType}</dd>
-            </div>
-            <div>
-              <dt className="text-sm text-gray-500">Monthly Rent</dt>
-              <dd className="mt-1 font-medium flex items-center">
-                <IndianRupee className="h-4 w-4 mr-1" />
-                {parseInt(formData.rentAmount).toLocaleString('en-IN')}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-sm text-gray-500">Security Deposit</dt>
-              <dd className="mt-1 font-medium flex items-center">
-                <IndianRupee className="h-4 w-4 mr-1" />
-                {parseInt(formData.securityDeposit).toLocaleString('en-IN')}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-sm text-gray-500">Maintenance</dt>
-              <dd className="mt-1 font-medium">{formData.maintenance}</dd>
-            </div>
-            <div>
-              <dt className="text-sm text-gray-500">Available From</dt>
-              <dd className="mt-1 font-medium">
-                {new Date(formData.availableFrom).toLocaleDateString('en-IN')}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-sm text-gray-500">Furnishing</dt>
-              <dd className="mt-1 font-medium">{formData.furnishing}</dd>
-            </div>
-            <div>
-              <dt className="text-sm text-gray-500">Parking</dt>
-              <dd className="mt-1 font-medium">{formData.parking}</dd>
-            </div>
-            <div>
-              <dt className="text-sm text-gray-500">Rent Negotiable</dt>
-              <dd className="mt-1 font-medium">{formData.rentNegotiable ? 'Yes' : 'No'}</dd>
-            </div>
-          </dl>
+        {/* Rental Terms */}
+        <div className="bg-slate-50 p-4 rounded-xl space-y-4">
+          <h3 className="font-medium flex items-center gap-2 text-slate-700">
+            <Key className="h-4 w-4" />
+            Rental Terms
+          </h3>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <InfoItem 
+              label="Monthly Rent" 
+              value={hasValue(formData.rentAmount) ? (
+                <div className="flex items-center gap-1">
+                  <IndianRupee className="h-4 w-4" />
+                  {formatCurrency(formData.rentAmount)}
+                  {formData.rentNegotiable && 
+                    <span className="text-sm text-slate-500">(Negotiable)</span>
+                  }
+                </div>
+              ) : '-'}
+            />
+            <InfoItem 
+              label="Security Deposit" 
+              value={hasValue(formData.securityDeposit) ? (
+                <div className="flex items-center gap-1">
+                  <IndianRupee className="h-4 w-4" />
+                  {formatCurrency(formData.securityDeposit)}
+                </div>
+              ) : '-'}
+            />
+            <InfoItem 
+              label="Maintenance" 
+              value={formData.maintenance || '-'}
+            />
+            <InfoItem 
+              icon={CalendarDays}
+              label="Available From" 
+              value={formatDate(formData.availableFrom)}
+            />
+            <InfoItem 
+              icon={Palette}
+              label="Furnishing" 
+              value={formData.furnishing || '-'}
+            />
+            <InfoItem 
+              icon={Car}
+              label="Parking" 
+              value={formData.parking || '-'}
+            />
+          </div>
         </div>
 
-        <div className="border-b pb-6">
-          <h4 className="font-medium text-lg mb-4">Preferred Tenants</h4>
+        {/* Amenities */}
+        <div className="bg-slate-50 p-4 rounded-xl space-y-4">
+          <h3 className="font-medium flex items-center gap-2 text-slate-700">
+            <Check className="h-4 w-4" />
+            Features & Amenities
+          </h3>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            {(formData.amenities || []).length > 0 ? (
+              formData.amenities.map((amenity) => (
+                <div 
+                  key={amenity}
+                  className="px-3 py-2 bg-white rounded-lg border border-slate-200 text-sm"
+                >
+                  {amenity}
+                </div>
+              ))
+            ) : (
+              <div className="col-span-full text-sm text-slate-500">
+                No amenities selected
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Tenant Preferences */}
+        <div className="bg-slate-50 p-4 rounded-xl space-y-4">
+          <h3 className="font-medium flex items-center gap-2 text-slate-700">
+            <Users className="h-4 w-4" />
+            Tenant Preferences
+          </h3>
           <div className="flex flex-wrap gap-2">
-            {formData.preferredTenants.map((tenant) => (
-              <span
-                key={tenant}
-                className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-indigo-100 text-indigo-800"
-              >
-                {tenant}
-              </span>
-            ))}
+            {(formData.preferredTenants || []).length > 0 ? (
+              formData.preferredTenants.map((tenant) => (
+                <span
+                  key={tenant}
+                  className="px-3 py-1.5 bg-white rounded-lg border border-slate-200 text-sm"
+                >
+                  {tenant}
+                </span>
+              ))
+            ) : (
+              <div className="text-sm text-slate-500">
+                No preferences selected
+              </div>
+            )}
           </div>
         </div>
 
-        <div className="border-b pb-6">
-          <h4 className="font-medium text-lg mb-4">Amenities</h4>
-          <div className="flex flex-wrap gap-2">
-            {formData.amenities.map((amenity) => (
-              <span
-                key={amenity}
-                className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800"
-              >
-                {amenity}
-              </span>
-            ))}
-          </div>
-        </div>
-
-        {formData.description && (
-          <div>
-            <h4 className="font-medium text-lg mb-4">Description</h4>
-            <p className="text-gray-700 whitespace-pre-line">{formData.description}</p>
-          </div>
-        )}
-
+        {/* Action Buttons */}
         <div className="flex justify-between pt-6 border-t">
           <button
             type="button"
             onClick={onPrevious}
-            className="px-6 py-3 text-sm font-medium text-slate-600 bg-slate-100 
-              rounded-xl hover:bg-slate-200 transition-colors focus:outline-none 
-              focus:ring-4 focus:ring-slate-100"
+            className="px-4 py-2.5 text-sm font-medium text-slate-600 bg-slate-100 
+              rounded-lg hover:bg-slate-200 transition-colors focus:outline-none 
+              focus:ring-2 focus:ring-slate-200"
           >
             Previous
           </button>
-          <div className="flex space-x-3">
+          <div className="flex gap-3">
             <button
               type="button"
               onClick={onSaveForLater}
-              className="px-6 py-3 text-sm font-medium text-slate-600 bg-slate-100 
-                rounded-xl hover:bg-slate-200 transition-colors focus:outline-none 
-                focus:ring-4 focus:ring-slate-100"
+              disabled={saving}
+              className="px-4 py-2.5 text-sm font-medium text-slate-600 bg-slate-100 
+                rounded-lg hover:bg-slate-200 transition-colors focus:outline-none 
+                focus:ring-2 focus:ring-slate-200 disabled:opacity-50"
             >
               Save as Draft
             </button>
             <button
               type="button"
               onClick={onPublish}
-              className="px-6 py-3 text-sm font-medium text-white bg-indigo-600 
-                rounded-xl hover:bg-indigo-700 transition-colors focus:outline-none 
-                focus:ring-4 focus:ring-indigo-100"
+              disabled={saving}
+              className="px-6 py-2.5 text-sm font-medium text-white bg-indigo-600 
+                rounded-lg hover:bg-indigo-700 transition-colors focus:outline-none 
+                focus:ring-2 focus:ring-indigo-200 disabled:opacity-50"
             >
-              Save & Publish
+              {saving ? 'Saving...' : 'Save & Publish'}
             </button>
           </div>
         </div>

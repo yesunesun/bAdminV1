@@ -1,12 +1,17 @@
+// src/components/property/RentalDetails.tsx
+// Version: 1.1.0
+// Last Modified: 2025-01-30T16:45:00+05:30 (IST)
+// Author: Bhoomitalli Team
+
 import React from 'react';
 import { FormSection } from '@/components/FormSection';
-import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { IndianRupee } from 'lucide-react';
 import { FormSectionProps } from './types';
 import { cn } from '@/lib/utils';
+import { RequiredLabel } from '@/components/ui/RequiredLabel';
 import {
   RENTAL_TYPES,
   MAINTENANCE_OPTIONS,
@@ -17,160 +22,214 @@ import {
 
 export function RentalDetails({ form }: FormSectionProps) {
   const { register, watch, setValue, formState: { errors } } = form;
-  const maintenance = watch('maintenance');
-  const furnishing = watch('furnishing');
-  const parking = watch('parking');
+
+  const handleCurrencyInput = (e: React.ChangeEvent<HTMLInputElement>, fieldName: string) => {
+    const value = e.target.value.replace(/[^0-9]/g, '');
+    if (value === '') {
+      setValue(fieldName, '');
+      return;
+    }
+    const numValue = parseInt(value);
+    if (!isNaN(numValue)) {
+      setValue(fieldName, numValue.toString());
+    }
+  };
+
+  // Get tomorrow's date in YYYY-MM-DD format
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const minDate = tomorrow.toISOString().split('T')[0];
 
   return (
     <FormSection
       title="Rental Details"
-      description="Specify your rental terms and conditions."
+      description="Specify your rental terms and conditions"
     >
-      <div className="space-y-6">
-        <div>
-          <Label>Property Available For</Label>
-          <div className="grid grid-cols-2 gap-4 mt-2">
-            {RENTAL_TYPES.map((type) => (
-              <div
-                key={type.id}
-                className={cn(
-                  "flex items-center space-x-3 p-4 rounded-xl border border-slate-200 bg-white",
-                  "transition-all hover:border-slate-300",
-                  "shadow-[0_2px_4px_rgba(0,0,0,0.02)]"
-                )}
-              >
-                <Checkbox
-                  id={type.id}
-                  checked={watch('rentalType') === type.id}
-                  onCheckedChange={(checked) => {
-                    if (checked) {
-                      setValue('rentalType', type.id as 'rent' | 'lease');
-                    }
-                  }}
-                />
-                <label
-                  htmlFor={type.id}
-                  className="text-base font-medium text-slate-700 cursor-pointer"
-                >
-                  {type.label}
-                </label>
-              </div>
-            ))}
-          </div>
+      <div className="space-y-4">
+        {/* Rental Type Selection */}
+        <div className="grid grid-cols-2 gap-4">
+          {RENTAL_TYPES.map((type) => (
+            <div
+              key={type.id}
+              className={cn(
+                "flex items-center space-x-3 p-3 rounded-xl border border-slate-200 bg-white",
+                "transition-all hover:border-slate-300",
+                "shadow-[0_2px_4px_rgba(0,0,0,0.02)]"
+              )}
+            >
+              <Checkbox
+                id={type.id}
+                checked={watch('rentalType') === type.id}
+                onCheckedChange={(checked) => {
+                  if (checked) setValue('rentalType', type.id);
+                }}
+              />
+              <label htmlFor={type.id} className="text-base font-medium text-slate-700 cursor-pointer">
+                {type.label}
+              </label>
+            </div>
+          ))}
         </div>
 
-        <div className="grid grid-cols-2 gap-6">
+        {/* Rent and Deposit - Two Column */}
+        <div className="grid grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="rentAmount">Expected Rent</Label>
-            <div className="relative flex items-center">
+            <RequiredLabel required>Monthly Rent</RequiredLabel>
+            <div className="relative">
+              <span className="absolute left-3 inset-y-0 flex items-center text-slate-500">
+                <IndianRupee className="h-4 w-4" />
+              </span>
               <Input
-                id="rentAmount"
-                type="number"
-                className="pr-32"
+                type="text"
+                className="h-11 pl-9 pr-20 text-base"
                 {...register('rentAmount')}
-                placeholder="Amount"
+                placeholder="Enter amount"
+                onChange={(e) => handleCurrencyInput(e, 'rentAmount')}
               />
-              <span className="absolute right-5 text-sm font-medium text-slate-500">
+              <span className="absolute right-3 inset-y-0 flex items-center text-sm text-slate-500">
                 per month
               </span>
             </div>
             {errors.rentAmount && (
-              <p className="text-sm text-red-600 mt-1">{errors.rentAmount.message}</p>
+              <p className="text-sm text-red-600 mt-0.5">{errors.rentAmount.message}</p>
             )}
           </div>
 
           <div>
-            <Label htmlFor="securityDeposit">Expected Deposit</Label>
+            <RequiredLabel required>Security Deposit</RequiredLabel>
             <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
-                <IndianRupee className="h-5 w-5 text-slate-400" />
-              </div>
+              <span className="absolute left-3 inset-y-0 flex items-center text-slate-500">
+                <IndianRupee className="h-4 w-4" />
+              </span>
               <Input
-                id="securityDeposit"
-                type="number"
-                className="pl-12"
+                type="text"
+                className="h-11 pl-9 text-base"
                 {...register('securityDeposit')}
-                placeholder="Security deposit amount"
+                placeholder="Enter deposit amount"
+                onChange={(e) => handleCurrencyInput(e, 'securityDeposit')}
               />
             </div>
             {errors.securityDeposit && (
-              <p className="text-sm text-red-600 mt-1">{errors.securityDeposit.message}</p>
+              <p className="text-sm text-red-600 mt-0.5">{errors.securityDeposit.message}</p>
             )}
           </div>
         </div>
 
-        <div className="flex items-center space-x-2">
-          <Checkbox
-            id="rentNegotiable"
-            checked={watch('rentNegotiable')}
-            onCheckedChange={(checked) => {
-              setValue('rentNegotiable', checked as boolean);
-            }}
-          />
-          <label
-            htmlFor="rentNegotiable"
-            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-          >
-            Rent Negotiable
-          </label>
+        {/* Rent Negotiable and Maintenance - Two Column */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="rentNegotiable"
+              checked={watch('rentNegotiable')}
+              onCheckedChange={(checked) => setValue('rentNegotiable', checked as boolean)}
+            />
+            <label htmlFor="rentNegotiable" className="text-base text-slate-700 cursor-pointer">
+              Rent Negotiable
+            </label>
+          </div>
+
+          <div>
+            <RequiredLabel required>Maintenance</RequiredLabel>
+            <Select 
+              value={watch('maintenance')} 
+              onValueChange={value => setValue('maintenance', value)}
+            >
+              <SelectTrigger className="h-11 text-base">
+                <SelectValue placeholder="Maintenance terms?" />
+              </SelectTrigger>
+              <SelectContent>
+                {MAINTENANCE_OPTIONS.map(option => (
+                  <SelectItem key={option} value={option} className="text-base">
+                    {option}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
+        {/* Available From and Furnishing - Two Column */}
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <RequiredLabel required>Available From</RequiredLabel>
+            <Input
+              type="date"
+              className="h-11 text-base"
+              min={minDate}
+              {...register('availableFrom')}
+            />
+            {errors.availableFrom && (
+              <p className="text-sm text-red-600 mt-0.5">{errors.availableFrom.message}</p>
+            )}
+          </div>
+
+          <div>
+            <RequiredLabel required>Furnishing</RequiredLabel>
+            <Select 
+              value={watch('furnishing')} 
+              onValueChange={value => setValue('furnishing', value)}
+            >
+              <SelectTrigger className="h-11 text-base">
+                <SelectValue placeholder="Furnishing status?" />
+              </SelectTrigger>
+              <SelectContent>
+                {FURNISHING_OPTIONS.map(option => (
+                  <SelectItem key={option} value={option} className="text-base">
+                    {option}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* Parking */}
         <div>
-          <Label htmlFor="maintenance">Monthly Maintenance</Label>
-          <Select value={maintenance} onValueChange={value => setValue('maintenance', value)}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select maintenance option" />
+          <RequiredLabel required>Parking</RequiredLabel>
+          <Select 
+            value={watch('parking')} 
+            onValueChange={value => setValue('parking', value)}
+          >
+            <SelectTrigger className="h-11 text-base">
+              <SelectValue placeholder="Available parking?" />
             </SelectTrigger>
             <SelectContent>
-              {MAINTENANCE_OPTIONS.map(option => (
-                <SelectItem key={option} value={option}>{option}</SelectItem>
+              {PARKING_OPTIONS.map(option => (
+                <SelectItem key={option} value={option} className="text-base">
+                  {option}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
-          {errors.maintenance && (
-            <p className="text-sm text-red-600 mt-1">{errors.maintenance.message}</p>
-          )}
         </div>
 
+        {/* Preferred Tenants */}
         <div>
-          <Label htmlFor="availableFrom">Available From</Label>
-          <Input
-            id="availableFrom"
-            type="date"
-            {...register('availableFrom')}
-          />
-          {errors.availableFrom && (
-            <p className="text-sm text-red-600 mt-1">{errors.availableFrom.message}</p>
-          )}
-        </div>
-
-        <div>
-          <Label>Preferred Tenants</Label>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-2">
+          <RequiredLabel required>Preferred Tenants</RequiredLabel>
+          <div className="grid grid-cols-3 gap-3">
             {TENANT_PREFERENCES.map((tenant) => (
               <div
                 key={tenant}
                 className={cn(
-                  "flex items-center space-x-3 p-4 rounded-xl border border-slate-200 bg-white",
-                  "transition-all hover:border-slate-300",
-                  "shadow-[0_2px_4px_rgba(0,0,0,0.02)]"
+                  "flex items-center space-x-3 p-3 rounded-xl border border-slate-200 bg-white",
+                  "transition-all hover:border-slate-300"
                 )}
               >
                 <Checkbox
                   id={`tenant-${tenant}`}
                   checked={watch('preferredTenants')?.includes(tenant)}
                   onCheckedChange={(checked) => {
-                    const currentTenants = watch('preferredTenants') || [];
+                    const current = watch('preferredTenants') || [];
                     if (checked) {
-                      setValue('preferredTenants', [...currentTenants, tenant]);
+                      setValue('preferredTenants', [...current, tenant]);
                     } else {
-                      setValue('preferredTenants', currentTenants.filter(t => t !== tenant));
+                      setValue('preferredTenants', current.filter(t => t !== tenant));
                     }
                   }}
                 />
                 <label
                   htmlFor={`tenant-${tenant}`}
-                  className="text-base font-medium text-slate-700 cursor-pointer"
+                  className="text-base text-slate-700 cursor-pointer"
                 >
                   {tenant}
                 </label>
@@ -179,51 +238,17 @@ export function RentalDetails({ form }: FormSectionProps) {
           </div>
         </div>
 
+        {/* Description */}
         <div>
-          <Label htmlFor="furnishing">Furnishing</Label>
-          <Select value={furnishing} onValueChange={value => setValue('furnishing', value)}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select furnishing status" />
-            </SelectTrigger>
-            <SelectContent>
-              {FURNISHING_OPTIONS.map(option => (
-                <SelectItem key={option} value={option}>{option}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {errors.furnishing && (
-            <p className="text-sm text-red-600 mt-1">{errors.furnishing.message}</p>
-          )}
-        </div>
-
-        <div>
-          <Label htmlFor="parking">Parking</Label>
-          <Select value={parking} onValueChange={value => setValue('parking', value)}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select parking option" />
-            </SelectTrigger>
-            <SelectContent>
-              {PARKING_OPTIONS.map(option => (
-                <SelectItem key={option} value={option}>{option}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {errors.parking && (
-            <p className="text-sm text-red-600 mt-1">{errors.parking.message}</p>
-          )}
-        </div>
-
-        <div>
-          <Label htmlFor="description">Description</Label>
+          <RequiredLabel>Description</RequiredLabel>
           <textarea
-            id="description"
             {...register('description')}
-            rows={4}
-            className="w-full rounded-xl border border-slate-200 bg-white px-5 py-4 text-base transition-all
+            rows={3}
+            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base
               shadow-[0_2px_4px_rgba(0,0,0,0.02)] placeholder:text-slate-400
               focus:border-slate-300 focus:outline-none focus:ring-4 focus:ring-slate-100
-              hover:border-slate-300 hover:shadow-[0_3px_6px_rgba(0,0,0,0.04)]"
-            placeholder="Add more details about your property"
+              hover:border-slate-300"
+            placeholder="Additional details about your property (optional)"
           />
         </div>
       </div>

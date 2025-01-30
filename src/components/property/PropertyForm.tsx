@@ -1,3 +1,7 @@
+// PropertyForm.tsx
+// Version: 1.3.0
+// Last Modified: 30-01-2025 16:00 IST
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -255,7 +259,7 @@ export function PropertyForm({ initialData, propertyId: existingPropertyId, mode
 
   if (!user) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="text-center py-12">
           <div className="bg-white p-8 rounded-lg shadow max-w-md mx-auto">
             <h2 className="text-2xl font-bold text-red-600 mb-4">Access Denied</h2>
@@ -273,44 +277,63 @@ export function PropertyForm({ initialData, propertyId: existingPropertyId, mode
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="bg-white rounded-xl shadow-lg">
-        <div className="p-4 border-b border-slate-200">
+        <div className="p-3 border-b border-slate-200">
           <div className="flex justify-between items-center">
             <FormProgress currentStep={currentStep} totalSteps={STEPS.length} />
             {process.env.NODE_ENV === 'development' && (
               <button
                 type="button"
                 onClick={handleAutoFill}
-                className="flex items-center px-4 py-2 text-sm font-medium text-white bg-emerald-600 
+                className="flex items-center px-3 py-1.5 text-sm font-medium text-white bg-emerald-600 
                   rounded-lg hover:bg-emerald-700 transition-colors focus:outline-none 
                   focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500"
               >
-                <Wand2 className="h-4 w-4 mr-2" />
-                Auto Fill (Test)
+                <Wand2 className="h-3.5 w-3.5 mr-1.5" />
+                Auto Fill
               </button>
             )}
           </div>
         </div>
 
-        <div className="grid grid-cols-5 border-b border-slate-200">
+        <div className="flex border-b border-slate-200">
           {STEPS.map((step, index) => {
             const Icon = step.icon;
             return (
               <button
                 key={step.id}
-                onClick={() => index < 4 && setCurrentStep(index + 1)}
-                disabled={index === 4}
+                onClick={() => setCurrentStep(index + 1)}
                 className={cn(
-                  "flex flex-col items-center p-4 text-sm transition-colors relative",
-                  "hover:bg-slate-50",
-                  currentStep === index + 1 && "text-indigo-600",
-                  currentStep !== index + 1 && "text-slate-500",
-                  index === 4 && "opacity-50 cursor-not-allowed"
+                  // Base styles - Reduced width
+                  "flex flex-1 flex-col items-center justify-center py-2 px-1.5",
+                  "min-w-[80px] max-w-[100px]", // Control minimum and maximum width
+                  "relative group transition-all duration-200",
+                  // Text and icon styles
+                  "text-sm select-none",
+                  // Hover effects
+                  "hover:bg-indigo-50/60",
+                  // Active/Current step styles
+                  currentStep === index + 1 
+                    ? "text-indigo-600 bg-indigo-50/40" 
+                    : "text-slate-500 hover:text-indigo-600",
+                  // Border and divider styles
+                  "border-r border-slate-200 last:border-r-0",
                 )}
               >
-                <Icon className="h-5 w-5 mb-1" />
-                <span className="text-xs font-medium">{step.title}</span>
+                <Icon className={cn(
+                  "h-4 w-4 transition-transform duration-200",
+                  "group-hover:scale-110",
+                  currentStep === index + 1 ? "text-indigo-600" : "text-slate-400 group-hover:text-indigo-600"
+                )} />
+                <span className={cn(
+                  "text-[11px] font-medium tracking-tight mt-0.5",
+                  "transition-colors duration-200",
+                  "truncate px-1 w-full text-center",
+                  currentStep === index + 1 ? "text-indigo-600" : "text-slate-600 group-hover:text-indigo-600"
+                )}>
+                  {step.title}
+                </span>
                 {currentStep === index + 1 && (
                   <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600" />
                 )}
@@ -319,9 +342,9 @@ export function PropertyForm({ initialData, propertyId: existingPropertyId, mode
           })}
         </div>
 
-        <div className="p-8">
+        <div className="p-6">
           {error && (
-            <div className="mb-6 bg-red-50 border border-red-200 p-4 rounded-xl">
+            <div className="mb-4 bg-red-50 border border-red-200 p-3 rounded-xl">
               <p className="text-sm text-red-700">{error}</p>
             </div>
           )}
@@ -341,7 +364,7 @@ export function PropertyForm({ initialData, propertyId: existingPropertyId, mode
               onPrevious={handlePreviousStep}
             />
           ) : (
-            <div className="space-y-8">
+            <div className="space-y-6">
               {currentStep === 1 && <PropertyDetails form={form} mode={mode} />}
               {currentStep === 2 && <LocationDetails form={form} />}
               {currentStep === 3 && <RentalDetails form={form} />}

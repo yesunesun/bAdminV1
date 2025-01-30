@@ -1,11 +1,18 @@
+// src/contexts/AuthContext.tsx
+// Version: 1.3.0
+// Last Modified: 30-01-2025 15:00 IST
+
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import type { User, AuthError } from '@supabase/supabase-js';
+
+type UserRole = 'property_owner' | 'property_seeker';
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
   signInWithEmail: (email: string) => Promise<{ error?: AuthError }>;
+  registerUser: (email: string, phone: string, role: UserRole) => Promise<{ error?: AuthError }>;
   verifyOtp: (email: string, token: string) => Promise<{ error?: AuthError }>;
   signOut: () => Promise<void>;
 }
@@ -41,6 +48,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
+        shouldCreateUser: false,
+      }
+    });
+    return { error };
+  };
+
+  const registerUser = async (email: string, phone: string, role: UserRole) => {
+    // First, send OTP to email
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        data: {
+          phone,
+          role,
+          registered_at: new Date().toISOString(),
+        },
         shouldCreateUser: true,
       }
     });
@@ -53,6 +76,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       token,
       type: 'email'
     });
+
+    // If verification is successful and we have user metadata, store it in the profiles table
+    if (!error) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.user_metadata) {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .upsert({
+            id: user.id,
+            email: user.email,
+            phone: user.user_metadata.phone,
+            role: user.user_metadata.role,
+            updated_at: new Date().toISOString(),
+          });
+
+        if (profileError) {
+          console.error('Error updating profile:', profileError);
+        }
+      }
+    }
+
     return { error };
   };
 
@@ -61,8 +105,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (error) throw error;
   };
 
+  const value = {
+    user,
+    loading,
+    signInWithEmail,
+    registerUser,
+    verifyOtp,
+    signOut,
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, signInWithEmail, verifyOtp, signOut }}>
+    <AuthContext.Provider value={value}>
       {!loading && children}
     </AuthContext.Provider>
   );
