@@ -1,30 +1,81 @@
-import { Building2, MapPin, Home, Settings, Upload, FileCheck } from 'lucide-react';
+// src/components/property/constants.ts
+// Version: 1.1.0
+// Last Modified: 2025-01-30T19:30:00+05:30 (IST)
+// Author: Bhoomitalli Team
+
+import { 
+  Home, 
+  MapPin, 
+  IndianRupee, 
+  Settings, 
+  ImagePlus, 
+  ClipboardCheck 
+} from 'lucide-react';
 
 export const STEPS = [
-  { id: 'details', title: 'Property Details', icon: Building2 },
-  { id: 'location', title: 'Location', icon: MapPin },
-  { id: 'rental', title: 'Rental Details', icon: Home },
-  { id: 'amenities', title: 'Amenities', icon: Settings },
-  { id: 'upload', title: 'Upload Images', icon: Upload },
-  { id: 'summary', title: 'Summary', icon: FileCheck },
-];
+  {
+    id: 'details',
+    title: 'Basic Details',
+    icon: Home,
+    description: 'Property type and details'
+  },
+  {
+    id: 'location',
+    title: 'Location',
+    icon: MapPin,
+    description: 'Property location'
+  },
+  {
+    id: 'rental',
+    title: 'Rental',
+    icon: IndianRupee,
+    description: 'Rental terms'
+  },
+  {
+    id: 'features',
+    title: 'Features',
+    icon: Settings,
+    description: 'Amenities and features'
+  },
+  {
+    id: 'photos',
+    title: 'Photos',
+    icon: ImagePlus,
+    description: 'Property photos'
+  },
+  {
+    id: 'review',
+    title: 'Review',
+    icon: ClipboardCheck,
+    description: 'Review and publish'
+  }
+] as const;
 
 export const PROPERTY_TYPES = [
   'Apartment',
   'Independent House',
   'Villa',
-  'Gated Community',
-];
+  'Penthouse',
+  'Studio Apartment',
+  'Service Apartment'
+] as const;
 
-export const BHK_TYPES = ['1 BHK', '2 BHK', '3 BHK', '4 BHK', '4+ BHK'];
+export const BHK_TYPES = [
+  '1 RK',
+  '1 BHK',
+  '2 BHK',
+  '3 BHK',
+  '4 BHK',
+  '4+ BHK'
+] as const;
 
 export const PROPERTY_AGE = [
   'Less than 1 year',
   '1-3 years',
   '3-5 years',
   '5-10 years',
-  'More than 10 years',
-];
+  '10+ years'
+] as const;
 
 export const FACING_OPTIONS = [
   'North',
@@ -34,47 +85,54 @@ export const FACING_OPTIONS = [
   'North East',
   'North West',
   'South East',
-  'South West',
-];
-
-export const HYDERABAD_LOCATIONS = {
-  'Central Zone': ['Begumpet', 'Banjara Hills', 'Jubilee Hills', 'Somajiguda'],
-  'West Zone': ['Gachibowli', 'Madhapur', 'HITEC City', 'Kondapur'],
-  'East Zone': ['Uppal', 'LB Nagar', 'Nacharam', 'Malakpet'],
-  'North Zone': ['Kompally', 'Alwal', 'Secunderabad', 'Sainikpuri'],
-  'South Zone': ['Mehdipatnam', 'Attapur', 'Rajendranagar', 'Shamshabad'],
-} as const;
+  'South West'
+] as const;
 
 export const RENTAL_TYPES = [
   { id: 'rent', label: 'Rent' },
-  { id: 'lease', label: 'Lease' },
-];
+  { id: 'lease', label: 'Lease' }
+] as const;
 
 export const MAINTENANCE_OPTIONS = [
   'Maintenance Included',
   'Maintenance Extra',
-];
+  'No Maintenance'
+] as const;
 
 export const TENANT_PREFERENCES = [
-  'Anyone',
   'Family',
-  'Bachelor Female',
   'Bachelor Male',
+  'Bachelor Female',
   'Company',
-];
+  'Any'
+] as const;
 
 export const FURNISHING_OPTIONS = [
-  'Fully-furnished',
-  'Semi-furnished',
-  'Unfurnished',
-];
+  'Fully Furnished',
+  'Semi Furnished',
+  'Unfurnished'
+] as const;
 
 export const PARKING_OPTIONS = [
-  'Bike',
-  'Car',
+  'Two Wheeler',
+  'Four Wheeler',
   'Both',
-  'None',
-];
+  'None'
+] as const;
+
+export const PROPERTY_SHOW_OPTIONS = [
+  'Owner',
+  'Caretaker',
+  'Security',
+  'Agent'
+] as const;
+
+export const PROPERTY_CONDITION_OPTIONS = [
+  'Excellent',
+  'Good',
+  'Average',
+  'Needs Repair'
+] as const;
 
 export const AMENITIES_LIST = [
   'Power Backup',
@@ -84,22 +142,18 @@ export const AMENITIES_LIST = [
   'Swimming Pool',
   'Club House',
   'Children Play Area',
-  'Gated Community',
-];
+  'Garden',
+  'Indoor Games',
+  'Visitor Parking',
+  'Water Storage',
+  'Rain Water Harvesting'
+] as const;
 
-export const PROPERTY_SHOW_OPTIONS = [
-  'Need help',
-  'I will show',
-  'Neighbours',
-  'Friends/Relatives',
-  'Security',
-  'Tenants',
-  'Others'
-];
-
-export const PROPERTY_CONDITION_OPTIONS = [
-  'Vacant',
-  'Tenant on Notice Period',
-  'New Property',
-  'Need Help to Manage'
-];
+// Sample zone and localities - replace with actual data
+export const HYDERABAD_LOCATIONS: Record<string, string[]> = {
+  'West Zone': ['HITEC City', 'Madhapur', 'Gachibowli', 'Kondapur'],
+  'Central Zone': ['Banjara Hills', 'Jubilee Hills', 'Ameerpet', 'Punjagutta'],
+  'East Zone': ['Uppal', 'LB Nagar', 'Dilsukhnagar', 'Nacharam'],
+  'North Zone': ['Kompally', 'Alwal', 'Secunderabad', 'Medchal'],
+  'South Zone': ['Mehdipatnam', 'Attapur', 'Rajendranagar', 'Shamshabad']
+};

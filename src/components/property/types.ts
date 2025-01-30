@@ -124,3 +124,16 @@ export type PropertyStats = {
   views: number;
   inquiries: number;
 };
+
+// src/components/property/types.ts
+// Version: 2.0.0
+// Last Modified: 2025-01-30T20:30:00+05:30 (IST)
+// Author: Bhoomitalli Team
+
+import { UseFormReturn } from 'react-hook-form';
+
+
+export interface FormSectionProps {
+  form: UseFormReturn<FormData>;
+  mode?: 'create' | 'edit';
+}

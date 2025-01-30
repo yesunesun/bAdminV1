@@ -1,12 +1,14 @@
-// PropertyForm.tsx
-// Version: 1.3.0
-// Last Modified: 30-01-2025 16:00 IST
+// src/components/property/PropertyForm.tsx
+// Version: 2.0.0
+// Last Modified: 2025-01-30T19:45:00+05:30 (IST)
+// Author: Bhoomitalli Team
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useForm } from 'react-hook-form';
 import { cn } from '@/lib/utils';
+import { FormProgress } from '@/components/FormProgress';
 import { PropertyDetails } from './PropertyDetails';
 import { LocationDetails } from './LocationDetails';
 import { RentalDetails } from './RentalDetails';
@@ -18,7 +20,7 @@ import { STEPS } from './constants';
 import { supabase } from '@/lib/supabase';
 import { Wand2 } from 'lucide-react';
 
-// Test data for auto-fill
+// Test data for auto-fill in development mode
 const TEST_DATA: FormData = {
   title: '',
   propertyType: 'Apartment',
@@ -100,27 +102,49 @@ export function PropertyForm({ initialData, propertyId: existingPropertyId, mode
     form.trigger();
   };
 
-  const handleNextStep = () => {
-    // Basic validation before moving to next step
-    if (currentStep === 1) {
-      if (!form.getValues('propertyType') || !form.getValues('bhkType')) {
-        setError('Please fill in all required fields');
-        return;
-      }
-    } else if (currentStep === 2) {
-      if (!form.getValues('locality')) {
-        setError('Please select a locality');
-        return;
-      }
-    } else if (currentStep === 3) {
-      if (!form.getValues('rentAmount')) {
-        setError('Please enter rent amount');
-        return;
-      }
+  const validateCurrentStep = (): boolean => {
+    const values = form.getValues();
+    let isValid = true;
+    let errorMessage = '';
+
+    switch (currentStep) {
+      case 1:
+        if (!values.propertyType || !values.bhkType) {
+          errorMessage = 'Please fill in basic property details';
+          isValid = false;
+        }
+        break;
+      case 2:
+        if (!values.zone || !values.locality || !values.address) {
+          errorMessage = 'Please fill in location details';
+          isValid = false;
+        }
+        break;
+      case 3:
+        if (!values.rentAmount || !values.securityDeposit || !values.availableFrom) {
+          errorMessage = 'Please fill in rental details';
+          isValid = false;
+        }
+        break;
+      case 4:
+        if (!values.furnishing || !values.parking) {
+          errorMessage = 'Please fill in amenities details';
+          isValid = false;
+        }
+        break;
     }
-    
-    setError('');
-    setCurrentStep(prev => Math.min(prev + 1, 6));
+
+    if (!isValid) {
+      setError(errorMessage);
+    }
+    return isValid;
+  };
+
+  const handleNextStep = () => {
+    if (validateCurrentStep()) {
+      setError('');
+      setCurrentStep(prev => Math.min(prev + 1, STEPS.length));
+    }
   };
 
   const handlePreviousStep = () => {
@@ -141,12 +165,12 @@ export function PropertyForm({ initialData, propertyId: existingPropertyId, mode
         owner_id: user!.id,
         title: formData.title || `${formData.bhkType} ${formData.propertyType} in ${formData.locality}`,
         description: formData.description || '',
-        price: parseFloat(formData.rentAmount),
-        bedrooms: parseInt(formData.bhkType.split(' ')[0]),
+        price: parseFloat(formData.rentAmount) || 0,
+        bedrooms: parseInt(formData.bhkType?.split(' ')[0]) || 0,
         bathrooms: formData.bathrooms ? parseInt(formData.bathrooms) : 0,
         square_feet: formData.builtUpArea ? parseFloat(formData.builtUpArea) : null,
         address: formData.address || '',
-        city: formData.locality,
+        city: formData.locality || '',
         state: 'Telangana',
         zip_code: formData.pinCode || '',
         status: 'draft',
@@ -187,12 +211,12 @@ export function PropertyForm({ initialData, propertyId: existingPropertyId, mode
         owner_id: user!.id,
         title: formData.title || `${formData.bhkType} ${formData.propertyType} in ${formData.locality}`,
         description: formData.description || '',
-        price: parseFloat(formData.rentAmount),
-        bedrooms: parseInt(formData.bhkType.split(' ')[0]),
+        price: parseFloat(formData.rentAmount) || 0,
+        bedrooms: parseInt(formData.bhkType?.split(' ')[0]) || 0,
         bathrooms: formData.bathrooms ? parseInt(formData.bathrooms) : 0,
         square_feet: formData.builtUpArea ? parseFloat(formData.builtUpArea) : null,
         address: formData.address || '',
-        city: formData.locality,
+        city: formData.locality || '',
         state: 'Telangana',
         zip_code: formData.pinCode || '',
         status: 'published',
@@ -232,20 +256,20 @@ export function PropertyForm({ initialData, propertyId: existingPropertyId, mode
             type="button"
             onClick={handlePreviousStep}
             className="px-6 py-3 text-sm font-medium text-slate-600 bg-slate-100 
-              rounded-xl hover:bg-slate-200 transition-colors focus:outline-none 
-              focus:ring-4 focus:ring-slate-100"
+              rounded-lg hover:bg-slate-200 transition-colors focus:outline-none 
+              focus:ring-2 focus:ring-slate-200"
           >
             Previous
           </button>
         )}
         {currentStep === 1 && <div />}
-        {currentStep < 6 && (
+        {currentStep < STEPS.length && (
           <button
             type="button"
             onClick={handleNextStep}
             className={cn(
-              "px-6 py-3 text-sm font-medium text-white bg-indigo-600 rounded-xl",
-              "hover:bg-indigo-700 transition-colors focus:outline-none focus:ring-4 focus:ring-indigo-100",
+              "px-6 py-3 text-sm font-medium text-white bg-indigo-600 rounded-lg",
+              "hover:bg-indigo-700 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-200",
               "disabled:opacity-50"
             )}
           >
@@ -260,12 +284,12 @@ export function PropertyForm({ initialData, propertyId: existingPropertyId, mode
     return (
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="text-center py-12">
-          <div className="bg-white p-8 rounded-lg shadow max-w-md mx-auto">
+          <div className="bg-white p-8 rounded-lg shadow-lg max-w-md mx-auto">
             <h2 className="text-2xl font-bold text-red-600 mb-4">Access Denied</h2>
             <p className="text-gray-600 mb-4">You must be logged in to create a property listing.</p>
             <button
               onClick={() => navigate('/login')}
-              className="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              className="w-full py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
             >
               Sign In
             </button>
@@ -278,9 +302,14 @@ export function PropertyForm({ initialData, propertyId: existingPropertyId, mode
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="bg-white rounded-xl shadow-lg">
-        <div className="p-3 border-b border-slate-200">
+        {/* Header with Progress */}
+        <div className="p-4 border-b border-slate-200">
           <div className="flex justify-between items-center">
-            {/* <FormProgress currentStep={currentStep} totalSteps={STEPS.length} /> */}
+            <FormProgress 
+              currentStep={currentStep} 
+              totalSteps={STEPS.length}
+              className="flex-1 mr-4" 
+            />
             {process.env.NODE_ENV === 'development' && (
               <button
                 type="button"
@@ -296,51 +325,7 @@ export function PropertyForm({ initialData, propertyId: existingPropertyId, mode
           </div>
         </div>
 
-        <div className="flex border-b border-slate-200">
-          {STEPS.map((step, index) => {
-            const Icon = step.icon;
-            return (
-              <button
-                key={step.id}
-                onClick={() => setCurrentStep(index + 1)}
-                className={cn(
-                  // Base styles - Reduced width
-                  "flex flex-1 flex-col items-center justify-center py-2 px-1.5",
-                  "min-w-[80px] max-w-[100px]", // Control minimum and maximum width
-                  "relative group transition-all duration-200",
-                  // Text and icon styles
-                  "text-sm select-none",
-                  // Hover effects
-                  "hover:bg-indigo-50/60",
-                  // Active/Current step styles
-                  currentStep === index + 1 
-                    ? "text-indigo-600 bg-indigo-50/40" 
-                    : "text-slate-500 hover:text-indigo-600",
-                  // Border and divider styles
-                  "border-r border-slate-200 last:border-r-0",
-                )}
-              >
-                <Icon className={cn(
-                  "h-4 w-4 transition-transform duration-200",
-                  "group-hover:scale-110",
-                  currentStep === index + 1 ? "text-indigo-600" : "text-slate-400 group-hover:text-indigo-600"
-                )} />
-                <span className={cn(
-                  "text-[11px] font-medium tracking-tight mt-0.5",
-                  "transition-colors duration-200",
-                  "truncate px-1 w-full text-center",
-                  currentStep === index + 1 ? "text-indigo-600" : "text-slate-600 group-hover:text-indigo-600"
-                )}>
-                  {step.title}
-                </span>
-                {currentStep === index + 1 && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600" />
-                )}
-              </button>
-            );
-          })}
-        </div>
-
+        {/* Main Content Area */}
         <div className="p-6">
           {error && (
             <div className="mb-4 bg-red-50 border border-red-200 p-3 rounded-xl">
@@ -348,7 +333,7 @@ export function PropertyForm({ initialData, propertyId: existingPropertyId, mode
             </div>
           )}
 
-          {currentStep === 6 ? (
+          {currentStep === STEPS.length ? (
             <PropertySummary
               formData={form.watch()}
               onSaveForLater={handleSaveForLater}
