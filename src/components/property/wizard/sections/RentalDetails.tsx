@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { IndianRupee } from 'lucide-react';
-import { FormSectionProps } from './types';
+import { FormSectionProps } from '../types';
 import { cn } from '@/lib/utils';
 import { RequiredLabel } from '@/components/ui/RequiredLabel';
 import {
@@ -18,7 +18,7 @@ import {
   TENANT_PREFERENCES,
   FURNISHING_OPTIONS,
   PARKING_OPTIONS,
-} from './constants';
+} from '../constants';
 
 export function RentalDetails({ form }: FormSectionProps) {
   const { register, watch, setValue, formState: { errors } } = form;

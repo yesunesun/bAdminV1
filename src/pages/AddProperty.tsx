@@ -1,4 +1,5 @@
-import { PropertyForm } from '@/components/property/PropertyForm';
+import { PropertyForm } from '@/components/property/wizard/PropertyForm';
+
 
 export default function AddProperty() {
   return <PropertyForm />;

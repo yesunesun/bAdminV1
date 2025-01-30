@@ -8,7 +8,7 @@ import { FormSection } from '@/components/FormSection';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { FormSectionProps } from './types';
+import { FormSectionProps } from '../types';
 import { cn } from '@/lib/utils';
 import { RequiredLabel } from '@/components/ui/RequiredLabel';
 import { Minus, Plus, Phone } from 'lucide-react';
@@ -16,7 +16,7 @@ import {
   AMENITIES_LIST, 
   PROPERTY_SHOW_OPTIONS, 
   PROPERTY_CONDITION_OPTIONS 
-} from './constants';
+} from '../constants';
 
 export function AmenitiesSection({ form }: FormSectionProps) {
   const { watch, setValue, register, formState: { errors } } = form;

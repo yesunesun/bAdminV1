@@ -7,14 +7,14 @@ import React from 'react';
 import { FormSection } from '@/components/FormSection';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FormSectionProps } from './types';
+import { FormSectionProps } from '../types';
 import { RequiredLabel } from '@/components/ui/RequiredLabel';
 import {
   PROPERTY_TYPES,
   BHK_TYPES,
   PROPERTY_AGE,
   FACING_OPTIONS,
-} from './constants';
+} from '../constants';
 
 export function PropertyDetails({ form, mode = 'create' }: FormSectionProps) {
   const { register, watch, setValue, formState: { errors }, trigger } = form;

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { PropertyForm } from '@/components/property/PropertyForm';
+import { PropertyForm } from '@/components/property/wizard/PropertyForm';
 
 export default function EditProperty() {
   const { id } = useParams<{ id: string }>();

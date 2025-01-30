@@ -61,7 +61,6 @@ export const PROPERTY_TYPES = [
 ] as const;
 
 export const BHK_TYPES = [
-  '1 RK',
   '1 BHK',
   '2 BHK',
   '3 BHK',

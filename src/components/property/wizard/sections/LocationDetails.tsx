@@ -7,10 +7,10 @@ import React, { useState, useEffect } from 'react';
 import { FormSection } from '@/components/FormSection';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FormSectionProps } from './types';
+import { FormSectionProps } from '../types';
 import { RequiredLabel } from '@/components/ui/RequiredLabel';
 import { MapPin } from 'lucide-react';
-import { HYDERABAD_LOCATIONS } from './constants';
+import { HYDERABAD_LOCATIONS } from '../constants';
 
 export function LocationDetails({ form }: FormSectionProps) {
   const { register, formState: { errors }, setValue, watch } = form;
