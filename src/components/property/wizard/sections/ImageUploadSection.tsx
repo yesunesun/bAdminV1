@@ -1,9 +1,9 @@
 // src/components/property/ImageUploadSection.tsx
-// Version: 1.2.0
-// Last Modified: 2025-01-30T18:15:00+05:30 (IST)
+// Version: 1.3.1
+// Last Modified: 2025-01-31T15:30:00+05:30 (IST)
 // Author: Bhoomitalli Team
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FormSection } from '@/components/FormSection';
 import { 
   ImagePlus, 
@@ -14,6 +14,7 @@ import {
   Star
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/lib/supabase';
 
 interface ImageUploadSectionProps {
   propertyId: string;
@@ -31,8 +32,15 @@ export function ImageUploadSection({
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [primaryImageIndex, setPrimaryImageIndex] = useState(0);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   const MAX_IMAGES = 10;
+  const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+
+  // Initialize component
+  useEffect(() => {
+    setError(null);
+  }, []);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -43,7 +51,7 @@ export function ImageUploadSection({
     }
 
     const validFiles = files.filter(file => {
-      const isValid = file.type.startsWith('image/') && file.size <= 5 * 1024 * 1024;
+      const isValid = file.type.startsWith('image/') && file.size <= MAX_FILE_SIZE;
       if (!isValid) {
         setError('Please select images under 5MB');
       }
@@ -75,7 +83,32 @@ export function ImageUploadSection({
     }
   };
 
-  const handleUpload = async () => {
+  const uploadSingleImage = async (file: File, index: number): Promise<string> => {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${propertyId}/${Date.now()}-${Math.random()}.${fileExt}`;
+
+    // Upload to Supabase Storage
+    const { error: uploadError, data: uploadData } = await supabase.storage
+      .from('property-images')
+      .upload(fileName, file, {
+        cacheControl: '3600',
+        upsert: false
+      });
+
+    if (uploadError) {
+      console.error('Storage upload error:', uploadError);
+      throw new Error(`Storage upload failed: ${uploadError.message}`);
+    }
+
+    // Get public URL
+    const { data: { publicUrl } } = supabase.storage
+      .from('property-images')
+      .getPublicUrl(fileName);
+
+    return publicUrl;
+  };
+
+  const uploadImages = async () => {
     if (images.length === 0) {
       setError('Please select at least one image');
       return;
@@ -83,16 +116,50 @@ export function ImageUploadSection({
 
     setUploading(true);
     setError(null);
+    setUploadProgress(0);
 
-    try {
-      // Upload logic here
-      await new Promise(resolve => setTimeout(resolve, 1500)); // Simulated upload
-      onUploadComplete();
-    } catch (error) {
-      setError('Failed to upload images. Please try again.');
-    } finally {
-      setUploading(false);
+    for (const [index, file] of images.entries()) {
+      // Upload to storage
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${propertyId}/${Date.now()}-${index}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('property-images')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (uploadError) {
+        console.error(`Storage upload error for image ${index + 1}:`, uploadError);
+        continue;
+      }
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('property-images')
+        .getPublicUrl(fileName);
+
+      // Save to database
+      const { error: dbError } = await supabase
+        .from('property_images')
+        .insert([{
+          property_id: propertyId,
+          url: publicUrl,
+          is_primary: index === primaryImageIndex,
+          display_order: index
+        }]);
+
+      if (dbError) {
+        console.error(`Database error for image ${index + 1}:`, dbError);
+        continue;
+      }
+
+      setUploadProgress(((index + 1) / images.length) * 100);
     }
+
+    setUploading(false);
+    onUploadComplete();
   };
 
   return (
@@ -122,7 +189,7 @@ export function ImageUploadSection({
             accept="image/*"
             onChange={handleFileSelect}
             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-            disabled={images.length >= MAX_IMAGES}
+            disabled={images.length >= MAX_IMAGES || uploading}
           />
         </div>
 
@@ -165,6 +232,7 @@ export function ImageUploadSection({
                     <button
                       onClick={() => removeImage(index)}
                       className="p-1.5 rounded-full bg-white/90 text-red-500 hover:bg-white transition-colors duration-200"
+                      disabled={uploading}
                     >
                       <X className="h-4 w-4" />
                     </button>
@@ -214,7 +282,7 @@ export function ImageUploadSection({
           </button>
           <button
             type="button"
-            onClick={handleUpload}
+            onClick={uploadImages}
             disabled={uploading || images.length === 0}
             className={cn(
               "flex items-center px-6 py-2.5 text-sm font-medium text-white",
@@ -227,7 +295,7 @@ export function ImageUploadSection({
             {uploading ? (
               <>
                 <Upload className="h-4 w-4 mr-2 animate-pulse" />
-                Uploading...
+                Uploading... {Math.round(uploadProgress)}%
               </>
             ) : (
               <>
