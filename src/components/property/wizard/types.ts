@@ -92,10 +92,12 @@ export interface ImageUploadSectionProps {
 
 export interface PropertySummaryProps {
   formData: FormData;
-  onSaveForLater: () => void;
-  onPublish: () => void;
+  onSave: () => Promise<void>;
+  onSaveAsDraft: () => Promise<void>;
+  onPublish: () => Promise<void>;
   onPrevious: () => void;
   saving: boolean;
+  status?: 'draft' | 'published';
 }
 
 export type StepValidationStatus = {
