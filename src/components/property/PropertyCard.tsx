@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Globe2, Lock, AlertCircle, CheckCircle2, ImageOff, Trash2, Pencil } from 'lucide-react';
+import { Globe2, Lock, AlertCircle, CheckCircle2, ImageOff, Trash2, Pencil, Eye } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface Property {
@@ -113,18 +113,27 @@ export function PropertyCard({
                 </span>
               </button>
             </div>
-            <button
-              onClick={() => onDelete(property.id)}
-              className="inline-flex items-center p-2 border border-transparent rounded-full shadow-sm text-white bg-red-600 hover:bg-red-700"
+            <Link
+              to={`/properties/${property.id}/preview`}
+              className="inline-flex items-center p-2 border border-transparent rounded-full shadow-sm text-white bg-blue-600 hover:bg-blue-700"
+              title="Preview property"
             >
-              <Trash2 className="h-4 w-4" />
-            </button>
+              <Eye className="h-4 w-4" />
+            </Link>
             <Link
               to={`/properties/${property.id}/edit`}
               className="inline-flex items-center p-2 border border-transparent rounded-full shadow-sm text-white bg-indigo-600 hover:bg-indigo-700"
+              title="Edit property"
             >
               <Pencil className="h-4 w-4" />
             </Link>
+            <button
+              onClick={() => onDelete(property.id)}
+              className="inline-flex items-center p-2 border border-transparent rounded-full shadow-sm text-white bg-red-600 hover:bg-red-700"
+              title="Delete property"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
           </div>
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-4">

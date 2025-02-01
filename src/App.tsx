@@ -1,6 +1,6 @@
 // App.tsx
-// Version: 1.1.0
-// Last Modified: 30-01-2025 14:30 IST
+// Version: 1.2.0
+// Last Modified: 01-02-2025 14:30 IST
 
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
@@ -13,6 +13,7 @@ import AddProperty from './pages/AddProperty';
 import Properties from './pages/Properties';
 import PropertyDetails from './pages/PropertyDetails';
 import EditProperty from './pages/EditProperty';
+import PropertyPreview from './pages/PropertyPreview';
 import AuthCallback from './pages/AuthCallback';
 
 // Protected Route wrapper component
@@ -92,10 +93,10 @@ function App() {
                 }
               />
               <Route
-                path="/properties/:id"
+                path="/properties/:id/preview"
                 element={
                   <ProtectedRoute>
-                    <PropertyDetails />
+                    <PropertyPreview />
                   </ProtectedRoute>
                 }
               />
@@ -104,6 +105,14 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <EditProperty />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/properties/:id"
+                element={
+                  <ProtectedRoute>
+                    <PropertyDetails />
                   </ProtectedRoute>
                 }
               />
