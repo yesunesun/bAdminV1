@@ -1,11 +1,11 @@
 // src/components/property/wizard/PropertyForm.tsx
-// Version: 1.3.0
-// Last Modified: 2025-02-01T16:00:00+05:30 (IST)
+// Version: 1.5.0
+// Last Modified: 2025-02-01T17:00:00+05:30 (IST)
 
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { Wand2 } from 'lucide-react';
+import { Wand2, PencilLine, CheckCircle } from 'lucide-react';
 import { FormData } from './types';
 import { STEPS } from './constants';
 import { PropertyDetails } from './sections/PropertyDetails';
@@ -24,11 +24,33 @@ interface PropertyFormProps {
   status?: 'draft' | 'published';
 }
 
+const StatusIndicator = ({ status }: { status: 'draft' | 'published' }) => {
+  const isDraft = status === 'draft';
+  
+  return (
+    <div className={cn(
+      "flex items-center px-3 py-1.5 rounded-lg",
+      isDraft 
+        ? "bg-amber-50 text-amber-700 border border-amber-200" 
+        : "bg-green-50 text-green-700 border border-green-200"
+    )}>
+      {isDraft ? (
+        <PencilLine className="h-4 w-4 mr-1.5" />
+      ) : (
+        <CheckCircle className="h-4 w-4 mr-1.5" />
+      )}
+      <span className="text-sm font-medium capitalize">
+        {status}
+      </span>
+    </div>
+  );
+};
+
 export function PropertyForm({ 
   initialData, 
   propertyId, 
   mode = 'create',
-  status = 'draft'
+  status: initialStatus = 'draft'
 }: PropertyFormProps) {
   const navigate = useNavigate();
   const {
@@ -38,6 +60,7 @@ export function PropertyForm({
     saving,
     savedPropertyId,
     user,
+    status, // Get the current status from usePropertyForm
     handleAutoFill,
     handleNextStep,
     handlePreviousStep,
@@ -46,7 +69,7 @@ export function PropertyForm({
     handleUpdate,
     handleImageUploadComplete,
     setCurrentStep,
-  } = usePropertyForm({ initialData, propertyId, mode, status });
+  } = usePropertyForm({ initialData, propertyId, mode, status: initialStatus });
 
   if (!user) {
     return (
@@ -74,18 +97,21 @@ export function PropertyForm({
       <div className="bg-white rounded-xl shadow-lg">
         <div className="p-3 border-b border-slate-200">
           <div className="flex justify-between items-center">
-            {process.env.NODE_ENV === 'development' && (
-              <button
-                type="button"
-                onClick={handleAutoFill}
-                className="flex items-center px-3 py-1.5 text-sm font-medium text-white bg-emerald-600 
-                  rounded-lg hover:bg-emerald-700 transition-colors focus:outline-none 
-                  focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500"
-              >
-                <Wand2 className="h-3.5 w-3.5 mr-1.5" />
-                Auto Fill
-              </button>
-            )}
+            <div>
+              {process.env.NODE_ENV === 'development' && (
+                <button
+                  type="button"
+                  onClick={handleAutoFill}
+                  className="flex items-center px-3 py-1.5 text-sm font-medium text-white bg-emerald-600 
+                    rounded-lg hover:bg-emerald-700 transition-colors focus:outline-none 
+                    focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500"
+                >
+                  <Wand2 className="h-3.5 w-3.5 mr-1.5" />
+                  Auto Fill
+                </button>
+              )}
+            </div>
+            <StatusIndicator status={status} />
           </div>
         </div>
 

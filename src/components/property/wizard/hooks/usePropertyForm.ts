@@ -1,8 +1,8 @@
 // src/components/property/wizard/hooks/usePropertyForm.ts
-// Version: 1.2.0
-// Last Modified: 2025-02-01T16:00:00+05:30 (IST)
+// Version: 1.3.0
+// Last Modified: 2025-02-01T17:30:00+05:30 (IST)
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { FormData } from '../types';
@@ -68,6 +68,32 @@ export function usePropertyForm({
       direction: ''
     }
   });
+
+  // Fetch property status when in edit mode
+  useEffect(() => {
+    const fetchPropertyStatus = async () => {
+      if (mode === 'edit' && existingPropertyId) {
+        try {
+          const { data, error } = await supabase
+            .from('properties')
+            .select('status')
+            .eq('id', existingPropertyId)
+            .single();
+
+          if (error) throw error;
+          
+          if (data && data.status) {
+            setStatus(data.status);
+          }
+        } catch (err) {
+          console.error('Error fetching property status:', err);
+          setError('Failed to fetch property status.');
+        }
+      }
+    };
+
+    fetchPropertyStatus();
+  }, [mode, existingPropertyId]);
 
   const preparePropertyData = (formData: FormData, propertyStatus: 'draft' | 'published') => {
     return {
