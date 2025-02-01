@@ -1,6 +1,6 @@
 // src/components/property/PropertyDetails.tsx
-// Version: 1.3.0
-// Last Modified: 2025-01-30T16:35:00+05:30 (IST)
+// Version: 1.4.1
+// Last Modified: 2025-02-01T10:30:00+05:30 (IST)
 // Author: Bhoomitalli Team
 
 import React from 'react';
@@ -45,12 +45,13 @@ export function PropertyDetails({ form, mode = 'create' }: FormSectionProps) {
     <FormSection
       title="Property Details"
       description="Tell us about your property"
+      className="text-base"
     >
       <div className="space-y-4">
         {/* Basic Property Info - Two Column */}
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <RequiredLabel required>Type</RequiredLabel>
+            <RequiredLabel required className="text-base">Type</RequiredLabel>
             <Select 
               value={watch('propertyType')} 
               onValueChange={value => setValue('propertyType', value)}
@@ -58,7 +59,7 @@ export function PropertyDetails({ form, mode = 'create' }: FormSectionProps) {
               <SelectTrigger className="h-11 text-base">
                 <SelectValue placeholder="Type of property?" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="text-base">
                 {PROPERTY_TYPES.map(type => (
                   <SelectItem key={type} value={type} className="text-base">
                     {type}
@@ -72,7 +73,7 @@ export function PropertyDetails({ form, mode = 'create' }: FormSectionProps) {
           </div>
 
           <div>
-            <RequiredLabel required>BHK</RequiredLabel>
+            <RequiredLabel required className="text-base">BHK</RequiredLabel>
             <Select 
               value={watch('bhkType')} 
               onValueChange={value => setValue('bhkType', value)}
@@ -80,7 +81,7 @@ export function PropertyDetails({ form, mode = 'create' }: FormSectionProps) {
               <SelectTrigger className="h-11 text-base">
                 <SelectValue placeholder="Number of bedrooms?" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="text-base">
                 {BHK_TYPES.map(type => (
                   <SelectItem key={type} value={type} className="text-base">
                     {type}
@@ -97,7 +98,7 @@ export function PropertyDetails({ form, mode = 'create' }: FormSectionProps) {
         {/* Floor Details - Two Column */}
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <RequiredLabel required>Floor</RequiredLabel>
+            <RequiredLabel required className="text-base">Floor</RequiredLabel>
             <Input
               type="number"
               min="0"
@@ -112,7 +113,7 @@ export function PropertyDetails({ form, mode = 'create' }: FormSectionProps) {
           </div>
 
           <div>
-            <RequiredLabel required>Total Floors</RequiredLabel>
+            <RequiredLabel required className="text-base">Total Floors</RequiredLabel>
             <Input
               type="number"
               min="1"
@@ -130,7 +131,7 @@ export function PropertyDetails({ form, mode = 'create' }: FormSectionProps) {
         {/* Property Age and Facing - Two Column */}
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <RequiredLabel required>Age</RequiredLabel>
+            <RequiredLabel required className="text-base">Age</RequiredLabel>
             <Select 
               value={watch('propertyAge')} 
               onValueChange={value => setValue('propertyAge', value)}
@@ -138,7 +139,7 @@ export function PropertyDetails({ form, mode = 'create' }: FormSectionProps) {
               <SelectTrigger className="h-11 text-base">
                 <SelectValue placeholder="Property age?" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="text-base">
                 {PROPERTY_AGE.map(age => (
                   <SelectItem key={age} value={age} className="text-base">
                     {age}
@@ -152,7 +153,7 @@ export function PropertyDetails({ form, mode = 'create' }: FormSectionProps) {
           </div>
 
           <div>
-            <RequiredLabel required>Facing</RequiredLabel>
+            <RequiredLabel required className="text-base">Facing</RequiredLabel>
             <Select 
               value={watch('facing')} 
               onValueChange={value => setValue('facing', value)}
@@ -160,7 +161,7 @@ export function PropertyDetails({ form, mode = 'create' }: FormSectionProps) {
               <SelectTrigger className="h-11 text-base">
                 <SelectValue placeholder="Direction facing?" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="text-base">
                 {FACING_OPTIONS.map(option => (
                   <SelectItem key={option} value={option} className="text-base">
                     {option}
@@ -177,12 +178,12 @@ export function PropertyDetails({ form, mode = 'create' }: FormSectionProps) {
         {/* Area and Title - Two Column */}
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <RequiredLabel required>Built-up Area</RequiredLabel>
+            <RequiredLabel required className="text-base">Built-up Area</RequiredLabel>
             <div className="relative">
               <Input
                 type="number"
                 min="100"
-                className="h-11 pr-16 text-base"
+                className="h-11 text-base pr-16"
                 {...register('builtUpArea')}
                 placeholder="Area (min. 100)"
                 onChange={(e) => {
@@ -197,7 +198,7 @@ export function PropertyDetails({ form, mode = 'create' }: FormSectionProps) {
                   }
                 }}
               />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-500 pointer-events-none">
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-base text-slate-500 pointer-events-none">
                 sq ft
               </span>
             </div>
@@ -206,9 +207,9 @@ export function PropertyDetails({ form, mode = 'create' }: FormSectionProps) {
             )}
           </div>
 
-          {mode === 'create' && (
+          {mode === 'edit' && (
             <div>
-              <RequiredLabel>Title</RequiredLabel>
+              <RequiredLabel className="text-base">Title</RequiredLabel>
               <Input
                 className="h-11 text-base"
                 {...register('title')}

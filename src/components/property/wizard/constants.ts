@@ -38,16 +38,16 @@ export const STEPS = [
     description: 'Amenities and features'
   },
   {
-    id: 'photos',
-    title: 'Photos',
-    icon: ImagePlus,
-    description: 'Property photos'
-  },
-  {
     id: 'review',
     title: 'Review',
     icon: ClipboardCheck,
     description: 'Review and publish'
+  },
+  {
+    id: 'photos',
+    title: 'Photos',
+    icon: ImagePlus,
+    description: 'Property photos'
   }
 ] as const;
 
