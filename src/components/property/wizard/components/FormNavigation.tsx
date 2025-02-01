@@ -1,6 +1,6 @@
 // src/components/property/wizard/components/FormNavigation.tsx
-// Version: 1.0.0
-// Last Modified: 2025-02-01T12:30:00+05:30 (IST)
+// Version: 1.1.0
+// Last Modified: 2025-02-01T13:30:00+05:30 (IST)
 
 import React from 'react';
 import { cn } from '@/lib/utils';
@@ -9,31 +9,47 @@ import { STEPS } from '../constants';
 interface FormNavigationProps {
   currentStep: number;
   onStepChange: (step: number) => void;
+  propertyId?: string;
+  mode?: 'create' | 'edit';
 }
 
-export function FormNavigation({ currentStep, onStepChange }: FormNavigationProps) {
+export function FormNavigation({ 
+  currentStep, 
+  onStepChange, 
+  propertyId, 
+  mode 
+}: FormNavigationProps) {
+  const isStepAccessible = (stepIndex: number) => {
+    const isPhotoStep = stepIndex === STEPS.length - 1;
+    if (isPhotoStep) {
+      return mode === 'edit' || propertyId !== undefined;
+    }
+    return true;
+  };
+
   return (
     <div className="flex border-b border-slate-200">
       {STEPS.map((step, index) => {
-        const isClickable = index <= currentStep;
+        const isAccessible = isStepAccessible(index);
         const Icon = step.icon;
         return (
           <button
             key={step.id}
-            onClick={() => isClickable && onStepChange(index + 1)}
-            disabled={!isClickable}
+            onClick={() => isAccessible && onStepChange(index + 1)}
+            disabled={!isAccessible}
             className={cn(
               "flex flex-1 flex-col items-center justify-center py-2 px-1.5",
               "min-w-[80px] max-w-[100px]",
               "relative group transition-all duration-200",
               "text-sm select-none",
-              isClickable && "hover:bg-indigo-50/60",
+              isAccessible && "hover:bg-indigo-50/60",
               currentStep === index + 1 
                 ? "text-indigo-600 bg-indigo-50/40" 
                 : "text-slate-500 hover:text-indigo-600",
-              !isClickable && "opacity-50 cursor-not-allowed",
+              !isAccessible && "opacity-50 cursor-not-allowed",
               "border-r border-slate-200 last:border-r-0",
             )}
+            title={!isAccessible ? "Complete property details first" : undefined}
           >
             <Icon className={cn(
               "h-4 w-4 transition-transform duration-200",

@@ -93,7 +93,9 @@ export function PropertyForm({ initialData, propertyId, mode = 'create' }: Prope
         <FormHeader onAutoFill={handleAutoFill} />
         <FormNavigation 
           currentStep={currentStep} 
-          onStepChange={setCurrentStep} 
+          onStepChange={setCurrentStep}
+          propertyId={savedPropertyId || propertyId}
+          mode={mode}
         />
         <div className="p-6">
           {error && <ErrorMessage message={error} />}

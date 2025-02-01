@@ -1,7 +1,6 @@
-// src/components/property/ImageUploadSection.tsx
+// src/components/property/wizard/sections/ImageUploadSection.tsx
 // Version: 1.4.0
-// Last Modified: 2025-02-01T11:30:00+05:30 (IST)
-// Author: Bhoomitalli Team
+// Last Modified: 2025-02-01T14:00:00+05:30 (IST)
 
 import React from 'react';
 import { FormSection } from '@/components/FormSection';
@@ -10,7 +9,8 @@ import {
   Upload,
   Image as ImageIcon,
   AlertCircle,
-  Star
+  Star,
+  Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useImageUpload } from './image-upload/hooks/useImageUpload';
@@ -28,18 +28,25 @@ export function ImageUploadSection({
   onPrevious 
 }: ImageUploadSectionProps) {
   const {
-    images,
-    previews,
+    existingImages,
     error,
     uploading,
     uploadProgress,
     primaryImageIndex,
+    isLoading,
     handleFileSelect,
     removeImage,
-    setPrimaryImageIndex
+    handleSetPrimaryImage,
   } = useImageUpload(propertyId, onUploadComplete);
 
-  const MAX_IMAGES = 10;
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center p-12">
+        <Loader2 className="h-8 w-8 text-indigo-600 animate-spin" />
+        <span className="ml-3 text-sm text-slate-600">Loading images...</span>
+      </div>
+    );
+  }
 
   return (
     <FormSection
@@ -49,17 +56,17 @@ export function ImageUploadSection({
       <div className="space-y-4">
         {/* Upload Area */}
         <UploadArea
-          images={images}
+          images={existingImages}
           onFileSelect={handleFileSelect}
           disabled={uploading}
         />
 
         {/* Image Grid */}
-        {previews.length > 0 && (
+        {existingImages.length > 0 && (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-            {previews.map((preview, index) => (
+            {existingImages.map((image, index) => (
               <div 
-                key={index}
+                key={image.id}
                 className={cn(
                   "relative group",
                   "aspect-[4/3]",
@@ -69,8 +76,8 @@ export function ImageUploadSection({
                 )}
               >
                 <img 
-                  src={preview} 
-                  alt={`Upload ${index + 1}`}
+                  src={image.url} 
+                  alt={`Property ${index + 1}`}
                   className="h-full w-full object-cover"
                 />
                 
@@ -78,7 +85,7 @@ export function ImageUploadSection({
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
                   <div className="absolute top-2 right-2 flex gap-2">
                     <button
-                      onClick={() => setPrimaryImageIndex(index)}
+                      onClick={() => handleSetPrimaryImage(index)}
                       className={cn(
                         "p-1.5 rounded-full",
                         "transition-colors duration-200",
@@ -97,6 +104,10 @@ export function ImageUploadSection({
                     >
                       <X className="h-4 w-4" />
                     </button>
+                  </div>
+                  {/* Image Number */}
+                  <div className="absolute bottom-2 left-2 px-2 py-1 rounded-md bg-black/50 text-white text-xs">
+                    {index + 1} / {existingImages.length}
                   </div>
                   {/* Upload Progress */}
                   {uploading && (
@@ -130,14 +141,14 @@ export function ImageUploadSection({
             Photo Requirements
           </h4>
           <ul className="text-sm text-slate-600 space-y-1 list-disc pl-5">
-            <li>Upload up to {MAX_IMAGES} photos</li>
+            <li>Upload up to 10 photos</li>
             <li>First image will be the primary photo</li>
             <li>Maximum size: 5MB per image</li>
             <li>Supported formats: JPG, PNG</li>
           </ul>
         </div>
 
-        {/* Navigation Button */}
+        {/* Navigation */}
         <div className="flex justify-start pt-4 border-t">
           <button
             type="button"
