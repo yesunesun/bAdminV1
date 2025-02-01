@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
+import ImageGallery from '../components/property/ImageGallery';
+import { Building, Calendar, IndianRupee, MapPin, Ruler, Users } from 'lucide-react';
 
 interface Property {
   id: string;
@@ -56,7 +58,6 @@ const PropertyPreview = () => {
 
         if (error) throw error;
 
-        // Fetch images for the property
         const { data: imagesData, error: imagesError } = await supabase
           .from('property_images')
           .select('id, url')
@@ -95,109 +96,151 @@ const PropertyPreview = () => {
 
   const { property_details } = property;
 
+  const KeyDetail = ({ icon: Icon, label, value }: { icon: any, label: string, value: string }) => (
+    <div className="flex items-center space-x-2">
+      <Icon className="w-5 h-5 text-gray-500" />
+      <div>
+        <p className="text-sm font-medium text-gray-500">{label}</p>
+        <p className="mt-1">{value}</p>
+      </div>
+    </div>
+  );
+
   return (
-    <div className="p-4">
+    <div className="p-4 bg-gray-50 min-h-screen">
       <div className="max-w-5xl mx-auto space-y-6">
-        {/* Images Gallery */}
+        {/* Header with Title and Price */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-lg shadow-sm">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">{property.title}</h1>
+            <div className="flex items-center mt-2 text-gray-600">
+              <MapPin className="w-4 h-4 mr-2" />
+              <p>{property_details.locality}, {property.city}, {property.state}</p>
+            </div>
+          </div>
+          <div className="flex items-center bg-blue-50 px-4 py-2 rounded-lg">
+            <IndianRupee className="w-5 h-5 text-blue-600 mr-2" />
+            <div>
+              <p className="text-2xl font-bold text-blue-600">₹{property_details.rentAmount}</p>
+              <p className="text-sm text-blue-600">per month</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Image Carousel */}
         <Card>
-          <CardContent className="p-4">
-            {property.images && property.images.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {property.images.map((image) => (
-                  <div key={image.id} className="aspect-square rounded overflow-hidden">
-                    <img 
-                      src={image.url} 
-                      alt={property.title}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center p-8">No images available</div>
-            )}
+          <CardContent className="p-6">
+            <ImageGallery images={property.images || []} title={property.title} />
           </CardContent>
         </Card>
 
-        {/* Property Details */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Main Details */}
           <Card className="md:col-span-2">
-            <CardContent className="p-4 space-y-4">
-              <div>
-                <h1 className="text-2xl font-bold">{property.title}</h1>
-                <p className="text-gray-600">
-                  {property_details.locality}, {property.city}, {property.state}
+            <CardHeader>
+              <CardTitle>Property Details</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Quick Info Grid */}
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+                <KeyDetail 
+                  icon={Building}
+                  label="Property Type"
+                  value={`${property_details.propertyType} - ${property_details.bhkType}`}
+                />
+                <KeyDetail 
+                  icon={Ruler}
+                  label="Built-up Area"
+                  value={property_details.builtUpArea}
+                />
+                <KeyDetail 
+                  icon={Calendar}
+                  label="Available From"
+                  value={property_details.availableFrom}
+                />
+              </div>
+
+              {/* Description */}
+              <div className="pt-4 border-t">
+                <h2 className="text-lg font-semibold mb-3">About this property</h2>
+                <p className="text-gray-700 leading-relaxed whitespace-pre-line">
+                  {property_details.description}
                 </p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 border-t border-b py-4">
-                <div>
-                  <p className="text-sm text-gray-600">Property Type</p>
-                  <p>{property_details.propertyType} - {property_details.bhkType}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Floor</p>
-                  <p>{property_details.floor} of {property_details.totalFloors}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Built-up Area</p>
-                  <p>{property_details.builtUpArea}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Facing</p>
-                  <p>{property_details.facing}</p>
-                </div>
-              </div>
-
-              <div>
-                <h2 className="font-bold mb-2">Description</h2>
-                <p className="text-gray-700">{property_details.description}</p>
-              </div>
-
-              <div>
-                <h2 className="font-bold mb-2">Amenities</h2>
-                <div className="flex flex-wrap gap-2">
-                  {property_details.amenities?.map((amenity, index) => (
-                    <Badge key={index} variant="secondary">{amenity}</Badge>
-                  ))}
-                </div>
               </div>
             </CardContent>
           </Card>
 
+          {/* Rental Details Card */}
           <Card>
-            <CardContent className="p-4 space-y-4">
-              <div>
-                <p className="text-sm text-gray-600">Rent</p>
-                <p className="text-2xl font-bold">₹{property_details.rentAmount}</p>
-                <div className="mt-2">
-                  <p className="text-sm">
-                    <span className="text-gray-600">Security Deposit:</span>{' '}
-                    ₹{property_details.securityDeposit}
-                  </p>
-                  <p className="text-sm">
-                    <span className="text-gray-600">Maintenance:</span>{' '}
-                    ₹{property_details.maintenance}
-                  </p>
+            <CardHeader>
+              <CardTitle>Rental Details</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-3">
+                {[
+                  { label: 'Security Deposit', value: `₹${property_details.securityDeposit}` },
+                  { label: 'Maintenance', value: `₹${property_details.maintenance}` },
+                  { label: 'Furnishing', value: property_details.furnishing },
+                ].map((item) => (
+                  <div key={item.label} className="flex justify-between items-center py-2 border-b last:border-0">
+                    <span className="text-gray-600">{item.label}</span>
+                    <span className="font-medium">{item.value}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="pt-4">
+                <div className="flex items-center mb-3">
+                  <Users className="w-5 h-5 text-gray-500 mr-2" />
+                  <h3 className="font-medium">Preferred Tenants</h3>
                 </div>
-              </div>
-
-              <div className="border-t pt-4">
-                <p className="text-sm text-gray-600">Available From</p>
-                <p>{property_details.availableFrom}</p>
-              </div>
-
-              <div className="border-t pt-4">
-                <p className="text-sm text-gray-600">Preferred Tenants</p>
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {property_details.preferredTenants?.map((tenant, index) => (
-                    <Badge key={index} variant="outline">{tenant}</Badge>
+                <div className="flex flex-wrap gap-2">
+                  {property_details.preferredTenants?.map((tenant) => (
+                    <Badge key={tenant} variant="outline">{tenant}</Badge>
                   ))}
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
+
+        {/* Property Features */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Property Features</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+              {[
+                { label: 'Floor', value: `${property_details.floor} of ${property_details.totalFloors}` },
+                { label: 'Facing', value: property_details.facing },
+                { label: 'Property Age', value: property_details.propertyAge },
+                { label: 'Parking', value: property_details.parking },
+              ].map((feature) => (
+                <div key={feature.label}>
+                  <p className="text-sm font-medium text-gray-500">{feature.label}</p>
+                  <p className="mt-1">{feature.value}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Amenities */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Amenities</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              {property_details.amenities?.map((amenity) => (
+                <Badge key={amenity} variant="secondary" className="px-3 py-1">
+                  {amenity}
+                </Badge>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
@@ -206,20 +249,14 @@ const PropertyPreview = () => {
 const LoadingSkeleton = () => (
   <div className="p-4">
     <div className="max-w-5xl mx-auto space-y-6">
-      <Card>
-        <CardContent className="p-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {[...Array(6)].map((_, i) => (
-              <Skeleton key={i} className="aspect-square" />
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Skeleton className="md:col-span-2 h-96" />
-        <Skeleton className="h-96" />
+      <Skeleton className="h-24 rounded-lg" />
+      <Skeleton className="h-96 rounded-lg" /> {/* Carousel skeleton */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Skeleton className="md:col-span-2 h-[400px]" />
+        <Skeleton className="h-[400px]" />
       </div>
+      <Skeleton className="h-48" />
+      <Skeleton className="h-32" />
     </div>
   </div>
 );
