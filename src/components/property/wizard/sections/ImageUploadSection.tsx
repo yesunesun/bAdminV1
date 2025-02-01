@@ -1,12 +1,11 @@
 // src/components/property/ImageUploadSection.tsx
-// Version: 1.3.1
-// Last Modified: 2025-01-31T15:30:00+05:30 (IST)
+// Version: 1.4.0
+// Last Modified: 2025-02-01T11:30:00+05:30 (IST)
 // Author: Bhoomitalli Team
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { FormSection } from '@/components/FormSection';
 import { 
-  ImagePlus, 
   X, 
   Upload,
   Image as ImageIcon,
@@ -14,7 +13,8 @@ import {
   Star
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { supabase } from '@/lib/supabase';
+import { useImageUpload } from './image-upload/hooks/useImageUpload';
+import { UploadArea } from './image-upload/components/UploadArea';
 
 interface ImageUploadSectionProps {
   propertyId: string;
@@ -27,140 +27,19 @@ export function ImageUploadSection({
   onUploadComplete, 
   onPrevious 
 }: ImageUploadSectionProps) {
-  const [images, setImages] = useState<File[]>([]);
-  const [previews, setPreviews] = useState<string[]>([]);
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [primaryImageIndex, setPrimaryImageIndex] = useState(0);
-  const [uploadProgress, setUploadProgress] = useState(0);
+  const {
+    images,
+    previews,
+    error,
+    uploading,
+    uploadProgress,
+    primaryImageIndex,
+    handleFileSelect,
+    removeImage,
+    setPrimaryImageIndex
+  } = useImageUpload(propertyId, onUploadComplete);
 
   const MAX_IMAGES = 10;
-  const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
-
-  // Initialize component
-  useEffect(() => {
-    setError(null);
-  }, []);
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    
-    if (images.length + files.length > MAX_IMAGES) {
-      setError(`Maximum ${MAX_IMAGES} images allowed`);
-      return;
-    }
-
-    const validFiles = files.filter(file => {
-      const isValid = file.type.startsWith('image/') && file.size <= MAX_FILE_SIZE;
-      if (!isValid) {
-        setError('Please select images under 5MB');
-      }
-      return isValid;
-    });
-
-    if (validFiles.length > 0) {
-      setError(null);
-      setImages(prev => [...prev, ...validFiles]);
-      
-      // Generate previews
-      validFiles.forEach(file => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          setPreviews(prev => [...prev, reader.result as string]);
-        };
-        reader.readAsDataURL(file);
-      });
-    }
-  };
-
-  const removeImage = (index: number) => {
-    setImages(prev => prev.filter((_, i) => i !== index));
-    setPreviews(prev => prev.filter((_, i) => i !== index));
-    if (primaryImageIndex === index) {
-      setPrimaryImageIndex(0);
-    } else if (primaryImageIndex > index) {
-      setPrimaryImageIndex(prev => prev - 1);
-    }
-  };
-
-  const uploadSingleImage = async (file: File, index: number): Promise<string> => {
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${propertyId}/${Date.now()}-${Math.random()}.${fileExt}`;
-
-    // Upload to Supabase Storage
-    const { error: uploadError, data: uploadData } = await supabase.storage
-      .from('property-images')
-      .upload(fileName, file, {
-        cacheControl: '3600',
-        upsert: false
-      });
-
-    if (uploadError) {
-      console.error('Storage upload error:', uploadError);
-      throw new Error(`Storage upload failed: ${uploadError.message}`);
-    }
-
-    // Get public URL
-    const { data: { publicUrl } } = supabase.storage
-      .from('property-images')
-      .getPublicUrl(fileName);
-
-    return publicUrl;
-  };
-
-  const uploadImages = async () => {
-    if (images.length === 0) {
-      setError('Please select at least one image');
-      return;
-    }
-
-    setUploading(true);
-    setError(null);
-    setUploadProgress(0);
-
-    for (const [index, file] of images.entries()) {
-      // Upload to storage
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${propertyId}/${Date.now()}-${index}.${fileExt}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('property-images')
-        .upload(fileName, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
-
-      if (uploadError) {
-        console.error(`Storage upload error for image ${index + 1}:`, uploadError);
-        continue;
-      }
-
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('property-images')
-        .getPublicUrl(fileName);
-
-      // Save to database
-      const { error: dbError } = await supabase
-        .from('property_images')
-        .insert([{
-          property_id: propertyId,
-          url: publicUrl,
-          is_primary: index === primaryImageIndex,
-          display_order: index
-        }]);
-
-      if (dbError) {
-        console.error(`Database error for image ${index + 1}:`, dbError);
-        continue;
-      }
-
-      setUploadProgress(((index + 1) / images.length) * 100);
-    }
-
-    setUploading(false);
-    onUploadComplete();
-  };
 
   return (
     <FormSection
@@ -169,29 +48,11 @@ export function ImageUploadSection({
     >
       <div className="space-y-4">
         {/* Upload Area */}
-        <div className={cn(
-          "border-2 border-dashed rounded-xl p-4",
-          "transition-colors duration-200",
-          images.length === 0 ? "border-slate-200 hover:border-slate-300" : "border-slate-300",
-          "min-h-[120px] flex items-center justify-center relative"
-        )}>
-          <div className="text-center">
-            <ImagePlus className="h-8 w-8 text-slate-400 mx-auto mb-2" />
-            <p className="text-sm text-slate-600">
-              {images.length === 0 
-                ? "Click or drag images here" 
-                : `Add more images (${MAX_IMAGES - images.length} remaining)`}
-            </p>
-          </div>
-          <input
-            type="file"
-            multiple
-            accept="image/*"
-            onChange={handleFileSelect}
-            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-            disabled={images.length >= MAX_IMAGES || uploading}
-          />
-        </div>
+        <UploadArea
+          images={images}
+          onFileSelect={handleFileSelect}
+          disabled={uploading}
+        />
 
         {/* Image Grid */}
         {previews.length > 0 && (
@@ -237,10 +98,17 @@ export function ImageUploadSection({
                       <X className="h-4 w-4" />
                     </button>
                   </div>
-                  {/* Image Number */}
-                  <div className="absolute bottom-2 left-2 px-2 py-1 rounded-md bg-black/50 text-white text-xs">
-                    {index + 1} / {previews.length}
-                  </div>
+                  {/* Upload Progress */}
+                  {uploading && (
+                    <div className="absolute bottom-2 left-2 right-2 bg-black/50 rounded-md px-2 py-1">
+                      <div className="h-1 bg-white/30 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-white transition-all duration-300"
+                          style={{ width: `${uploadProgress}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
@@ -269,8 +137,8 @@ export function ImageUploadSection({
           </ul>
         </div>
 
-        {/* Navigation Buttons */}
-        <div className="flex justify-between pt-4 border-t">
+        {/* Navigation Button */}
+        <div className="flex justify-start pt-4 border-t">
           <button
             type="button"
             onClick={onPrevious}
@@ -279,30 +147,6 @@ export function ImageUploadSection({
               focus:ring-2 focus:ring-slate-200"
           >
             Previous
-          </button>
-          <button
-            type="button"
-            onClick={uploadImages}
-            disabled={uploading || images.length === 0}
-            className={cn(
-              "flex items-center px-6 py-2.5 text-sm font-medium text-white",
-              "rounded-lg transition-colors focus:outline-none focus:ring-2",
-              uploading || images.length === 0
-                ? "bg-slate-400 cursor-not-allowed"
-                : "bg-indigo-600 hover:bg-indigo-700 focus:ring-indigo-200"
-            )}
-          >
-            {uploading ? (
-              <>
-                <Upload className="h-4 w-4 mr-2 animate-pulse" />
-                Uploading... {Math.round(uploadProgress)}%
-              </>
-            ) : (
-              <>
-                <Upload className="h-4 w-4 mr-2" />
-                Upload & Continue
-              </>
-            )}
           </button>
         </div>
       </div>
