@@ -1,76 +1,96 @@
-import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import { supabase } from '../lib/supabase';
-import { 
-  Building2, 
-  Eye, 
-  Clock, 
-  ArrowUpRight, 
-  ArrowDownRight,
-  IndianRupee,
-  Plus 
-} from 'lucide-react';
+// src/pages/Dashboard.tsx
+// Version: 1.5.0
+// Last Modified: 2025-02-02T15:00:00+05:30 (IST)
 
-interface Metrics {
+import React, { useEffect, useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
+import { Home, ListFilter, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+
+interface DashboardMetrics {
   totalProperties: number;
+  pendingReview: number;
   publishedProperties: number;
-  draftProperties: number;
-  averagePrice: number;
-  totalViews: number;
-  recentActivity: {
-    type: 'created' | 'published' | 'updated';
-    propertyTitle: string;
-    date: string;
-  }[];
+  rejectedProperties: number;
 }
 
 export default function Dashboard() {
-  const { user } = useAuth();
-  const [metrics, setMetrics] = useState<Metrics | null>(null);
-  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+  const { 
+    user, 
+    userProfile, 
+    loading: authLoading, 
+    error: authError,
+    isSupervisor, 
+    isPropertyOwner 
+  } = useAuth();
+  
+  const [metrics, setMetrics] = useState<DashboardMetrics>({
+    totalProperties: 0,
+    pendingReview: 0,
+    publishedProperties: 0,
+    rejectedProperties: 0
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Redirect if not authenticated
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate('/login');
+    }
+  }, [authLoading, user, navigate]);
 
   useEffect(() => {
     const fetchMetrics = async () => {
-      if (!user) return;
+      // Don't fetch if still authenticating or no user
+      if (authLoading || !user || !userProfile) {
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
 
       try {
-        const { data: properties, error } = await supabase
+        let query = supabase
           .from('properties')
-          .select('*')
-          .eq('owner_id', user.id);
+          .select('id, status', { count: 'exact' });
 
-        if (error) throw error;
+        // If user is a property owner, only fetch their properties
+        if (isPropertyOwner()) {
+          query = query.eq('owner_id', user.id);
+        }
 
-        const publishedProperties = properties.filter(p => p.status === 'published');
-        const draftProperties = properties.filter(p => p.status === 'draft');
-        const totalPrices = properties.reduce((sum, p) => sum + p.price, 0);
+        const { data, error: fetchError } = await query;
 
-        setMetrics({
-          totalProperties: properties.length,
-          publishedProperties: publishedProperties.length,
-          draftProperties: draftProperties.length,
-          averagePrice: properties.length ? totalPrices / properties.length : 0,
-          totalViews: 0, // This would come from analytics in a real app
-          recentActivity: properties
-            .slice(0, 5)
-            .map(p => ({
-              type: p.status === 'published' ? 'published' : 'created',
-              propertyTitle: p.title,
-              date: new Date(p.created_at).toLocaleDateString()
-            }))
-        });
-      } catch (error) {
-        console.error('Error fetching metrics:', error);
+        if (fetchError) throw fetchError;
+
+        if (!data) {
+          throw new Error('No data received from server');
+        }
+
+        const newMetrics = {
+          totalProperties: data.length,
+          pendingReview: data.filter(p => p.status === 'pending_review').length,
+          publishedProperties: data.filter(p => p.status === 'published').length,
+          rejectedProperties: data.filter(p => p.status === 'rejected').length
+        };
+
+        setMetrics(newMetrics);
+      } catch (err) {
+        console.error('Error fetching metrics:', err);
+        setError('Failed to load dashboard data. Please try again.');
       } finally {
         setLoading(false);
       }
     };
 
     fetchMetrics();
-  }, [user]);
+  }, [user, userProfile, authLoading, isPropertyOwner]);
 
-  if (loading) {
+  // Handle loading states
+  if (authLoading) {
     return (
       <div className="flex justify-center items-center min-h-[50vh]">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
@@ -78,159 +98,158 @@ export default function Dashboard() {
     );
   }
 
-  if (!metrics) return null;
+  // Handle auth errors
+  if (authError) {
+    return (
+      <div className="p-8">
+        <div className="bg-red-50 border border-red-200 rounded-md p-4">
+          <p className="text-red-600">Authentication error: {authError}</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Handle no user or profile
+  if (!user || !userProfile) {
+    return (
+      <div className="p-8 text-center">
+        <p className="text-gray-600">Please log in to access the dashboard.</p>
+      </div>
+    );
+  }
+
+  // Verify role access
+  if (!isPropertyOwner() && !isSupervisor()) {
+    return (
+      <div className="p-8 text-center">
+        <p className="text-gray-600">You do not have access to this dashboard.</p>
+      </div>
+    );
+  }
+
+  const MetricCard = ({ title, value, icon: Icon, color }: { 
+    title: string; 
+    value: number; 
+    icon: any;
+    color: string;
+  }) => (
+    <div className="bg-white rounded-lg shadow p-6">
+      <div className="flex items-center">
+        <div className={`rounded-full p-3 ${color}`}>
+          <Icon className="h-6 w-6 text-white" />
+        </div>
+        <div className="ml-4">
+          <h3 className="text-lg font-medium text-gray-900">{title}</h3>
+          <p className="text-2xl font-semibold text-gray-900">{value}</p>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <Link
-          to="/properties/add"
-          className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Add Property
-        </Link>
+      <div className="mb-8">
+        <h1 className="text-2xl font-bold text-gray-900">
+          Welcome back, {userProfile.email}
+        </h1>
+        <p className="mt-1 text-sm text-gray-500">
+          {isSupervisor() ? 'Supervisor Dashboard' : 'Property Owner Dashboard'}
+        </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        {/* Total Properties */}
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <Building2 className="h-6 w-6 text-gray-400" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    Total Properties
-                  </dt>
-                  <dd className="flex items-baseline">
-                    <div className="text-2xl font-semibold text-gray-900">
-                      {metrics.totalProperties}
-                    </div>
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </div>
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-6">
+          <p className="text-red-600">{error}</p>
         </div>
+      )}
 
-        {/* Published Properties */}
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <Eye className="h-6 w-6 text-gray-400" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    Published Properties
-                  </dt>
-                  <dd className="flex items-baseline">
-                    <div className="text-2xl font-semibold text-gray-900">
-                      {metrics.publishedProperties}
-                    </div>
-                    <div className="ml-2 flex items-baseline text-sm font-semibold text-green-600">
-                      <ArrowUpRight className="self-center flex-shrink-0 h-4 w-4 text-green-500" />
-                      <span className="sr-only">Increased by</span>
-                      Active
-                    </div>
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Draft Properties */}
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <Clock className="h-6 w-6 text-gray-400" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    Draft Properties
-                  </dt>
-                  <dd className="flex items-baseline">
-                    <div className="text-2xl font-semibold text-gray-900">
-                      {metrics.draftProperties}
-                    </div>
-                    <div className="ml-2 flex items-baseline text-sm font-semibold text-amber-600">
-                      <ArrowDownRight className="self-center flex-shrink-0 h-4 w-4 text-amber-500" />
-                      <span className="sr-only">Decreased by</span>
-                      Pending
-                    </div>
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Average Price */}
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <IndianRupee className="h-6 w-6 text-gray-400" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    Average Price
-                  </dt>
-                  <dd className="flex items-baseline">
-                    <div className="text-2xl font-semibold text-gray-900">
-                      ₹{Math.round(metrics.averagePrice).toLocaleString('en-IN')}
-                    </div>
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Recent Activity */}
-      <div className="mt-8">
-        <h2 className="text-lg font-medium text-gray-900 mb-4">Recent Activity</h2>
-        <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-          <ul className="divide-y divide-gray-200">
-            {metrics.recentActivity.map((activity, index) => (
-              <li key={index} className="px-4 py-4 sm:px-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <span className={`h-2.5 w-2.5 rounded-full mr-2 ${
-                      activity.type === 'published' ? 'bg-green-500' : 'bg-amber-500'
-                    }`}></span>
-                    <p className="text-sm font-medium text-gray-900">
-                      {activity.propertyTitle}
-                    </p>
-                  </div>
-                  <div className="ml-2 flex-shrink-0 flex">
-                    <p className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
-                      {activity.date}
-                    </p>
-                  </div>
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="bg-white rounded-lg shadow p-6 animate-pulse">
+              <div className="flex items-center">
+                <div className="rounded-full bg-gray-200 h-12 w-12"></div>
+                <div className="ml-4 space-y-2">
+                  <div className="h-4 bg-gray-200 rounded w-20"></div>
+                  <div className="h-6 bg-gray-200 rounded w-12"></div>
                 </div>
-                <div className="mt-2 sm:flex sm:justify-between">
-                  <div className="sm:flex">
-                    <p className="flex items-center text-sm text-gray-500">
-                      {activity.type === 'published' ? 'Published' : 'Created'}
-                    </p>
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
+              </div>
+            </div>
+          ))}
         </div>
-      </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <MetricCard
+            title="Total Properties"
+            value={metrics.totalProperties}
+            icon={Home}
+            color="bg-blue-500"
+          />
+          <MetricCard
+            title="Pending Review"
+            value={metrics.pendingReview}
+            icon={Clock}
+            color="bg-yellow-500"
+          />
+          <MetricCard
+            title="Published"
+            value={metrics.publishedProperties}
+            icon={CheckCircle}
+            color="bg-green-500"
+          />
+          <MetricCard
+            title="Rejected"
+            value={metrics.rejectedProperties}
+            icon={XCircle}
+            color="bg-red-500"
+          />
+        </div>
+      )}
+
+      {/* Role-specific content */}
+      {isSupervisor() && (
+        <div className="mt-8">
+          <h2 className="text-lg font-medium text-gray-900 mb-4">Quick Actions</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <a
+              href="/properties?status=pending_review"
+              className="flex items-center p-4 bg-white rounded-lg shadow hover:bg-gray-50"
+            >
+              <ListFilter className="h-6 w-6 text-yellow-500" />
+              <span className="ml-3 text-gray-900">Review Pending Properties</span>
+            </a>
+            <a
+              href="/properties"
+              className="flex items-center p-4 bg-white rounded-lg shadow hover:bg-gray-50"
+            >
+              <Home className="h-6 w-6 text-blue-500" />
+              <span className="ml-3 text-gray-900">View All Properties</span>
+            </a>
+          </div>
+        </div>
+      )}
+
+      {isPropertyOwner() && (
+        <div className="mt-8">
+          <h2 className="text-lg font-medium text-gray-900 mb-4">Quick Actions</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <a
+              href="/properties/add"
+              className="flex items-center p-4 bg-white rounded-lg shadow hover:bg-gray-50"
+            >
+              <Home className="h-6 w-6 text-blue-500" />
+              <span className="ml-3 text-gray-900">Add New Property</span>
+            </a>
+            <a
+              href="/properties"
+              className="flex items-center p-4 bg-white rounded-lg shadow hover:bg-gray-50"
+            >
+              <ListFilter className="h-6 w-6 text-blue-500" />
+              <span className="ml-3 text-gray-900">View My Properties</span>
+            </a>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

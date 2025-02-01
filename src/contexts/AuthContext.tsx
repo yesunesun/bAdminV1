@@ -1,122 +1,119 @@
-// src/contexts/AuthContext.tsx
-// Version: 1.3.0
-// Last Modified: 30-01-2025 15:00 IST
-
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
-import type { User, AuthError } from '@supabase/supabase-js';
+import type { User } from '@supabase/supabase-js';
+import type { Database } from '../lib/database.types';
 
-type UserRole = 'property_owner' | 'property_seeker';
+type UserProfile = Database['public']['Tables']['profiles']['Row'];
 
 interface AuthContextType {
   user: User | null;
+  userProfile: UserProfile | null;
   loading: boolean;
-  signInWithEmail: (email: string) => Promise<{ error?: AuthError }>;
-  registerUser: (email: string, phone: string, role: UserRole) => Promise<{ error?: AuthError }>;
-  verifyOtp: (email: string, token: string) => Promise<{ error?: AuthError }>;
+  error: string | null;
+  signInWithEmail: (email: string) => Promise<{ error?: any }>;
   signOut: () => Promise<void>;
+  isAuthenticated: () => boolean;
+  isSuperAdmin: () => boolean;
+  isSupervisor: () => boolean;
+  isPropertyOwner: () => boolean;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextType | null>(null);
 
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-}
-
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchProfile = async (userId: string) => {
+    try {
+      const { data: profile, error: fetchError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (fetchError) {
+        console.error('Profile fetch error:', fetchError);
+        return null;
+      }
+      return profile;
+    } catch (err) {
+      console.error('Profile fetch failed:', err);
+      return null;
+    }
+  };
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  const signInWithEmail = async (email: string) => {
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        shouldCreateUser: false,
-      }
-    });
-    return { error };
-  };
-
-  const registerUser = async (email: string, phone: string, role: UserRole) => {
-    // First, send OTP to email
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        data: {
-          phone,
-          role,
-          registered_at: new Date().toISOString(),
-        },
-        shouldCreateUser: true,
-      }
-    });
-    return { error };
-  };
-
-  const verifyOtp = async (email: string, token: string) => {
-    const { error } = await supabase.auth.verifyOtp({
-      email,
-      token,
-      type: 'email'
-    });
-
-    // If verification is successful and we have user metadata, store it in the profiles table
-    if (!error) {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user?.user_metadata) {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .upsert({
-            id: user.id,
-            email: user.email,
-            phone: user.user_metadata.phone,
-            role: user.user_metadata.role,
-            updated_at: new Date().toISOString(),
-          });
-
-        if (profileError) {
-          console.error('Error updating profile:', profileError);
+    let isMounted = true;
+  
+    async function initializeAuth() {
+      try {
+        setLoading(true);
+        console.log('Fetching session...');
+        const { data: { session } } = await supabase.auth.getSession();
+        console.log('Session:', session);
+  
+        if (session?.user) {
+          console.log('User found:', session.user);
+          setUser(session.user);
+          const profile = await fetchProfile(session.user.id);
+          console.log('Profile:', profile);
+          setUserProfile(profile || null);
+        } else {
+          console.log('No user found.');
         }
+      } catch (error) {
+        console.error('Auth initialization error:', error);
+        setError('Authentication failed.');
+      } finally {
+        if (isMounted) setLoading(false);
       }
     }
+  
+    initializeAuth();
+  
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+  
+  
 
+  const signInWithEmail = async (email: string) => {
+    setError(null);
+    const { error } = await supabase.auth.signInWithOtp({ email });
     return { error };
   };
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
+    await supabase.auth.signOut();
+    setUser(null);
+    setUserProfile(null);
+    window.location.href = '/login';
   };
 
   const value = {
     user,
+    userProfile,
     loading,
+    error,
     signInWithEmail,
-    registerUser,
-    verifyOtp,
     signOut,
+    isAuthenticated: () => !!userProfile,
+    isSuperAdmin: () => userProfile?.role === 'super_admin',
+    isSupervisor: () => ['super_admin', 'supervisor'].includes(userProfile?.role || ''),
+    isPropertyOwner: () => userProfile?.role === 'property_owner',
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {!loading && children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
 }

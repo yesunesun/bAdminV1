@@ -1,11 +1,11 @@
 // src/components/property/wizard/PropertyForm.tsx
-// Version: 1.5.0
-// Last Modified: 2025-02-01T17:00:00+05:30 (IST)
+// Version: 1.6.0
+// Last Modified: 2025-02-01T18:30:00+05:30 (IST)
 
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { Wand2, PencilLine, CheckCircle } from 'lucide-react';
+import { Wand2, PencilLine, CheckCircle, Clock, AlertCircle } from 'lucide-react';
 import { FormData } from './types';
 import { STEPS } from './constants';
 import { PropertyDetails } from './sections/PropertyDetails';
@@ -21,26 +21,55 @@ interface PropertyFormProps {
   initialData?: FormData;
   propertyId?: string;
   mode?: 'create' | 'edit';
-  status?: 'draft' | 'published';
+  status?: 'draft' | 'published' | 'pending_review' | 'rejected';
 }
 
-const StatusIndicator = ({ status }: { status: 'draft' | 'published' }) => {
-  const isDraft = status === 'draft';
+const StatusIndicator = ({ 
+  status 
+}: { 
+  status: 'draft' | 'published' | 'pending_review' | 'rejected' 
+}) => {
+  const statusConfig = {
+    draft: {
+      icon: PencilLine,
+      bg: "bg-amber-50",
+      text: "text-amber-700",
+      border: "border-amber-200"
+    },
+    published: {
+      icon: CheckCircle,
+      bg: "bg-green-50",
+      text: "text-green-700",
+      border: "border-green-200"
+    },
+    pending_review: {
+      icon: Clock,
+      bg: "bg-blue-50",
+      text: "text-blue-700",
+      border: "border-blue-200"
+    },
+    rejected: {
+      icon: AlertCircle,
+      bg: "bg-red-50",
+      text: "text-red-700",
+      border: "border-red-200"
+    }
+  };
+
+  const config = statusConfig[status];
+  const Icon = config.icon;
   
   return (
     <div className={cn(
       "flex items-center px-3 py-1.5 rounded-lg",
-      isDraft 
-        ? "bg-amber-50 text-amber-700 border border-amber-200" 
-        : "bg-green-50 text-green-700 border border-green-200"
+      config.bg,
+      config.text,
+      "border",
+      config.border
     )}>
-      {isDraft ? (
-        <PencilLine className="h-4 w-4 mr-1.5" />
-      ) : (
-        <CheckCircle className="h-4 w-4 mr-1.5" />
-      )}
+      <Icon className="h-4 w-4 mr-1.5" />
       <span className="text-sm font-medium capitalize">
-        {status}
+        {status.replace('_', ' ')}
       </span>
     </div>
   );
@@ -60,7 +89,7 @@ export function PropertyForm({
     saving,
     savedPropertyId,
     user,
-    status, // Get the current status from usePropertyForm
+    status,
     handleAutoFill,
     handleNextStep,
     handlePreviousStep,
@@ -92,6 +121,8 @@ export function PropertyForm({
     );
   }
 
+  const isEditable = status === 'draft' || status === 'rejected';
+
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="bg-white rounded-xl shadow-lg">
@@ -115,11 +146,23 @@ export function PropertyForm({
           </div>
         </div>
 
+        {!isEditable && (
+          <div className="p-4 bg-gray-50 border-b border-gray-200">
+            <div className="flex items-center">
+              <AlertCircle className="h-5 w-5 text-gray-400 mr-2" />
+              <p className="text-sm text-gray-600">
+                This property is {status === 'pending_review' ? 'under review' : status} and cannot be edited.
+              </p>
+            </div>
+          </div>
+        )}
+
         <FormNavigation 
           currentStep={currentStep} 
           onStepChange={setCurrentStep}
           propertyId={savedPropertyId || propertyId}
           mode={mode}
+          disabled={!isEditable}
         />
 
         <div className="p-6">
@@ -134,6 +177,7 @@ export function PropertyForm({
               propertyId={savedPropertyId!}
               onUploadComplete={handleImageUploadComplete}
               onPrevious={handlePreviousStep}
+              disabled={!isEditable}
             />
           ) : currentStep === STEPS.length - 1 ? (
             <PropertySummary
@@ -145,22 +189,26 @@ export function PropertyForm({
               saving={saving}
               status={status}
               propertyId={savedPropertyId || propertyId}
+              disabled={!isEditable}
             />
           ) : (
             <div className="space-y-6">
-              {currentStep === 1 && <PropertyDetails form={form} mode={mode} />}
-              {currentStep === 2 && <LocationDetails form={form} />}
-              {currentStep === 3 && <RentalDetails form={form} />}
-              {currentStep === 4 && <AmenitiesSection form={form} />}
+              {currentStep === 1 && <PropertyDetails form={form} mode={mode} disabled={!isEditable} />}
+              {currentStep === 2 && <LocationDetails form={form} disabled={!isEditable} />}
+              {currentStep === 3 && <RentalDetails form={form} disabled={!isEditable} />}
+              {currentStep === 4 && <AmenitiesSection form={form} disabled={!isEditable} />}
               
               <div className="flex justify-between pt-6 border-t">
                 {currentStep > 1 && (
                   <button
                     type="button"
                     onClick={handlePreviousStep}
-                    className="px-6 py-3 text-sm font-medium text-slate-600 bg-slate-100 
-                      rounded-xl hover:bg-slate-200 transition-colors focus:outline-none 
-                      focus:ring-4 focus:ring-slate-100"
+                    disabled={!isEditable}
+                    className={cn(
+                      "px-6 py-3 text-sm font-medium text-slate-600 bg-slate-100 rounded-xl",
+                      "hover:bg-slate-200 transition-colors focus:outline-none focus:ring-4 focus:ring-slate-100",
+                      !isEditable && "opacity-50 cursor-not-allowed"
+                    )}
                   >
                     Previous
                   </button>
@@ -169,10 +217,11 @@ export function PropertyForm({
                 <button
                   type="button"
                   onClick={handleNextStep}
+                  disabled={!isEditable}
                   className={cn(
                     "px-6 py-3 text-sm font-medium text-white bg-indigo-600 rounded-xl",
                     "hover:bg-indigo-700 transition-colors focus:outline-none focus:ring-4 focus:ring-indigo-100",
-                    "disabled:opacity-50"
+                    "disabled:opacity-50 disabled:cursor-not-allowed"
                   )}
                 >
                   Next
