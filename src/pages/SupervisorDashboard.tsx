@@ -1,6 +1,6 @@
 // src/pages/SupervisorDashboard.tsx
-// Version: 1.0.0
-// Last Modified: 2025-02-01T18:30:00+05:30 (IST)
+// Version: 1.0.1
+// Last Modified: 2025-02-02T16:00:00+05:30 (IST)
 
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -18,14 +18,16 @@ interface PendingProperty {
 }
 
 export default function SupervisorDashboard() {
-  const { user, userProfile, isSupervisor } = useAuth();
+  const { user, userProfile, loading: authLoading, isSupervisor } = useAuth();
   const navigate = useNavigate();
   const [pendingProperties, setPendingProperties] = useState<PendingProperty[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchPendingProperties = async () => {
-      if (!user || !isSupervisor()) {
+      // Wait until authentication state is ready.
+      if (authLoading) return;
+      if (!user || !userProfile || !isSupervisor()) {
         navigate('/');
         return;
       }
@@ -48,7 +50,7 @@ export default function SupervisorDashboard() {
 
         if (error) throw error;
 
-        setPendingProperties(data.map(property => ({
+        setPendingProperties(data.map((property: any) => ({
           ...property,
           owner_email: property.profiles?.email
         })));
@@ -60,7 +62,7 @@ export default function SupervisorDashboard() {
     };
 
     fetchPendingProperties();
-  }, [user, navigate, isSupervisor]);
+  }, [user, userProfile, authLoading, isSupervisor, navigate]);
 
   const handleAction = async (propertyId: string, action: 'approve' | 'reject') => {
     try {
@@ -77,14 +79,30 @@ export default function SupervisorDashboard() {
 
       if (error) throw error;
 
-      // Update local state
-      setPendingProperties(prev => 
+      // Remove the updated property from local state.
+      setPendingProperties(prev =>
         prev.filter(property => property.id !== propertyId)
       );
     } catch (error) {
       console.error('Error updating property:', error);
     }
   };
+
+  if (authLoading) {
+    return (
+      <div className="flex justify-center items-center min-h-[50vh]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+      </div>
+    );
+  }
+
+  if (!user || !userProfile) {
+    return (
+      <div className="p-8 text-center">
+        <p className="text-gray-600">Loading your profile...</p>
+      </div>
+    );
+  }
 
   if (!isSupervisor()) {
     return (

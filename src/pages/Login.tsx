@@ -1,135 +1,59 @@
 // src/pages/Login.tsx
-// Version: 1.3.0
-// Last Modified: 30-01-2025 15:00 IST
-
-import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import { Mail } from 'lucide-react';
+import { useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 export default function Login() {
   const navigate = useNavigate();
+  const { signInWithEmail, verifyOTP, error } = useAuth();
   const [email, setEmail] = useState('');
-  const [token, setToken] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [showVerification, setShowVerification] = useState(false);
-  const { signInWithEmail, verifyOtp } = useAuth();
+  const [verificationCode, setVerificationCode] = useState('');
+  const [isCodeSent, setIsCodeSent] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const handleSignInSubmit = async (e: React.FormEvent) => {
+  const handleSendCode = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setIsLoading(true);
-    
+    setLoading(true);
     try {
-      const { error: signInError } = await signInWithEmail(email);
-      
-      if (signInError) {
-        setError(signInError.message);
-        return;
+      const { error } = await signInWithEmail(email);
+      if (!error) {
+        setIsCodeSent(true);
       }
-      
-      setShowVerification(true);
-    } catch (err) {
-      setError('An unexpected error occurred. Please try again later.');
-      console.error('Sign in error:', err);
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
-  const handleVerificationSubmit = async (e: React.FormEvent) => {
+  const handleVerifyCode = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setIsLoading(true);
-
+    setLoading(true);
     try {
-      const { error: verifyError } = await verifyOtp(email, token);
-
-      if (verifyError) {
-        setError(verifyError.message);
-        return;
+      const { error } = await verifyOTP(email, verificationCode);
+      if (!error) {
+        navigate('/dashboard');
       }
-
-      navigate('/dashboard');
-    } catch (err) {
-      setError('An unexpected error occurred. Please try again later.');
-      console.error('Verification error:', err);
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-[80vh] flex items-center justify-center">
-      <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-lg shadow">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8">
         <div>
-          <div className="mx-auto h-12 w-12 flex items-center justify-center rounded-full bg-indigo-100">
-            <Mail className="h-6 w-6 text-indigo-600" />
-          </div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            {showVerification ? 'Enter verification code' : 'Sign in to your account'}
+            Sign in to your account
           </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            {showVerification 
-              ? 'Check your email for the verification code'
-              : 'We\'ll send a verification code to your email'}
-          </p>
         </div>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 p-4 rounded-md">
-            <p className="text-sm text-red-700">{error}</p>
+          <div className="bg-red-50 border border-red-200 rounded-md p-4 mt-4">
+            <p className="text-red-600">{error}</p>
           </div>
         )}
 
-        {showVerification ? (
-          <form className="mt-8 space-y-6" onSubmit={handleVerificationSubmit}>
-            <div>
-              <label htmlFor="token" className="block text-sm font-medium text-gray-700">
-                Verification Code
-              </label>
-              <div className="mt-1">
-                <input
-                  id="token"
-                  name="token"
-                  type="text"
-                  required
-                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                  placeholder="Enter code"
-                  value={token}
-                  onChange={(e) => setToken(e.target.value)}
-                  disabled={isLoading}
-                />
-              </div>
-            </div>
-
-            <div>
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
-              >
-                {isLoading ? 'Verifying...' : 'Verify Code'}
-              </button>
-            </div>
-
-            <div className="text-center">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowVerification(false);
-                  setToken('');
-                  setError('');
-                }}
-                className="text-sm text-indigo-600 hover:text-indigo-500"
-              >
-                Use a different email
-              </button>
-            </div>
-          </form>
-        ) : (
-          <form className="mt-8 space-y-6" onSubmit={handleSignInSubmit}>
+        {!isCodeSent ? (
+          <form className="mt-8 space-y-6" onSubmit={handleSendCode}>
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">
                 Email address
@@ -139,13 +63,10 @@ export default function Login() {
                   id="email"
                   name="email"
                   type="email"
-                  autoComplete="email"
                   required
-                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                  placeholder="you@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  disabled={isLoading}
+                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
                 />
               </div>
             </div>
@@ -153,20 +74,52 @@ export default function Login() {
             <div>
               <button
                 type="submit"
-                disabled={isLoading}
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                disabled={loading}
+                className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${
+                  loading ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
               >
-                {isLoading ? 'Sending code...' : 'Send verification code'}
+                {loading ? 'Sending...' : 'Send Verification Code'}
               </button>
             </div>
+          </form>
+        ) : (
+          <form className="mt-8 space-y-6" onSubmit={handleVerifyCode}>
+            <div>
+              <label htmlFor="code" className="block text-sm font-medium text-gray-700">
+                Verification Code
+              </label>
+              <div className="mt-1">
+                <input
+                  id="code"
+                  name="code"
+                  type="text"
+                  required
+                  value={verificationCode}
+                  onChange={(e) => setVerificationCode(e.target.value)}
+                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                />
+              </div>
+            </div>
 
-            <div className="text-center">
-              <p className="text-sm text-gray-600">
-                Don't have an account?{' '}
-                <Link to="/register" className="text-indigo-600 hover:text-indigo-500">
-                  Register here
-                </Link>
-              </p>
+            <div className="flex flex-col space-y-4">
+              <button
+                type="submit"
+                disabled={loading}
+                className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${
+                  loading ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+              >
+                {loading ? 'Verifying...' : 'Verify Code'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsCodeSent(false)}
+                className="text-indigo-600 hover:text-indigo-500 text-sm font-medium focus:outline-none"
+              >
+                Use a different email
+              </button>
             </div>
           </form>
         )}

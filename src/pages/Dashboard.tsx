@@ -1,9 +1,9 @@
 // src/pages/Dashboard.tsx
-// Version: 1.5.0
-// Last Modified: 2025-02-02T15:00:00+05:30 (IST)
+// Version: 1.5.5
+// Last Modified: 2025-02-02T22:30:00+05:30 (IST)
 
 import React, { useEffect, useState } from 'react';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { Home, ListFilter, Clock, CheckCircle, XCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -15,16 +15,30 @@ interface DashboardMetrics {
   rejectedProperties: number;
 }
 
+interface MetricCardProps {
+  title: string;
+  value: number;
+  icon: React.ElementType;
+  color: string;
+}
+
+const MetricCard: React.FC<MetricCardProps> = ({ title, value, icon: Icon, color }) => (
+  <div className="bg-white rounded-lg shadow p-6">
+    <div className="flex items-center">
+      <div className={`rounded-full p-3 ${color}`}>
+        <Icon className="h-6 w-6 text-white" />
+      </div>
+      <div className="ml-4">
+        <h3 className="text-lg font-medium text-gray-900">{title}</h3>
+        <p className="text-2xl font-semibold text-gray-900">{value}</p>
+      </div>
+    </div>
+  </div>
+);
+
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { 
-    user, 
-    userProfile, 
-    loading: authLoading, 
-    error: authError,
-    isSupervisor, 
-    isPropertyOwner 
-  } = useAuth();
+  const { user, userProfile, loading: authLoading } = useAuth();
   
   const [metrics, setMetrics] = useState<DashboardMetrics>({
     totalProperties: 0,
@@ -35,116 +49,132 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Redirect if not authenticated
+  // // Debug log for auth state
+  // useEffect(() => {
+  //   console.log('Dashboard Auth State:', {
+  //     authenticated: !!user,
+  //     userId: user?.id,
+  //     userEmail: userProfile?.email,
+  //     hasProfile: !!userProfile,
+  //     userRole: userProfile?.role,
+  //     loading: authLoading,
+  //     timestamp: new Date().toISOString()
+  //   });
+  // }, [user, userProfile, authLoading]);
+
+  // Authentication check effect
   useEffect(() => {
     if (!authLoading && !user) {
+      // console.log('No authenticated user, redirecting to login');
       navigate('/login');
     }
   }, [authLoading, user, navigate]);
 
+  // Data fetching effect
   useEffect(() => {
+    let isSubscribed = true;
+
     const fetchMetrics = async () => {
-      // Don't fetch if still authenticating or no user
-      if (authLoading || !user || !userProfile) {
+      if (!user?.id || !userProfile) {
+        console.log('Skipping metrics fetch - missing user data:', {
+          hasUser: !!user,
+          hasProfile: !!userProfile
+        });
         return;
       }
 
-      setLoading(true);
-      setError(null);
-
       try {
+        console.log('Starting metrics fetch:', {
+          userId: user.id,
+          userRole: userProfile.role,
+          timestamp: new Date().toISOString()
+        });
+
+        setLoading(true);
+        setError(null);
+
+        // Build query
         let query = supabase
           .from('properties')
           .select('id, status', { count: 'exact' });
 
-        // If user is a property owner, only fetch their properties
-        if (isPropertyOwner()) {
+        if (userProfile.role === 'property_owner') {
+          console.log('Applying owner filter:', user.id);
           query = query.eq('owner_id', user.id);
         }
 
+        // Execute query
+        console.log('Executing metrics query...');
         const { data, error: fetchError } = await query;
 
-        if (fetchError) throw fetchError;
+        console.log('Metrics query response:', {
+          success: !fetchError,
+          dataReceived: !!data,
+          count: data?.length,
+          error: fetchError?.message,
+          timestamp: new Date().toISOString()
+        });
+
+        if (fetchError) {
+          throw new Error(fetchError.message);
+        }
 
         if (!data) {
           throw new Error('No data received from server');
         }
 
-        const newMetrics = {
-          totalProperties: data.length,
-          pendingReview: data.filter(p => p.status === 'pending_review').length,
-          publishedProperties: data.filter(p => p.status === 'published').length,
-          rejectedProperties: data.filter(p => p.status === 'rejected').length
-        };
+        if (isSubscribed) {
+          const newMetrics = {
+            totalProperties: data.length,
+            pendingReview: data.filter(p => p.status === 'pending_review').length,
+            publishedProperties: data.filter(p => p.status === 'published').length,
+            rejectedProperties: data.filter(p => p.status === 'rejected').length
+          };
 
-        setMetrics(newMetrics);
-      } catch (err) {
-        console.error('Error fetching metrics:', err);
-        setError('Failed to load dashboard data. Please try again.');
+          console.log('Setting new metrics:', newMetrics);
+          setMetrics(newMetrics);
+        }
+      } catch (err: any) {
+        console.error('Metrics fetch error:', {
+          message: err.message,
+          timestamp: new Date().toISOString()
+        });
+        
+        if (isSubscribed) {
+          setError(err.message || 'Failed to load dashboard data');
+        }
       } finally {
-        setLoading(false);
+        if (isSubscribed) {
+          setLoading(false);
+          console.log('Metrics fetch complete, final state:', {
+            hasError: !!error,
+            timestamp: new Date().toISOString()
+          });
+        }
       }
     };
 
     fetchMetrics();
-  }, [user, userProfile, authLoading, isPropertyOwner]);
 
-  // Handle loading states
+    return () => {
+      isSubscribed = false;
+      console.log('Cleanup: cancelling metrics fetch');
+    };
+  }, [user?.id, userProfile?.role]);
+
   if (authLoading) {
+    console.log('Rendering loading state');
     return (
-      <div className="flex justify-center items-center min-h-[50vh]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+      <div className="flex justify-center items-center min-h-[60vh]">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
       </div>
     );
   }
 
-  // Handle auth errors
-  if (authError) {
-    return (
-      <div className="p-8">
-        <div className="bg-red-50 border border-red-200 rounded-md p-4">
-          <p className="text-red-600">Authentication error: {authError}</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Handle no user or profile
   if (!user || !userProfile) {
-    return (
-      <div className="p-8 text-center">
-        <p className="text-gray-600">Please log in to access the dashboard.</p>
-      </div>
-    );
+    console.log('Rendering unauthorized state');
+    return null;
   }
-
-  // Verify role access
-  if (!isPropertyOwner() && !isSupervisor()) {
-    return (
-      <div className="p-8 text-center">
-        <p className="text-gray-600">You do not have access to this dashboard.</p>
-      </div>
-    );
-  }
-
-  const MetricCard = ({ title, value, icon: Icon, color }: { 
-    title: string; 
-    value: number; 
-    icon: any;
-    color: string;
-  }) => (
-    <div className="bg-white rounded-lg shadow p-6">
-      <div className="flex items-center">
-        <div className={`rounded-full p-3 ${color}`}>
-          <Icon className="h-6 w-6 text-white" />
-        </div>
-        <div className="ml-4">
-          <h3 className="text-lg font-medium text-gray-900">{title}</h3>
-          <p className="text-2xl font-semibold text-gray-900">{value}</p>
-        </div>
-      </div>
-    </div>
-  );
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -153,7 +183,7 @@ export default function Dashboard() {
           Welcome back, {userProfile.email}
         </h1>
         <p className="mt-1 text-sm text-gray-500">
-          {isSupervisor() ? 'Supervisor Dashboard' : 'Property Owner Dashboard'}
+          {userProfile.role === 'supervisor' ? 'Supervisor Dashboard' : 'Property Owner Dashboard'}
         </p>
       </div>
 
@@ -206,50 +236,61 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Role-specific content */}
-      {isSupervisor() && (
+      {userProfile.role === "supervisor" && (
         <div className="mt-8">
           <h2 className="text-lg font-medium text-gray-900 mb-4">Quick Actions</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <a
-              href="/properties?status=pending_review"
+            <button
+              onClick={() => {
+                console.log('Navigating to pending review properties');
+                navigate('/properties?status=pending_review');
+              }}
               className="flex items-center p-4 bg-white rounded-lg shadow hover:bg-gray-50"
             >
               <ListFilter className="h-6 w-6 text-yellow-500" />
               <span className="ml-3 text-gray-900">Review Pending Properties</span>
-            </a>
-            <a
-              href="/properties"
+            </button>
+            <button
+              onClick={() => {
+                console.log('Navigating to all properties');
+                navigate('/properties');
+              }}
               className="flex items-center p-4 bg-white rounded-lg shadow hover:bg-gray-50"
             >
               <Home className="h-6 w-6 text-blue-500" />
               <span className="ml-3 text-gray-900">View All Properties</span>
-            </a>
+            </button>
           </div>
         </div>
       )}
 
-      {isPropertyOwner() && (
+      {userProfile.role === "property_owner" && (
         <div className="mt-8">
           <h2 className="text-lg font-medium text-gray-900 mb-4">Quick Actions</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <a
-              href="/properties/add"
+            <button
+              onClick={() => {
+                console.log('Navigating to add property');
+                navigate('/properties/add');
+              }}
               className="flex items-center p-4 bg-white rounded-lg shadow hover:bg-gray-50"
             >
               <Home className="h-6 w-6 text-blue-500" />
               <span className="ml-3 text-gray-900">Add New Property</span>
-            </a>
-            <a
-              href="/properties"
+            </button>
+            <button
+              onClick={() => {
+                console.log('Navigating to my properties');
+                navigate('/properties');
+              }}
               className="flex items-center p-4 bg-white rounded-lg shadow hover:bg-gray-50"
             >
               <ListFilter className="h-6 w-6 text-blue-500" />
               <span className="ml-3 text-gray-900">View My Properties</span>
-            </a>
+            </button>
           </div>
         </div>
       )}
     </div>
   );
-}
+};

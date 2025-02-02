@@ -1,8 +1,8 @@
 // src/components/property/PropertyCard.tsx
-// Version: 1.2.0
-// Last Modified: 2025-02-01T20:30:00+05:30 (IST)
+// Version: 1.2.2
+// Last Modified: 2025-02-02T23:55:00+05:30 (IST)
 
-import React, { useState } from 'react';
+import { useState } from 'react'; // Added explicit useState import
 import { Link } from 'react-router-dom';
 import { 
   Globe2, 
@@ -32,6 +32,18 @@ export function PropertyCard({
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
 
+  // Add safety check for price formatting
+  const formatPrice = (price: number | undefined | null) => {
+    if (typeof price !== 'number') return '0';
+    return price.toLocaleString('en-IN');
+  };
+
+  // Safety check for the entire property object
+  if (!property) {
+    console.warn('PropertyCard received undefined property');
+    return null;
+  }
+
   const getStatusConfig = (status: PropertyStatus) => {
     const configs = {
       draft: {
@@ -59,7 +71,7 @@ export function PropertyCard({
         label: 'Published'
       }
     };
-    return configs[status];
+    return configs[status] || configs.draft;
   };
 
   const statusConfig = getStatusConfig(property.status);
@@ -80,13 +92,18 @@ export function PropertyCard({
       <div className="px-4 py-4 sm:px-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
           <div className="flex-1 min-w-0">
-            <h3 className="text-lg font-medium text-gray-900 mb-1">{property.title}</h3>
+            <h3 className="text-lg font-medium text-gray-900 mb-1">
+              {property.title || 'Untitled Property'}
+            </h3>
             <p className="text-sm text-gray-500">
-              {property.address}, {property.city}, {property.state}
+              {[property.address, property.city, property.state]
+                .filter(Boolean)
+                .join(', ') || 'Address not available'}
             </p>
             <p className="mt-1 text-sm font-semibold text-gray-900">
-              ₹{property.price.toLocaleString('en-IN')}
+              ₹{formatPrice(property.price)}
             </p>
+
             {showOwnerInfo && property.ownerDetails && (
               <div className="mt-2 flex items-center space-x-4 text-sm text-gray-500">
                 <span className="flex items-center">
@@ -99,6 +116,7 @@ export function PropertyCard({
                 </span>
               </div>
             )}
+            
             {property.rejection_reason && (
               <div className="mt-2 text-sm text-red-600">
                 <p className="font-medium">Rejection Reason:</p>
@@ -106,6 +124,7 @@ export function PropertyCard({
               </div>
             )}
           </div>
+
           <div className="mt-4 sm:mt-0 sm:ml-4 flex items-center space-x-4">
             <span className={cn(
               "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium",
@@ -214,7 +233,7 @@ export function PropertyCard({
 
       {/* Rejection Reason Modal */}
       {showRejectModal && (
-        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full">
             <h3 className="text-lg font-medium text-gray-900">Reject Property</h3>
             <div className="mt-4">
