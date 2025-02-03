@@ -1,21 +1,23 @@
 // src/App.tsx
-// Version: 1.9.0
-// Last Modified: 2025-02-02T03:30:00+05:30 (IST)
+// Version: 2.3.0
+// Last Modified: 2025-02-03T16:30:00+05:30 (IST)
 
-import React from 'react';
+import React, { Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Header } from '@/components/Header';
 import { AuthDebug } from './components/AuthDebug';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import Dashboard from './pages/Dashboard';
-import AddProperty from './pages/AddProperty';
-import Properties from './pages/Properties';
-import PropertyDetails from './pages/PropertyDetails';
-import EditProperty from './pages/EditProperty';
-import PropertyPreview from './pages/PropertyPreview';
-import AuthCallback from './pages/AuthCallback';
+
+// Lazy load page components
+const Login = React.lazy(() => import('./pages/Login'));
+const Register = React.lazy(() => import('./pages/Register'));
+const Dashboard = React.lazy(() => import('./pages/Dashboard'));
+const AddProperty = React.lazy(() => import('./pages/AddProperty'));
+const Properties = React.lazy(() => import('./pages/Properties'));
+const PropertyDetails = React.lazy(() => import('./pages/PropertyDetails'));
+const EditProperty = React.lazy(() => import('./pages/EditProperty'));
+const PropertyPreview = React.lazy(() => import('./pages/PropertyPreview'));
+const AuthCallback = React.lazy(() => import('./pages/AuthCallback'));
 
 function LoadingSpinner() {
   return (
@@ -25,138 +27,137 @@ function LoadingSpinner() {
   );
 }
 
+function ErrorBoundary({ children }: { children: React.ReactNode }) {
+  const { error, clearError } = useAuth();
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="max-w-md w-full space-y-8 p-6">
+          <div className="rounded-md bg-red-50 p-4">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-red-800">An error occurred</h3>
+                <div className="mt-2 text-sm text-red-700">{error}</div>
+                <div className="mt-4">
+                  <button
+                    type="button"
+                    onClick={clearError}
+                    className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return <>{children}</>;
+}
+
 function RequireAuth({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
-  console.log('RequireAuth:', { user, loading });
-  
+  const { isAuthenticated, loading } = useAuth();
+
   if (loading) {
     return <LoadingSpinner />;
   }
-  
-  if (!user) {
+
+  if (!isAuthenticated()) {
     return <Navigate to="/login" replace />;
   }
-  
+
   return <>{children}</>;
 }
 
 function PublicOnly({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
-  console.log('PublicOnly:', { user, loading });
+  const { isAuthenticated, loading } = useAuth();
 
   if (loading) {
     return <LoadingSpinner />;
   }
 
-  if (user) {
+  if (isAuthenticated()) {
     return <Navigate to="/dashboard" replace />;
   }
 
   return <>{children}</>;
 }
 
-function AppRoutes() {
-  const { user, loading } = useAuth();
-  console.log('AppRoutes:', { user, loading });
+function AppContent() {
+  const { isAuthenticated, loading } = useAuth();
 
   if (loading) {
     return <LoadingSpinner />;
   }
 
   return (
-    <>
-      <Header />
-      <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-        <Routes>
-          {/* Root redirect */}
-          <Route path="/" element={<Navigate to={user ? "/dashboard" : "/login"} replace />} />
-
-          {/* Public routes */}
-          <Route 
-            path="/login" 
-            element={
-              <PublicOnly>
-                <Login />
-              </PublicOnly>
-            } 
-          />
-          <Route 
-            path="/register" 
-            element={
-              <PublicOnly>
-                <Register />
-              </PublicOnly>
-            } 
-          />
-          <Route path="/auth/callback" element={<AuthCallback />} />
-
-          {/* Protected routes */}
-          <Route
-            path="/dashboard"
-            element={
-              <RequireAuth>
-                <Dashboard />
-              </RequireAuth>
-            }
-          />
-          <Route
-            path="/properties"
-            element={
-              <RequireAuth>
-                <Properties />
-              </RequireAuth>
-            }
-          />
-          <Route
-            path="/properties/add"
-            element={
-              <RequireAuth>
-                <AddProperty />
-              </RequireAuth>
-            }
-          />
-          <Route
-            path="/properties/:id"
-            element={
-              <RequireAuth>
-                <PropertyDetails />
-              </RequireAuth>
-            }
-          />
-          <Route
-            path="/properties/:id/edit"
-            element={
-              <RequireAuth>
-                <EditProperty />
-              </RequireAuth>
-            }
-          />
-          <Route
-            path="/properties/:id/preview"
-            element={
-              <RequireAuth>
-                <PropertyPreview />
-              </RequireAuth>
-            }
-          />
-
-          {/* Catch all route */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </main>
+    <div className="min-h-screen bg-gray-50">
+      <ErrorBoundary>
+        {isAuthenticated() ? (
+          <>
+            <Header />
+            <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+              <Suspense fallback={<LoadingSpinner />}>
+                <Routes>
+                  <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/properties" element={<Properties />} />
+                  <Route path="/properties/add" element={<AddProperty />} />
+                  <Route path="/properties/:id" element={<PropertyDetails />} />
+                  <Route path="/properties/:id/edit" element={<EditProperty />} />
+                  <Route path="/properties/:id/preview" element={<PropertyPreview />} />
+                  <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                </Routes>
+              </Suspense>
+            </main>
+          </>
+        ) : (
+          <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+            <Suspense fallback={<LoadingSpinner />}>
+              <Routes>
+                <Route path="/auth/callback" element={<AuthCallback />} />
+                <Route
+                  path="/login"
+                  element={
+                    <PublicOnly>
+                      <Login />
+                    </PublicOnly>
+                  }
+                />
+                <Route
+                  path="/register"
+                  element={
+                    <PublicOnly>
+                      <Register />
+                    </PublicOnly>
+                  }
+                />
+                <Route path="*" element={<Navigate to="/login" replace />} />
+              </Routes>
+            </Suspense>
+          </main>
+        )}
+      </ErrorBoundary>
       {process.env.NODE_ENV === 'development' && <AuthDebug />}
-    </>
+    </div>
   );
 }
 
 export default function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <div className="min-h-screen bg-gray-50">
-          <AppRoutes />
-        </div>
-      </BrowserRouter>
-    </AuthProvider>
+    <BrowserRouter>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </BrowserRouter>
   );
 }

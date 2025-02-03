@@ -1,15 +1,18 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, ReactNode, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import type { User } from '@supabase/supabase-js';
 import type { Database } from '../lib/database.types';
 
 type UserProfile = Database['public']['Tables']['profiles']['Row'];
 
-interface AuthContextType {
+interface AuthState {
   user: User | null;
   userProfile: UserProfile | null;
   loading: boolean;
   error: string | null;
+}
+
+interface AuthContextType extends AuthState {
   signInWithEmail: (email: string) => Promise<{ error?: any }>;
   verifyOTP: (email: string, token: string) => Promise<{ error?: any }>;
   signOut: () => Promise<void>;
@@ -17,150 +20,227 @@ interface AuthContextType {
   isSuperAdmin: () => boolean;
   isSupervisor: () => boolean;
   isPropertyOwner: () => boolean;
+  clearError: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const useAuth = () => {
+export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-};
+}
 
-export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [authState, setAuthState] = useState<AuthState>({
+    user: null,
+    userProfile: null,
+    loading: true,
+    error: null
+  });
+
+  const updateAuthState = (updates: Partial<AuthState>) => {
+    setAuthState(current => ({ ...current, ...updates }));
+  };
+
+  const clearError = () => {
+    updateAuthState({ error: null });
+  };
 
   const fetchProfile = async (userId: string): Promise<UserProfile | null> => {
     console.log('📥 Fetching profile for user:', userId);
-    
     try {
-      const { data: profile, error: fetchError } = await supabase
+      // Add delay to ensure Supabase session is properly initialized
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      const { data: profile, error } = await supabase
         .from('profiles')
-        .select()
+        .select('*')
         .eq('id', userId)
         .single();
 
-      if (fetchError) {
-        console.error('⚠️ Profile fetch error:', fetchError);
-        throw fetchError;
-      }
-
-      if (!profile) {
-        console.error('⚠️ No profile found for user:', userId);
+      if (error) {
+        if (error.code === 'PGRST116') {
+          // Session expired or invalid, trigger sign out
+          console.error('❌ Invalid session during profile fetch');
+          await supabase.auth.signOut();
+          return null;
+        }
+        console.error('❌ Profile fetch error:', error);
         return null;
       }
 
-      console.log('✅ Fetched profile:', profile);
+      if (!profile) {
+        console.log('⚠️ No profile found for user');
+        return null;
+      }
+
+      console.log('✅ Profile fetched successfully:', profile);
       return profile;
     } catch (err) {
       console.error('❌ Error in fetchProfile:', err);
-      throw err;
+      return null;
+    }
+  };
+
+  const handleAuthStateChange = async (currentUser: User | null) => {
+    console.log('🔄 Handling auth state change:', { 
+      hasUser: !!currentUser,
+      userId: currentUser?.id,
+      email: currentUser?.email 
+    });
+    
+    try {
+      if (!currentUser) {
+        console.log('👤 No user, clearing auth state');
+        updateAuthState({
+          user: null,
+          userProfile: null,
+          loading: false
+        });
+        return;
+      }
+
+      updateAuthState({ loading: true });
+      
+      const profile = await fetchProfile(currentUser.id);
+      
+      if (!profile) {
+        console.error('❌ No profile found after auth state change');
+        updateAuthState({
+          user: null,
+          userProfile: null,
+          loading: false,
+          error: 'Unable to load user profile'
+        });
+        await supabase.auth.signOut();
+        return;
+      }
+
+      console.log('✅ Auth state updated successfully:', {
+        userId: currentUser.id,
+        role: profile.role
+      });
+
+      updateAuthState({
+        user: currentUser,
+        userProfile: profile,
+        loading: false,
+        error: null
+      });
+    } catch (err) {
+      console.error('❌ Error in handleAuthStateChange:', err);
+      updateAuthState({
+        user: null,
+        userProfile: null,
+        loading: false,
+        error: 'Failed to update authentication state'
+      });
+      // Force sign out on error
+      await supabase.auth.signOut().catch(console.error);
     }
   };
 
   useEffect(() => {
-    console.log('🔄 AuthProvider mounted');
     let mounted = true;
+    console.log('🔄 Auth Provider mounted');
 
-    const initAuth = async () => {
-      console.log('🚀 Initializing auth...');
+    const initializeAuth = async () => {
       try {
+        console.log('📥 Getting initial session');
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        console.log('📋 Session data:', session);
         
-        if (sessionError) throw sessionError;
+        if (sessionError) {
+          console.error('❌ Session error:', sessionError);
+          throw sessionError;
+        }
 
         if (!mounted) return;
 
         if (session?.user) {
-          console.log('👤 User found in session:', session.user.id);
-          setUser(session.user);
-          
-          try {
-            const profile = await fetchProfile(session.user.id);
-            if (mounted && profile) {
-              console.log('👥 Setting user profile:', profile);
-              setUserProfile(profile);
-            }
-          } catch (profileError: any) {
-            console.error('❌ Profile error:', profileError);
-            setError(profileError.message || 'Failed to load user profile');
-          }
+          console.log('✅ Found existing session');
+          await handleAuthStateChange(session.user);
         } else {
-          console.log('ℹ️ No user session found');
-          setUser(null);
-          setUserProfile(null);
+          console.log('⚠️ No session found');
+          updateAuthState({
+            user: null,
+            userProfile: null,
+            loading: false
+          });
         }
       } catch (err) {
         console.error('❌ Auth initialization error:', err);
         if (mounted) {
-          setError('Authentication failed');
-        }
-      } finally {
-        if (mounted) {
-          setLoading(false);
+          updateAuthState({
+            user: null,
+            userProfile: null,
+            loading: false,
+            error: 'Failed to initialize authentication'
+          });
         }
       }
     };
 
-    initAuth();
+    // Initialize auth state
+    initializeAuth();
 
+    // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('🔔 Auth state change:', event, session?.user?.id);
+      if (!mounted) {
+        console.log('⚠️ Skipping auth state change - component unmounted');
+        return;
+      }
       
-      if (!mounted) return;
-
-      if (session?.user) {
-        setUser(session.user);
-        try {
-          const profile = await fetchProfile(session.user.id);
-          if (mounted && profile) {
-            setUserProfile(profile);
-          }
-        } catch (err: any) {
-          console.error('❌ Error handling auth state change:', err);
-          setError(err.message || 'Failed to load user profile');
+      console.log('🔄 Auth state changed:', { event, userId: session?.user?.id });
+      
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        if (session?.user) {
+          await handleAuthStateChange(session.user);
         }
-      } else {
-        setUser(null);
-        setUserProfile(null);
+      } else if (event === 'SIGNED_OUT') {
+        updateAuthState({
+          user: null,
+          userProfile: null,
+          loading: false
+        });
       }
     });
 
     return () => {
+      console.log('♻️ Cleaning up Auth Provider');
       mounted = false;
       subscription.unsubscribe();
     };
   }, []);
 
   const signInWithEmail = async (email: string) => {
-    console.log('📧 Sending OTP to email:', email);
-    setError(null);
+    console.log('🔑 Attempting email sign in');
+    updateAuthState({ error: null });
+    
     try {
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          emailRedirectTo: window.location.origin
+          emailRedirectTo: `${window.location.origin}/auth/callback`
         }
       });
       
       if (error) throw error;
       return { error: null };
     } catch (error: any) {
-      console.error('❌ Sign-in error:', error);
-      setError(error.message);
+      console.error('❌ Sign in error:', error);
+      const errorMessage = error.message || 'Failed to sign in';
+      updateAuthState({ error: errorMessage });
       return { error };
     }
   };
 
   const verifyOTP = async (email: string, token: string) => {
-    console.log('🔐 Verifying OTP for email:', email);
-    setError(null);
+    console.log('🔐 Verifying OTP');
+    updateAuthState({ error: null });
+    
     try {
       const { data, error } = await supabase.auth.verifyOtp({
         email,
@@ -169,49 +249,47 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
 
       if (error) throw error;
-      
-      if (data.user) {
-        setUser(data.user);
-        const profile = await fetchProfile(data.user.id);
-        if (profile) {
-          setUserProfile(profile);
-        }
-      }
-      
+      await handleAuthStateChange(data.user);
       return { error: null };
     } catch (error: any) {
       console.error('❌ OTP verification error:', error);
-      setError(error.message);
+      const errorMessage = error.message || 'Failed to verify OTP';
+      updateAuthState({ error: errorMessage });
       return { error };
     }
   };
 
   const signOut = async () => {
-    console.log('🚪 Signing out...');
+    console.log('🚪 Signing out');
     try {
-      await supabase.auth.signOut();
-      setUser(null);
-      setUserProfile(null);
-      window.location.href = '/login';
-    } catch (err) {
-      console.error('❌ Sign-out error:', err);
-      setError('Failed to sign out');
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      
+      await handleAuthStateChange(null);
+    } catch (err: any) {
+      console.error('❌ Sign out error:', err);
+      updateAuthState({ error: 'Failed to sign out' });
     }
   };
 
-  const value: AuthContextType = {
-    user,
-    userProfile,
-    loading,
-    error,
-    signInWithEmail,
-    verifyOTP,
-    signOut,
-    isAuthenticated: () => !!user && !!userProfile,
-    isSuperAdmin: () => userProfile?.role === 'super_admin',
-    isSupervisor: () => ['super_admin', 'supervisor'].includes(userProfile?.role || ''),
-    isPropertyOwner: () => userProfile?.role === 'property_owner',
-  };
+  const contextValue = useMemo(
+    () => ({
+      ...authState,
+      signInWithEmail,
+      verifyOTP,
+      signOut,
+      clearError,
+      isAuthenticated: () => !!authState.user && !!authState.userProfile,
+      isSuperAdmin: () => authState.userProfile?.role === 'super_admin',
+      isSupervisor: () => ['super_admin', 'supervisor'].includes(authState.userProfile?.role || ''),
+      isPropertyOwner: () => authState.userProfile?.role === 'property_owner',
+    }),
+    [authState]
+  );
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-};
+  return (
+    <AuthContext.Provider value={contextValue}>
+      {children}
+    </AuthContext.Provider>
+  );
+}

@@ -49,26 +49,26 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // // Debug log for auth state
-  // useEffect(() => {
-  //   console.log('Dashboard Auth State:', {
-  //     authenticated: !!user,
-  //     userId: user?.id,
-  //     userEmail: userProfile?.email,
-  //     hasProfile: !!userProfile,
-  //     userRole: userProfile?.role,
-  //     loading: authLoading,
-  //     timestamp: new Date().toISOString()
-  //   });
-  // }, [user, userProfile, authLoading]);
+  // Debug log for auth state
+  useEffect(() => {
+    console.log('Dashboard Auth State:', {
+      authenticated: !!user,
+      userId: user?.id,
+      userEmail: userProfile?.email,
+      hasProfile: !!userProfile,
+      userRole: userProfile?.role,
+      loading: authLoading,
+      timestamp: new Date().toISOString()
+    });
+  }, [user, userProfile, authLoading]);
 
   // Authentication check effect
-  useEffect(() => {
-    if (!authLoading && !user) {
-      // console.log('No authenticated user, redirecting to login');
-      navigate('/login');
-    }
-  }, [authLoading, user, navigate]);
+// In Dashboard.tsx, modify the authentication check:
+useEffect(() => {
+  if (!authLoading && !user && !userProfile) {
+    navigate('/login', { replace: true });
+  }
+}, [authLoading, user, userProfile, navigate]);
 
   // Data fetching effect
   useEffect(() => {
@@ -76,83 +76,59 @@ export default function Dashboard() {
 
     const fetchMetrics = async () => {
       if (!user?.id || !userProfile) {
-        console.log('Skipping metrics fetch - missing user data:', {
-          hasUser: !!user,
-          hasProfile: !!userProfile
-        });
+        console.warn('⚠️ Skipping metrics fetch - missing user data');
         return;
       }
-
+    
       try {
-        console.log('Starting metrics fetch:', {
-          userId: user.id,
-          userRole: userProfile.role,
-          timestamp: new Date().toISOString()
-        });
-
+        console.log('Starting metrics fetch:', { userId: user.id, userRole: userProfile.role });
+    
         setLoading(true);
         setError(null);
-
-        // Build query
-        let query = supabase
-          .from('properties')
-          .select('id, status', { count: 'exact' });
-
+    
+        // Validate table access before making a request
+        const { error: tableCheckError } = await supabase.from('properties').select('id').limit(1);
+        if (tableCheckError) {
+          console.error('❌ Database access error:', tableCheckError);
+          setError('Database access failed');
+          return;
+        }
+    
+        let query = supabase.from('properties').select('id, status', { count: 'exact' });
+    
         if (userProfile.role === 'property_owner') {
           console.log('Applying owner filter:', user.id);
           query = query.eq('owner_id', user.id);
         }
-
-        // Execute query
+    
         console.log('Executing metrics query...');
         const { data, error: fetchError } = await query;
-
-        console.log('Metrics query response:', {
-          success: !fetchError,
-          dataReceived: !!data,
-          count: data?.length,
-          error: fetchError?.message,
-          timestamp: new Date().toISOString()
-        });
-
+    
         if (fetchError) {
           throw new Error(fetchError.message);
         }
-
+    
         if (!data) {
           throw new Error('No data received from server');
         }
-
-        if (isSubscribed) {
-          const newMetrics = {
-            totalProperties: data.length,
-            pendingReview: data.filter(p => p.status === 'pending_review').length,
-            publishedProperties: data.filter(p => p.status === 'published').length,
-            rejectedProperties: data.filter(p => p.status === 'rejected').length
-          };
-
-          console.log('Setting new metrics:', newMetrics);
-          setMetrics(newMetrics);
-        }
+    
+        const newMetrics = {
+          totalProperties: data.length,
+          pendingReview: data.filter(p => p.status === 'pending_review').length,
+          publishedProperties: data.filter(p => p.status === 'published').length,
+          rejectedProperties: data.filter(p => p.status === 'rejected').length
+        };
+    
+        console.log('Setting new metrics:', newMetrics);
+        setMetrics(newMetrics);
       } catch (err: any) {
-        console.error('Metrics fetch error:', {
-          message: err.message,
-          timestamp: new Date().toISOString()
-        });
-        
-        if (isSubscribed) {
-          setError(err.message || 'Failed to load dashboard data');
-        }
+        console.error('❌ Metrics fetch error:', err);
+        setError(err.message || 'Failed to load dashboard data');
       } finally {
-        if (isSubscribed) {
-          setLoading(false);
-          console.log('Metrics fetch complete, final state:', {
-            hasError: !!error,
-            timestamp: new Date().toISOString()
-          });
-        }
+        setLoading(false);
       }
     };
+    
 
     fetchMetrics();
 

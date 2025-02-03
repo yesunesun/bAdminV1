@@ -1,6 +1,6 @@
 // src/pages/Properties.tsx
-// Version: 1.5.8
-// Last Modified: 2025-02-02T22:30:00+05:30 (IST)
+// Version: 1.6.2
+// Last Modified: 2025-02-03T10:30:00+05:30 (IST)
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
@@ -8,73 +8,27 @@ import { useAuth } from "@/contexts/AuthContext";
 import { PropertyList } from "@/components/property/PropertyList";
 import { useNavigate } from "react-router-dom";
 
-// Define TypeScript interfaces for our data structures
-interface PropertyProfile {
-  email: string;
-  phone: string;
-}
-
-interface Property {
-  id: string;
-  title: string;
-  status: string;
-  created_at: string;
-  owner_id: string;
-  profiles: PropertyProfile;
-  property_details: Record<string, any>;
-}
-
 export default function Properties() {
   const navigate = useNavigate();
   const { user, userProfile, loading: authLoading } = useAuth();
-  const [properties, setProperties] = useState<Property[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [properties, setProperties] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Debug log for auth state
-  // useEffect(() => {
-  //   console.log('Auth State:', {
-  //     authenticated: !!user,
-  //     userId: user?.id,
-  //     userEmail: userProfile?.email,
-  //     hasProfile: !!userProfile,
-  //     userRole: userProfile?.role,
-  //     loading: authLoading
-  //   });
-  // }, [user, userProfile, authLoading]);
-
-  // Authentication check effect
-  useEffect(() => {
-    if (!authLoading && !user) {
-      // console.log('No authenticated user, redirecting to login');
-      navigate('/login');
-    }
-  }, [authLoading, user, navigate]);
-
-  // Data fetching effect
+  // Handle data fetching
   useEffect(() => {
     let isSubscribed = true;
 
     const fetchProperties = async () => {
-      if (!user?.id || !userProfile) {
-        console.log('Skipping fetch - missing user data:', {
-          hasUser: !!user,
-          hasProfile: !!userProfile
-        });
-        return;
-      }
-
       try {
-        console.log('Starting properties fetch:', {
-          userId: user.id,
-          userRole: userProfile.role,
-          timestamp: new Date().toISOString()
-        });
+        // If still loading auth or no user/profile, don't fetch yet
+        if (authLoading || !user?.id || !userProfile) {
+          return;
+        }
 
         setLoading(true);
         setError(null);
 
-        // Construct the query
         let query = supabase
           .from("properties")
           .select(`
@@ -83,6 +37,10 @@ export default function Properties() {
             status,
             created_at,
             owner_id,
+            price,
+            address,
+            city,
+            state,
             property_details,
             profiles!owner_id (
               email,
@@ -91,24 +49,11 @@ export default function Properties() {
           `)
           .order('created_at', { ascending: false });
 
-        // Add role-based filtering
         if (userProfile.role === "property_owner") {
-          console.log('Applying owner filter:', user.id);
           query = query.eq("owner_id", user.id);
         }
 
-        // Execute the query
-        console.log('Executing Supabase query...');
         const { data: propertiesData, error: fetchError } = await query;
-
-        // Log the response
-        console.log('Query response:', {
-          success: !fetchError,
-          dataReceived: !!propertiesData,
-          count: propertiesData?.length,
-          error: fetchError?.message,
-          timestamp: new Date().toISOString()
-        });
 
         if (fetchError) {
           throw new Error(fetchError.message);
@@ -119,32 +64,18 @@ export default function Properties() {
             ...property,
             property_details: property.property_details || {}
           }));
-
-          console.log('Setting properties:', {
-            count: safeProperties.length,
-            firstItemId: safeProperties[0]?.id
-          });
-
+          
           setProperties(safeProperties);
         }
       } catch (err: any) {
-        console.error('Properties fetch error:', {
-          message: err.message,
-          timestamp: new Date().toISOString()
-        });
-        
         if (isSubscribed) {
+          console.error('Error fetching properties:', err);
           setError(err.message || 'Failed to load properties');
-          setProperties([]); // Reset properties on error
+          setProperties([]);
         }
       } finally {
         if (isSubscribed) {
           setLoading(false);
-          console.log('Fetch complete, final state:', {
-            propertiesCount: properties.length,
-            hasError: !!error,
-            timestamp: new Date().toISOString()
-          });
         }
       }
     };
@@ -153,13 +84,18 @@ export default function Properties() {
 
     return () => {
       isSubscribed = false;
-      console.log('Cleanup: cancelling property fetch');
     };
-  }, [user?.id, userProfile?.role]);
+  }, [authLoading, user?.id, userProfile]);
 
-  // Handle loading state
-  if (authLoading) {
-    console.log('Rendering loading state');
+  // Handle authentication state
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate('/login');
+    }
+  }, [authLoading, user, navigate]);
+
+  // Show loading state while auth is initializing or data is loading
+  if (authLoading || (loading && !properties.length)) {
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
@@ -167,9 +103,8 @@ export default function Properties() {
     );
   }
 
-  // Handle unauthorized state
+  // Don't render anything while redirecting to login
   if (!user || !userProfile) {
-    console.log('Rendering unauthorized state');
     return null;
   }
 
@@ -182,10 +117,7 @@ export default function Properties() {
         
         {userProfile.role === "property_owner" && (
           <button
-            onClick={() => {
-              console.log('Navigating to add property');
-              navigate('/properties/add');
-            }}
+            onClick={() => navigate('/properties/add')}
             className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors"
           >
             Add Property
@@ -201,7 +133,11 @@ export default function Properties() {
 
       <PropertyList 
         properties={properties} 
-        loading={loading} 
+        loading={loading}
+        onDelete={(id) => {/* Implement delete handler */}}
+        onTogglePublish={(id, status) => {/* Implement status toggle handler */}}
+        isUpdating={null}
+        showOwnerInfo={userProfile.role === 'supervisor'}
       />
     </div>
   );
