@@ -1,11 +1,11 @@
 // src/pages/Login.tsx
-// Version: 1.3.0
-// Last Modified: 30-01-2025 15:00 IST
+// Version: 1.4.1
+// Last Modified: 06-02-2025 15:30 IST
 
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Mail } from 'lucide-react';
+import { Mail, Building2, Home } from 'lucide-react';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -61,115 +61,141 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-[80vh] flex items-center justify-center">
-      <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-lg shadow">
-        <div>
-          <div className="mx-auto h-12 w-12 flex items-center justify-center rounded-full bg-indigo-100">
-            <Mail className="h-6 w-6 text-indigo-600" />
+    <div className="min-h-screen flex">
+      {/* Left side - Branding */}
+      <div className="hidden lg:flex lg:w-1/2 bg-sky-50 items-center justify-center p-12">
+        <div className="max-w-md space-y-8">
+          <div className="text-center">
+            <img 
+              src="/bhumitallilogo.png" 
+              alt="Bhoomitalli" 
+              className="h-16 mx-auto mb-8"
+            />
+            <h1 className="mt-6 text-4xl font-bold text-sky-900">Bhoomitalli</h1>
+            <p className="mt-2 text-xl text-sky-700">Transform Your Real Estate Journey</p>
           </div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            {showVerification ? 'Enter verification code' : 'Sign in to your account'}
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            {showVerification 
-              ? 'Check your email for the verification code'
-              : 'We\'ll send a verification code to your email'}
-          </p>
-        </div>
-
-        {error && (
-          <div className="bg-red-50 border border-red-200 p-4 rounded-md">
-            <p className="text-sm text-red-700">{error}</p>
-          </div>
-        )}
-
-        {showVerification ? (
-          <form className="mt-8 space-y-6" onSubmit={handleVerificationSubmit}>
-            <div>
-              <label htmlFor="token" className="block text-sm font-medium text-gray-700">
-                Verification Code
-              </label>
-              <div className="mt-1">
-                <input
-                  id="token"
-                  name="token"
-                  type="text"
-                  required
-                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                  placeholder="Enter code"
-                  value={token}
-                  onChange={(e) => setToken(e.target.value)}
-                  disabled={isLoading}
-                />
-              </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="p-4 bg-white rounded-lg shadow-md">
+              <Home className="h-6 w-6 text-sky-600 mb-2" />
+              <h3 className="font-semibold text-sky-900">Property Management</h3>
+              <p className="text-sm text-sky-600">Effortless listing and management</p>
             </div>
+            <div className="p-4 bg-white rounded-lg shadow-md">
+              <Building2 className="h-6 w-6 text-sky-600 mb-2" />
+              <h3 className="font-semibold text-sky-900">Portfolio Growth</h3>
+              <p className="text-sm text-sky-600">Scale your property business</p>
+            </div>
+          </div>
+        </div>
+      </div>
 
-            <div>
+      {/* Right side - Login Form */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center bg-gradient-to-br from-sky-400/20 to-sky-100">
+        <div className="max-w-md w-full space-y-8 p-8 bg-white/80 backdrop-blur rounded-xl shadow-lg mx-4">
+          <div className="text-center">
+            <div className="mx-auto h-14 w-14 flex items-center justify-center rounded-full bg-sky-100">
+              <Mail className="h-7 w-7 text-sky-600" />
+            </div>
+            <h2 className="mt-6 text-3xl font-bold text-sky-900">
+              {showVerification ? 'Verify Your Email' : 'Begin Your Journey'}
+            </h2>
+            <p className="mt-2 text-sm text-sky-600">
+              {showVerification 
+                ? 'Check your email for the verification code'
+                : 'Access your real estate portfolio securely'}
+            </p>
+          </div>
+
+          {error && (
+            <div className="bg-red-50 border border-red-200 p-4 rounded-lg">
+              <p className="text-sm text-red-700">{error}</p>
+            </div>
+          )}
+
+          {showVerification ? (
+            <form className="mt-8 space-y-6" onSubmit={handleVerificationSubmit}>
+              <div>
+                <label htmlFor="token" className="block text-sm font-medium text-sky-900">
+                  Verification Code
+                </label>
+                <div className="mt-1">
+                  <input
+                    id="token"
+                    name="token"
+                    type="text"
+                    required
+                    className="appearance-none block w-full px-3 py-2 border border-sky-200 rounded-lg shadow-sm placeholder-sky-400 focus:outline-none focus:ring-sky-500 focus:border-sky-500 bg-white/50 backdrop-blur sm:text-sm"
+                    placeholder="Enter verification code"
+                    value={token}
+                    onChange={(e) => setToken(e.target.value)}
+                    disabled={isLoading}
+                  />
+                </div>
+              </div>
+
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 disabled:opacity-50 transition-colors duration-200"
               >
                 {isLoading ? 'Verifying...' : 'Verify Code'}
               </button>
-            </div>
 
-            <div className="text-center">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowVerification(false);
-                  setToken('');
-                  setError('');
-                }}
-                className="text-sm text-indigo-600 hover:text-indigo-500"
-              >
-                Use a different email
-              </button>
-            </div>
-          </form>
-        ) : (
-          <form className="mt-8 space-y-6" onSubmit={handleSignInSubmit}>
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                Email address
-              </label>
-              <div className="mt-1">
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                  placeholder="you@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  disabled={isLoading}
-                />
+              <div className="text-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowVerification(false);
+                    setToken('');
+                    setError('');
+                  }}
+                  className="text-sm text-sky-600 hover:text-sky-700"
+                >
+                  Use a different email
+                </button>
               </div>
-            </div>
+            </form>
+          ) : (
+            <form className="mt-8 space-y-6" onSubmit={handleSignInSubmit}>
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium text-sky-900">
+                  Email address
+                </label>
+                <div className="mt-1">
+                  <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    autoComplete="email"
+                    required
+                    className="appearance-none block w-full px-3 py-2 border border-sky-200 rounded-lg shadow-sm placeholder-sky-400 focus:outline-none focus:ring-sky-500 focus:border-sky-500 bg-white/50 backdrop-blur sm:text-sm"
+                    placeholder="you@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    disabled={isLoading}
+                  />
+                </div>
+              </div>
 
-            <div>
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 disabled:opacity-50 transition-colors duration-200"
               >
                 {isLoading ? 'Sending code...' : 'Send verification code'}
               </button>
-            </div>
 
-            <div className="text-center">
-              <p className="text-sm text-gray-600">
-                Don't have an account?{' '}
-                <Link to="/register" className="text-indigo-600 hover:text-indigo-500">
-                  Register here
-                </Link>
-              </p>
-            </div>
-          </form>
-        )}
+              <div className="text-center">
+                <p className="text-sm text-sky-600">
+                  Don't have an account?{' '}
+                  <Link to="/register" className="font-medium text-sky-700 hover:text-sky-800">
+                    Register here
+                  </Link>
+                </p>
+              </div>
+            </form>
+          )}
+        </div>
       </div>
     </div>
   );

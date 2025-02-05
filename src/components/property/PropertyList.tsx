@@ -1,3 +1,8 @@
+// src/components/property/PropertyList.tsx
+// Version: 1.2.0
+// Last Modified: 06-02-2025 17:00 IST
+// Updates: Changed "Add Property" to "List your Property" and updated route path
+
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, Search } from 'lucide-react';
@@ -80,11 +85,11 @@ export function PropertyList({
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-900">My Properties</h2>
         <Link
-          to="/properties/add"
+          to="/properties/list"
           className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
         >
           <Plus className="h-4 w-4 mr-2" />
-          Add Property
+          List your Property
         </Link>
       </div>
 

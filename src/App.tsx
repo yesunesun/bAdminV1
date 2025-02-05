@@ -1,6 +1,7 @@
 // App.tsx
-// Version: 1.2.0
-// Last Modified: 01-02-2025 14:30 IST
+// Version: 1.3.2
+// Last Modified: 06-02-2025 17:15 IST
+// Updates: Fixed ProtectedRoute component definition
 
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
@@ -9,15 +10,20 @@ import { Header } from '@/components/Header';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
-import AddProperty from './pages/AddProperty';
+import ListYourProperty from './pages/ListYourProperty';
 import Properties from './pages/Properties';
 import PropertyDetails from './pages/PropertyDetails';
 import EditProperty from './pages/EditProperty';
 import PropertyPreview from './pages/PropertyPreview';
 import AuthCallback from './pages/AuthCallback';
+import ChatBot from './components/ChatBot';
+
+interface ProtectedRouteProps {
+  children: React.ReactNode;
+}
 
 // Protected Route wrapper component
-const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const { user } = useAuth();
   
   if (!user) {
@@ -85,10 +91,10 @@ function App() {
                 }
               />
               <Route
-                path="/properties/add"
+                path="/properties/list"
                 element={
                   <ProtectedRoute>
-                    <AddProperty />
+                    <ListYourProperty />
                   </ProtectedRoute>
                 }
               />
@@ -118,6 +124,9 @@ function App() {
               />
             </Routes>
           </main>
+
+          {/* Persistent Chat Interface */}
+          <ChatBot />
         </div>
       </BrowserRouter>
     </AuthProvider>

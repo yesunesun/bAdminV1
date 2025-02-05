@@ -8,8 +8,16 @@ export default {
   theme: {
     container: {
       center: true,
-      padding: "2rem",
+      padding: {
+        DEFAULT: "1rem",
+        sm: "2rem",
+        lg: "4rem",
+      },
       screens: {
+        sm: "640px",
+        md: "768px",
+        lg: "1024px",
+        xl: "1280px",
         "2xl": "1400px",
       },
     },
@@ -54,6 +62,16 @@ export default {
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
+      spacing: {
+        '1': 'var(--space-1)',
+        '2': 'var(--space-2)',
+        '3': 'var(--space-3)',
+        '4': 'var(--space-4)',
+        '6': 'var(--space-6)',
+        '8': 'var(--space-8)',
+        '12': 'var(--space-12)',
+        '16': 'var(--space-16)',
+      },
       keyframes: {
         "accordion-down": {
           from: { height: "0" },
@@ -70,5 +88,15 @@ export default {
       },
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [
+    require("tailwindcss-animate"),
+    // Only include typography plugin if installed
+    ...((() => {
+      try {
+        return [require('@tailwindcss/typography')];
+      } catch {
+        return [];
+      }
+    })()),
+  ],
 }
