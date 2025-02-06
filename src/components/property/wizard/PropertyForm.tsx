@@ -1,8 +1,11 @@
 // src/components/property/wizard/PropertyForm.tsx
-// Version: 1.5.0
-// Last Modified: 2025-02-01T17:00:00+05:30 (IST)
+// Version: 1.6.0
+// Last Modified: 2025-02-06T15:00:00+05:30 (IST)
+// Author: Bhoomitalli Team
+// Description: Main property wizard component that handles the entire property listing flow
+// including initial type selection and subsequent details collection
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Wand2, PencilLine, CheckCircle } from 'lucide-react';
@@ -15,6 +18,7 @@ import { AmenitiesSection } from './sections/AmenitiesSection';
 import { ImageUploadSection } from './sections/ImageUploadSection';
 import { PropertySummary } from './sections/PropertySummary';
 import { FormNavigation } from './components/FormNavigation';
+import PropertyTypeSelection from './components/PropertyTypeSelection';
 import { usePropertyForm } from './hooks/usePropertyForm';
 
 interface PropertyFormProps {
@@ -53,6 +57,11 @@ export function PropertyForm({
   status: initialStatus = 'draft'
 }: PropertyFormProps) {
   const navigate = useNavigate();
+  const [showTypeSelection, setShowTypeSelection] = useState(mode === 'create');
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [selectedAdType, setSelectedAdType] = useState<string>('');
+  const [selectedCity, setSelectedCity] = useState<string>('');
+
   const {
     form,
     currentStep,
@@ -60,7 +69,7 @@ export function PropertyForm({
     saving,
     savedPropertyId,
     user,
-    status, // Get the current status from usePropertyForm
+    status,
     handleAutoFill,
     handleNextStep,
     handlePreviousStep,
@@ -69,7 +78,15 @@ export function PropertyForm({
     handleUpdate,
     handleImageUploadComplete,
     setCurrentStep,
-  } = usePropertyForm({ initialData, propertyId, mode, status: initialStatus });
+  } = usePropertyForm({ 
+    initialData, 
+    propertyId, 
+    mode, 
+    status: initialStatus,
+    propertyCategory: selectedCategory,
+    adType: selectedAdType,
+    city: selectedCity
+  });
 
   if (!user) {
     return (
@@ -90,6 +107,17 @@ export function PropertyForm({
         </div>
       </div>
     );
+  }
+
+  const handleTypeSelectionComplete = (category: string, adType: string, city: string) => {
+    setSelectedCategory(category);
+    setSelectedAdType(adType);
+    setSelectedCity(city);
+    setShowTypeSelection(false);
+  };
+
+  if (showTypeSelection) {
+    return <PropertyTypeSelection onNext={handleTypeSelectionComplete} />;
   }
 
   return (
@@ -120,6 +148,8 @@ export function PropertyForm({
           onStepChange={setCurrentStep}
           propertyId={savedPropertyId || propertyId}
           mode={mode}
+          category={selectedCategory}
+          adType={selectedAdType}
         />
 
         <div className="p-6">
@@ -145,13 +175,38 @@ export function PropertyForm({
               saving={saving}
               status={status}
               propertyId={savedPropertyId || propertyId}
+              category={selectedCategory}
+              adType={selectedAdType}
+              city={selectedCity}
             />
           ) : (
             <div className="space-y-6">
-              {currentStep === 1 && <PropertyDetails form={form} mode={mode} />}
-              {currentStep === 2 && <LocationDetails form={form} />}
-              {currentStep === 3 && <RentalDetails form={form} />}
-              {currentStep === 4 && <AmenitiesSection form={form} />}
+              {currentStep === 1 && (
+                <PropertyDetails 
+                  form={form} 
+                  mode={mode} 
+                  category={selectedCategory}
+                  adType={selectedAdType}
+                />
+              )}
+              {currentStep === 2 && (
+                <LocationDetails 
+                  form={form} 
+                  selectedCity={selectedCity}
+                />
+              )}
+              {currentStep === 3 && (
+                <RentalDetails 
+                  form={form}
+                  adType={selectedAdType}
+                />
+              )}
+              {currentStep === 4 && (
+                <AmenitiesSection 
+                  form={form}
+                  category={selectedCategory}
+                />
+              )}
               
               <div className="flex justify-between pt-6 border-t">
                 {currentStep > 1 && (
@@ -170,8 +225,8 @@ export function PropertyForm({
                   type="button"
                   onClick={handleNextStep}
                   className={cn(
-                    "px-6 py-3 text-sm font-medium text-white bg-indigo-600 rounded-xl",
-                    "hover:bg-indigo-700 transition-colors focus:outline-none focus:ring-4 focus:ring-indigo-100",
+                    "px-6 py-3 text-sm font-medium text-white bg-teal-600 rounded-xl",
+                    "hover:bg-teal-700 transition-colors focus:outline-none focus:ring-4 focus:ring-teal-100",
                     "disabled:opacity-50"
                   )}
                 >

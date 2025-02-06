@@ -1,7 +1,7 @@
 // src/components/property/PropertyList.tsx
-// Version: 1.2.0
-// Last Modified: 06-02-2025 17:00 IST
-// Updates: Changed "Add Property" to "List your Property" and updated route path
+// Version: 1.3.0
+// Last Modified: 06-02-2025 17:35 IST
+// Updates: Added HowItWorks component integration
 
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -9,6 +9,7 @@ import { Plus, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PropertyCard } from './PropertyCard';
+import { HowItWorks } from './HowItWorks';
 import { Property } from './types';
 
 interface PropertyListProps {
@@ -92,6 +93,9 @@ export function PropertyList({
           List your Property
         </Link>
       </div>
+
+      {/* How It Works Section */}
+      {properties.length === 0 && <HowItWorks />}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="relative">

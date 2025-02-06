@@ -1,11 +1,19 @@
 // src/components/property/validationSchema.ts
-// Version: 1.0.0
-// Last Modified: 30-01-2025 16:55 IST
+// Version: 1.1.0
+// Last Modified: 06-02-2025 19:30 IST
+// Updates: Added property selection validations
 
 import { z } from 'zod';
 import { PROPERTY_TYPES, BHK_TYPES, PROPERTY_AGE, FACING_OPTIONS } from './constants';
 
 export const propertyValidationSchema = z.object({
+  // Property Selection
+  propertyCategory: z.enum(['residential', 'commercial', 'land'], {
+    required_error: 'Property category is required'
+  }),
+  listingType: z.string().min(1, 'Listing type is required'),
+  location: z.string().min(1, 'Location is required'),
+
   // Property Details
   title: z.string().optional(),
   propertyType: z.enum(PROPERTY_TYPES as [string, ...string[]]).min(1, 'Property type is required'),
@@ -55,6 +63,11 @@ export const propertyValidationSchema = z.object({
 export type PropertyValidationSchema = z.infer<typeof propertyValidationSchema>;
 
 export const stepValidationSchemas = {
+  0: propertyValidationSchema.pick({
+    propertyCategory: true,
+    listingType: true,
+    location: true,
+  }),
   1: propertyValidationSchema.pick({
     propertyType: true,
     bhkType: true,

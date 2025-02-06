@@ -1,11 +1,18 @@
 // src/components/property/types.ts
-// Version: 1.1.0
-// Last Modified: 30-01-2025 17:00 IST
+// Version: 1.2.0
+// Last Modified: 06-02-2025 19:15 IST
+// Updates: Added PropertySelectionSection types
 
 import { UseFormReturn } from 'react-hook-form';
-import { PropertyValidationSchema } from './validationSchema';
+import { PropertyValidationSchema } from './validationSchemas';
 
 export type FormData = {
+  // Property Selection Fields
+  propertyCategory: 'residential' | 'commercial' | 'land';
+  listingType: string;
+  location: string;
+  
+  // Existing Fields
   title: string;
   propertyType: string;
   bhkType: string;
@@ -84,6 +91,10 @@ export interface FormStepProps extends FormSectionProps {
   onPrevious: () => void;
 }
 
+export interface PropertySelectionSectionProps extends FormSectionProps {
+  isFirstStep?: boolean;
+}
+
 export interface ImageUploadSectionProps {
   propertyId: string;
   onUploadComplete: () => void;
@@ -127,15 +138,18 @@ export type PropertyStats = {
   inquiries: number;
 };
 
-// src/components/property/types.ts
-// Version: 2.0.0
-// Last Modified: 2025-01-30T20:30:00+05:30 (IST)
-// Author: Bhoomitalli Team
+// Property Selection Types
+export type PropertyCategory = 'residential' | 'commercial' | 'land';
 
-import { UseFormReturn } from 'react-hook-form';
+export interface PropertyCategoryOption {
+  id: PropertyCategory;
+  title: string;
+  listingTypes: string[];
+  icon: React.FC<{ className?: string }>;
+}
 
-
-export interface FormSectionProps {
-  form: UseFormReturn<FormData>;
-  mode?: 'create' | 'edit';
+export interface HowItWorksProps {
+  onStartListing?: () => void;
+  showCTA?: boolean;
+  className?: string;
 }
