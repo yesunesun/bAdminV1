@@ -1,11 +1,9 @@
 // src/components/property/PropertyList.tsx
-// Version: 1.3.0
-// Last Modified: 06-02-2025 17:35 IST
-// Updates: Added HowItWorks component integration
+// Version: 1.4.0
+// Last Modified: 07-02-2025 15:45 IST
 
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Plus, Search } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PropertyCard } from './PropertyCard';
@@ -76,7 +74,7 @@ export function PropertyList({
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-[50vh]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
   }
@@ -86,9 +84,10 @@ export function PropertyList({
       {/* How It Works Section */}
       {properties.length === 0 && <HowItWorks />}
 
+      {/* Filters */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
           <Input
             type="text"
             placeholder="Search properties..."
@@ -120,29 +119,28 @@ export function PropertyList({
         </Select>
       </div>
 
+      {/* Property Grid */}
       {filteredProperties.length === 0 ? (
-        <div className="text-center py-12 bg-white rounded-lg shadow">
-          <h3 className="text-lg font-semibold text-gray-900">No properties found</h3>
-          <p className="mt-1 text-sm text-gray-500">
+        <div className="text-center py-12 bg-card rounded-xl shadow-sm">
+          <h3 className="text-lg font-semibold text-card-foreground">No properties found</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
             {searchQuery || statusFilter !== 'all' || priceRange !== 'all'
               ? 'Try adjusting your filters'
               : 'Get started by creating a new property listing'}
           </p>
         </div>
       ) : (
-        <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-          <ul className="divide-y divide-gray-200">
-            {filteredProperties.map((property) => (
-              <PropertyCard
-                key={property.id}
-                property={property}
-                completionStatus={checkPropertyCompletion(property)}
-                onDelete={onDelete}
-                onTogglePublish={onTogglePublish}
-                isUpdating={isUpdating === property.id}
-              />
-            ))}
-          </ul>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {filteredProperties.map((property) => (
+            <PropertyCard
+              key={property.id}
+              property={property}
+              completionStatus={checkPropertyCompletion(property)}
+              onDelete={onDelete}
+              onTogglePublish={onTogglePublish}
+              isUpdating={isUpdating === property.id}
+            />
+          ))}
         </div>
       )}
     </div>

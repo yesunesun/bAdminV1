@@ -1,13 +1,11 @@
 // src/components/property/PropertyCard.tsx
-// Version: 1.5.1
-// Last Modified: 07-02-2025 12:30 IST
+// Version: 1.6.2
+// Last Modified: 07-02-2025 16:30 IST
 
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Globe2, Lock, AlertCircle, CheckCircle2, ImageOff, Trash2, Pencil, Eye, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-// Previous interfaces remain the same...
 
 export function PropertyCard({ 
   property, 
@@ -16,136 +14,138 @@ export function PropertyCard({
   onTogglePublish,
   isUpdating
 }: PropertyCardProps) {
-  const publishTooltip = !isComplete 
-    ? "Complete all required fields to publish" 
-    : property.status === 'published' 
-      ? "Click to unpublish" 
-      : "Click to publish";
+  const defaultImage = property.images?.[0]?.url;
+  const isDark = defaultImage ? 'text-white' : 'text-card-foreground';
 
   return (
-    <li>
-      <div className="px-4 py-4 sm:px-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex-1 min-w-0">
-            <h3 className="text-lg font-medium text-foreground mb-1">{property.title}</h3>
-            <p className="text-sm text-muted-foreground">
-              {property.address}, {property.city}, {property.state}
-            </p>
-            <p className="mt-1 text-sm font-semibold text-foreground">
-              ₹{property.price.toLocaleString('en-IN')}
-            </p>
-          </div>
-          <div className="mt-4 sm:mt-0 sm:ml-4 flex items-center space-x-4">
-            <button
-              onClick={() => onTogglePublish(property.id, property.status)}
-              disabled={isUpdating || !isComplete}
-              title={publishTooltip}
-              className={cn(
-                "relative inline-flex h-8 w-14 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
-                property.status === 'published' ? 'bg-primary' : 'bg-muted',
-                (!isComplete || isUpdating) ? 'opacity-50 cursor-not-allowed' : ''
-              )}
-            >
-              <span className="sr-only">Toggle publish status</span>
-              <span
-                className={cn(
-                  "pointer-events-none relative inline-block h-7 w-7 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
-                  property.status === 'published' ? 'translate-x-6' : 'translate-x-0'
-                )}
-              >
-                <span
-                  className={cn(
-                    "absolute inset-0 flex h-full w-full items-center justify-center transition-opacity",
-                    property.status === 'published'
-                      ? 'opacity-0 duration-100 ease-out'
-                      : 'opacity-100 duration-200 ease-in'
-                  )}
-                >
-                  <Lock className="h-4 w-4 text-muted-foreground" />
-                </span>
-                <span
-                  className={cn(
-                    "absolute inset-0 flex h-full w-full items-center justify-center transition-opacity",
-                    property.status === 'published'
-                      ? 'opacity-100 duration-200 ease-in'
-                      : 'opacity-0 duration-100 ease-out'
-                  )}
-                >
-                  <Globe2 className="h-4 w-4 text-primary" />
-                </span>
-              </span>
-            </button>
-            <div className="flex items-center space-x-2">
-              <Link
-                to={`/properties/${property.id}/preview`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center justify-center p-2 rounded-full text-primary-foreground bg-primary hover:bg-primary/90 transition-colors"
-                title="Preview property"
-              >
-                <Eye className="h-4 w-4" />
-              </Link>
-              <Link
-                to={`/properties/${property.id}/edit`}
-                className="inline-flex items-center justify-center p-2 rounded-full text-accent-foreground bg-accent hover:bg-accent/90 transition-colors"
-                title="Edit property"
-              >
-                <Pencil className="h-4 w-4" />
-              </Link>
-              <button
-                onClick={() => onDelete(property.id)}
-                className="inline-flex items-center justify-center p-2 rounded-full text-destructive-foreground bg-destructive hover:bg-destructive/90 transition-colors"
-                title="Delete property"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
+    <div className={cn(
+      "group relative rounded-xl overflow-hidden transition-all duration-300 hover:shadow-xl",
+      "bg-card h-[280px] flex flex-col justify-end",
+      isDark
+    )}>
+      {defaultImage && (
+        <div className="absolute inset-0">
+          <img 
+            src={defaultImage} 
+            alt={property.title} 
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
         </div>
-        <div className="mt-4 flex flex-wrap items-center gap-4">
-          <div className="flex items-center space-x-4">
-            {!hasImages && (
-              <Link
-                to={`/properties/${property.id}/edit?section=images`}
-                className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-secondary text-secondary-foreground hover:bg-secondary/90 transition-colors cursor-pointer"
-              >
-                <ImageOff className="h-4 w-4 mr-1.5" />
-                <span>No Images</span>
-                <Upload className="h-4 w-4 ml-1.5" />
-              </Link>
-            )}
-            {isComplete ? (
-              <span className="inline-flex items-center text-sm text-primary">
-                <CheckCircle2 className="h-4 w-4 mr-1.5" />
-                All details complete
-              </span>
+      )}
+      
+      {/* Visibility Toggle */}
+      <div className="absolute top-4 right-4 z-10">
+        <button
+          onClick={() => onTogglePublish(property.id, property.status)}
+          disabled={isUpdating || !isComplete}
+          className={cn(
+            "h-8 px-3 rounded-full transition-colors text-sm font-medium",
+            property.status === 'published' 
+              ? 'bg-primary text-primary-foreground hover:bg-primary/90' 
+              : 'bg-secondary text-secondary-foreground hover:bg-secondary/90',
+            (!isComplete || isUpdating) ? 'opacity-50 cursor-not-allowed' : ''
+          )}
+        >
+          <span className="flex items-center gap-1.5 whitespace-nowrap">
+            {property.status === 'published' ? (
+              <>
+                <Globe2 className="h-4 w-4" />
+                Make Private
+              </>
             ) : (
-              <div className="group relative">
-                <span className="inline-flex items-center text-sm text-secondary-foreground cursor-help">
-                  <AlertCircle className="h-4 w-4 mr-1.5" />
-                  Incomplete details
-                </span>
-                <div className="hidden group-hover:block absolute left-0 bottom-full mb-2 w-64 p-2 bg-card rounded-lg shadow-lg border border-border text-sm text-card-foreground z-10">
-                  <p className="font-medium mb-1">Missing requirements:</p>
-                  <ul className="list-disc list-inside">
-                    {!hasImages && (
-                      <li className="flex items-center text-secondary-foreground">
-                        <ImageOff className="h-4 w-4 mr-1.5" />
-                        Property images required
-                      </li>
-                    )}
-                    {missingFields.map(field => (
-                      <li key={field} className="capitalize">
-                        {field.replace(/([A-Z])/g, ' $1').trim()}
-                      </li>
+              <>
+                <Lock className="h-4 w-4" />
+                Make Public
+              </>
+            )}
+          </span>
+        </button>
+      </div>
+
+      {/* Content */}
+      <div className="relative p-4 space-y-2">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold line-clamp-1">{property.title}</h3>
+          <p className={cn(
+            "text-sm font-bold",
+            defaultImage ? "text-white" : "text-foreground"
+          )}>
+            ₹{property.price.toLocaleString('en-IN')}
+          </p>
+        </div>
+
+        <p className={cn(
+          "text-sm line-clamp-1",
+          defaultImage ? "text-white/90" : "text-muted-foreground"
+        )}>
+          {property.address}, {property.city}
+        </p>
+
+        {/* Property Details */}
+        <div className={cn(
+          "flex items-center gap-4 text-sm",
+          defaultImage ? "text-white/90" : "text-muted-foreground"
+        )}>
+          <span>{property.bedrooms} BHK</span>
+          <span>{property.square_feet} sq.ft</span>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex items-center justify-between pt-2">
+          <div className="flex items-center gap-2">
+            {!isComplete && (
+              <div className="group/tooltip relative">
+                <AlertCircle className="h-4 w-4 text-yellow-400" />
+                <div className="hidden group-hover/tooltip:block absolute left-0 bottom-full mb-2 w-48 p-2 bg-popover rounded-lg shadow-lg border border-border text-sm text-popover-foreground z-20">
+                  <ul className="space-y-1 text-xs">
+                    {missingFields.slice(0, 3).map(field => (
+                      <li key={field} className="capitalize">{field.replace(/([A-Z])/g, ' $1')}</li>
                     ))}
+                    {missingFields.length > 3 && <li>...and {missingFields.length - 3} more</li>}
                   </ul>
                 </div>
               </div>
             )}
+            {!hasImages && (
+              <Link
+                to={`/properties/${property.id}/edit?section=images`}
+                className="flex items-center gap-1 text-yellow-400 hover:text-yellow-300"
+                title="Add images"
+              >
+                <ImageOff className="h-4 w-4" />
+                <Upload className="h-3 w-3" />
+              </Link>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <Link
+              to={`/properties/${property.id}/preview`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-1.5 rounded-full bg-primary text-primary-foreground hover:bg-primary/90"
+              title="Preview"
+            >
+              <Eye className="h-4 w-4" />
+            </Link>
+            <Link
+              to={`/properties/${property.id}/edit`}
+              className="p-1.5 rounded-full bg-accent text-accent-foreground hover:bg-accent/90"
+              title="Edit"
+            >
+              <Pencil className="h-4 w-4" />
+            </Link>
+            <button
+              onClick={() => onDelete(property.id)}
+              className="p-1.5 rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              title="Delete"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
           </div>
         </div>
       </div>
-    </li>
+    </div>
   );
 }
