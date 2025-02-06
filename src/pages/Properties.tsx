@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { PropertyList } from '@/components/property/PropertyList';
 import { Property } from '@/components/property/types';
+import { Plus } from 'lucide-react';
 
 export default function Properties() {
   const { user } = useAuth();
@@ -101,6 +103,17 @@ export default function Properties() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold text-foreground">My Properties</h2>
+        <Link
+          to="/properties/list"
+          className="inline-flex items-center px-4 py-2 rounded-md shadow-sm text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors"
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          List your Property
+        </Link>
+      </div>
+
       <PropertyList
         properties={properties}
         loading={loading}
@@ -120,13 +133,13 @@ export default function Properties() {
             <div className="mt-4 flex justify-end space-x-3">
               <button
                 onClick={() => setDeleteId(null)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
               >
                 Cancel
               </button>
               <button
                 onClick={confirmDelete}
-                className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 rounded-md"
+                className="px-4 py-2 text-sm font-medium text-white bg-destructive hover:bg-destructive/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-destructive rounded-md"
               >
                 Delete
               </button>

@@ -148,12 +148,12 @@ const ChatBot = () => {
             className={`
               rounded-full w-14 h-14 bg-sky-600 hover:bg-sky-700 text-white shadow-lg
               transition-transform duration-300
-              ${!isOpen && 'animate-bounce-gentle'}
+              ${!isOpen ? 'animate-bounce-gentle' : ''}
             `}
           >
             <MessageSquare className={`
               h-6 w-6 
-              ${!isOpen && 'animate-pulse-subtle'}
+              ${!isOpen ? 'animate-pulse-subtle' : ''}
             `} />
           </Button>
 
@@ -236,7 +236,8 @@ const ChatBot = () => {
         </Card>
       )}
 
-      <style jsx global>{`
+      <style>
+        {`
         @keyframes bounce-gentle {
           0%, 100% { transform: translateY(0); }
           50% { transform: translateY(-5px); }
@@ -263,7 +264,8 @@ const ChatBot = () => {
         .animate-fade-in {
           animation: fade-in 0.3s ease-out;
         }
-      `}</style>
+        `}
+      </style>
     </div>
   );
 };

@@ -83,17 +83,6 @@ export function PropertyList({
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-900">My Properties</h2>
-        <Link
-          to="/properties/list"
-          className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          List your Property
-        </Link>
-      </div>
-
       {/* How It Works Section */}
       {properties.length === 0 && <HowItWorks />}
 

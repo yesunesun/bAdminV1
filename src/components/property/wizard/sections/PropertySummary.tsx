@@ -1,6 +1,6 @@
 // src/components/property/wizard/sections/PropertySummary.tsx
-// Version: 1.2.0
-// Last Modified: 2025-02-01T15:30:00+05:30 (IST)
+// Version: 1.3.0
+// Last Modified: 2025-02-06T16:45:00+05:30 (IST)
 
 import React from 'react';
 import { FormSection } from '@/components/FormSection';
@@ -28,13 +28,13 @@ interface SummarySectionProps {
 }
 
 const SummarySection: React.FC<SummarySectionProps> = ({ title, items }) => (
-  <div className="rounded-lg border border-slate-200 p-4">
-    <h3 className="text-sm font-medium text-slate-900 mb-3">{title}</h3>
+  <div className="rounded-lg border border-border p-4">
+    <h3 className="text-sm font-medium text-foreground mb-3">{title}</h3>
     <dl className="grid gap-2">
       {items.map(({ label, value }) => (
         <div key={label} className="grid grid-cols-2 gap-2">
-          <dt className="text-sm text-slate-500">{label}:</dt>
-          <dd className="text-sm text-slate-900">
+          <dt className="text-sm text-muted-foreground">{label}:</dt>
+          <dd className="text-sm text-foreground">
             {typeof value === 'boolean'
               ? value ? 'Yes' : 'No'
               : Array.isArray(value)
@@ -67,9 +67,9 @@ export function PropertySummary({
   const renderButtons = () => {
     if (saving) {
       return (
-        <div className="flex items-center gap-2 px-4 py-2 bg-slate-100 rounded-lg">
+        <div className="flex items-center gap-2 px-4 py-2 bg-secondary rounded-lg">
           <Loader2 className="h-4 w-4 animate-spin" />
-          <span className="text-sm text-slate-600">Saving changes...</span>
+          <span className="text-sm text-secondary-foreground">Saving changes...</span>
         </div>
       );
     }
@@ -80,11 +80,11 @@ export function PropertySummary({
           type="button"
           onClick={onUpdate}
           className={cn(
-            "flex items-center px-6 py-3",
-            "text-sm font-medium text-white",
-            "bg-indigo-600 rounded-lg",
-            "hover:bg-indigo-700 transition-colors",
-            "focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
+            "flex items-center px-6 py-3 rounded-lg",
+            "text-sm font-medium",
+            "bg-primary text-primary-foreground",
+            "hover:bg-primary/90 transition-colors",
+            "focus:outline-none focus:ring-2 focus:ring-ring",
             "disabled:opacity-50"
           )}
           disabled={saving}
@@ -101,11 +101,11 @@ export function PropertySummary({
           type="button"
           onClick={onSaveAsDraft}
           className={cn(
-            "flex items-center px-6 py-3",
-            "text-sm font-medium text-slate-700",
-            "bg-slate-100 rounded-lg",
-            "hover:bg-slate-200 transition-colors",
-            "focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500",
+            "flex items-center px-6 py-3 rounded-lg",
+            "text-sm font-medium",
+            "bg-secondary text-secondary-foreground",
+            "hover:bg-secondary/90 transition-colors",
+            "focus:outline-none focus:ring-2 focus:ring-ring",
             "disabled:opacity-50"
           )}
           disabled={saving}
@@ -117,11 +117,11 @@ export function PropertySummary({
           type="button"
           onClick={onSaveAndPublish}
           className={cn(
-            "flex items-center px-6 py-3",
-            "text-sm font-medium text-white",
-            "bg-indigo-600 rounded-lg",
-            "hover:bg-indigo-700 transition-colors",
-            "focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
+            "flex items-center px-6 py-3 rounded-lg",
+            "text-sm font-medium",
+            "bg-primary text-primary-foreground",
+            "hover:bg-primary/90 transition-colors",
+            "focus:outline-none focus:ring-2 focus:ring-ring",
             "disabled:opacity-50"
           )}
           disabled={saving}
@@ -194,22 +194,22 @@ export function PropertySummary({
           />
 
           {formData.description && (
-            <div className="rounded-lg border border-slate-200 p-4">
-              <h3 className="text-sm font-medium text-slate-900 mb-2">Description</h3>
-              <p className="text-sm text-slate-600 whitespace-pre-wrap">{formData.description}</p>
+            <div className="rounded-lg border border-border p-4">
+              <h3 className="text-sm font-medium text-foreground mb-2">Description</h3>
+              <p className="text-sm text-muted-foreground whitespace-pre-wrap">{formData.description}</p>
             </div>
           )}
         </div>
 
-        <div className="flex justify-between items-center pt-6 border-t">
+        <div className="flex justify-between items-center pt-6 border-t border-border">
           <button
             type="button"
             onClick={onPrevious}
             className={cn(
-              "px-6 py-3 text-sm font-medium",
-              "text-slate-700 bg-slate-100 rounded-lg",
-              "hover:bg-slate-200 transition-colors",
-              "focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500",
+              "px-6 py-3 text-sm font-medium rounded-lg",
+              "bg-secondary text-secondary-foreground",
+              "hover:bg-secondary/90 transition-colors",
+              "focus:outline-none focus:ring-2 focus:ring-ring",
               "disabled:opacity-50"
             )}
             disabled={saving}

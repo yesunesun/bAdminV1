@@ -1,8 +1,3 @@
-// src/pages/Dashboard.tsx
-// Version: 1.4.0
-// Last Modified: 06-02-2025 18:15 IST
-// Updates: Refactored to use component-based architecture, moved role to header
-
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus } from 'lucide-react';
@@ -114,7 +109,7 @@ export default function Dashboard() {
       actions={
         <Link
           to="/properties/list"
-          className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          className="inline-flex items-center px-4 py-2 rounded-md shadow-sm text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors"
         >
           <Plus className="h-4 w-4 mr-2" />
           List your Property

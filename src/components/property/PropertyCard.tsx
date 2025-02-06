@@ -64,11 +64,11 @@ export function PropertyCard({
       <div className="px-4 py-4 sm:px-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
           <div className="flex-1 min-w-0">
-            <h3 className="text-lg font-medium text-gray-900 mb-1">{property.title}</h3>
-            <p className="text-sm text-gray-500">
+            <h3 className="text-lg font-medium text-foreground mb-1">{property.title}</h3>
+            <p className="text-sm text-muted-foreground">
               {property.address}, {property.city}, {property.state}
             </p>
-            <p className="mt-1 text-sm font-semibold text-gray-900">
+            <p className="mt-1 text-sm font-semibold text-foreground">
               ₹{property.price.toLocaleString('en-IN')}
             </p>
           </div>
@@ -78,8 +78,8 @@ export function PropertyCard({
                 onClick={() => onTogglePublish(property.id, property.status)}
                 disabled={isUpdating || !isComplete}
                 className={cn(
-                  "relative inline-flex h-8 w-14 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2",
-                  property.status === 'published' ? 'bg-green-600' : 'bg-gray-200',
+                  "relative inline-flex h-8 w-14 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
+                  property.status === 'published' ? 'bg-primary' : 'bg-muted',
                   (!isComplete || isUpdating) ? 'opacity-50 cursor-not-allowed' : ''
                 )}
               >
@@ -98,7 +98,7 @@ export function PropertyCard({
                         : 'opacity-100 duration-200 ease-in'
                     )}
                   >
-                    <Lock className="h-4 w-4 text-gray-400" />
+                    <Lock className="h-4 w-4 text-muted-foreground" />
                   </span>
                   <span
                     className={cn(
@@ -108,58 +108,58 @@ export function PropertyCard({
                         : 'opacity-0 duration-100 ease-out'
                     )}
                   >
-                    <Globe2 className="h-4 w-4 text-green-600" />
+                    <Globe2 className="h-4 w-4 text-primary" />
                   </span>
                 </span>
               </button>
             </div>
-            <Link
-              to={`/properties/${property.id}/preview`}
-              className="inline-flex items-center p-2 border border-transparent rounded-full shadow-sm text-white bg-blue-600 hover:bg-blue-700"
-              title="Preview property"
-            >
-              <Eye className="h-4 w-4" />
-            </Link>
-            <Link
-              to={`/properties/${property.id}/edit`}
-              className="inline-flex items-center p-2 border border-transparent rounded-full shadow-sm text-white bg-indigo-600 hover:bg-indigo-700"
-              title="Edit property"
-            >
-              <Pencil className="h-4 w-4" />
-            </Link>
-            <button
-              onClick={() => onDelete(property.id)}
-              className="inline-flex items-center p-2 border border-transparent rounded-full shadow-sm text-white bg-red-600 hover:bg-red-700"
-              title="Delete property"
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
+            <div className="flex items-center space-x-2">
+              <button
+                className="inline-flex items-center justify-center p-2 rounded-full text-primary-foreground bg-primary hover:bg-primary/90 transition-colors"
+                title="Preview property"
+              >
+                <Eye className="h-4 w-4" />
+              </button>
+              <button
+                className="inline-flex items-center justify-center p-2 rounded-full text-accent-foreground bg-accent hover:bg-accent/90 transition-colors"
+                title="Edit property"
+              >
+                <Pencil className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => onDelete(property.id)}
+                className="inline-flex items-center justify-center p-2 rounded-full text-destructive-foreground bg-destructive hover:bg-destructive/90 transition-colors"
+                title="Delete property"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
           </div>
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-4">
           <div className="flex items-center space-x-4">
             {!hasImages && (
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-amber-100 text-amber-800">
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-secondary text-secondary-foreground">
                 <ImageOff className="h-4 w-4 mr-1.5" />
                 No Images
               </span>
             )}
             {isComplete ? (
-              <span className="inline-flex items-center text-sm text-green-600">
+              <span className="inline-flex items-center text-sm text-primary">
                 <CheckCircle2 className="h-4 w-4 mr-1.5" />
                 All details complete
               </span>
             ) : (
               <div className="group relative">
-                <span className="inline-flex items-center text-sm text-amber-600 cursor-help">
+                <span className="inline-flex items-center text-sm text-secondary-foreground cursor-help">
                   <AlertCircle className="h-4 w-4 mr-1.5" />
                   Incomplete details
                 </span>
-                <div className="hidden group-hover:block absolute left-0 bottom-full mb-2 w-64 p-2 bg-white rounded-lg shadow-lg border border-gray-200 text-sm text-gray-600 z-10">
+                <div className="hidden group-hover:block absolute left-0 bottom-full mb-2 w-64 p-2 bg-card rounded-lg shadow-lg border border-border text-sm text-card-foreground z-10">
                   <p className="font-medium mb-1">Missing requirements:</p>
                   <ul className="list-disc list-inside">
                     {!hasImages && (
-                      <li className="flex items-center text-amber-600">
+                      <li className="flex items-center text-secondary-foreground">
                         <ImageOff className="h-4 w-4 mr-1.5" />
                         Property images required
                       </li>

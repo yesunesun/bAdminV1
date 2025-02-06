@@ -1,6 +1,6 @@
 // src/components/property/constants.ts
-// Version: 1.1.0
-// Last Modified: 2025-01-30T19:30:00+05:30 (IST)
+// Version: 1.2.0
+// Last Modified: 2025-02-06T23:00:00+05:30 (IST)
 // Author: Bhoomitalli Team
 
 import { 
@@ -134,18 +134,34 @@ export const PROPERTY_CONDITION_OPTIONS = [
 ] as const;
 
 export const AMENITIES_LIST = [
+  // Basic utilities
   'Power Backup',
   'Lift',
   'Security',
-  'Park',
+  'Gas Pipeline',
+  'Air Conditioner',
+  'Internet Services',
+  'Intercom',
+  
+  // Facilities
   'Swimming Pool',
   'Club House',
   'Children Play Area',
-  'Garden',
   'Indoor Games',
+  'Park',
+  'Garden',
+  
+  // Services
+  'House Keeping',
+  'Servant Room',
+  'Fire Safety',
+  'Shopping Center',
+  
+  // Parking & Water
   'Visitor Parking',
   'Water Storage',
-  'Rain Water Harvesting'
+  'Rain Water Harvesting',
+  'Sewage Treatment Plant'
 ] as const;
 
 // Sample zone and localities - replace with actual data
@@ -156,4 +172,3 @@ export const HYDERABAD_LOCATIONS: Record<string, string[]> = {
   'North Zone': ['Kompally', 'Alwal', 'Secunderabad', 'Medchal'],
   'South Zone': ['Mehdipatnam', 'Attapur', 'Rajendranagar', 'Shamshabad']
 };
-

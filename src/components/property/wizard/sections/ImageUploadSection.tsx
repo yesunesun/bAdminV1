@@ -1,6 +1,6 @@
 // src/components/property/wizard/sections/ImageUploadSection.tsx
-// Version: 1.4.0
-// Last Modified: 2025-02-01T14:00:00+05:30 (IST)
+// Version: 1.5.0
+// Last Modified: 2025-02-06T17:00:00+05:30 (IST)
 
 import React from 'react';
 import { FormSection } from '@/components/FormSection';
@@ -42,8 +42,8 @@ export function ImageUploadSection({
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-12">
-        <Loader2 className="h-8 w-8 text-indigo-600 animate-spin" />
-        <span className="ml-3 text-sm text-slate-600">Loading images...</span>
+        <Loader2 className="h-8 w-8 text-primary animate-spin" />
+        <span className="ml-3 text-sm text-muted-foreground">Loading images...</span>
       </div>
     );
   }
@@ -72,7 +72,9 @@ export function ImageUploadSection({
                   "aspect-[4/3]",
                   "rounded-lg overflow-hidden",
                   "border-2",
-                  primaryImageIndex === index ? "border-indigo-500" : "border-slate-200"
+                  primaryImageIndex === index 
+                    ? "border-primary" 
+                    : "border-border"
                 )}
               >
                 <img 
@@ -90,8 +92,8 @@ export function ImageUploadSection({
                         "p-1.5 rounded-full",
                         "transition-colors duration-200",
                         primaryImageIndex === index 
-                          ? "bg-indigo-500 text-white"
-                          : "bg-white/90 text-slate-600 hover:bg-white"
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-background/90 text-foreground hover:bg-background"
                       )}
                       title={primaryImageIndex === index ? "Primary image" : "Set as primary"}
                     >
@@ -99,22 +101,26 @@ export function ImageUploadSection({
                     </button>
                     <button
                       onClick={() => removeImage(index)}
-                      className="p-1.5 rounded-full bg-white/90 text-red-500 hover:bg-white transition-colors duration-200"
+                      className={cn(
+                        "p-1.5 rounded-full",
+                        "bg-background/90 text-destructive",
+                        "hover:bg-background transition-colors duration-200"
+                      )}
                       disabled={uploading}
                     >
                       <X className="h-4 w-4" />
                     </button>
                   </div>
                   {/* Image Number */}
-                  <div className="absolute bottom-2 left-2 px-2 py-1 rounded-md bg-black/50 text-white text-xs">
+                  <div className="absolute bottom-2 left-2 px-2 py-1 rounded-md bg-black/50 text-background text-xs">
                     {index + 1} / {existingImages.length}
                   </div>
                   {/* Upload Progress */}
                   {uploading && (
                     <div className="absolute bottom-2 left-2 right-2 bg-black/50 rounded-md px-2 py-1">
-                      <div className="h-1 bg-white/30 rounded-full overflow-hidden">
+                      <div className="h-1 bg-background/30 rounded-full overflow-hidden">
                         <div 
-                          className="h-full bg-white transition-all duration-300"
+                          className="h-full bg-background transition-all duration-300"
                           style={{ width: `${uploadProgress}%` }}
                         />
                       </div>
@@ -128,19 +134,19 @@ export function ImageUploadSection({
 
         {/* Error Message */}
         {error && (
-          <div className="flex items-center gap-2 text-red-600 bg-red-50 rounded-lg p-3">
+          <div className="flex items-center gap-2 text-destructive bg-destructive/10 rounded-lg p-3">
             <AlertCircle className="h-5 w-5 flex-shrink-0" />
             <p className="text-sm">{error}</p>
           </div>
         )}
 
         {/* Upload Tips */}
-        <div className="bg-slate-50 rounded-lg p-4">
-          <h4 className="text-sm font-medium text-slate-700 mb-2 flex items-center gap-2">
+        <div className="bg-muted rounded-lg p-4">
+          <h4 className="text-sm font-medium text-foreground mb-2 flex items-center gap-2">
             <ImageIcon className="h-4 w-4" />
             Photo Requirements
           </h4>
-          <ul className="text-sm text-slate-600 space-y-1 list-disc pl-5">
+          <ul className="text-sm text-muted-foreground space-y-1 list-disc pl-5">
             <li>Upload up to 10 photos</li>
             <li>First image will be the primary photo</li>
             <li>Maximum size: 5MB per image</li>
@@ -149,13 +155,16 @@ export function ImageUploadSection({
         </div>
 
         {/* Navigation */}
-        <div className="flex justify-start pt-4 border-t">
+        <div className="flex justify-start pt-4 border-t border-border">
           <button
             type="button"
             onClick={onPrevious}
-            className="px-4 py-2.5 text-sm font-medium text-slate-600 bg-slate-100 
-              rounded-lg hover:bg-slate-200 transition-colors focus:outline-none 
-              focus:ring-2 focus:ring-slate-200"
+            className={cn(
+              "px-4 py-2.5 text-sm font-medium rounded-lg",
+              "bg-secondary text-secondary-foreground",
+              "hover:bg-secondary/90 transition-colors",
+              "focus:outline-none focus:ring-2 focus:ring-ring"
+            )}
           >
             Previous
           </button>

@@ -1,8 +1,3 @@
-// App.tsx
-// Version: 1.3.2
-// Last Modified: 06-02-2025 17:15 IST
-// Updates: Fixed ProtectedRoute component definition
-
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -22,7 +17,6 @@ interface ProtectedRouteProps {
   children: React.ReactNode;
 }
 
-// Protected Route wrapper component
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const { user } = useAuth();
   
@@ -33,7 +27,6 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   return <>{children}</>;
 };
 
-// Public Route wrapper component - redirects to dashboard if already authenticated
 const PublicRoute = ({ children }: { children: React.ReactNode }) => {
   const { user } = useAuth();
   
@@ -48,9 +41,8 @@ function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen bg-background">
           <Header />
-
           <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
             <Routes>
               {/* Public routes */}
@@ -124,8 +116,6 @@ function App() {
               />
             </Routes>
           </main>
-
-          {/* Persistent Chat Interface */}
           <ChatBot />
         </div>
       </BrowserRouter>
