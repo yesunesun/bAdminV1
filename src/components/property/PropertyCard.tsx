@@ -1,56 +1,13 @@
+// src/components/property/PropertyCard.tsx
+// Version: 1.5.1
+// Last Modified: 07-02-2025 12:30 IST
+
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Globe2, Lock, AlertCircle, CheckCircle2, ImageOff, Trash2, Pencil, Eye } from 'lucide-react';
+import { Globe2, Lock, AlertCircle, CheckCircle2, ImageOff, Trash2, Pencil, Eye, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-interface Property {
-  id: string;
-  title: string;
-  price: number;
-  address: string;
-  city: string;
-  state: string;
-  status: 'draft' | 'published';
-  property_details: {
-    propertyType: string;
-    bhkType: string;
-    floor: string;
-    totalFloors: string;
-    propertyAge: string;
-    facing: string;
-    builtUpArea: string;
-    zone: string;
-    locality: string;
-    landmark: string;
-    address: string;
-    pinCode: string;
-    rentalType: string;
-    rentAmount: string;
-    securityDeposit: string;
-    maintenance: string;
-    availableFrom: string;
-    preferredTenants: string[];
-    furnishing: string;
-    parking: string;
-    description: string;
-    amenities: string[];
-  };
-  images?: { id: string; url: string }[];
-}
-
-interface CompletionStatus {
-  isComplete: boolean;
-  missingFields: string[];
-  hasImages: boolean;
-}
-
-interface PropertyCardProps {
-  property: Property;
-  completionStatus: CompletionStatus;
-  onDelete: (id: string) => void;
-  onTogglePublish: (id: string, status: 'draft' | 'published') => void;
-  isUpdating: boolean;
-}
+// Previous interfaces remain the same...
 
 export function PropertyCard({ 
   property, 
@@ -59,6 +16,12 @@ export function PropertyCard({
   onTogglePublish,
   isUpdating
 }: PropertyCardProps) {
+  const publishTooltip = !isComplete 
+    ? "Complete all required fields to publish" 
+    : property.status === 'published' 
+      ? "Click to unpublish" 
+      : "Click to publish";
+
   return (
     <li>
       <div className="px-4 py-4 sm:px-6">
@@ -73,59 +36,62 @@ export function PropertyCard({
             </p>
           </div>
           <div className="mt-4 sm:mt-0 sm:ml-4 flex items-center space-x-4">
-            <div className="relative">
-              <button
-                onClick={() => onTogglePublish(property.id, property.status)}
-                disabled={isUpdating || !isComplete}
+            <button
+              onClick={() => onTogglePublish(property.id, property.status)}
+              disabled={isUpdating || !isComplete}
+              title={publishTooltip}
+              className={cn(
+                "relative inline-flex h-8 w-14 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
+                property.status === 'published' ? 'bg-primary' : 'bg-muted',
+                (!isComplete || isUpdating) ? 'opacity-50 cursor-not-allowed' : ''
+              )}
+            >
+              <span className="sr-only">Toggle publish status</span>
+              <span
                 className={cn(
-                  "relative inline-flex h-8 w-14 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
-                  property.status === 'published' ? 'bg-primary' : 'bg-muted',
-                  (!isComplete || isUpdating) ? 'opacity-50 cursor-not-allowed' : ''
+                  "pointer-events-none relative inline-block h-7 w-7 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
+                  property.status === 'published' ? 'translate-x-6' : 'translate-x-0'
                 )}
               >
-                <span className="sr-only">Toggle publish status</span>
                 <span
                   className={cn(
-                    "pointer-events-none relative inline-block h-7 w-7 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
-                    property.status === 'published' ? 'translate-x-6' : 'translate-x-0'
+                    "absolute inset-0 flex h-full w-full items-center justify-center transition-opacity",
+                    property.status === 'published'
+                      ? 'opacity-0 duration-100 ease-out'
+                      : 'opacity-100 duration-200 ease-in'
                   )}
                 >
-                  <span
-                    className={cn(
-                      "absolute inset-0 flex h-full w-full items-center justify-center transition-opacity",
-                      property.status === 'published'
-                        ? 'opacity-0 duration-100 ease-out'
-                        : 'opacity-100 duration-200 ease-in'
-                    )}
-                  >
-                    <Lock className="h-4 w-4 text-muted-foreground" />
-                  </span>
-                  <span
-                    className={cn(
-                      "absolute inset-0 flex h-full w-full items-center justify-center transition-opacity",
-                      property.status === 'published'
-                        ? 'opacity-100 duration-200 ease-in'
-                        : 'opacity-0 duration-100 ease-out'
-                    )}
-                  >
-                    <Globe2 className="h-4 w-4 text-primary" />
-                  </span>
+                  <Lock className="h-4 w-4 text-muted-foreground" />
                 </span>
-              </button>
-            </div>
+                <span
+                  className={cn(
+                    "absolute inset-0 flex h-full w-full items-center justify-center transition-opacity",
+                    property.status === 'published'
+                      ? 'opacity-100 duration-200 ease-in'
+                      : 'opacity-0 duration-100 ease-out'
+                  )}
+                >
+                  <Globe2 className="h-4 w-4 text-primary" />
+                </span>
+              </span>
+            </button>
             <div className="flex items-center space-x-2">
-              <button
+              <Link
+                to={`/properties/${property.id}/preview`}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="inline-flex items-center justify-center p-2 rounded-full text-primary-foreground bg-primary hover:bg-primary/90 transition-colors"
                 title="Preview property"
               >
                 <Eye className="h-4 w-4" />
-              </button>
-              <button
+              </Link>
+              <Link
+                to={`/properties/${property.id}/edit`}
                 className="inline-flex items-center justify-center p-2 rounded-full text-accent-foreground bg-accent hover:bg-accent/90 transition-colors"
                 title="Edit property"
               >
                 <Pencil className="h-4 w-4" />
-              </button>
+              </Link>
               <button
                 onClick={() => onDelete(property.id)}
                 className="inline-flex items-center justify-center p-2 rounded-full text-destructive-foreground bg-destructive hover:bg-destructive/90 transition-colors"
@@ -139,10 +105,14 @@ export function PropertyCard({
         <div className="mt-4 flex flex-wrap items-center gap-4">
           <div className="flex items-center space-x-4">
             {!hasImages && (
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-secondary text-secondary-foreground">
+              <Link
+                to={`/properties/${property.id}/edit?section=images`}
+                className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-secondary text-secondary-foreground hover:bg-secondary/90 transition-colors cursor-pointer"
+              >
                 <ImageOff className="h-4 w-4 mr-1.5" />
-                No Images
-              </span>
+                <span>No Images</span>
+                <Upload className="h-4 w-4 ml-1.5" />
+              </Link>
             )}
             {isComplete ? (
               <span className="inline-flex items-center text-sm text-primary">

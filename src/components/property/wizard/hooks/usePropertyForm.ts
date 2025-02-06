@@ -1,31 +1,47 @@
 // src/components/property/wizard/hooks/usePropertyForm.ts
-// Version: 1.3.0
-// Last Modified: 2025-02-01T17:30:00+05:30 (IST)
+// Version: 1.4.1
+// Last Modified: 07-02-2025 12:00 IST
+// Updates: Fixed searchParams usage for section navigation
 
 import { useState, useCallback, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { FormData } from '../types';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { TEST_DATA } from '../test-data';
+import { STEPS } from '../constants';
 
 interface UsePropertyFormProps {
   initialData?: FormData;
   propertyId?: string;
   mode?: 'create' | 'edit';
   status?: 'draft' | 'published';
+  propertyCategory?: string;
+  adType?: string;
+  city?: string;
 }
 
 export function usePropertyForm({ 
   initialData, 
   propertyId: existingPropertyId, 
   mode = 'create',
-  status: initialStatus = 'draft'
+  status: initialStatus = 'draft',
+  propertyCategory,
+  adType,
+  city
 }: UsePropertyFormProps) {
+  const [searchParams] = useSearchParams();
+  const section = searchParams.get('section');
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [currentStep, setCurrentStep] = useState(1);
+  
+  const [currentStep, setCurrentStep] = useState(() => {
+    if (section === 'images') {
+      return STEPS.length;
+    }
+    return 1;
+  });
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [savedPropertyId, setSavedPropertyId] = useState<string | null>(existingPropertyId || null);
@@ -69,7 +85,6 @@ export function usePropertyForm({
     }
   });
 
-  // Fetch property status when in edit mode
   useEffect(() => {
     const fetchPropertyStatus = async () => {
       if (mode === 'edit' && existingPropertyId) {
