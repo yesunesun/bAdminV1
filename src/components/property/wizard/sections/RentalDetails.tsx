@@ -50,7 +50,7 @@ export function RentalDetails({ form }: FormSectionProps) {
 
   return (
     <FormSection
-      title="Rental Details"
+      title="Rental Detailsx"
       description="Specify your rental terms and conditions"
     >
       <div className="space-y-4">

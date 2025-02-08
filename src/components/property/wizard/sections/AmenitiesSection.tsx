@@ -93,7 +93,7 @@ export function AmenitiesSection({ form }: FormSectionProps) {
 
   return (
     <FormSection
-      title="Amenities & Features"
+      title="Amenities & Featuresx"
       description="What does your property offer?"
     >
       <div className="space-y-6">
