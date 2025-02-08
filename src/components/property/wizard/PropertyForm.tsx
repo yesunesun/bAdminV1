@@ -1,247 +1,264 @@
-// src/components/property/wizard/PropertyForm.tsx
-// Version: 1.7.0
-// Last Modified: 2025-02-06T16:30:00+05:30 (IST)
+// src/components/property/RentalDetails.tsx
+// Version: 1.2.0
+// Last Modified: 2025-02-08T14:30:00+05:30 (IST)
+// Author: Bhoomitalli Team
 
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React from 'react';
+import { FormSection } from '@/components/FormSection';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { IndianRupee } from 'lucide-react';
+import { FormSectionProps } from '../types';
 import { cn } from '@/lib/utils';
-import { Wand2, PencilLine, CheckCircle } from 'lucide-react';
-import { FormData } from './types';
-import { STEPS } from './constants';
-import { PropertyDetails } from './sections/PropertyDetails';
-import { LocationDetails } from './sections/LocationDetails';
-import { RentalDetails } from './sections/RentalDetails';
-import { AmenitiesSection } from './sections/AmenitiesSection';
-import { ImageUploadSection } from './sections/ImageUploadSection';
-import { PropertySummary } from './sections/PropertySummary';
-import { FormNavigation } from './components/FormNavigation';
-import PropertyTypeSelection from './components/PropertyTypeSelection';
-import { usePropertyForm } from './hooks/usePropertyForm';
+import { RequiredLabel } from '@/components/ui/RequiredLabel';
+import {
+  RENTAL_TYPES,
+  MAINTENANCE_OPTIONS,
+  TENANT_PREFERENCES,
+  FURNISHING_OPTIONS,
+  PARKING_OPTIONS,
+} from '../constants';
 
-interface PropertyFormProps {
-  initialData?: FormData;
-  propertyId?: string;
-  mode?: 'create' | 'edit';
-  status?: 'draft' | 'published';
-}
+export function RentalDetails({ form }: FormSectionProps) {
+  const { register, watch, setValue, formState: { errors } } = form;
 
-const StatusIndicator = ({ status }: { status: 'draft' | 'published' }) => {
-  const isDraft = status === 'draft';
-  
-  return (
-    <div className={cn(
-      "flex items-center px-3 py-1.5 rounded-lg",
-      isDraft 
-        ? "bg-warning/10 text-warning border border-warning/20" 
-        : "bg-success/10 text-success border border-success/20"
-    )}>
-      {isDraft ? (
-        <PencilLine className="h-4 w-4 mr-1.5" />
-      ) : (
-        <CheckCircle className="h-4 w-4 mr-1.5" />
-      )}
-      <span className="text-sm font-medium capitalize">
-        {status}
-      </span>
-    </div>
-  );
-};
+  const handleCurrencyInput = (e: React.ChangeEvent<HTMLInputElement>, fieldName: string) => {
+    // Remove any non-numeric characters and leading zeros
+    let value = e.target.value.replace(/[^0-9]/g, '').replace(/^0+/, '');
+    
+    if (value === '') {
+      setValue(fieldName, '');
+      return;
+    }
 
-export function PropertyForm({ 
-  initialData, 
-  propertyId, 
-  mode = 'create',
-  status: initialStatus = 'draft'
-}: PropertyFormProps) {
-  const navigate = useNavigate();
-  const [showTypeSelection, setShowTypeSelection] = useState(mode === 'create');
-  const [selectedCategory, setSelectedCategory] = useState<string>('');
-  const [selectedAdType, setSelectedAdType] = useState<string>('');
-  const [selectedCity, setSelectedCity] = useState<string>('');
-
-  const {
-    form,
-    currentStep,
-    error,
-    saving,
-    savedPropertyId,
-    user,
-    status,
-    handleAutoFill,
-    handleNextStep,
-    handlePreviousStep,
-    handleSaveAsDraft,
-    handleSaveAndPublish,
-    handleUpdate,
-    handleImageUploadComplete,
-    setCurrentStep,
-  } = usePropertyForm({ 
-    initialData, 
-    propertyId, 
-    mode, 
-    status: initialStatus,
-    propertyCategory: selectedCategory,
-    adType: selectedAdType,
-    city: selectedCity
-  });
-
-  if (!user) {
-    return (
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="text-center py-12">
-          <div className="bg-card p-8 rounded-lg shadow-lg max-w-md mx-auto">
-            <h2 className="text-2xl font-bold text-destructive mb-4">Access Denied</h2>
-            <p className="text-muted-foreground mb-4">You must be logged in to create a property listing.</p>
-            <button
-              onClick={() => navigate('/login')}
-              className={cn(
-                "w-full py-2.5 px-4 rounded-lg shadow-sm text-sm font-medium",
-                "bg-primary text-primary-foreground",
-                "hover:bg-primary/90 transition-colors",
-                "focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring"
-              )}
-            >
-              Sign In
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  const handleTypeSelectionComplete = (category: string, adType: string, city: string) => {
-    setSelectedCategory(category);
-    setSelectedAdType(adType);
-    setSelectedCity(city);
-    setShowTypeSelection(false);
+    // Format the number with commas
+    const numValue = parseInt(value);
+    if (!isNaN(numValue)) {
+      setValue(fieldName, numValue.toString());
+    }
   };
 
-  if (showTypeSelection) {
-    return <PropertyTypeSelection onNext={handleTypeSelectionComplete} />;
-  }
+  // Get tomorrow's date in YYYY-MM-DD format
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const minDate = tomorrow.toISOString().split('T')[0];
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="bg-card rounded-xl shadow-lg">
-        <div className="p-3 border-b border-border">
-          <div className="flex justify-between items-center">
-            <div>
-              {process.env.NODE_ENV === 'development' && (
-                <button
-                  type="button"
-                  onClick={handleAutoFill}
-                  className={cn(
-                    "flex items-center px-3 py-1.5 text-sm font-medium rounded-lg",
-                    "bg-success text-success-foreground",
-                    "hover:bg-success/90 transition-colors",
-                    "focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring"
-                  )}
-                >
-                  <Wand2 className="h-3.5 w-3.5 mr-1.5" />
-                  Auto Fill
-                </button>
+    <FormSection
+      title="Rental Details"
+      description="Specify your rental terms and conditions"
+    >
+      <div className="space-y-4">
+        {/* Rental Type Selection */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {RENTAL_TYPES.map((type) => (
+            <div
+              key={type.id}
+              className={cn(
+                "flex items-center space-x-3 p-3 rounded-xl border border-slate-200 bg-white",
+                "transition-all hover:border-slate-300",
+                "shadow-[0_2px_4px_rgba(0,0,0,0.02)]"
               )}
+            >
+              <Checkbox
+                id={type.id}
+                checked={watch('rentalType') === type.id}
+                onCheckedChange={(checked) => {
+                  if (checked) setValue('rentalType', type.id);
+                }}
+              />
+              <label htmlFor={type.id} className="text-base font-medium text-slate-700 cursor-pointer">
+                {type.label}
+              </label>
             </div>
-            <StatusIndicator status={status} />
+          ))}
+        </div>
+
+        {/* Rent and Deposit - Two Column */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <RequiredLabel required>Monthly Rent</RequiredLabel>
+            <div className="relative">
+              <span className="absolute left-3 inset-y-0 flex items-center text-slate-500">
+                <IndianRupee className="h-4 w-4" />
+              </span>
+              <Input
+                inputMode="numeric"
+                pattern="[0-9]*"
+                className="h-11 pl-9 pr-20 text-base"
+                {...register('rentAmount')}
+                placeholder="Enter amount"
+                onChange={(e) => handleCurrencyInput(e, 'rentAmount')}
+              />
+              <span className="absolute right-3 inset-y-0 flex items-center text-sm text-slate-500">
+                per month
+              </span>
+            </div>
+            {errors.rentAmount && (
+              <p className="text-sm text-red-600 mt-0.5">{errors.rentAmount.message}</p>
+            )}
+          </div>
+
+          <div>
+            <RequiredLabel required>Security Deposit</RequiredLabel>
+            <div className="relative">
+              <span className="absolute left-3 inset-y-0 flex items-center text-slate-500">
+                <IndianRupee className="h-4 w-4" />
+              </span>
+              <Input
+                inputMode="numeric"
+                pattern="[0-9]*"
+                className="h-11 pl-9 text-base"
+                {...register('securityDeposit')}
+                placeholder="Enter deposit amount"
+                onChange={(e) => handleCurrencyInput(e, 'securityDeposit')}
+              />
+            </div>
+            {errors.securityDeposit && (
+              <p className="text-sm text-red-600 mt-0.5">{errors.securityDeposit.message}</p>
+            )}
           </div>
         </div>
 
-        <FormNavigation 
-          currentStep={currentStep} 
-          onStepChange={setCurrentStep}
-          propertyId={savedPropertyId || propertyId}
-          mode={mode}
-          category={selectedCategory}
-          adType={selectedAdType}
-        />
-
-        <div className="p-6">
-          {error && (
-            <div className="mb-4 bg-destructive/10 border border-destructive/20 p-3 rounded-xl">
-              <p className="text-sm text-destructive">{error}</p>
-            </div>
-          )}
-
-          {currentStep === STEPS.length ? (
-            <ImageUploadSection
-              propertyId={savedPropertyId!}
-              onUploadComplete={handleImageUploadComplete}
-              onPrevious={handlePreviousStep}
+        {/* Rest of the component remains the same */}
+        {/* Rent Negotiable and Maintenance - Two Column */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="rentNegotiable"
+              checked={watch('rentNegotiable')}
+              onCheckedChange={(checked) => setValue('rentNegotiable', checked as boolean)}
             />
-          ) : currentStep === STEPS.length - 1 ? (
-            <PropertySummary
-              formData={form.watch()}
-              onPrevious={handlePreviousStep}
-              onSaveAsDraft={handleSaveAsDraft}
-              onSaveAndPublish={handleSaveAndPublish}
-              onUpdate={handleUpdate}
-              saving={saving}
-              status={status}
-              propertyId={savedPropertyId || propertyId}
+            <label htmlFor="rentNegotiable" className="text-base text-slate-700 cursor-pointer">
+              Rent Negotiable
+            </label>
+          </div>
+
+          <div>
+            <RequiredLabel required>Maintenance</RequiredLabel>
+            <Select 
+              value={watch('maintenance')} 
+              onValueChange={value => setValue('maintenance', value)}
+            >
+              <SelectTrigger className="h-11 text-base">
+                <SelectValue placeholder="Maintenance terms?" />
+              </SelectTrigger>
+              <SelectContent>
+                {MAINTENANCE_OPTIONS.map(option => (
+                  <SelectItem key={option} value={option} className="text-base">
+                    {option}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* Available From and Furnishing - Two Column */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <RequiredLabel required>Available From</RequiredLabel>
+            <Input
+              type="date"
+              className="h-11 text-base"
+              min={minDate}
+              {...register('availableFrom')}
             />
-          ) : (
-            <div className="space-y-6">
-              {currentStep === 1 && (
-                <PropertyDetails 
-                  form={form} 
-                  mode={mode} 
-                  category={selectedCategory}
-                  adType={selectedAdType}
-                />
-              )}
-              {currentStep === 2 && (
-                <LocationDetails 
-                  form={form} 
-                  selectedCity={selectedCity}
-                />
-              )}
-              {currentStep === 3 && (
-                <RentalDetails 
-                  form={form}
-                  adType={selectedAdType}
-                />
-              )}
-              {currentStep === 4 && (
-                <AmenitiesSection 
-                  form={form}
-                  category={selectedCategory}
-                />
-              )}
-              
-              <div className="flex justify-between pt-6 border-t border-border">
-                {currentStep > 1 && (
-                  <button
-                    type="button"
-                    onClick={handlePreviousStep}
-                    className={cn(
-                      "px-6 py-3 text-sm font-medium rounded-xl",
-                      "bg-secondary text-secondary-foreground",
-                      "hover:bg-secondary/90 transition-colors",
-                      "focus:outline-none focus:ring-4 focus:ring-ring/30"
-                    )}
-                  >
-                    Previous
-                  </button>
+            {errors.availableFrom && (
+              <p className="text-sm text-red-600 mt-0.5">{errors.availableFrom.message}</p>
+            )}
+          </div>
+
+          <div>
+            <RequiredLabel required>Furnishing</RequiredLabel>
+            <Select 
+              value={watch('furnishing')} 
+              onValueChange={value => setValue('furnishing', value)}
+            >
+              <SelectTrigger className="h-11 text-base">
+                <SelectValue placeholder="Furnishing status?" />
+              </SelectTrigger>
+              <SelectContent>
+                {FURNISHING_OPTIONS.map(option => (
+                  <SelectItem key={option} value={option} className="text-base">
+                    {option}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* Parking */}
+        <div>
+          <RequiredLabel required>Parking</RequiredLabel>
+          <Select 
+            value={watch('parking')} 
+            onValueChange={value => setValue('parking', value)}
+          >
+            <SelectTrigger className="h-11 text-base">
+              <SelectValue placeholder="Available parking?" />
+            </SelectTrigger>
+            <SelectContent>
+              {PARKING_OPTIONS.map(option => (
+                <SelectItem key={option} value={option} className="text-base">
+                  {option}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Preferred Tenants */}
+        <div>
+          <RequiredLabel required>Preferred Tenants</RequiredLabel>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+            {TENANT_PREFERENCES.map((tenant) => (
+              <div
+                key={tenant}
+                className={cn(
+                  "flex items-center space-x-3 p-3 rounded-xl border border-slate-200 bg-white",
+                  "transition-all hover:border-slate-300"
                 )}
-                {currentStep === 1 && <div />}
-                <button
-                  type="button"
-                  onClick={handleNextStep}
-                  className={cn(
-                    "px-6 py-3 text-sm font-medium rounded-xl",
-                    "bg-primary text-primary-foreground",
-                    "hover:bg-primary/90 transition-colors",
-                    "focus:outline-none focus:ring-4 focus:ring-ring/30",
-                    "disabled:opacity-50"
-                  )}
+              >
+                <Checkbox
+                  id={`tenant-${tenant}`}
+                  checked={watch('preferredTenants')?.includes(tenant)}
+                  onCheckedChange={(checked) => {
+                    const current = watch('preferredTenants') || [];
+                    if (checked) {
+                      setValue('preferredTenants', [...current, tenant]);
+                    } else {
+                      setValue('preferredTenants', current.filter(t => t !== tenant));
+                    }
+                  }}
+                />
+                <label
+                  htmlFor={`tenant-${tenant}`}
+                  className="text-base text-slate-700 cursor-pointer"
                 >
-                  Next
-                </button>
+                  {tenant}
+                </label>
               </div>
-            </div>
-          )}
+            ))}
+          </div>
+        </div>
+
+        {/* Description */}
+        <div>
+          <RequiredLabel>Description</RequiredLabel>
+          <textarea
+            {...register('description')}
+            rows={3}
+            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base
+              shadow-[0_2px_4px_rgba(0,0,0,0.02)] placeholder:text-slate-400
+              focus:border-slate-300 focus:outline-none focus:ring-4 focus:ring-slate-100
+              hover:border-slate-300"
+            placeholder="Additional details about your property (optional)"
+          />
         </div>
       </div>
-    </div>
+    </FormSection>
   );
 }
