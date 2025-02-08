@@ -1,6 +1,11 @@
 // src/components/property/validationSchema.ts
+<<<<<<< HEAD
 // Version: 1.4.0
 // Last Modified: 2025-02-09T15:30:00+05:30 (IST)
+=======
+// Version: 1.2.0
+// Last Modified: 2025-02-08T14:30:00+05:30 (IST)
+>>>>>>> 1869bcab7721521e6bcea95b7d908917d1bc2873
 // Author: Bhoomitalli Team
 
 import { z } from 'zod';
@@ -29,6 +34,7 @@ export const propertyValidationSchema = z.object({
   locality: z.string().min(1, 'Locality is required'),
   landmark: z.string().optional(),
   address: z.string().min(1, 'Complete address is required'),
+<<<<<<< HEAD
   pinCode: z.string({
     required_error: 'PIN code is required',
   })
@@ -36,6 +42,11 @@ export const propertyValidationSchema = z.object({
     .max(6, 'PIN code must be exactly 6 digits')
     .regex(/^\d{6}$/, 'PIN code must contain only numbers')
     .regex(/^[1-9]\d{5}$/, 'PIN code must start with a non-zero digit'),
+=======
+  pinCode: z.string()
+    .length(6, 'PIN code must be 6 digits')
+    .regex(/^[1-9][0-9]{5}$/, 'Must be a valid 6-digit PIN code starting with non-zero digit'),
+>>>>>>> 1869bcab7721521e6bcea95b7d908917d1bc2873
 
   // Rental Details
   rentalType: z.enum(['rent', 'lease']).min(1, 'Rental type is required'),
