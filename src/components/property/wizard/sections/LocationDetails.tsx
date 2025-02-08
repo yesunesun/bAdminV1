@@ -1,6 +1,6 @@
 // src/components/property/LocationDetails.tsx
-// Version: 1.2.0
-// Last Modified: 2025-01-30T17:05:00+05:30 (IST)
+// Version: 1.4.0
+// Last Modified: 2025-02-09T15:30:00+05:30 (IST)
 // Author: Bhoomitalli Team
 
 import React, { useState, useEffect } from 'react';
@@ -19,7 +19,6 @@ export function LocationDetails({ form }: FormSectionProps) {
 
   const zone = watch('zone');
   const locality = watch('locality');
-  const pinCode = watch('pinCode');
 
   useEffect(() => {
     if (zone) {
@@ -32,9 +31,18 @@ export function LocationDetails({ form }: FormSectionProps) {
     }
   }, [zone, locality, setValue]);
 
+  // Watch pinCode value for controlled input
+  const pinCode = watch('pinCode');
+
   const handlePinCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/\D/g, '').slice(0, 6);
-    setValue('pinCode', value);
+    const value = e.target.value;
+    // Only allow numbers and limit to 6 digits
+    if (/^\d*$/.test(value) && value.length <= 6) {
+      setValue('pinCode', value, { 
+        shouldValidate: true, // Trigger validation on change
+        shouldDirty: true // Mark field as dirty
+      });
+    }
   };
 
   return (
@@ -108,14 +116,25 @@ export function LocationDetails({ form }: FormSectionProps) {
           <div>
             <RequiredLabel required>PIN Code</RequiredLabel>
             <Input
-              value={pinCode}
+              type="tel"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              {...register('pinCode', { required: 'PIN code is required' })}
+              value={pinCode || ''}
               onChange={handlePinCodeChange}
               className="h-11 text-base"
               maxLength={6}
               placeholder="6-digit PIN code"
+              aria-describedby="pincode-hint"
+              required
             />
             {errors.pinCode && (
               <p className="text-sm text-red-600 mt-0.5">{errors.pinCode.message}</p>
+            )}
+            {!errors.pinCode && (
+              <p id="pincode-hint" className="text-xs text-slate-500 mt-0.5">
+                Enter a valid 6-digit PIN code
+              </p>
             )}
           </div>
         </div>

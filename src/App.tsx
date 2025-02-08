@@ -11,7 +11,7 @@ import PropertyDetails from './pages/PropertyDetails';
 import EditProperty from './pages/EditProperty';
 import PropertyPreview from './pages/PropertyPreview';
 import AuthCallback from './pages/AuthCallback';
-import ChatBot from './components/ChatBot';
+// import ChatBot from './components/ChatBot';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -116,7 +116,7 @@ function App() {
               />
             </Routes>
           </main>
-          <ChatBot />
+          {/* <ChatBot /> */}
         </div>
       </BrowserRouter>
     </AuthProvider>

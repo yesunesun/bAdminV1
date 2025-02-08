@@ -1,7 +1,7 @@
 // src/components/property/validationSchema.ts
-// Version: 1.1.0
-// Last Modified: 06-02-2025 19:30 IST
-// Updates: Added property selection validations
+// Version: 1.4.0
+// Last Modified: 2025-02-09T15:30:00+05:30 (IST)
+// Author: Bhoomitalli Team
 
 import { z } from 'zod';
 import { PROPERTY_TYPES, BHK_TYPES, PROPERTY_AGE, FACING_OPTIONS } from './constants';
@@ -29,12 +29,22 @@ export const propertyValidationSchema = z.object({
   locality: z.string().min(1, 'Locality is required'),
   landmark: z.string().optional(),
   address: z.string().min(1, 'Complete address is required'),
-  pinCode: z.string().length(6, 'PIN code must be 6 digits').regex(/^\d+$/, 'Must contain only numbers'),
+  pinCode: z.string({
+    required_error: 'PIN code is required',
+  })
+    .min(6, 'PIN code must be exactly 6 digits')
+    .max(6, 'PIN code must be exactly 6 digits')
+    .regex(/^\d{6}$/, 'PIN code must contain only numbers')
+    .regex(/^[1-9]\d{5}$/, 'PIN code must start with a non-zero digit'),
 
   // Rental Details
   rentalType: z.enum(['rent', 'lease']).min(1, 'Rental type is required'),
-  rentAmount: z.string().min(1, 'Rent amount is required'),
-  securityDeposit: z.string().min(1, 'Security deposit is required'),
+  rentAmount: z.string()
+    .min(1, 'Rent amount is required')
+    .regex(/^[1-9][0-9]*$/, 'Must be a valid amount'),
+  securityDeposit: z.string()
+    .min(1, 'Security deposit is required')
+    .regex(/^[1-9][0-9]*$/, 'Must be a valid amount'),
   rentNegotiable: z.boolean().default(false),
   maintenance: z.string().min(1, 'Maintenance option is required'),
   availableFrom: z.string().min(1, 'Available date is required'),

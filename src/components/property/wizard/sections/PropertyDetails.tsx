@@ -1,6 +1,6 @@
 // src/components/property/PropertyDetails.tsx
-// Version: 1.4.1
-// Last Modified: 2025-02-01T10:30:00+05:30 (IST)
+// Version: 1.5.0
+// Last Modified: 2025-02-09T16:30:00+05:30 (IST)
 // Author: Bhoomitalli Team
 
 import React from 'react';
@@ -22,7 +22,10 @@ export function PropertyDetails({ form, mode = 'create' }: FormSectionProps) {
   const handleNumberInput = (e: React.ChangeEvent<HTMLInputElement>, fieldName: string) => {
     const value = e.target.value;
     if (value === '') {
-      setValue(fieldName, '');
+      setValue(fieldName, '', {
+        shouldValidate: true,
+        shouldDirty: true
+      });
       return;
     }
     
@@ -33,12 +36,17 @@ export function PropertyDetails({ form, mode = 'create' }: FormSectionProps) {
     }
     
     if (numValue < 0) {
-      setValue(fieldName, '0');
+      setValue(fieldName, '0', {
+        shouldValidate: true,
+        shouldDirty: true
+      });
       return;
     }
     
-    setValue(fieldName, numValue.toString());
-    trigger(fieldName);
+    setValue(fieldName, numValue.toString(), {
+      shouldValidate: true,
+      shouldDirty: true
+    });
   };
 
   return (
@@ -54,7 +62,9 @@ export function PropertyDetails({ form, mode = 'create' }: FormSectionProps) {
             <RequiredLabel required className="text-base">Type</RequiredLabel>
             <Select 
               value={watch('propertyType')} 
-              onValueChange={value => setValue('propertyType', value)}
+              onValueChange={value => setValue('propertyType', value, { 
+                shouldValidate: true 
+              })}
             >
               <SelectTrigger className="h-11 text-base">
                 <SelectValue placeholder="Type of property?" />
@@ -68,7 +78,7 @@ export function PropertyDetails({ form, mode = 'create' }: FormSectionProps) {
               </SelectContent>
             </Select>
             {errors.propertyType && (
-              <p className="text-sm text-red-600 mt-0.5">{errors.propertyType.message}</p>
+              <p className="text-sm text-red-600 mt-0.5">{errors.propertyType.message?.toString()}</p>
             )}
           </div>
 
@@ -76,7 +86,9 @@ export function PropertyDetails({ form, mode = 'create' }: FormSectionProps) {
             <RequiredLabel required className="text-base">BHK</RequiredLabel>
             <Select 
               value={watch('bhkType')} 
-              onValueChange={value => setValue('bhkType', value)}
+              onValueChange={value => setValue('bhkType', value, { 
+                shouldValidate: true 
+              })}
             >
               <SelectTrigger className="h-11 text-base">
                 <SelectValue placeholder="Number of bedrooms?" />
@@ -90,7 +102,7 @@ export function PropertyDetails({ form, mode = 'create' }: FormSectionProps) {
               </SelectContent>
             </Select>
             {errors.bhkType && (
-              <p className="text-sm text-red-600 mt-0.5">{errors.bhkType.message}</p>
+              <p className="text-sm text-red-600 mt-0.5">{errors.bhkType.message?.toString()}</p>
             )}
           </div>
         </div>
@@ -103,12 +115,15 @@ export function PropertyDetails({ form, mode = 'create' }: FormSectionProps) {
               type="number"
               min="0"
               className="h-11 text-base"
-              {...register('floor')}
+              {...register('floor', { 
+                required: 'Floor number is required',
+                min: { value: 0, message: 'Floor number cannot be negative' }
+              })}
               placeholder="Floor number (0 = ground)"
               onChange={(e) => handleNumberInput(e, 'floor')}
             />
             {errors.floor && (
-              <p className="text-sm text-red-600 mt-0.5">{errors.floor.message}</p>
+              <p className="text-sm text-red-600 mt-0.5">{errors.floor.message?.toString()}</p>
             )}
           </div>
 
@@ -118,12 +133,15 @@ export function PropertyDetails({ form, mode = 'create' }: FormSectionProps) {
               type="number"
               min="1"
               className="h-11 text-base"
-              {...register('totalFloors')}
+              {...register('totalFloors', { 
+                required: 'Total floors is required',
+                min: { value: 1, message: 'Building must have at least 1 floor' }
+              })}
               placeholder="Building total floors"
               onChange={(e) => handleNumberInput(e, 'totalFloors')}
             />
             {errors.totalFloors && (
-              <p className="text-sm text-red-600 mt-0.5">{errors.totalFloors.message}</p>
+              <p className="text-sm text-red-600 mt-0.5">{errors.totalFloors.message?.toString()}</p>
             )}
           </div>
         </div>
@@ -134,7 +152,9 @@ export function PropertyDetails({ form, mode = 'create' }: FormSectionProps) {
             <RequiredLabel required className="text-base">Age</RequiredLabel>
             <Select 
               value={watch('propertyAge')} 
-              onValueChange={value => setValue('propertyAge', value)}
+              onValueChange={value => setValue('propertyAge', value, { 
+                shouldValidate: true 
+              })}
             >
               <SelectTrigger className="h-11 text-base">
                 <SelectValue placeholder="Property age?" />
@@ -148,7 +168,7 @@ export function PropertyDetails({ form, mode = 'create' }: FormSectionProps) {
               </SelectContent>
             </Select>
             {errors.propertyAge && (
-              <p className="text-sm text-red-600 mt-0.5">{errors.propertyAge.message}</p>
+              <p className="text-sm text-red-600 mt-0.5">{errors.propertyAge.message?.toString()}</p>
             )}
           </div>
 
@@ -156,7 +176,9 @@ export function PropertyDetails({ form, mode = 'create' }: FormSectionProps) {
             <RequiredLabel required className="text-base">Facing</RequiredLabel>
             <Select 
               value={watch('facing')} 
-              onValueChange={value => setValue('facing', value)}
+              onValueChange={value => setValue('facing', value, { 
+                shouldValidate: true 
+              })}
             >
               <SelectTrigger className="h-11 text-base">
                 <SelectValue placeholder="Direction facing?" />
@@ -170,7 +192,7 @@ export function PropertyDetails({ form, mode = 'create' }: FormSectionProps) {
               </SelectContent>
             </Select>
             {errors.facing && (
-              <p className="text-sm text-red-600 mt-0.5">{errors.facing.message}</p>
+              <p className="text-sm text-red-600 mt-0.5">{errors.facing.message?.toString()}</p>
             )}
           </div>
         </div>
@@ -184,17 +206,26 @@ export function PropertyDetails({ form, mode = 'create' }: FormSectionProps) {
                 type="number"
                 min="100"
                 className="h-11 text-base pr-16"
-                {...register('builtUpArea')}
+                {...register('builtUpArea', {
+                  required: 'Built-up area is required',
+                  min: { value: 100, message: 'Area must be at least 100 sq ft' }
+                })}
                 placeholder="Area (min. 100)"
                 onChange={(e) => {
                   const value = e.target.value;
                   if (value === '') {
-                    setValue('builtUpArea', '');
+                    setValue('builtUpArea', '', {
+                      shouldValidate: true,
+                      shouldDirty: true
+                    });
                     return;
                   }
                   const numValue = parseInt(value);
                   if (!isNaN(numValue) && numValue >= 100) {
-                    setValue('builtUpArea', numValue.toString());
+                    setValue('builtUpArea', numValue.toString(), {
+                      shouldValidate: true,
+                      shouldDirty: true
+                    });
                   }
                 }}
               />
@@ -203,7 +234,7 @@ export function PropertyDetails({ form, mode = 'create' }: FormSectionProps) {
               </span>
             </div>
             {errors.builtUpArea && (
-              <p className="text-sm text-red-600 mt-0.5">{errors.builtUpArea.message}</p>
+              <p className="text-sm text-red-600 mt-0.5">{errors.builtUpArea.message?.toString()}</p>
             )}
           </div>
 
@@ -216,7 +247,7 @@ export function PropertyDetails({ form, mode = 'create' }: FormSectionProps) {
                 placeholder="E.g., Spacious 2BHK in Gachibowli"
               />
               {errors.title && (
-                <p className="text-sm text-red-600 mt-0.5">{errors.title.message}</p>
+                <p className="text-sm text-red-600 mt-0.5">{errors.title.message?.toString()}</p>
               )}
             </div>
           )}

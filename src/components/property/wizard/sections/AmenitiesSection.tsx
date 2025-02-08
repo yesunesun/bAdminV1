@@ -1,6 +1,7 @@
 // src/components/property/wizard/sections/AmenitiesSection.tsx
-// Version: 1.2.4
-// Last Modified: 2025-02-06T22:15:00+05:30 (IST)
+// Version: 1.5.0
+// Last Modified: 2025-02-09T16:30:00+05:30 (IST)
+// Author: Bhoomitalli Team
 
 import React from 'react';
 import { FormSection } from '@/components/FormSection';
@@ -15,30 +16,23 @@ import {
   Phone,
   Building2,
   Shield,
-  Home,
-  Car,
-  Droplet,
-  Lock,
-  Users,
   HeartPulse,
   Utensils,
   Zap,
   ArrowUpDown,
   Trees,
-  Building,
+  Lock,
+  Droplet,
   Gamepad,
   ParkingSquare,
   Container,
   CloudRain,
-  CheckCircle,
-  Navigation,
   Wifi,
   Wind,
   Speaker,
   PlaySquare,
   UserCircle,
   Flame,
-  Trash2,
   HomeIcon,
   Store
 } from 'lucide-react';
@@ -55,41 +49,46 @@ export function AmenitiesSection({ form }: FormSectionProps) {
   const handleNumberChange = (type: 'bathrooms' | 'balconies', action: 'increment' | 'decrement') => {
     const current = parseInt(watch(type) || '0');
     if (action === 'increment') {
-      setValue(type, (current + 1).toString());
+      setValue(type, (current + 1).toString(), {
+        shouldValidate: true,
+        shouldDirty: true
+      });
     } else if (current > 0) {
-      setValue(type, (current - 1).toString());
+      setValue(type, (current - 1).toString(), {
+        shouldValidate: true,
+        shouldDirty: true
+      });
     }
   };
 
   const quickAmenities = [
-    { id: 'hasGym', label: 'Gym', icon: HeartPulse },           // Heart pulse for gym/fitness
-    { id: 'nonVegAllowed', label: 'Non-Veg Allowed', icon: Utensils },  // Utensils for food
-    { id: 'gatedSecurity', label: 'Gated Security', icon: Shield }      // Shield for security
+    { id: 'hasGym', label: 'Gym', icon: HeartPulse },
+    { id: 'nonVegAllowed', label: 'Non-Veg Allowed', icon: Utensils },
+    { id: 'gatedSecurity', label: 'Gated Security', icon: Shield }
   ];
 
   // Using unique icons for each amenity
   const otherAmenitiesIcons: Record<string, React.ComponentType> = {
-    'Power Backup': Zap,                    // Electric symbol for power backup
-    'Lift': ArrowUpDown,                    // Up/down arrows for lift
-    'Security': Lock,                       // Lock for security
-    'Park': Trees,                          // Trees for park
-    'Swimming Pool': Droplet,               // Water drop for pool
-    'Club House': Building2,                // Modern building for club house
-    'Children Play Area': PlaySquare,       // Play symbol for play area
-    'Garden': Trees,                        // Trees for garden
-    'Indoor Games': Gamepad,                // Gamepad for indoor games
-    'Visitor Parking': ParkingSquare,       // Parking sign for visitor parking
-    'Water Storage': Container,             // Container for water storage
-    'Rain Water Harvesting': CloudRain,     // Rain cloud for rain water harvesting
-    'Internet Services': Wifi,              // WiFi symbol for internet
-    'Air Conditioner': Wind,                // Wind symbol for AC
-    'Intercom': Speaker,                    // Speaker for intercom
-    'Servant Room': UserCircle,             // User icon for servant room
-    'Gas Pipeline': Flame,                  // Flame icon for gas
-    'Fire Safety': Shield,                  // Shield for fire safety
-    'Shopping Center': Store,               // Store for shopping center
-    'Sewage Treatment Plant': Trash2,       // Waste management icon
-    'House Keeping': HomeIcon               // Home icon for house keeping
+    'Power Backup': Zap,
+    'Lift': ArrowUpDown,
+    'Security': Lock,
+    'Park': Trees,
+    'Swimming Pool': Droplet,
+    'Club House': Building2,
+    'Children Play Area': PlaySquare,
+    'Garden': Trees,
+    'Indoor Games': Gamepad,
+    'Visitor Parking': ParkingSquare,
+    'Water Storage': Container,
+    'Rain Water Harvesting': CloudRain,
+    'Internet Services': Wifi,
+    'Air Conditioner': Wind,
+    'Intercom': Speaker,
+    'Servant Room': UserCircle,
+    'Gas Pipeline': Flame,
+    'Fire Safety': Shield,
+    'Shopping Center': Store,
+    'House Keeping': HomeIcon
   };
 
   return (
@@ -115,6 +114,10 @@ export function AmenitiesSection({ form }: FormSectionProps) {
               <Input
                 type="text"
                 className="flex-1 text-center border-x rounded-none h-full"
+                {...register('bathrooms', {
+                  required: 'Number of bathrooms is required',
+                  min: { value: 1, message: 'At least 1 bathroom is required' }
+                })}
                 value={watch('bathrooms') || '0'}
                 readOnly
               />
@@ -126,6 +129,9 @@ export function AmenitiesSection({ form }: FormSectionProps) {
                 <Plus className="h-4 w-4" />
               </button>
             </div>
+            {errors.bathrooms && (
+              <p className="text-sm text-red-600 mt-0.5">{errors.bathrooms.message?.toString()}</p>
+            )}
           </div>
 
           {/* Balconies Counter */}
@@ -167,7 +173,7 @@ export function AmenitiesSection({ form }: FormSectionProps) {
               <Checkbox
                 id={id}
                 checked={watch(id)}
-                onCheckedChange={(checked) => setValue(id, checked)}
+                onCheckedChange={(checked) => setValue(id, checked as boolean)}
               />
               <label
                 htmlFor={id}
@@ -186,7 +192,10 @@ export function AmenitiesSection({ form }: FormSectionProps) {
             <RequiredLabel required>Who Shows Property?</RequiredLabel>
             <Select 
               value={watch('propertyShowOption')} 
-              onValueChange={value => setValue('propertyShowOption', value)}
+              onValueChange={value => setValue('propertyShowOption', value, {
+                shouldValidate: true,
+                shouldDirty: true
+              })}
             >
               <SelectTrigger className="h-12">
                 <SelectValue placeholder="Select who shows" />
@@ -198,7 +207,7 @@ export function AmenitiesSection({ form }: FormSectionProps) {
               </SelectContent>
             </Select>
             {errors.propertyShowOption && (
-              <p className="text-sm text-red-500 mt-1">{errors.propertyShowOption.message}</p>
+              <p className="text-sm text-red-600 mt-0.5">{errors.propertyShowOption.message?.toString()}</p>
             )}
           </div>
 
@@ -206,7 +215,10 @@ export function AmenitiesSection({ form }: FormSectionProps) {
             <RequiredLabel required>Property Condition</RequiredLabel>
             <Select 
               value={watch('propertyCondition')} 
-              onValueChange={value => setValue('propertyCondition', value)}
+              onValueChange={value => setValue('propertyCondition', value, {
+                shouldValidate: true,
+                shouldDirty: true
+              })}
             >
               <SelectTrigger className="h-12">
                 <SelectValue placeholder="Select condition" />
@@ -218,7 +230,7 @@ export function AmenitiesSection({ form }: FormSectionProps) {
               </SelectContent>
             </Select>
             {errors.propertyCondition && (
-              <p className="text-sm text-red-500 mt-1">{errors.propertyCondition.message}</p>
+              <p className="text-sm text-red-600 mt-0.5">{errors.propertyCondition.message?.toString()}</p>
             )}
           </div>
         </div>
@@ -238,10 +250,18 @@ export function AmenitiesSection({ form }: FormSectionProps) {
                 type="tel"
                 className="h-12 pl-16"
                 maxLength={10}
-                {...register('secondaryNumber')}
+                {...register('secondaryNumber', {
+                  pattern: {
+                    value: /^\d{10}$/,
+                    message: 'Please enter a valid 10-digit phone number'
+                  }
+                })}
                 placeholder="Additional contact number"
               />
             </div>
+            {errors.secondaryNumber && (
+              <p className="text-sm text-red-600 mt-0.5">{errors.secondaryNumber.message?.toString()}</p>
+            )}
           </div>
 
           <div>
@@ -259,7 +279,7 @@ export function AmenitiesSection({ form }: FormSectionProps) {
           <Checkbox
             id="hasSimilarUnits"
             checked={watch('hasSimilarUnits')}
-            onCheckedChange={(checked) => setValue('hasSimilarUnits', checked)}
+            onCheckedChange={(checked) => setValue('hasSimilarUnits', checked as boolean)}
           />
           <label
             htmlFor="hasSimilarUnits"
@@ -286,9 +306,15 @@ export function AmenitiesSection({ form }: FormSectionProps) {
                     onCheckedChange={(checked) => {
                       const current = watch('amenities') || [];
                       if (checked) {
-                        setValue('amenities', [...current, amenity]);
+                        setValue('amenities', [...current, amenity], {
+                          shouldValidate: true,
+                          shouldDirty: true
+                        });
                       } else {
-                        setValue('amenities', current.filter(a => a !== amenity));
+                        setValue('amenities', current.filter(a => a !== amenity), {
+                          shouldValidate: true,
+                          shouldDirty: true
+                        });
                       }
                     }}
                   />
@@ -304,7 +330,7 @@ export function AmenitiesSection({ form }: FormSectionProps) {
             })}
           </div>
           {errors.amenities && (
-            <p className="text-sm text-red-500 mt-1">{errors.amenities.message}</p>
+            <p className="text-sm text-red-600 mt-0.5">{errors.amenities.message?.toString()}</p>
           )}
         </div>
       </div>

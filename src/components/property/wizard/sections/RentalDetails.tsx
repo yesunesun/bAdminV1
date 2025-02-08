@@ -1,6 +1,6 @@
 // src/components/property/RentalDetails.tsx
-// Version: 1.1.0
-// Last Modified: 2025-01-30T16:45:00+05:30 (IST)
+// Version: 1.5.0
+// Last Modified: 2025-02-09T16:30:00+05:30 (IST)
 // Author: Bhoomitalli Team
 
 import React from 'react';
@@ -24,14 +24,22 @@ export function RentalDetails({ form }: FormSectionProps) {
   const { register, watch, setValue, formState: { errors } } = form;
 
   const handleCurrencyInput = (e: React.ChangeEvent<HTMLInputElement>, fieldName: string) => {
-    const value = e.target.value.replace(/[^0-9]/g, '');
+    let value = e.target.value.replace(/[^0-9]/g, '').replace(/^0+/, '');
+    
     if (value === '') {
-      setValue(fieldName, '');
+      setValue(fieldName, '', {
+        shouldValidate: true,
+        shouldDirty: true
+      });
       return;
     }
+
     const numValue = parseInt(value);
     if (!isNaN(numValue)) {
-      setValue(fieldName, numValue.toString());
+      setValue(fieldName, numValue.toString(), {
+        shouldValidate: true,
+        shouldDirty: true
+      });
     }
   };
 
@@ -47,7 +55,7 @@ export function RentalDetails({ form }: FormSectionProps) {
     >
       <div className="space-y-4">
         {/* Rental Type Selection */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {RENTAL_TYPES.map((type) => (
             <div
               key={type.id}
@@ -61,7 +69,12 @@ export function RentalDetails({ form }: FormSectionProps) {
                 id={type.id}
                 checked={watch('rentalType') === type.id}
                 onCheckedChange={(checked) => {
-                  if (checked) setValue('rentalType', type.id);
+                  if (checked) {
+                    setValue('rentalType', type.id, {
+                      shouldValidate: true,
+                      shouldDirty: true
+                    });
+                  }
                 }}
               />
               <label htmlFor={type.id} className="text-base font-medium text-slate-700 cursor-pointer">
@@ -69,10 +82,13 @@ export function RentalDetails({ form }: FormSectionProps) {
               </label>
             </div>
           ))}
+          {errors.rentalType && (
+            <p className="text-sm text-red-600 col-span-2">{errors.rentalType.message?.toString()}</p>
+          )}
         </div>
 
         {/* Rent and Deposit - Two Column */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <RequiredLabel required>Monthly Rent</RequiredLabel>
             <div className="relative">
@@ -80,9 +96,16 @@ export function RentalDetails({ form }: FormSectionProps) {
                 <IndianRupee className="h-4 w-4" />
               </span>
               <Input
-                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 className="h-11 pl-9 pr-20 text-base"
-                {...register('rentAmount')}
+                {...register('rentAmount', {
+                  required: 'Monthly rent is required',
+                  pattern: {
+                    value: /^[1-9][0-9]*$/,
+                    message: 'Please enter a valid amount'
+                  }
+                })}
                 placeholder="Enter amount"
                 onChange={(e) => handleCurrencyInput(e, 'rentAmount')}
               />
@@ -91,7 +114,7 @@ export function RentalDetails({ form }: FormSectionProps) {
               </span>
             </div>
             {errors.rentAmount && (
-              <p className="text-sm text-red-600 mt-0.5">{errors.rentAmount.message}</p>
+              <p className="text-sm text-red-600 mt-0.5">{errors.rentAmount.message?.toString()}</p>
             )}
           </div>
 
@@ -102,21 +125,28 @@ export function RentalDetails({ form }: FormSectionProps) {
                 <IndianRupee className="h-4 w-4" />
               </span>
               <Input
-                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 className="h-11 pl-9 text-base"
-                {...register('securityDeposit')}
+                {...register('securityDeposit', {
+                  required: 'Security deposit is required',
+                  pattern: {
+                    value: /^[1-9][0-9]*$/,
+                    message: 'Please enter a valid amount'
+                  }
+                })}
                 placeholder="Enter deposit amount"
                 onChange={(e) => handleCurrencyInput(e, 'securityDeposit')}
               />
             </div>
             {errors.securityDeposit && (
-              <p className="text-sm text-red-600 mt-0.5">{errors.securityDeposit.message}</p>
+              <p className="text-sm text-red-600 mt-0.5">{errors.securityDeposit.message?.toString()}</p>
             )}
           </div>
         </div>
 
         {/* Rent Negotiable and Maintenance - Two Column */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="flex items-center space-x-2">
             <Checkbox
               id="rentNegotiable"
@@ -132,7 +162,10 @@ export function RentalDetails({ form }: FormSectionProps) {
             <RequiredLabel required>Maintenance</RequiredLabel>
             <Select 
               value={watch('maintenance')} 
-              onValueChange={value => setValue('maintenance', value)}
+              onValueChange={value => setValue('maintenance', value, {
+                shouldValidate: true,
+                shouldDirty: true
+              })}
             >
               <SelectTrigger className="h-11 text-base">
                 <SelectValue placeholder="Maintenance terms?" />
@@ -145,21 +178,26 @@ export function RentalDetails({ form }: FormSectionProps) {
                 ))}
               </SelectContent>
             </Select>
+            {errors.maintenance && (
+              <p className="text-sm text-red-600 mt-0.5">{errors.maintenance.message?.toString()}</p>
+            )}
           </div>
         </div>
 
         {/* Available From and Furnishing - Two Column */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <RequiredLabel required>Available From</RequiredLabel>
             <Input
               type="date"
               className="h-11 text-base"
               min={minDate}
-              {...register('availableFrom')}
+              {...register('availableFrom', {
+                required: 'Available date is required'
+              })}
             />
             {errors.availableFrom && (
-              <p className="text-sm text-red-600 mt-0.5">{errors.availableFrom.message}</p>
+              <p className="text-sm text-red-600 mt-0.5">{errors.availableFrom.message?.toString()}</p>
             )}
           </div>
 
@@ -167,7 +205,10 @@ export function RentalDetails({ form }: FormSectionProps) {
             <RequiredLabel required>Furnishing</RequiredLabel>
             <Select 
               value={watch('furnishing')} 
-              onValueChange={value => setValue('furnishing', value)}
+              onValueChange={value => setValue('furnishing', value, {
+                shouldValidate: true,
+                shouldDirty: true
+              })}
             >
               <SelectTrigger className="h-11 text-base">
                 <SelectValue placeholder="Furnishing status?" />
@@ -180,6 +221,9 @@ export function RentalDetails({ form }: FormSectionProps) {
                 ))}
               </SelectContent>
             </Select>
+            {errors.furnishing && (
+              <p className="text-sm text-red-600 mt-0.5">{errors.furnishing.message?.toString()}</p>
+            )}
           </div>
         </div>
 
@@ -188,7 +232,10 @@ export function RentalDetails({ form }: FormSectionProps) {
           <RequiredLabel required>Parking</RequiredLabel>
           <Select 
             value={watch('parking')} 
-            onValueChange={value => setValue('parking', value)}
+            onValueChange={value => setValue('parking', value, {
+              shouldValidate: true,
+              shouldDirty: true
+            })}
           >
             <SelectTrigger className="h-11 text-base">
               <SelectValue placeholder="Available parking?" />
@@ -201,12 +248,15 @@ export function RentalDetails({ form }: FormSectionProps) {
               ))}
             </SelectContent>
           </Select>
+          {errors.parking && (
+            <p className="text-sm text-red-600 mt-0.5">{errors.parking.message?.toString()}</p>
+          )}
         </div>
 
         {/* Preferred Tenants */}
         <div>
           <RequiredLabel required>Preferred Tenants</RequiredLabel>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
             {TENANT_PREFERENCES.map((tenant) => (
               <div
                 key={tenant}
@@ -221,9 +271,15 @@ export function RentalDetails({ form }: FormSectionProps) {
                   onCheckedChange={(checked) => {
                     const current = watch('preferredTenants') || [];
                     if (checked) {
-                      setValue('preferredTenants', [...current, tenant]);
+                      setValue('preferredTenants', [...current, tenant], {
+                        shouldValidate: true,
+                        shouldDirty: true
+                      });
                     } else {
-                      setValue('preferredTenants', current.filter(t => t !== tenant));
+                      setValue('preferredTenants', current.filter(t => t !== tenant), {
+                        shouldValidate: true,
+                        shouldDirty: true
+                      });
                     }
                   }}
                 />
@@ -236,6 +292,9 @@ export function RentalDetails({ form }: FormSectionProps) {
               </div>
             ))}
           </div>
+          {errors.preferredTenants && (
+            <p className="text-sm text-red-600 mt-0.5">{errors.preferredTenants.message?.toString()}</p>
+          )}
         </div>
 
         {/* Description */}
