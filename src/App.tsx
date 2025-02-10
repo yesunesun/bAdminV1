@@ -1,8 +1,14 @@
+// src/App.tsx
+// Version: 1.3.4
+// Last Modified: 11-02-2025 00:30 IST
+
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Header } from '@/components/Header';
 import Login from './pages/Login';
+import AdminLogin from './pages/AdminLogin';
+import AdminDashboard from './pages/AdminDashboard';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import ListYourProperty from './pages/ListYourProperty';
@@ -12,58 +18,85 @@ import EditProperty from './pages/EditProperty';
 import PropertyPreview from './pages/PropertyPreview';
 import AuthCallback from './pages/AuthCallback';
 import ChatBot from './components/ChatBot';
+import AdminPasswordReset from './pages/AdminPasswordReset';
+import AdminRegister from './pages/AdminRegister';
+import SuperAdminRegister from './pages/SuperAdminRegister';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
+  adminOnly?: boolean;
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, adminOnly }) => {
   const { user } = useAuth();
-  
+
   if (!user) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to={adminOnly ? "/admin/login" : "/login"} replace />;
   }
-  
+
   return <>{children}</>;
 };
 
 const PublicRoute = ({ children }: { children: React.ReactNode }) => {
   const { user } = useAuth();
-  
+
   if (user) {
     return <Navigate to="/dashboard" replace />;
   }
-  
+
   return <>{children}</>;
 };
 
 function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
+      <HashRouter>
         <div className="min-h-screen bg-background">
           <Header />
           <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
             <Routes>
+              {/* Auth routes */}
+              <Route path="/" element={<AuthCallback />} />
+              
+              {/* Admin Registration routes */}
+              <Route path="/admin/register" element={<AdminRegister />} />
+              <Route path="/super-admin/register" element={<SuperAdminRegister />} />
+              
               {/* Public routes */}
-              <Route path="/" element={<Navigate to="/login" replace />} />
-              <Route 
-                path="/login" 
+              <Route
+                path="/login"
                 element={
                   <PublicRoute>
                     <Login />
                   </PublicRoute>
-                } 
+                }
               />
-              <Route 
-                path="/register" 
+              <Route
+                path="/admin/login"
+                element={
+                  <PublicRoute>
+                    <AdminLogin />
+                  </PublicRoute>
+                }
+              />
+              <Route
+                path="/register"
                 element={
                   <PublicRoute>
                     <Register />
                   </PublicRoute>
-                } 
+                }
               />
-              <Route path="/auth/callback" element={<AuthCallback />} />
+
+              {/* Admin routes */}
+              <Route
+                path="/admin/dashboard"
+                element={
+                  <ProtectedRoute adminOnly>
+                    <AdminDashboard />
+                  </ProtectedRoute>
+                }
+              />
 
               {/* Protected routes */}
               <Route
@@ -114,11 +147,19 @@ function App() {
                   </ProtectedRoute>
                 }
               />
+              <Route
+                path="/admin/reset-password"
+                element={
+                  <PublicRoute>
+                    <AdminPasswordReset />
+                  </PublicRoute>
+                }
+              />
             </Routes>
           </main>
           <ChatBot />
         </div>
-      </BrowserRouter>
+      </HashRouter>
     </AuthProvider>
   );
 }

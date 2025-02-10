@@ -1,6 +1,6 @@
 // src/pages/Login.tsx
-// Version: 1.4.1
-// Last Modified: 06-02-2025 15:30 IST
+// Version: 1.6.0
+// Last Modified: 10-02-2025 16:00 IST
 
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
@@ -14,7 +14,7 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [showVerification, setShowVerification] = useState(false);
-  const { signInWithEmail, verifyOtp } = useAuth();
+  const { signInWithOTP, verifyOTP } = useAuth();
 
   const handleSignInSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,7 +22,7 @@ export default function Login() {
     setIsLoading(true);
     
     try {
-      const { error: signInError } = await signInWithEmail(email);
+      const { error: signInError } = await signInWithOTP(email);
       
       if (signInError) {
         setError(signInError.message);
@@ -44,7 +44,7 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-      const { error: verifyError } = await verifyOtp(email, token);
+      const { error: verifyError } = await verifyOTP(email, token);
 
       if (verifyError) {
         setError(verifyError.message);
@@ -97,12 +97,12 @@ export default function Login() {
               <Mail className="h-7 w-7 text-sky-600" />
             </div>
             <h2 className="mt-6 text-3xl font-bold text-sky-900">
-              {showVerification ? 'Verify Your Email' : 'Begin Your Journey'}
+              {showVerification ? 'Verify Your Email' : 'Welcome Back'}
             </h2>
             <p className="mt-2 text-sm text-sky-600">
               {showVerification 
                 ? 'Check your email for the verification code'
-                : 'Access your real estate portfolio securely'}
+                : 'Sign in to access your account'}
             </p>
           </div>
 
