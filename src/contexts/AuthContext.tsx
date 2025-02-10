@@ -1,6 +1,6 @@
 // src/contexts/AuthContext.tsx
-// Version: 1.3.0
-// Last Modified: 30-01-2025 15:00 IST
+// Version: 1.4.0
+// Last Modified: 10-02-2025 15:00 IST
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
@@ -12,7 +12,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   signInWithEmail: (email: string) => Promise<{ error?: AuthError }>;
-  registerUser: (email: string, phone: string, role: UserRole) => Promise<{ error?: AuthError }>;
+  registerUser: (email: string, role: UserRole) => Promise<{ error?: AuthError }>;
   verifyOtp: (email: string, token: string) => Promise<{ error?: AuthError }>;
   signOut: () => Promise<void>;
 }
@@ -54,13 +54,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error };
   };
 
-  const registerUser = async (email: string, phone: string, role: UserRole) => {
-    // First, send OTP to email
+  const registerUser = async (email: string, role: UserRole) => {
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
         data: {
-          phone,
           role,
           registered_at: new Date().toISOString(),
         },
@@ -86,7 +84,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           .upsert({
             id: user.id,
             email: user.email,
-            phone: user.user_metadata.phone,
             role: user.user_metadata.role,
             updated_at: new Date().toISOString(),
           });
