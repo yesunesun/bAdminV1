@@ -1,6 +1,6 @@
 // src/contexts/AuthContext.tsx
-// Version: 3.1.0
-// Last Modified: 11-02-2025 04:00 IST
+// Version: 3.2.0
+// Last Modified: 12-02-2025 16:30 IST
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
@@ -11,6 +11,8 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   signInAdmin: (email: string, password: string) => Promise<{ error?: AuthError }>;
+  signInWithOTP: (email: string) => Promise<{ error?: AuthError }>;
+  verifyOTP: (email: string, token: string) => Promise<{ error?: AuthError }>;
   signOut: () => Promise<void>;
 }
 
@@ -54,6 +56,65 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  const signInWithOTP = async (email: string) => {
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        email: email.trim(),
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+
+      if (error) throw error;
+      return { error: undefined };
+    } catch (err) {
+      console.error('OTP sign in error:', err);
+      if (err instanceof Error) {
+        return {
+          error: {
+            message: err.message,
+            name: 'AuthError'
+          } as AuthError
+        };
+      }
+      return {
+        error: {
+          message: 'An unexpected error occurred during OTP sign in',
+          name: 'AuthError'
+        } as AuthError
+      };
+    }
+  };
+
+  const verifyOTP = async (email: string, token: string) => {
+    try {
+      const { error } = await supabase.auth.verifyOtp({
+        email: email.trim(),
+        token: token.trim(),
+        type: 'email',
+      });
+
+      if (error) throw error;
+      return { error: undefined };
+    } catch (err) {
+      console.error('OTP verification error:', err);
+      if (err instanceof Error) {
+        return {
+          error: {
+            message: err.message,
+            name: 'AuthError'
+          } as AuthError
+        };
+      }
+      return {
+        error: {
+          message: 'An unexpected error occurred during OTP verification',
+          name: 'AuthError'
+        } as AuthError
+      };
+    }
+  };
 
   const signInAdmin = async (email: string, password: string) => {
     try {
@@ -155,6 +216,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     session,
     loading,
     signInAdmin,
+    signInWithOTP,
+    verifyOTP,
     signOut,
   };
 

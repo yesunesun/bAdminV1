@@ -1,6 +1,6 @@
 // src/lib/supabase.ts
-// Version: 1.2.5
-// Last Modified: 10-02-2025 23:45 IST
+// Version: 1.2.6
+// Last Modified: 12-02-2025 17:00 IST
 
 import { createClient } from '@supabase/supabase-js';
 import { Database } from './database.types';
@@ -8,38 +8,66 @@ import { Database } from './database.types';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-// Add debug logging
-console.log('Initializing Supabase client with URL:', 
-  supabaseUrl?.substring(0, supabaseUrl.indexOf('.')) + '...');
+// Enhanced debug logging
+console.log('Environment Check:', {
+  hasSupabaseUrl: !!supabaseUrl,
+  hasSupabaseKey: !!supabaseKey,
+  isDevelopment: import.meta.env.DEV,
+  baseUrl: window.location.origin,
+});
 
 if (!supabaseUrl || !supabaseKey) {
-  throw new Error('Missing Supabase environment variables');
+  console.error('Missing Supabase environment variables:', {
+    url: supabaseUrl ? 'Set' : 'Missing',
+    key: supabaseKey ? 'Set' : 'Missing'
+  });
+  throw new Error('Required Supabase configuration is missing. Check your environment variables.');
 }
 
-// Create client with updated config to handle all redirect scenarios
+// Create client with enhanced config
 export const supabase = createClient<Database>(supabaseUrl, supabaseKey, {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: true,
     flowType: 'pkce',
-    // Handle all possible redirect URLs
-    redirectTo: typeof window !== 'undefined' ? window.location.origin : undefined
+    debug: import.meta.env.DEV,
+    storage: window.localStorage,
+    storageKey: 'bhoomitalli-auth-token',
+    redirectTo: `${window.location.origin}/auth/callback`
+  },
+  global: {
+    headers: {
+      'x-client-info': 'bhoomitalli-web'
+    }
   }
 });
 
-// Enhanced auth state monitoring with detailed logging
+// Enhanced auth state monitoring
 supabase.auth.onAuthStateChange((event, session) => {
-  console.log('Auth state changed:', event, 
-    session ? `Session exists for user: ${session.user.id}` : 'No session');
-  
-  if (event === 'SIGNED_IN' && session?.user?.email) {
-    console.log('User signed in:', {
-      email: session.user.email,
-      lastSignIn: session.user.last_sign_in_at,
-      redirectTo: window.location.origin
-    });
+  console.log('Auth state changed:', {
+    event,
+    userId: session?.user?.id,
+    email: session?.user?.email,
+    lastSignIn: session?.user?.last_sign_in_at,
+    provider: session?.user?.app_metadata?.provider,
+    timestamp: new Date().toISOString()
+  });
+
+  if (event === 'SIGNED_OUT') {
+    // Clear any local storage items if needed
+    localStorage.removeItem('bhoomitalli-user-data');
   }
+});
+
+// Initialize auth state immediately
+supabase.auth.getSession().then(({ data: { session }, error }) => {
+  console.log('Initial auth state:', {
+    hasSession: !!session,
+    error: error?.message,
+    userId: session?.user?.id,
+    timestamp: new Date().toISOString()
+  });
 });
 
 export type SupabaseClient = typeof supabase;

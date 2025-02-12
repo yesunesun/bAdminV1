@@ -1,9 +1,9 @@
 // src/pages/AdminLogin.tsx
-// Version: 1.8.0
-// Last Modified: 11-02-2025 04:00 IST
+// Version: 1.9.1
+// Last Modified: 12-02-2025 17:15 IST
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { Lock, Shield, AlertCircle } from 'lucide-react';
@@ -16,6 +16,31 @@ export default function AdminLogin() {
   const [error, setError] = useState('');
   const [isResending, setIsResending] = useState(false);
   const { signInAdmin } = useAuth();
+
+  const isDevMode = import.meta.env.DEV;
+
+  useEffect(() => {
+    document.title = 'Admin Login | Bhoomitalli Real Estate';
+    
+    // Check for existing session
+    const checkSession = async () => {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      if (session) {
+        // Verify if user is admin
+        const { data: adminData, error: adminError } = await supabase
+          .from('admin_users')
+          .select('is_active')
+          .eq('user_id', session.user.id)
+          .single();
+
+        if (adminData?.is_active) {
+          navigate('/admin/dashboard');
+        }
+      }
+    };
+
+    checkSession();
+  }, [navigate]);
 
   const handleResendConfirmation = async () => {
     if (!formData.email) {
@@ -50,12 +75,15 @@ export default function AdminLogin() {
     setIsLoading(true);
 
     try {
+      console.log('Attempting admin sign in for:', formData.email);
+      
       const { error: signInError } = await signInAdmin(
         formData.email,
         formData.password
       );
 
       if (signInError) {
+        console.error('Sign in error:', signInError);
         if (signInError.message.includes('not confirmed')) {
           setError('Please confirm your email first');
           return;
@@ -63,6 +91,7 @@ export default function AdminLogin() {
         throw signInError;
       }
 
+      console.log('Admin sign in successful, navigating to dashboard');
       navigate('/admin/dashboard');
     } catch (err) {
       console.error('Login error:', err);
@@ -86,6 +115,27 @@ export default function AdminLogin() {
           </div>
           <h2 className="mt-6 text-3xl font-bold text-gray-900">Admin Portal</h2>
           <p className="mt-2 text-sm text-gray-600">Sign in to access admin dashboard</p>
+          
+          {isDevMode && (
+            <div className="mt-4 space-y-2">
+              <p className="text-sm text-gray-500">Development Mode Options:</p>
+              <div className="flex justify-center gap-4">
+                <Link 
+                  to="/admin/register" 
+                  className="text-sm font-medium text-indigo-600 hover:text-indigo-500"
+                >
+                  Admin Registration
+                </Link>
+                <span className="text-gray-300">|</span>
+                <Link 
+                  to="/super-admin/register" 
+                  className="text-sm font-medium text-purple-600 hover:text-purple-500"
+                >
+                  Super Admin Registration
+                </Link>
+              </div>
+            </div>
+          )}
         </div>
 
         {error && (

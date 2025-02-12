@@ -1,9 +1,9 @@
 // src/App.tsx
-// Version: 1.3.4
-// Last Modified: 11-02-2025 00:30 IST
+// Version: 1.3.6
+// Last Modified: 12-02-2025 17:45 IST
 
 import React from 'react';
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Header } from '@/components/Header';
 import Login from './pages/Login';
@@ -28,7 +28,15 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, adminOnly }) => {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+      </div>
+    );
+  }
 
   if (!user) {
     return <Navigate to={adminOnly ? "/admin/login" : "/login"} replace />;
@@ -38,7 +46,15 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, adminOnly }) 
 };
 
 const PublicRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+      </div>
+    );
+  }
 
   if (user) {
     return <Navigate to="/dashboard" replace />;
@@ -47,35 +63,59 @@ const PublicRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+function AppLayout({ children }: { children: React.ReactNode }) {
+  const location = window.location.pathname;
+  const noHeaderRoutes = ['/login', '/admin/login', '/register', '/admin/register', '/super-admin/register', '/admin/reset-password'];
+  const showHeader = !noHeaderRoutes.includes(location);
+
+  return (
+    <>
+      {showHeader && <Header />}
+      <main className={`${showHeader ? 'max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8' : ''}`}>
+        {children}
+      </main>
+      {showHeader && <ChatBot />}
+    </>
+  );
+}
+
 function App() {
   return (
     <AuthProvider>
-      <HashRouter>
+      <BrowserRouter>
         <div className="min-h-screen bg-background">
-          <Header />
-          <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+          <AppLayout>
             <Routes>
-              {/* Auth routes */}
-              <Route path="/" element={<AuthCallback />} />
-              
-              {/* Admin Registration routes */}
+              {/* Auth Callback */}
+              <Route path="/auth/callback" element={<AuthCallback />} />
+
+              {/* Admin Routes */}
+              <Route path="/admin/login" element={<AdminLogin />} />
               <Route path="/admin/register" element={<AdminRegister />} />
               <Route path="/super-admin/register" element={<SuperAdminRegister />} />
-              
-              {/* Public routes */}
+              <Route
+                path="/admin/dashboard"
+                element={
+                  <ProtectedRoute adminOnly>
+                    <AdminDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/reset-password"
+                element={
+                  <PublicRoute>
+                    <AdminPasswordReset />
+                  </PublicRoute>
+                }
+              />
+
+              {/* Public Routes */}
               <Route
                 path="/login"
                 element={
                   <PublicRoute>
                     <Login />
-                  </PublicRoute>
-                }
-              />
-              <Route
-                path="/admin/login"
-                element={
-                  <PublicRoute>
-                    <AdminLogin />
                   </PublicRoute>
                 }
               />
@@ -88,17 +128,7 @@ function App() {
                 }
               />
 
-              {/* Admin routes */}
-              <Route
-                path="/admin/dashboard"
-                element={
-                  <ProtectedRoute adminOnly>
-                    <AdminDashboard />
-                  </ProtectedRoute>
-                }
-              />
-
-              {/* Protected routes */}
+              {/* Protected Routes */}
               <Route
                 path="/dashboard"
                 element={
@@ -147,19 +177,13 @@ function App() {
                   </ProtectedRoute>
                 }
               />
-              <Route
-                path="/admin/reset-password"
-                element={
-                  <PublicRoute>
-                    <AdminPasswordReset />
-                  </PublicRoute>
-                }
-              />
+
+              {/* Default Route */}
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
             </Routes>
-          </main>
-          <ChatBot />
+          </AppLayout>
         </div>
-      </HashRouter>
+      </BrowserRouter>
     </AuthProvider>
   );
 }

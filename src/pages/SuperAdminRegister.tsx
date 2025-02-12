@@ -1,29 +1,72 @@
 // src/pages/SuperAdminRegister.tsx
-// Version: 1.0.0
-// Last Modified: 10-02-2025 23:55 IST
+// Version: 1.2.0
+// Last Modified: 11-02-2025 04:45 IST
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Crown, AlertCircle } from 'lucide-react';
 
 export default function SuperAdminRegister() {
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({ email: '', password: '' });
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+    confirmPassword: ''
+  });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
+  useEffect(() => {
+    document.title = 'Super Admin Registration | Bhoomitalli Real Estate';
+  }, []);
+
+  const checkExistingUser = async (email: string) => {
+    const { data, error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        shouldCreateUser: false
+      }
+    });
+    return !error; // If no error, user exists
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
     setError('');
 
+    // Form validation
+    if (!formData.email || !formData.password || !formData.confirmPassword) {
+      setError('All fields are required');
+      return;
+    }
+
+    if (formData.password.length < 8) {
+      setError('Password must be at least 8 characters long');
+      return;
+    }
+
+    if (formData.password !== formData.confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+
+    setIsLoading(true);
+
     try {
-      // Create the user in Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      // Check if user exists
+      const userExists = await checkExistingUser(formData.email);
+      if (userExists) {
+        setError('An account with this email already exists');
+        return;
+      }
+
+      // Create new user with super admin role
+      const { data: { user }, error: signUpError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {
+          emailRedirectTo: `${window.location.origin}/admin/login`,
           data: {
             is_admin: true,
             role: 'super_admin'
@@ -31,39 +74,61 @@ export default function SuperAdminRegister() {
         }
       });
 
-      if (authError) throw authError;
-
-      if (authData?.user) {
-        // Add user to admin_users table as super admin
-        const { error: adminError } = await supabase
-          .from('admin_users')
-          .insert([
-            {
-              user_id: authData.user.id,
-              email: formData.email,
-              role: 'super_admin'
-            }
-          ]);
-
-        if (adminError) throw adminError;
-
-        // Sign out after registration
-        await supabase.auth.signOut();
-        
-        // Show success message and redirect
-        alert('Registration successful! Please check your email for verification.');
-        navigate('/admin/login');
+      if (signUpError) {
+        throw signUpError;
       }
-    } catch (err: any) {
-      setError(err.message || 'An error occurred during registration');
+
+      if (!user) {
+        throw new Error('Failed to create account');
+      }
+
+      // Add user to admin_users table as super admin
+      const { error: adminError } = await supabase
+        .from('admin_users')
+        .insert([
+          {
+            user_id: user.id,
+            email: formData.email,
+            role: 'super_admin'
+          }
+        ]);
+
+      if (adminError) throw adminError;
+
+      // Sign out the user after successful registration
+      await supabase.auth.signOut();
+
+      // Success - show message and redirect
+      navigate('/admin/login', {
+        state: { 
+          success: true,
+          message: 'Super Admin registration successful! Please check your email to verify your account.' 
+        },
+        replace: true
+      });
+
+    } catch (err) {
+      console.error('Registration error:', err);
+      
+      // Handle specific error cases
+      if (err instanceof Error) {
+        if (err.message.includes('User already registered')) {
+          setError('An account with this email already exists');
+        } else if (err.message.includes('rate limit')) {
+          setError('Too many attempts. Please try again later.');
+        } else {
+          setError(err.message);
+        }
+      } else {
+        setError('An unexpected error occurred. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
     setError('');
   };
 
@@ -100,7 +165,7 @@ export default function SuperAdminRegister() {
                 type="email"
                 autoComplete="email"
                 required
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
+                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500 sm:text-sm bg-white"
                 value={formData.email}
                 onChange={handleChange}
                 placeholder="superadmin@example.com"
@@ -117,27 +182,53 @@ export default function SuperAdminRegister() {
                 type="password"
                 autoComplete="new-password"
                 required
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
+                minLength={8}
+                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500 sm:text-sm bg-white"
                 value={formData.password}
                 onChange={handleChange}
                 placeholder="••••••••"
-                minLength={8}
               />
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-sm text-gray-500">
                 Password must be at least 8 characters long
               </p>
             </div>
+
+            <div>
+              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
+                Confirm Password
+              </label>
+              <input
+                id="confirmPassword"
+                name="confirmPassword"
+                type="password"
+                autoComplete="new-password"
+                required
+                minLength={8}
+                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500 sm:text-sm bg-white"
+                value={formData.confirmPassword}
+                onChange={handleChange}
+                placeholder="••••••••"
+              />
+            </div>
           </div>
 
-          <div>
-            <button
-              type="submit"
-              disabled={isLoading || !formData.email || !formData.password}
-              className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
-            >
-              {isLoading ? 'Registering...' : 'Register'}
-            </button>
-          </div>
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+          >
+            {isLoading ? (
+              <span className="flex items-center gap-2">
+                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                Registering...
+              </span>
+            ) : (
+              'Register'
+            )}
+          </button>
         </form>
       </div>
     </div>
