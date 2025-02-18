@@ -1,8 +1,9 @@
 // src/components/property/wizard/components/FormNavigation.tsx
-// Version: 1.1.0
-// Last Modified: 2025-02-01T13:30:00+05:30 (IST)
+// Version: 1.2.0
+// Last Modified: 18-02-2025 17:00 IST
 
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { STEPS } from '../constants';
 
@@ -11,20 +12,36 @@ interface FormNavigationProps {
   onStepChange: (step: number) => void;
   propertyId?: string;
   mode?: 'create' | 'edit';
+  category?: string;
+  adType?: string;
 }
 
 export function FormNavigation({ 
   currentStep, 
   onStepChange, 
   propertyId, 
-  mode 
+  mode,
+  category,
+  adType
 }: FormNavigationProps) {
+  const navigate = useNavigate();
+
   const isStepAccessible = (stepIndex: number) => {
     const isPhotoStep = stepIndex === STEPS.length - 1;
     if (isPhotoStep) {
       return mode === 'edit' || propertyId !== undefined;
     }
     return true;
+  };
+
+  const handleStepClick = (index: number) => {
+    if (!isStepAccessible(index)) return;
+
+    const step = STEPS[index];
+    if (category && adType) {
+      navigate(`/properties/list/${category}/${adType}/${step.id}`, { replace: true });
+    }
+    onStepChange(index + 1);
   };
 
   return (
@@ -35,7 +52,7 @@ export function FormNavigation({
         return (
           <button
             key={step.id}
-            onClick={() => isAccessible && onStepChange(index + 1)}
+            onClick={() => isAccessible && handleStepClick(index)}
             disabled={!isAccessible}
             className={cn(
               "flex flex-1 flex-col items-center justify-center py-2 px-1.5",

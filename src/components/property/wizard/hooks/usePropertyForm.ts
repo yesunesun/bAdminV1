@@ -1,11 +1,10 @@
 // src/components/property/wizard/hooks/usePropertyForm.ts
-// Version: 1.4.1
-// Last Modified: 07-02-2025 12:00 IST
-// Updates: Fixed searchParams usage for section navigation
+// Version: 1.4.2
+// Last Modified: 19-02-2025 10:00 IST
 
 import { useState, useCallback, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useParams, useLocation } from 'react-router-dom';
 import { FormData } from '../types';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
@@ -22,31 +21,22 @@ interface UsePropertyFormProps {
   city?: string;
 }
 
-export function usePropertyForm({ 
-  initialData, 
-  propertyId: existingPropertyId, 
+export function usePropertyForm({
+  initialData,
+  propertyId: existingPropertyId,
   mode = 'create',
   status: initialStatus = 'draft',
   propertyCategory,
   adType,
   city
 }: UsePropertyFormProps) {
-  const [searchParams] = useSearchParams();
-  const section = searchParams.get('section');
-  const { user } = useAuth();
+  const { category, type, step } = useParams();
+  const location = useLocation();
   const navigate = useNavigate();
-  
-  const [currentStep, setCurrentStep] = useState(() => {
-    if (section === 'images') {
-      return STEPS.length;
-    }
-    return 1;
-  });
-  const [error, setError] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [savedPropertyId, setSavedPropertyId] = useState<string | null>(existingPropertyId || null);
-  const [status, setStatus] = useState(initialStatus);
+  const [searchParams] = useSearchParams();
+  const { user } = useAuth();
 
+  // Initialize form first
   const form = useForm<FormData>({
     defaultValues: initialData || {
       propertyType: '',
@@ -85,60 +75,60 @@ export function usePropertyForm({
     }
   });
 
-  useEffect(() => {
-    const fetchPropertyStatus = async () => {
-      if (mode === 'edit' && existingPropertyId) {
-        try {
-          const { data, error } = await supabase
-            .from('properties')
-            .select('status')
-            .eq('id', existingPropertyId)
-            .single();
+  // Initialize currentStep from URL or localStorage
+  const [currentStep, setCurrentStep] = useState(() => {
+    const savedStep = localStorage.getItem(`propertyWizard_${user?.id}_step`);
+    if (step) {
+      const stepIndex = STEPS.findIndex(s => s.id === step) + 1;
+      return stepIndex > 0 ? stepIndex : 1;
+    }
+    if (savedStep) {
+      return parseInt(savedStep);
+    }
+    return 1;
+  });
 
-          if (error) throw error;
-          
-          if (data && data.status) {
-            setStatus(data.status);
-          }
-        } catch (err) {
-          console.error('Error fetching property status:', err);
-          setError('Failed to fetch property status.');
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [savedPropertyId, setSavedPropertyId] = useState<string | null>(existingPropertyId || null);
+  const [status, setStatus] = useState(initialStatus);
+
+  // Load form data from localStorage
+  useEffect(() => {
+    if (user?.id && !initialData) {
+      const savedData = localStorage.getItem(`propertyWizard_${user.id}_data`);
+      if (savedData) {
+        try {
+          const parsedData = JSON.parse(savedData);
+          Object.entries(parsedData).forEach(([key, value]) => {
+            form.setValue(key as keyof FormData, value);
+          });
+        } catch (error) {
+          console.error('Error parsing saved form data:', error);
         }
       }
-    };
+    }
+  }, [user?.id, initialData, form]);
 
-    fetchPropertyStatus();
-  }, [mode, existingPropertyId]);
+  // Update URL when step changes
+  const updateUrl = useCallback((newStep: number) => {
+    if (!category || !type) return;
 
-  const preparePropertyData = (formData: FormData, propertyStatus: 'draft' | 'published') => {
-    return {
-      owner_id: user!.id,
-      title: formData.title || `${formData.bhkType} ${formData.propertyType} in ${formData.locality}`,
-      description: formData.description || '',
-      price: parseFloat(formData.rentAmount),
-      bedrooms: parseInt(formData.bhkType.split(' ')[0]),
-      bathrooms: formData.bathrooms ? parseInt(formData.bathrooms) : 0,
-      square_feet: formData.builtUpArea ? parseFloat(formData.builtUpArea) : null,
-      address: formData.address || '',
-      city: formData.locality,
-      state: 'Telangana',
-      zip_code: formData.pinCode || '',
-      status: propertyStatus,
-      property_details: formData
-    };
-  };
+    const stepData = STEPS[newStep - 1];
+    if (!stepData) return;
 
-  const handleAutoFill = useCallback(() => {
-    setError('');
-    Object.entries(TEST_DATA).forEach(([key, value]) => {
-      form.setValue(key as keyof FormData, value, {
-        shouldValidate: true,
-        shouldDirty: true,
-        shouldTouch: true
-      });
-    });
-    form.trigger();
-  }, [form]);
+    const newPath = `/properties/list/${category}/${type}/${stepData.id}`;
+    navigate(newPath, { replace: true });
+  }, [category, type, navigate]);
+
+  // Enhanced setCurrentStep with URL and localStorage updates
+  const setCurrentStepWithPersistence = useCallback((step: number) => {
+    setCurrentStep(step);
+    if (user?.id) {
+      localStorage.setItem(`propertyWizard_${user.id}_step`, step.toString());
+    }
+    updateUrl(step);
+  }, [user?.id, updateUrl]);
 
   const validateCurrentStep = () => {
     if (currentStep === 1) {
@@ -153,26 +143,74 @@ export function usePropertyForm({
     return true;
   };
 
-  const handleNextStep = () => {
+  // Save form data to localStorage
+  const saveFormToStorage = useCallback((data: Partial<FormData>) => {
+    if (user?.id) {
+      localStorage.setItem(`propertyWizard_${user.id}_data`, JSON.stringify(data));
+    }
+  }, [user?.id]);
+
+  // Handle form auto-fill (development only)
+  const handleAutoFill = useCallback(() => {
+    setError('');
+    Object.entries(TEST_DATA).forEach(([key, value]) => {
+      form.setValue(key as keyof FormData, value, {
+        shouldValidate: true,
+        shouldDirty: true,
+        shouldTouch: true
+      });
+    });
+    form.trigger();
+  }, [form]);
+
+  // Modified handle functions
+  const handleNextStep = useCallback(() => {
     if (!validateCurrentStep()) {
       setError('Please fill in all required fields');
       return;
     }
     setError('');
-    setCurrentStep(prev => Math.min(prev + 1, 6));
-  };
+    const formData = form.getValues();
+    saveFormToStorage(formData);
+    setCurrentStepWithPersistence(Math.min(currentStep + 1, STEPS.length));
+  }, [currentStep, form, saveFormToStorage, setCurrentStepWithPersistence]);
 
-  const handlePreviousStep = () => {
-    setCurrentStep(prev => Math.max(prev - 1, 1));
-  };
+  const handlePreviousStep = useCallback(() => {
+    const formData = form.getValues();
+    saveFormToStorage(formData);
+    setCurrentStepWithPersistence(Math.max(currentStep - 1, 1));
+  }, [currentStep, form, saveFormToStorage, setCurrentStepWithPersistence]);
 
+  // Clear storage when form is completed
+  const clearStorage = useCallback(() => {
+    if (user?.id) {
+      localStorage.removeItem(`propertyWizard_${user.id}_step`);
+      localStorage.removeItem(`propertyWizard_${user.id}_data`);
+    }
+  }, [user?.id]);
+
+  // Handle form submissions
   const handleSaveAsDraft = async () => {
     try {
       setSaving(true);
       setError('');
 
       const formData = form.getValues();
-      const propertyData = preparePropertyData(formData, 'draft');
+      const propertyData = {
+        owner_id: user!.id,
+        title: formData.title || `${formData.bhkType} ${formData.propertyType} in ${formData.locality}`,
+        description: formData.description || '',
+        price: parseFloat(formData.rentAmount),
+        bedrooms: parseInt(formData.bhkType.split(' ')[0]),
+        bathrooms: formData.bathrooms ? parseInt(formData.bathrooms) : 0,
+        square_feet: formData.builtUpArea ? parseFloat(formData.builtUpArea) : null,
+        address: formData.address || '',
+        city: formData.locality,
+        state: 'Telangana',
+        zip_code: formData.pinCode || '',
+        status: 'draft',
+        property_details: formData
+      };
 
       if (mode === 'edit' && existingPropertyId) {
         const { error: updateError } = await supabase
@@ -209,7 +247,21 @@ export function usePropertyForm({
       setError('');
 
       const formData = form.getValues();
-      const propertyData = preparePropertyData(formData, 'published');
+      const propertyData = {
+        owner_id: user!.id,
+        title: formData.title || `${formData.bhkType} ${formData.propertyType} in ${formData.locality}`,
+        description: formData.description || '',
+        price: parseFloat(formData.rentAmount),
+        bedrooms: parseInt(formData.bhkType.split(' ')[0]),
+        bathrooms: formData.bathrooms ? parseInt(formData.bathrooms) : 0,
+        square_feet: formData.builtUpArea ? parseFloat(formData.builtUpArea) : null,
+        address: formData.address || '',
+        city: formData.locality,
+        state: 'Telangana',
+        zip_code: formData.pinCode || '',
+        status: 'published',
+        property_details: formData
+      };
 
       if (mode === 'edit' && existingPropertyId) {
         const { error: updateError } = await supabase
@@ -246,7 +298,21 @@ export function usePropertyForm({
       setError('');
 
       const formData = form.getValues();
-      const propertyData = preparePropertyData(formData, status);
+      const propertyData = {
+        owner_id: user!.id,
+        title: formData.title || `${formData.bhkType} ${formData.propertyType} in ${formData.locality}`,
+        description: formData.description || '',
+        price: parseFloat(formData.rentAmount),
+        bedrooms: parseInt(formData.bhkType.split(' ')[0]),
+        bathrooms: formData.bathrooms ? parseInt(formData.bathrooms) : 0,
+        square_feet: formData.builtUpArea ? parseFloat(formData.builtUpArea) : null,
+        address: formData.address || '',
+        city: formData.locality,
+        state: 'Telangana',
+        zip_code: formData.pinCode || '',
+        status,
+        property_details: formData
+      };
 
       if (!existingPropertyId) {
         throw new Error('Property ID not found');
@@ -267,9 +333,10 @@ export function usePropertyForm({
     }
   };
 
-  const handleImageUploadComplete = () => {
+  const handleImageUploadComplete = useCallback(() => {
+    clearStorage();
     navigate('/properties');
-  };
+  }, [clearStorage, navigate]);
 
   return {
     form,
@@ -286,7 +353,7 @@ export function usePropertyForm({
     handleSaveAndPublish,
     handleUpdate,
     handleImageUploadComplete,
-    setCurrentStep,
+    setCurrentStep: setCurrentStepWithPersistence,
     setError
   };
 }

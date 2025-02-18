@@ -1,8 +1,8 @@
 // src/components/property/wizard/PropertyForm.tsx
-// Version: 1.7.0
-// Last Modified: 2025-02-06T16:30:00+05:30 (IST)
+// Version: 1.8.0
+// Last Modified: 18-02-2025 17:00 IST
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Wand2, PencilLine, CheckCircle } from 'lucide-react';
@@ -23,6 +23,11 @@ interface PropertyFormProps {
   propertyId?: string;
   mode?: 'create' | 'edit';
   status?: 'draft' | 'published';
+  showTypeSelection?: boolean;
+  onTypeSelect?: (category: string, type: string, city: string) => void;
+  selectedCategory?: string;
+  selectedAdType?: string;
+  currentStep?: string;
 }
 
 const StatusIndicator = ({ status }: { status: 'draft' | 'published' }) => {
@@ -51,17 +56,31 @@ export function PropertyForm({
   initialData, 
   propertyId, 
   mode = 'create',
-  status: initialStatus = 'draft'
+  status: initialStatus = 'draft',
+  showTypeSelection = false,
+  onTypeSelect,
+  selectedCategory,
+  selectedAdType,
+  currentStep: urlStep
 }: PropertyFormProps) {
   const navigate = useNavigate();
-  const [showTypeSelection, setShowTypeSelection] = useState(mode === 'create');
-  const [selectedCategory, setSelectedCategory] = useState<string>('');
-  const [selectedAdType, setSelectedAdType] = useState<string>('');
+  const [showTypeSelectionState, setShowTypeSelectionState] = useState(
+    showTypeSelection || (!selectedCategory && !selectedAdType)
+  );
   const [selectedCity, setSelectedCity] = useState<string>('');
+
+  // Determine initial step from URL or default to 1
+  const initialStep = useMemo(() => {
+    if (urlStep) {
+      const stepIndex = STEPS.findIndex(s => s.id === urlStep);
+      return stepIndex > -1 ? stepIndex + 1 : 1;
+    }
+    return 1;
+  }, [urlStep]);
 
   const {
     form,
-    currentStep,
+    currentStep: formStep,
     error,
     saving,
     savedPropertyId,
@@ -84,6 +103,23 @@ export function PropertyForm({
     adType: selectedAdType,
     city: selectedCity
   });
+
+  // Set initial step from URL
+  useEffect(() => {
+    if (initialStep > 1) {
+      setCurrentStep(initialStep);
+    }
+  }, [initialStep, setCurrentStep]);
+
+  const handleTypeSelectionComplete = (category: string, adType: string, city: string) => {
+    if (onTypeSelect) {
+      onTypeSelect(category, adType, city);
+    } else {
+      navigate(`/properties/list/${category.toLowerCase()}/${adType.toLowerCase()}/details`);
+    }
+    setSelectedCity(city);
+    setShowTypeSelectionState(false);
+  };
 
   if (!user) {
     return (
@@ -109,15 +145,14 @@ export function PropertyForm({
     );
   }
 
-  const handleTypeSelectionComplete = (category: string, adType: string, city: string) => {
-    setSelectedCategory(category);
-    setSelectedAdType(adType);
-    setSelectedCity(city);
-    setShowTypeSelection(false);
-  };
-
-  if (showTypeSelection) {
-    return <PropertyTypeSelection onNext={handleTypeSelectionComplete} />;
+  if (showTypeSelectionState) {
+    return (
+      <PropertyTypeSelection 
+        onNext={handleTypeSelectionComplete}
+        selectedCategory={selectedCategory}
+        selectedAdType={selectedAdType}
+      />
+    );
   }
 
   return (
@@ -147,7 +182,7 @@ export function PropertyForm({
         </div>
 
         <FormNavigation 
-          currentStep={currentStep} 
+          currentStep={formStep} 
           onStepChange={setCurrentStep}
           propertyId={savedPropertyId || propertyId}
           mode={mode}
@@ -162,13 +197,13 @@ export function PropertyForm({
             </div>
           )}
 
-          {currentStep === STEPS.length ? (
+          {formStep === STEPS.length ? (
             <ImageUploadSection
               propertyId={savedPropertyId!}
               onUploadComplete={handleImageUploadComplete}
               onPrevious={handlePreviousStep}
             />
-          ) : currentStep === STEPS.length - 1 ? (
+          ) : formStep === STEPS.length - 1 ? (
             <PropertySummary
               formData={form.watch()}
               onPrevious={handlePreviousStep}
@@ -181,7 +216,7 @@ export function PropertyForm({
             />
           ) : (
             <div className="space-y-6">
-              {currentStep === 1 && (
+              {formStep === 1 && (
                 <PropertyDetails 
                   form={form} 
                   mode={mode} 
@@ -189,19 +224,19 @@ export function PropertyForm({
                   adType={selectedAdType}
                 />
               )}
-              {currentStep === 2 && (
+              {formStep === 2 && (
                 <LocationDetails 
                   form={form} 
                   selectedCity={selectedCity}
                 />
               )}
-              {currentStep === 3 && (
+              {formStep === 3 && (
                 <RentalDetails 
                   form={form}
                   adType={selectedAdType}
                 />
               )}
-              {currentStep === 4 && (
+              {formStep === 4 && (
                 <AmenitiesSection 
                   form={form}
                   category={selectedCategory}
@@ -209,7 +244,7 @@ export function PropertyForm({
               )}
               
               <div className="flex justify-between pt-6 border-t border-border">
-                {currentStep > 1 && (
+                {formStep > 1 && (
                   <button
                     type="button"
                     onClick={handlePreviousStep}
@@ -223,7 +258,7 @@ export function PropertyForm({
                     Previous
                   </button>
                 )}
-                {currentStep === 1 && <div />}
+                {formStep === 1 && <div />}
                 <button
                   type="button"
                   onClick={handleNextStep}
@@ -231,8 +266,7 @@ export function PropertyForm({
                     "px-6 py-3 text-sm font-medium rounded-xl",
                     "bg-primary text-primary-foreground",
                     "hover:bg-primary/90 transition-colors",
-                    "focus:outline-none focus:ring-4 focus:ring-ring/30",
-                    "disabled:opacity-50"
+                    "focus:outline-none focus:ring-4 focus:ring-ring/30"
                   )}
                 >
                   Next

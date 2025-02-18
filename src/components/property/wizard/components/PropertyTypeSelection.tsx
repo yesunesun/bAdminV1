@@ -1,10 +1,8 @@
 // src/components/property/wizard/components/PropertyTypeSelection.tsx
-// Version: 1.2.0
-// Last Modified: 2025-02-06T18:00:00+05:30 (IST)
-// Author: Bhoomitalli Team
-// Description: Updated with new HowItWorks component
+// Version: 1.3.0
+// Last Modified: 2025-02-18T18:00:00+05:30 (IST)
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Card, 
   CardContent 
@@ -36,6 +34,8 @@ const propertyCategories = [
 
 interface PropertyTypeSelectionProps {
   onNext: (category: string, listingType: string, city: string) => void;
+  selectedCategory?: string;
+  selectedAdType?: string;
 }
 
 const features = [
@@ -56,14 +56,24 @@ const features = [
   }
 ];
 
-export default function PropertyTypeSelection({ onNext }: PropertyTypeSelectionProps) {
-  const [selectedCategory, setSelectedCategory] = useState<string>('');
-  const [selectedListingType, setSelectedListingType] = useState<string>('');
+export default function PropertyTypeSelection({ 
+  onNext, 
+  selectedCategory: initialCategory,
+  selectedAdType: initialAdType 
+}: PropertyTypeSelectionProps) {
+  const [selectedCategory, setSelectedCategory] = useState<string>(initialCategory || '');
+  const [selectedListingType, setSelectedListingType] = useState<string>(initialAdType || '');
   const selectedCategoryData = propertyCategories.find(cat => cat.id === selectedCategory);
+
+  // Update local state when props change
+  useEffect(() => {
+    if (initialCategory) setSelectedCategory(initialCategory);
+    if (initialAdType) setSelectedListingType(initialAdType);
+  }, [initialCategory, initialAdType]);
 
   const handleSubmit = () => {
     if (selectedCategory && selectedListingType) {
-      onNext(selectedCategory, selectedListingType, 'Hyderabad');
+      onNext(selectedCategory, selectedListingType.toLowerCase(), 'Hyderabad');
     }
   };
 
@@ -81,7 +91,7 @@ export default function PropertyTypeSelection({ onNext }: PropertyTypeSelectionP
           <div className="flex justify-end">
             <div className="flex items-center">
               <span className="text-slate-600 mr-2">Looking for a property?</span>
-              <a href="#" className="text-teal-600 hover:text-teal-700 font-medium">
+              <a href="/properties" className="text-teal-600 hover:text-teal-700 font-medium">
                 Browse Properties
               </a>
             </div>

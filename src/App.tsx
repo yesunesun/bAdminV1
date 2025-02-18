@@ -137,46 +137,74 @@ function App() {
                   </ProtectedRoute>
                 }
               />
-              <Route
-                path="/properties"
-                element={
-                  <ProtectedRoute>
-                    <Properties />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/properties/list"
-                element={
-                  <ProtectedRoute>
-                    <ListYourProperty />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/properties/:id/preview"
-                element={
-                  <ProtectedRoute>
-                    <PropertyPreview />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/properties/:id/edit"
-                element={
-                  <ProtectedRoute>
-                    <EditProperty />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/properties/:id"
-                element={
-                  <ProtectedRoute>
-                    <PropertyDetails />
-                  </ProtectedRoute>
-                }
-              />
+
+              {/* Properties Routes */}
+              <Route path="/properties">
+                <Route
+                  index
+                  element={
+                    <ProtectedRoute>
+                      <Properties />
+                    </ProtectedRoute>
+                  }
+                />
+                
+                {/* Property Listing Wizard Routes */}
+                <Route path="list">
+                  <Route
+                    index
+                    element={
+                      <ProtectedRoute>
+                        <ListYourProperty />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route path=":category/:type">
+                    <Route
+                      index
+                      element={
+                        <ProtectedRoute>
+                          <ListYourProperty />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path=":step"
+                      element={
+                        <ProtectedRoute>
+                          <ListYourProperty />
+                        </ProtectedRoute>
+                      }
+                    />
+                  </Route>
+                </Route>
+
+                {/* Individual Property Routes */}
+                <Route
+                  path=":id/preview"
+                  element={
+                    <ProtectedRoute>
+                      <PropertyPreview />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path=":id/edit"
+                  element={
+                    <ProtectedRoute>
+                      <EditProperty />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path=":id"
+                  element={
+                    <ProtectedRoute>
+                      <PropertyDetails />
+                    </ProtectedRoute>
+                  }
+                />
+              </Route>
 
               {/* Default Route */}
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
