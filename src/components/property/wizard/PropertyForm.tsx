@@ -1,6 +1,6 @@
 // src/components/property/wizard/PropertyForm.tsx
-// Version: 1.8.0
-// Last Modified: 18-02-2025 17:00 IST
+// Version: 1.9.0
+// Last Modified: 19-02-2025 14:45 IST
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -16,6 +16,7 @@ import { ImageUploadSection } from './sections/ImageUploadSection';
 import { PropertySummary } from './sections/PropertySummary';
 import { FormNavigation } from './components/FormNavigation';
 import PropertyTypeSelection from './components/PropertyTypeSelection';
+import WizardBreadcrumbs from './components/WizardBreadcrumbs';
 import { usePropertyForm } from './hooks/usePropertyForm';
 
 interface PropertyFormProps {
@@ -179,6 +180,14 @@ export function PropertyForm({
             </div>
             <StatusIndicator status={status} />
           </div>
+        </div>
+
+        <div className="px-6 pt-4">
+          <WizardBreadcrumbs
+            category={selectedCategory}
+            adType={selectedAdType}
+            currentStep={STEPS[formStep - 1].title}
+          />
         </div>
 
         <FormNavigation 
