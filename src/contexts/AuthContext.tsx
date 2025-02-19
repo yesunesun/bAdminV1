@@ -1,6 +1,6 @@
 // src/contexts/AuthContext.tsx
-// Version: 3.2.0
-// Last Modified: 12-02-2025 16:30 IST
+// Version: 3.2.1
+// Last Modified: 19-02-2025 14:45 IST
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
@@ -118,26 +118,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signInAdmin = async (email: string, password: string) => {
     try {
-      // First check if the user exists and if email is confirmed
-      const { data: { users }, error: getUserError } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password: password.trim()
-      });
-
-      if (getUserError) {
-        throw getUserError;
-      }
-
-      const user = users?.[0];
-      if (!user?.email_confirmed_at) {
-        return {
-          error: {
-            message: 'Please confirm your email first',
-            name: 'AuthError'
-          } as AuthError
-        };
-      }
-
       // Sign in the user
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email: email.trim(),
@@ -152,7 +132,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error('No user returned from sign in');
       }
 
-      // Check admin status
+      // Check email confirmation
+      if (!data.user.email_confirmed_at) {
+        return {
+          error: {
+            message: 'Please confirm your email first',
+            name: 'AuthError'
+          } as AuthError
+        };
+      }
+
+      // First check user metadata for admin status
+      const isAdminByMetadata = data.user.user_metadata?.is_admin === true || 
+                               data.user.user_metadata?.role === 'admin' ||
+                               data.user.user_metadata?.role === 'super_admin';
+
+      if (isAdminByMetadata) {
+        return { error: undefined };
+      }
+
+      // If not admin by metadata, check admin_users table as fallback
       const { data: adminData, error: adminError } = await supabase
         .from('admin_users')
         .select('is_active')
