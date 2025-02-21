@@ -1,6 +1,6 @@
 // src/modules/admin/components/UsersList.tsx
-// Version: 1.1.1
-// Last Modified: 21-02-2025 23:45 IST
+// Version: 1.2.0
+// Last Modified: 21-02-2025 16:15 IST
 
 import React from 'react';
 import { useUsers } from '../hooks/useUsers';
@@ -13,10 +13,12 @@ import { UsersTable } from './users/UsersTable';
 import { UsersTableHeader } from './users/UsersTableHeader';
 import { UsersPagination } from './users/UsersPagination';
 import { UsersSearchFilters } from './users/UsersSearchFilters';
+import { InviteUserModal } from './users/InviteUserModal';
 import { AuthProvider } from '@/contexts/AuthContext';
+import { ADMIN_ROLES } from '../utils/constants';
 
 export const UsersList: React.FC = () => {
-  const { isAdmin, loading: adminLoading, error: adminError } = useAdminAccess();
+  const { isAdmin, adminRole, loading: adminLoading, error: adminError } = useAdminAccess();
   const [page, setPage] = React.useState(1);
   const [itemsPerPage] = React.useState(10);
   const [searchTerm, setSearchTerm] = React.useState('');
@@ -46,11 +48,16 @@ export const UsersList: React.FC = () => {
   if (loading) return <UserListLoading />;
   if (error) return <UserListError error={error} />;
   if (!isAdmin) return <UserListError error="Unauthorized access" />;
-  if (!users.length) return <UserListEmpty />;
+
+  const canInviteUsers = adminRole === ADMIN_ROLES.SUPER_ADMIN || adminRole === ADMIN_ROLES.ADMIN;
 
   return (
     <Card className="w-full">
-      <UsersTableHeader />
+      <div className="p-4 flex justify-between items-center border-b">
+        <UsersTableHeader />
+        {canInviteUsers && <InviteUserModal onSuccess={refetch} />}
+      </div>
+
       <UsersSearchFilters
         searchTerm={searchTerm}
         onSearchChange={setSearchTerm}
@@ -59,14 +66,21 @@ export const UsersList: React.FC = () => {
         statusFilter={statusFilter}
         onStatusFilterChange={setStatusFilter}
       />
-      <UsersTable users={users} onRefresh={refetch} />
-      <UsersPagination
-        currentPage={page}
-        totalPages={totalPages}
-        totalUsers={totalUsers}
-        itemsPerPage={itemsPerPage}
-        onPageChange={setPage}
-      />
+      
+      {!users.length ? (
+        <UserListEmpty />
+      ) : (
+        <>
+          <UsersTable users={users} onRefresh={refetch} />
+          <UsersPagination
+            currentPage={page}
+            totalPages={totalPages}
+            totalUsers={totalUsers}
+            itemsPerPage={itemsPerPage}
+            onPageChange={setPage}
+          />
+        </>
+      )}
     </Card>
   );
 };

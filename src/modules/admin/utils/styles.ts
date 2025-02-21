@@ -1,9 +1,16 @@
 // src/modules/admin/utils/styles.ts
-// Version: 1.0.0
-// Last Modified: 21-02-2025 10:00 IST
+// Version: 1.1.0
+// Last Modified: 21-02-2025 17:00 IST
+
+import { ADMIN_ROLES } from './constants';
 
 export const getRoleColor = (role: string) => {
     const colors = {
+      // Admin role colors
+      [ADMIN_ROLES.SUPER_ADMIN]: 'bg-purple-100 text-purple-800',
+      [ADMIN_ROLES.ADMIN]: 'bg-purple-100 text-purple-800',
+      [ADMIN_ROLES.PROPERTY_MODERATOR]: 'bg-blue-100 text-blue-800',
+      // User role colors
       admin: 'bg-purple-100 text-purple-800',
       agent: 'bg-blue-100 text-blue-800',
       owner: 'bg-green-100 text-green-800',

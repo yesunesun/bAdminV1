@@ -1,16 +1,16 @@
 // src/modules/admin/hooks/useAdminAccess.ts
-// Version: 2.0.0
-// Last Modified: 21-02-2025 22:15 IST
+// Version: 2.1.0
+// Last Modified: 21-02-2025 16:15 IST
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { debugLog, debugError } from '@/lib/debug-utils';
-
-export type AdminRole = 'admin' | 'super_admin';
+import { AdminRole, ADMIN_ROLES } from '../utils/constants';
 
 interface UseAdminAccessReturn {
   isAdmin: boolean;
+  isPropertyModerator: boolean;
   loading: boolean;
   error: string | null;
   adminRole: AdminRole | null;
@@ -20,6 +20,7 @@ interface UseAdminAccessReturn {
 export const useAdminAccess = (): UseAdminAccessReturn => {
   const { user } = useAuth();
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isPropertyModerator, setIsPropertyModerator] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [adminRole, setAdminRole] = useState<AdminRole | null>(null);
@@ -27,13 +28,13 @@ export const useAdminAccess = (): UseAdminAccessReturn => {
   const checkAdminAccess = async () => {
     if (!user?.id) {
       setIsAdmin(false);
+      setIsPropertyModerator(false);
       setAdminRole(null);
       setLoading(false);
       return;
     }
 
     try {
-      // Simple direct query matching our new policies
       const { data, error: adminError } = await supabase
         .from('admin_roles')
         .select(`
@@ -52,6 +53,7 @@ export const useAdminAccess = (): UseAdminAccessReturn => {
 
       if (!data?.role_type) {
         setIsAdmin(false);
+        setIsPropertyModerator(false);
         setAdminRole(null);
         return;
       }
@@ -61,13 +63,18 @@ export const useAdminAccess = (): UseAdminAccessReturn => {
         roleType: data.role_type
       });
 
-      setIsAdmin(true);
-      setAdminRole(data.role_type as AdminRole);
+      const roleType = data.role_type as AdminRole;
+      setAdminRole(roleType);
+      
+      // Set appropriate access flags based on role
+      setIsAdmin(roleType === ADMIN_ROLES.ADMIN || roleType === ADMIN_ROLES.SUPER_ADMIN);
+      setIsPropertyModerator(roleType === ADMIN_ROLES.PROPERTY_MODERATOR);
       setError(null);
 
     } catch (err) {
       debugError('Admin Check', 'Failed', err);
       setIsAdmin(false);
+      setIsPropertyModerator(false);
       setAdminRole(null);
       setError('Admin verification failed');
     } finally {
@@ -81,6 +88,7 @@ export const useAdminAccess = (): UseAdminAccessReturn => {
 
   return {
     isAdmin,
+    isPropertyModerator,
     loading,
     error,
     adminRole,
