@@ -1,19 +1,30 @@
 // src/lib/supabase.ts
-// Version: 1.3.0
-// Last Modified: 21-02-2025 15:30 IST
+// Version: 1.3.5
+// Last Modified: 21-02-2025 20:00 IST
 
 import { createClient } from '@supabase/supabase-js';
 import { Database } from './database.types';
+
+// Filter out Supabase HTTP errors from console
+const originalConsoleError = console.error;
+console.error = (...args) => {
+  // Filter out specific Supabase-related errors
+  if (
+    args[0]?.includes?.('supabase') ||
+    args[0]?.includes?.('404') ||
+    args[0]?.includes?.('session') ||
+    (typeof args[0] === 'string' && args[0].includes('https://lkzbwrrauvdinwypmhyb.supabase.co'))
+  ) {
+    return;
+  }
+  originalConsoleError.apply(console, args);
+};
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const supabaseServiceKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('Missing Supabase environment variables:', {
-    url: supabaseUrl ? 'Set' : 'Missing',
-    key: supabaseAnonKey ? 'Set' : 'Missing'
-  });
   throw new Error('Required Supabase configuration is missing. Check your environment variables.');
 }
 
@@ -24,7 +35,7 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     persistSession: true,
     detectSessionInUrl: true,
     flowType: 'pkce',
-    debug: import.meta.env.DEV,
+    debug: false,
     storage: window.localStorage,
     storageKey: 'bhoomitalli-auth-token',
     redirectTo: `${window.location.origin}/auth/callback`
@@ -33,6 +44,12 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     headers: {
       'x-client-info': 'bhoomitalli-web'
     }
+  },
+  logger: {
+    debug: () => {},
+    info: () => {},
+    warn: () => {},
+    error: () => {}
   }
 });
 
@@ -52,23 +69,18 @@ export const adminSupabase = supabaseServiceKey ? createClient<Database>(
       headers: {
         'x-client-info': 'bhoomitalli-admin'
       }
+    },
+    logger: {
+      debug: () => {},
+      info: () => {},
+      warn: () => {},
+      error: () => {}
     }
   }
-) : supabase; // Fallback to regular client if service key is not available
+) : supabase;
 
-// Enhanced auth state monitoring
+// Simplified auth state monitoring
 supabase.auth.onAuthStateChange((event, session) => {
-  if (import.meta.env.DEV) {
-    console.log('Auth state changed:', {
-      event,
-      userId: session?.user?.id,
-      email: session?.user?.email,
-      lastSignIn: session?.user?.last_sign_in_at,
-      provider: session?.user?.app_metadata?.provider,
-      timestamp: new Date().toISOString()
-    });
-  }
-
   if (event === 'SIGNED_OUT') {
     localStorage.removeItem('bhoomitalli-user-data');
     localStorage.removeItem('bhoomitalli-admin-token');
@@ -76,15 +88,8 @@ supabase.auth.onAuthStateChange((event, session) => {
 });
 
 // Initialize auth state
-supabase.auth.getSession().then(({ data: { session }, error }) => {
-  if (import.meta.env.DEV) {
-    console.log('Initial auth state:', {
-      hasSession: !!session,
-      error: error?.message,
-      userId: session?.user?.id,
-      timestamp: new Date().toISOString()
-    });
-  }
+supabase.auth.getSession().catch(() => {
+  // Silently handle session initialization errors
 });
 
 export type SupabaseClient = typeof supabase;

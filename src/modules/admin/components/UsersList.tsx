@@ -1,6 +1,6 @@
 // src/modules/admin/components/UsersList.tsx
-// Version: 1.1.0
-// Last Modified: 21-02-2025 17:15 IST
+// Version: 1.1.1
+// Last Modified: 21-02-2025 23:45 IST
 
 import React from 'react';
 import { useUsers } from '../hooks/useUsers';
@@ -39,6 +39,9 @@ export const UsersList: React.FC = () => {
 
   const loading = adminLoading || usersLoading;
   const error = adminError || usersError;
+  
+  // Calculate total pages
+  const totalPages = Math.max(1, Math.ceil(totalUsers / itemsPerPage));
 
   if (loading) return <UserListLoading />;
   if (error) return <UserListError error={error} />;
@@ -59,9 +62,10 @@ export const UsersList: React.FC = () => {
       <UsersTable users={users} onRefresh={refetch} />
       <UsersPagination
         currentPage={page}
-        onPageChange={setPage}
-        totalItems={totalUsers}
+        totalPages={totalPages}
+        totalUsers={totalUsers}
         itemsPerPage={itemsPerPage}
+        onPageChange={setPage}
       />
     </Card>
   );

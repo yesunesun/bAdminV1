@@ -1,6 +1,6 @@
 // src/modules/admin/components/users/UsersTable.tsx
-// Version: 1.0.0
-// Last Modified: 21-02-2025 11:45 IST
+// Version: 1.1.0
+// Last Modified: 21-02-2025 22:45 IST
 
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
@@ -11,6 +11,7 @@ interface User {
   email: string;
   role: string;
   created_at: string;
+  last_sign_in_at?: string | null;
   phone?: string | null;
   status?: string;
 }
@@ -19,6 +20,15 @@ interface UsersTableProps {
   users: User[];
   onViewDetails: (userId: string) => void;
 }
+
+const formatDate = (date: string | null | undefined): string => {
+  if (!date) return 'Never';
+  return new Date(date).toLocaleDateString('en-IN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  });
+};
 
 export const UsersTable: React.FC<UsersTableProps> = ({ users, onViewDetails }) => {
   return (
@@ -40,6 +50,9 @@ export const UsersTable: React.FC<UsersTableProps> = ({ users, onViewDetails }) 
             </th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Joined
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Last Login
             </th>
             <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
               Actions
@@ -66,11 +79,10 @@ export const UsersTable: React.FC<UsersTableProps> = ({ users, onViewDetails }) 
                 {user.phone || 'Not provided'}
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                {new Date(user.created_at).toLocaleDateString('en-IN', {
-                  day: '2-digit',
-                  month: '2-digit',
-                  year: 'numeric'
-                })}
+                {formatDate(user.created_at)}
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                {formatDate(user.last_sign_in_at)}
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
                 <button

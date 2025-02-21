@@ -1,6 +1,6 @@
 // src/modules/admin/components/AdminHeader.tsx
-// Version: 1.1.0
-// Last Modified: 19-02-2025 14:45 IST
+// Version: 1.2.0
+// Last Modified: 21-02-2025 20:30 IST
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -14,6 +14,9 @@ export function AdminHeader() {
   const navigate = useNavigate();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Error boundary state
+  const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -35,8 +38,37 @@ export function AdminHeader() {
       navigate('/admin/login');
     } catch (error) {
       console.error('Error signing out:', error);
+      setError(error instanceof Error ? error : new Error('Failed to sign out'));
     }
   };
+
+  if (error) {
+    return (
+      <div className="bg-red-50 p-4 rounded-md">
+        <div className="flex">
+          <div className="ml-3">
+            <h3 className="text-sm font-medium text-red-800">Error</h3>
+            <div className="mt-2 text-sm text-red-700">
+              <p>{error.message}</p>
+            </div>
+            <div className="mt-4">
+              <button
+                type="button"
+                onClick={() => setError(null)}
+                className="text-sm font-medium text-red-600 hover:text-red-500"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
 
   return (
     <div className="border-b border-gray-200">
