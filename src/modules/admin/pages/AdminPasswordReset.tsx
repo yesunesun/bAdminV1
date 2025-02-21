@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { AdminHeader } from '../components/AdminHeader';
 import { Lock, Shield } from 'lucide-react';
 
 export default function AdminPasswordReset() {

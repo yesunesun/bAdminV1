@@ -4,8 +4,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
+// Update import paths
+import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { AdminHeader } from '../components/AdminHeader';
 import { Lock, Shield, AlertCircle } from 'lucide-react';
 
 export default function AdminLogin() {

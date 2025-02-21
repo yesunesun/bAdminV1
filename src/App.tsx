@@ -1,45 +1,42 @@
-// src/App.tsx
-// Version: 1.3.6
-// Last Modified: 12-02-2025 17:45 IST
+// src/App.tsx 
+// Version: 2.2.0
+// Last Modified: 20-02-2025 15:00 IST
 
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Header } from '@/components/Header';
-import Login from './pages/Login';
-import AdminLogin from './pages/AdminLogin';
-import AdminDashboard from './pages/AdminDashboard';
-import Register from './pages/Register';
-import Dashboard from './pages/Dashboard';
-import ListYourProperty from './pages/ListYourProperty';
-import Properties from './pages/Properties';
-import PropertyDetails from './pages/PropertyDetails';
-import EditProperty from './pages/EditProperty';
-import PropertyPreview from './pages/PropertyPreview';
-import AuthCallback from './pages/AuthCallback';
 import ChatBot from './components/ChatBot';
-import AdminPasswordReset from './pages/AdminPasswordReset';
-import AdminRegister from './pages/AdminRegister';
-import SuperAdminRegister from './pages/SuperAdminRegister';
+
+// Route Configurations
+import { mainRoutes } from './routes/mainRoutes';
+import { authRoutes } from './routes/authRoutes';
+import { adminRoutes } from './routes/adminRoutes';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
   adminOnly?: boolean;
 }
 
+const LoadingSpinner = () => (
+  <div className="min-h-screen flex items-center justify-center">
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+  </div>
+);
+
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, adminOnly }) => {
   const { user, loading } = useAuth();
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-      </div>
-    );
+    return <LoadingSpinner />;
   }
 
   if (!user) {
     return <Navigate to={adminOnly ? "/admin/login" : "/login"} replace />;
+  }
+
+  if (adminOnly && user.user_metadata?.role !== 'admin' && user.user_metadata?.role !== 'super_admin') {
+    return <Navigate to="/dashboard" replace />;
   }
 
   return <>{children}</>;
@@ -49,167 +46,80 @@ const PublicRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-      </div>
-    );
+    return <LoadingSpinner />;
   }
 
   if (user) {
+    const isAdminRoute = window.location.pathname.startsWith('/admin');
+    const isAdmin = user.user_metadata?.role === 'admin' || user.user_metadata?.role === 'super_admin';
+    
+    if (isAdminRoute && isAdmin) {
+      return <Navigate to="/admin/dashboard" replace />;
+    }
+    
     return <Navigate to="/dashboard" replace />;
   }
 
   return <>{children}</>;
 };
 
-function AppLayout({ children }: { children: React.ReactNode }) {
-  const location = window.location.pathname;
-  const noHeaderRoutes = ['/login', '/admin/login', '/register', '/admin/register', '/super-admin/register', '/admin/reset-password'];
-  const showHeader = !noHeaderRoutes.includes(location);
-
+function AppLayout() {
   return (
     <>
-      {showHeader && <Header />}
-      <main className={`${showHeader ? 'max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8' : ''}`}>
-        {children}
+      <Header />
+      <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+        <Outlet />
       </main>
-      {showHeader && <ChatBot />}
+      <ChatBot />
     </>
   );
 }
+
+const renderRoutes = (routes: any[], parentPath = '') => {
+  return routes.map((route, i) => {
+    const path = `${parentPath}${route.path}`;
+    
+    if (route.children) {
+      return (
+        <Route key={i} path={route.path}>
+          {renderRoutes(route.children, path)}
+        </Route>
+      );
+    }
+
+    const element = route.requiresAuth ? (
+      <ProtectedRoute adminOnly={route.adminOnly}>{route.element}</ProtectedRoute>
+    ) : route.publicOnly ? (
+      <PublicRoute>{route.element}</PublicRoute>
+    ) : (
+      route.element
+    );
+
+    return <Route key={i} path={route.path} element={element} index={route.index} />;
+  });
+};
 
 function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
         <div className="min-h-screen bg-background">
-          <AppLayout>
-            <Routes>
-              {/* Auth Callback */}
-              <Route path="/auth/callback" element={<AuthCallback />} />
+          <Routes>
+            {/* Auth Routes */}
+            {renderRoutes(authRoutes.map(route => ({ ...route, publicOnly: true })))}
 
-              {/* Admin Routes */}
-              <Route path="/admin/login" element={<AdminLogin />} />
-              <Route path="/admin/register" element={<AdminRegister />} />
-              <Route path="/super-admin/register" element={<SuperAdminRegister />} />
-              <Route
-                path="/admin/dashboard"
-                element={
-                  <ProtectedRoute adminOnly>
-                    <AdminDashboard />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/admin/reset-password"
-                element={
-                  <PublicRoute>
-                    <AdminPasswordReset />
-                  </PublicRoute>
-                }
-              />
+            {/* Admin Routes */}
+            {renderRoutes(adminRoutes.map(route => ({ 
+              ...route, 
+              requiresAuth: !route.path?.endsWith('login') && !route.path?.endsWith('register'),
+              adminOnly: !route.path?.endsWith('login') && !route.path?.endsWith('register')
+            })))}
 
-              {/* Public Routes */}
-              <Route
-                path="/login"
-                element={
-                  <PublicRoute>
-                    <Login />
-                  </PublicRoute>
-                }
-              />
-              <Route
-                path="/register"
-                element={
-                  <PublicRoute>
-                    <Register />
-                  </PublicRoute>
-                }
-              />
-
-              {/* Protected Routes */}
-              <Route
-                path="/dashboard"
-                element={
-                  <ProtectedRoute>
-                    <Dashboard />
-                  </ProtectedRoute>
-                }
-              />
-
-              {/* Properties Routes */}
-              <Route path="/properties">
-                <Route
-                  index
-                  element={
-                    <ProtectedRoute>
-                      <Properties />
-                    </ProtectedRoute>
-                  }
-                />
-                
-                {/* Property Listing Wizard Routes */}
-                <Route path="list">
-                  <Route
-                    index
-                    element={
-                      <ProtectedRoute>
-                        <ListYourProperty />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route path=":category/:type">
-                    <Route
-                      index
-                      element={
-                        <ProtectedRoute>
-                          <ListYourProperty />
-                        </ProtectedRoute>
-                      }
-                    />
-                    <Route
-                      path=":step"
-                      element={
-                        <ProtectedRoute>
-                          <ListYourProperty />
-                        </ProtectedRoute>
-                      }
-                    />
-                  </Route>
-                </Route>
-
-                {/* Individual Property Routes */}
-                <Route
-                  path=":id/preview"
-                  element={
-                    <ProtectedRoute>
-                      <PropertyPreview />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path=":id/edit"
-                  element={
-                    <ProtectedRoute>
-                      <EditProperty />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path=":id"
-                  element={
-                    <ProtectedRoute>
-                      <PropertyDetails />
-                    </ProtectedRoute>
-                  }
-                />
-              </Route>
-
-              {/* Default Route */}
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            </Routes>
-          </AppLayout>
+            {/* Main App Routes */}
+            <Route element={<AppLayout />}>
+              {renderRoutes(mainRoutes.map(route => ({ ...route, requiresAuth: true })))}
+            </Route>
+          </Routes>
         </div>
       </BrowserRouter>
     </AuthProvider>

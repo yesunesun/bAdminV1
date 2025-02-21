@@ -4,7 +4,9 @@
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+// Update import paths
 import { supabase } from '@/lib/supabase';
+import { AdminHeader } from '../components/AdminHeader';
 import { Shield, AlertCircle } from 'lucide-react';
 
 export default function AdminRegister() {
