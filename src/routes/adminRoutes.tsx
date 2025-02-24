@@ -1,10 +1,10 @@
 // src/routes/adminRoutes.tsx
-// Version: 1.4.0
-// Last Modified: 21-02-2025 21:15 IST
+// Version: 1.6.0
+// Last Modified: 23-02-2025 08:45 IST
+// Purpose: Admin routes configuration with Fast Refresh support
 
 import { Suspense } from 'react';
 import { ThemeProvider } from '@/contexts/ThemeContext';
-import { AuthProvider } from '@/contexts/AuthContext';
 import AdminDashboard from '@/modules/admin/pages/AdminDashboard';
 import AdminLogin from '@/modules/admin/pages/AdminLogin';
 import AdminRegister from '@/modules/admin/pages/AdminRegister';
@@ -35,28 +35,20 @@ const ErrorFallback = () => (
   </div>
 );
 
-// Wrapper for common providers
-const ProvidersWrapper = ({ children }: { children: React.ReactNode }) => (
-  <AuthProvider>
-    <ThemeProvider>
-      <Suspense fallback={<LoadingFallback />}>
-        {children}
-      </Suspense>
-    </ThemeProvider>
-  </AuthProvider>
+// Wrapper for theme and suspense
+const AdminWrapper = ({ children }: { children: React.ReactNode }) => (
+  <ThemeProvider>
+    <Suspense fallback={<LoadingFallback />}>
+      {children}
+    </Suspense>
+  </ThemeProvider>
 );
 
-// Base layout that includes auth and theme providers
-const BaseAdminLayout = ({ children }: { children: React.ReactNode }) => (
-  <ProvidersWrapper>
-    <AdminLayout>{children}</AdminLayout>
-  </ProvidersWrapper>
-);
-
+// Export routes configuration for React Router
 export const adminRoutes = [
   {
     path: '/admin',
-    element: <ProvidersWrapper />,
+    element: <AdminWrapper />,
     errorElement: <ErrorFallback />,
     children: [
       // Public routes

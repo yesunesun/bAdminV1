@@ -1,95 +1,177 @@
 // src/lib/supabase.ts
-// Version: 1.3.5
-// Last Modified: 21-02-2025 20:00 IST
+// Version: 2.1.0
+// Last Modified: 23-02-2025 08:00 IST
+// Purpose: Supabase client configuration with admin operations support
 
 import { createClient } from '@supabase/supabase-js';
-import { Database } from './database.types';
+import type { Database } from './database.types';
 
-// Filter out Supabase HTTP errors from console
+// Environment variable validation
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+// Validate required environment variables
+if (!supabaseUrl) {
+  throw new Error('VITE_SUPABASE_URL is not defined in environment variables');
+}
+
+if (!supabaseAnonKey) {
+  throw new Error('VITE_SUPABASE_ANON_KEY is not defined in environment variables');
+}
+
+// Custom error filter to reduce noise in console
 const originalConsoleError = console.error;
 console.error = (...args) => {
-  // Filter out specific Supabase-related errors
-  if (
-    args[0]?.includes?.('supabase') ||
-    args[0]?.includes?.('404') ||
-    args[0]?.includes?.('session') ||
-    (typeof args[0] === 'string' && args[0].includes('https://lkzbwrrauvdinwypmhyb.supabase.co'))
-  ) {
+  // Skip known Supabase-related non-critical errors
+  const skipErrors = [
+    'supabase',
+    '404',
+    'session',
+    'https://lkzbwrrauvdinwypmhyb.supabase.co',
+    'Request failed with status code 404',
+    'The content has been deleted',
+  ];
+
+  // Check if error should be skipped
+  const shouldSkip = skipErrors.some(errorText => 
+    args[0]?.includes?.(errorText) || 
+    (typeof args[0] === 'string' && args[0].includes(errorText))
+  );
+
+  if (shouldSkip) {
     return;
   }
+
+  // Log all other errors normally
   originalConsoleError.apply(console, args);
 };
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const supabaseServiceKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Required Supabase configuration is missing. Check your environment variables.');
-}
-
-// Regular client for normal operations
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+// Supabase client options
+const supabaseOptions = {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: true,
-    flowType: 'pkce',
-    debug: false,
+    flowType: 'pkce' as const,
     storage: window.localStorage,
     storageKey: 'bhoomitalli-auth-token',
-    redirectTo: `${window.location.origin}/auth/callback`
   },
   global: {
     headers: {
-      'x-client-info': 'bhoomitalli-web'
-    }
+      'x-client-info': 'bhoomitalli-web-client',
+    },
   },
-  logger: {
-    debug: () => {},
-    info: () => {},
-    warn: () => {},
-    error: () => {}
-  }
-});
+  db: {
+    schema: 'public',
+  },
+  realtime: {
+    reconnectAfterMs: (tries: number) => Math.min(1000 + tries * 1000, 10000),
+  },
+};
 
-// Admin client with service role key for admin operations
-export const adminSupabase = supabaseServiceKey ? createClient<Database>(
+// Create and export the Supabase client
+export const supabase = createClient<Database>(
   supabaseUrl,
-  supabaseServiceKey,
+  supabaseAnonKey,
+  supabaseOptions
+);
+
+// Create an admin client that uses the same anon key but includes admin headers
+// This will work with RLS policies that check for admin role in JWT claims
+export const adminSupabase = createClient<Database>(
+  supabaseUrl,
+  supabaseAnonKey,
   {
-    auth: {
-      autoRefreshToken: true,
-      persistSession: true,
-      detectSessionInUrl: false,
-      storage: window.localStorage,
-      storageKey: 'bhoomitalli-admin-token'
-    },
+    ...supabaseOptions,
     global: {
+      ...supabaseOptions.global,
       headers: {
-        'x-client-info': 'bhoomitalli-admin'
+        ...supabaseOptions.global.headers,
+        'x-client-info': 'bhoomitalli-admin-client',
       }
-    },
-    logger: {
-      debug: () => {},
-      info: () => {},
-      warn: () => {},
-      error: () => {}
     }
   }
-) : supabase;
-
-// Simplified auth state monitoring
-supabase.auth.onAuthStateChange((event, session) => {
-  if (event === 'SIGNED_OUT') {
-    localStorage.removeItem('bhoomitalli-user-data');
-    localStorage.removeItem('bhoomitalli-admin-token');
-  }
-});
+);
 
 // Initialize auth state
-supabase.auth.getSession().catch(() => {
-  // Silently handle session initialization errors
-});
+try {
+  await supabase.auth.getSession();
+} catch (error) {
+  console.warn('Session initialization warning:', error instanceof Error ? error.message : 'Unknown error');
+}
 
+// Export types
 export type SupabaseClient = typeof supabase;
+export type DbResult<T> = T extends PromiseLike<infer U> ? U : never;
+export type DbResultOk<T> = T extends PromiseLike<{ data: infer U }> ? Exclude<U, null> : never;
+
+// Helper types for database operations
+export type Tables<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Row'];
+export type Enums<T extends keyof Database['public']['Enums']> = Database['public']['Enums'][T];
+
+// Helper functions for type checking
+export const isErrorWithMessage = (error: unknown): error is { message: string } => {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'message' in error &&
+    typeof (error as Record<string, unknown>).message === 'string'
+  );
+};
+
+// Error handler for Supabase operations
+export const handleSupabaseError = (error: unknown): string => {
+  if (isErrorWithMessage(error)) {
+    return error.message;
+  }
+  return 'An unexpected error occurred';
+};
+
+// Type guard for database responses
+export const isDataResponse = <T>(
+  response: { data: T | null; error: null } | { data: null; error: Error }
+): response is { data: T; error: null } => {
+  return response.data !== null && response.error === null;
+};
+
+// Helper function to check if user has admin role
+export const isUserAdmin = async (): Promise<boolean> => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return false;
+
+    // Check user metadata for admin role
+    const isAdminByMetadata = 
+      user.user_metadata?.is_admin === true || 
+      user.user_metadata?.role === 'admin' ||
+      user.user_metadata?.role === 'super_admin';
+
+    if (isAdminByMetadata) return true;
+
+    // Check admin_users table as fallback
+    const { data: adminData } = await supabase
+      .from('admin_users')
+      .select('role_id')
+      .eq('user_id', user.id)
+      .single();
+
+    return !!adminData;
+  } catch (error) {
+    console.error('Error checking admin status:', error);
+    return false;
+  }
+};
+
+// Export commonly used types
+export type { Database } from './database.types';
+export type Json = Database['public']['Json'];
+export type Tables = Database['public']['Tables'];
+export type Enums = Database['public']['Enums'];
+
+// Export error types for better error handling
+export type SupabaseError = {
+  message: string;
+  details: string;
+  hint: string;
+  code: string;
+};

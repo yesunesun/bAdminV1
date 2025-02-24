@@ -1,20 +1,35 @@
 // src/pages/Login.tsx
-// Version: 1.6.0
-// Last Modified: 10-02-2025 16:00 IST
+// Version: 1.7.0
+// Last Modified: 22-02-2025 11:30 IST
 
-import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Mail, Building2, Home } from 'lucide-react';
+import { Mail, Building2, Home, Key } from 'lucide-react';
 
 export default function Login() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [token, setToken] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [showVerification, setShowVerification] = useState(false);
-  const { signInWithOTP, verifyOTP } = useAuth();
+  const [usePasswordAuth, setUsePasswordAuth] = useState(false);
+  const { signInWithOTP, verifyOTP, signInWithPassword } = useAuth();
+
+  // Check if user came from invitation flow
+  useEffect(() => {
+    const isInvited = searchParams.get('invite') === 'true';
+    if (isInvited) {
+      setUsePasswordAuth(true);
+      const invitedEmail = searchParams.get('email');
+      if (invitedEmail) {
+        setEmail(invitedEmail);
+      }
+    }
+  }, [searchParams]);
 
   const handleSignInSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,14 +37,21 @@ export default function Login() {
     setIsLoading(true);
     
     try {
-      const { error: signInError } = await signInWithOTP(email);
-      
-      if (signInError) {
-        setError(signInError.message);
-        return;
+      if (usePasswordAuth) {
+        const { error: signInError } = await signInWithPassword(email, password);
+        if (signInError) {
+          setError(signInError.message);
+          return;
+        }
+        navigate('/dashboard');
+      } else {
+        const { error: signInError } = await signInWithOTP(email);
+        if (signInError) {
+          setError(signInError.message);
+          return;
+        }
+        setShowVerification(true);
       }
-      
-      setShowVerification(true);
     } catch (err) {
       setError('An unexpected error occurred. Please try again later.');
       console.error('Sign in error:', err);
@@ -45,12 +67,10 @@ export default function Login() {
 
     try {
       const { error: verifyError } = await verifyOTP(email, token);
-
       if (verifyError) {
         setError(verifyError.message);
         return;
       }
-
       navigate('/dashboard');
     } catch (err) {
       setError('An unexpected error occurred. Please try again later.');
@@ -94,7 +114,11 @@ export default function Login() {
         <div className="max-w-md w-full space-y-8 p-8 bg-white/80 backdrop-blur rounded-xl shadow-lg mx-4">
           <div className="text-center">
             <div className="mx-auto h-14 w-14 flex items-center justify-center rounded-full bg-sky-100">
-              <Mail className="h-7 w-7 text-sky-600" />
+              {usePasswordAuth ? (
+                <Key className="h-7 w-7 text-sky-600" />
+              ) : (
+                <Mail className="h-7 w-7 text-sky-600" />
+              )}
             </div>
             <h2 className="mt-6 text-3xl font-bold text-sky-900">
               {showVerification ? 'Verify Your Email' : 'Welcome Back'}
@@ -177,15 +201,54 @@ export default function Login() {
                 </div>
               </div>
 
+              {usePasswordAuth && (
+                <div>
+                  <label htmlFor="password" className="block text-sm font-medium text-sky-900">
+                    Password
+                  </label>
+                  <div className="mt-1">
+                    <input
+                      id="password"
+                      name="password"
+                      type="password"
+                      autoComplete="current-password"
+                      required
+                      className="appearance-none block w-full px-3 py-2 border border-sky-200 rounded-lg shadow-sm placeholder-sky-400 focus:outline-none focus:ring-sky-500 focus:border-sky-500 bg-white/50 backdrop-blur sm:text-sm"
+                      placeholder="Enter your password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      disabled={isLoading}
+                    />
+                  </div>
+                </div>
+              )}
+
               <button
                 type="submit"
                 disabled={isLoading}
                 className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 disabled:opacity-50 transition-colors duration-200"
               >
-                {isLoading ? 'Sending code...' : 'Send verification code'}
+                {isLoading 
+                  ? (usePasswordAuth ? 'Signing in...' : 'Sending code...') 
+                  : (usePasswordAuth ? 'Sign in' : 'Send verification code')}
               </button>
 
-              <div className="text-center">
+              <div className="text-center space-y-2">
+                {!searchParams.get('invite') && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUsePasswordAuth(!usePasswordAuth);
+                      setError('');
+                      setPassword('');
+                    }}
+                    className="text-sm text-sky-600 hover:text-sky-700"
+                  >
+                    {usePasswordAuth 
+                      ? 'Sign in with email verification instead' 
+                      : 'Sign in with password instead'}
+                  </button>
+                )}
                 <p className="text-sm text-sky-600">
                   Don't have an account?{' '}
                   <Link to="/register" className="font-medium text-sky-700 hover:text-sky-800">

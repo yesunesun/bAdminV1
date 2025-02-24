@@ -12,6 +12,7 @@ interface AuthContextType {
   loading: boolean;
   signInAdmin: (email: string, password: string) => Promise<{ error?: AuthError }>;
   signInWithOTP: (email: string) => Promise<{ error?: AuthError }>;
+  signInWithPassword: (email: string, password: string) => Promise<{ error?: AuthError }>;
   verifyOTP: (email: string, token: string) => Promise<{ error?: AuthError }>;
   signOut: () => Promise<void>;
 }

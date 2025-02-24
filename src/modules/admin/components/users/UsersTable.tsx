@@ -1,10 +1,11 @@
 // src/modules/admin/components/users/UsersTable.tsx
-// Version: 1.1.0
-// Last Modified: 21-02-2025 22:45 IST
+// Version: 1.1.1
+// Last Modified: 21-02-2025 22:55 IST
 
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { getRoleColor, getStatusColor } from '../../utils/styles';
+import { UserTableActions } from './UserTableActions';
 
 interface User {
   id: string;
@@ -85,12 +86,13 @@ export const UsersTable: React.FC<UsersTableProps> = ({ users, onViewDetails }) 
                 {formatDate(user.last_sign_in_at)}
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
-                <button
-                  onClick={() => onViewDetails(user.id)}
-                  className="text-blue-600 hover:text-blue-900"
-                >
-                  View Details
-                </button>
+                <UserTableActions
+                  userId={user.id}
+                  userEmail={user.email}
+                  onView={onViewDetails}
+                  onEdit={onViewDetails}
+                  onDelete={async () => {}}
+                />
               </td>
             </tr>
           ))}

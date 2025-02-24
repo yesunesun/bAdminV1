@@ -1,6 +1,6 @@
 // src/modules/admin/components/users/InviteUserModal.tsx
-// Version: 1.8.0
-// Last Modified: 21-02-2025 22:00 IST
+// Version: 1.9.1
+// Last Modified: 21-02-2025 22:30 IST
 // Purpose: Handle admin user invitations with reliable user creation
 
 import React, { useState } from 'react';
@@ -16,7 +16,7 @@ import {
   DialogFooter,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { adminSupabase } from '@/lib/supabase';
+import { supabase, adminSupabase } from '@/lib/supabase';
 import { useToast } from '@/components/ui/use-toast';
 import { ADMIN_ROLES, ADMIN_ROLE_LABELS } from '../../utils/constants';
 import { useAdminAccess } from '../../hooks/useAdminAccess';
@@ -62,7 +62,7 @@ export function InviteUserModal({ onSuccess }: InviteUserModalProps) {
       validateInputs();
 
       // Step 1: Get role ID
-      const { data: roleData, error: roleError } = await adminSupabase
+      const { data: roleData, error: roleError } = await supabase
         .from('admin_roles')
         .select('id')
         .eq('role_type', role)
@@ -72,53 +72,60 @@ export function InviteUserModal({ onSuccess }: InviteUserModalProps) {
         throw new Error('Failed to fetch role information');
       }
 
-      // Step 2: Generate a random password (will be changed by user)
-      const tempPassword = Math.random().toString(36).slice(-12) + 
-                         Math.random().toString(36).slice(-12);
-
-      // Step 3: Create user with admin client
-      const { data, error: createError } = await adminSupabase.auth.admin.createUser({
+      // Step 2: Send magic link invite
+      const { error: signInError } = await supabase.auth.signInWithOtp({
         email: email.trim(),
-        password: tempPassword,
-        email_confirm: false,
-        user_metadata: {
-          role: role,
-          is_admin: true
+        options: {
+          emailRedirectTo: `${window.location.origin}/admin/login`,
+          data: {
+            role: role,
+            is_admin: true,
+            role_id: roleData.id
+          }
         }
       });
 
-      if (createError || !data.user) {
-        throw new Error(createError?.message || 'Failed to create user');
-      }
-
-      // Step 4: Create admin user entry
-      const { error: adminError } = await adminSupabase
-        .from('admin_users')
-        .insert([{
-          user_id: data.user.id,
-          role_id: roleData.id,
-          is_active: true
-        }]);
-
-      if (adminError) {
-        // Rollback user creation if admin user entry fails
-        await adminSupabase.auth.admin.deleteUser(data.user.id);
-        throw new Error('Failed to create admin user entry');
-      }
-
-      // Step 5: Generate invitation link with proper type
-      const { error: resetError } = await adminSupabase.auth.admin.inviteUserByEmail(email.trim(), {
-        redirectTo: `${window.location.origin}/auth/callback?type=invite`,
-        data: { role }
-      });
-
-      if (resetError) {
+      if (signInError) {
         throw new Error('Failed to send invitation email');
       }
 
+      // Create profile entry after successful invite
+      const { data: userData, error: userError } = await supabase
+        .from('profiles')
+        .insert([{
+          email: email.trim(),
+          role: role,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }])
+        .select()
+        .single();
+
+      if (userError) {
+        console.error('Profile creation error:', userError);
+        // Don't throw here as the invite is already sent
+      }
+
+      // Create admin_user entry
+      if (userData?.id) {
+        const { error: adminError } = await supabase
+          .from('admin_users')
+          .insert([{
+            user_id: userData.id,
+            role_id: roleData.id,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }]);
+
+        if (adminError) {
+          console.error('Admin user creation error:', adminError);
+          // Don't throw as the invite is already sent
+        }
+      }
+
       toast({
-        title: 'User invited successfully',
-        description: 'An invitation email has been sent with setup instructions.',
+        title: 'Invitation sent successfully',
+        description: 'A magic link has been sent to the provided email address.',
         duration: 5000,
       });
 
@@ -130,7 +137,7 @@ export function InviteUserModal({ onSuccess }: InviteUserModalProps) {
     } catch (error: any) {
       console.error('Invitation error:', error);
       toast({
-        title: 'Failed to invite user',
+        title: 'Failed to send invitation',
         description: error.message || 'An unexpected error occurred',
         variant: 'destructive',
         duration: 5000,
@@ -166,7 +173,7 @@ export function InviteUserModal({ onSuccess }: InviteUserModalProps) {
               aria-describedby="email-description"
             />
             <p id="email-description" className="text-sm text-gray-500">
-              The user will receive setup instructions at this email.
+              The user will receive a magic link to set up their account.
             </p>
           </div>
 
