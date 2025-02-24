@@ -1,6 +1,6 @@
 // src/modules/admin/components/users/UsersTable.tsx
-// Version: 1.1.1
-// Last Modified: 21-02-2025 22:55 IST
+// Version: 1.2.0
+// Last Modified: 24-02-2025 15:30 IST
 
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
@@ -15,6 +15,8 @@ interface User {
   last_sign_in_at?: string | null;
   phone?: string | null;
   status?: string;
+  isInvited?: boolean;
+  hasProfile?: boolean;
 }
 
 interface UsersTableProps {
@@ -47,6 +49,9 @@ export const UsersTable: React.FC<UsersTableProps> = ({ users, onViewDetails }) 
               Status
             </th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Profile
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Phone
             </th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -68,12 +73,17 @@ export const UsersTable: React.FC<UsersTableProps> = ({ users, onViewDetails }) 
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
                 <Badge className={getRoleColor(user.role)}>
-                  {user.role || 'User'}
+                  {user.role || 'Unassigned'}
                 </Badge>
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
                 <Badge className={getStatusColor(user.status || 'pending')}>
                   {user.status || 'Pending'}
+                </Badge>
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap">
+                <Badge variant={user.hasProfile ? "success" : "warning"}>
+                  {user.hasProfile ? 'Complete' : 'Incomplete'}
                 </Badge>
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -92,6 +102,7 @@ export const UsersTable: React.FC<UsersTableProps> = ({ users, onViewDetails }) 
                   onView={onViewDetails}
                   onEdit={onViewDetails}
                   onDelete={async () => {}}
+                  hasProfile={user.hasProfile}
                 />
               </td>
             </tr>
