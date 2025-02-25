@@ -1,14 +1,14 @@
 // src/routes/adminRoutes.tsx
-// Version: 1.6.0
-// Last Modified: 23-02-2025 08:45 IST
-// Purpose: Admin routes configuration with Fast Refresh support
+// Full file with reset-password route
 
-import { Suspense } from 'react';
+import { Suspense, lazy } from 'react';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import AdminDashboard from '@/modules/admin/pages/AdminDashboard';
 import AdminLogin from '@/modules/admin/pages/AdminLogin';
 import AdminRegister from '@/modules/admin/pages/AdminRegister';
 import AdminPasswordReset from '@/modules/admin/pages/AdminPasswordReset';
+import AdminForgotPassword from '@/modules/admin/pages/AdminForgotPassword';
+import AdminSetup from '@/pages/AdminSetup';
 import UsersList from '@/modules/admin/components/UsersList';
 import { AdminLayout } from '@/modules/admin/components/AdminLayout';
 
@@ -63,6 +63,14 @@ export const adminRoutes = [
       {
         path: 'reset-password',
         element: <AdminPasswordReset />
+      },
+      {
+        path: 'forgot-password',
+        element: <AdminForgotPassword />
+      },
+      {
+        path: 'setup',
+        element: <AdminSetup />
       },
       
       // Protected routes

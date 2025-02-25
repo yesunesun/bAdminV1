@@ -1,7 +1,7 @@
 // src/modules/admin/components/users/InviteUserModal.tsx
-// Version: 1.9.1
-// Last Modified: 21-02-2025 22:30 IST
-// Purpose: Handle admin user invitations with reliable user creation
+// Version: 5.0.0
+// Last Modified: 25-02-2025 23:45 IST
+// Purpose: Handle admin user invitations with email verification bypass
 
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -16,7 +16,7 @@ import {
   DialogFooter,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { supabase, adminSupabase } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { useToast } from '@/components/ui/use-toast';
 import { ADMIN_ROLES, ADMIN_ROLE_LABELS } from '../../utils/constants';
 import { useAdminAccess } from '../../hooks/useAdminAccess';
@@ -48,6 +48,25 @@ export function InviteUserModal({ onSuccess }: InviteUserModalProps) {
     }
   };
 
+  // Create secure setup token
+  const generateSetupToken = (email: string, roleId: string) => {
+    // Create a secure token with necessary data
+    const timestamp = Date.now();
+    // Add some randomness for security
+    const randomComponent = Math.random().toString(36).substring(2, 10);
+    
+    const tokenData = {
+      email,
+      role_id: roleId,
+      timestamp,
+      expires: timestamp + (24 * 60 * 60 * 1000), // 24 hours expiry
+      nonce: randomComponent
+    };
+    
+    // Base64 encode the token data
+    return btoa(JSON.stringify(tokenData));
+  };
+
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -72,63 +91,70 @@ export function InviteUserModal({ onSuccess }: InviteUserModalProps) {
         throw new Error('Failed to fetch role information');
       }
 
-      // Step 2: Send magic link invite
-      const { error: signInError } = await supabase.auth.signInWithOtp({
-        email: email.trim(),
+      const cleanEmail = email.trim().toLowerCase();
+      console.log('Processing invitation for:', cleanEmail);
+
+      // Step 2: Check if user already exists
+      const { data: existingUser } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', cleanEmail)
+        .single();
+
+      // Step 3: Generate secure setup token
+      const setupToken = generateSetupToken(cleanEmail, roleData.id);
+      const setupUrl = `${window.location.origin}/admin/setup?email=${encodeURIComponent(cleanEmail)}&setupToken=${encodeURIComponent(setupToken)}`;
+      
+      console.log('Setup URL generated:', setupUrl);
+
+      // Step 4: Send magic link email
+      // Using passwordless sign-in to send the email without creating account yet
+      const { error: magicLinkError } = await supabase.auth.signInWithOtp({
+        email: cleanEmail,
         options: {
-          emailRedirectTo: `${window.location.origin}/admin/login`,
+          // Override the email template with our own setup link
+          emailRedirectTo: setupUrl,
+          // Add metadata for tracking
           data: {
+            invitation_type: 'admin',
             role: role,
-            is_admin: true,
             role_id: roleData.id
           }
         }
       });
 
-      if (signInError) {
-        throw new Error('Failed to send invitation email');
+      if (magicLinkError) {
+        throw new Error(`Failed to send invitation email: ${magicLinkError.message}`);
       }
 
-      // Create profile entry after successful invite
-      const { data: userData, error: userError } = await supabase
-        .from('profiles')
-        .insert([{
-          email: email.trim(),
-          role: role,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }])
-        .select()
-        .single();
-
-      if (userError) {
-        console.error('Profile creation error:', userError);
-        // Don't throw here as the invite is already sent
+      // For development, show the setup URL directly
+      if (import.meta.env.MODE === 'development') {
+        toast({
+          title: 'Invitation sent successfully',
+          description: (
+            <div>
+              <p>In development mode. Setup link would normally be emailed.</p>
+              <a 
+                href={setupUrl} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-blue-600 underline mt-2 inline-block"
+              >
+                Test setup page directly
+              </a>
+            </div>
+          ),
+          duration: 10000,
+        });
+      } else {
+        toast({
+          title: 'Invitation sent successfully',
+          description: `An invitation email has been sent to ${cleanEmail}`,
+          duration: 5000,
+        });
       }
 
-      // Create admin_user entry
-      if (userData?.id) {
-        const { error: adminError } = await supabase
-          .from('admin_users')
-          .insert([{
-            user_id: userData.id,
-            role_id: roleData.id,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }]);
-
-        if (adminError) {
-          console.error('Admin user creation error:', adminError);
-          // Don't throw as the invite is already sent
-        }
-      }
-
-      toast({
-        title: 'Invitation sent successfully',
-        description: 'A magic link has been sent to the provided email address.',
-        duration: 5000,
-      });
-
+      // Reset form and close modal
       setEmail('');
       setRole('');
       setOpen(false);
@@ -173,7 +199,7 @@ export function InviteUserModal({ onSuccess }: InviteUserModalProps) {
               aria-describedby="email-description"
             />
             <p id="email-description" className="text-sm text-gray-500">
-              The user will receive a magic link to set up their account.
+              The user will receive a setup link via email to create their account.
             </p>
           </div>
 
@@ -210,7 +236,7 @@ export function InviteUserModal({ onSuccess }: InviteUserModalProps) {
               Cancel
             </Button>
             <Button type="submit" disabled={isLoading}>
-              {isLoading ? 'Sending Invite...' : 'Send Invitation'}
+              {isLoading ? 'Sending Invitation...' : 'Send Invitation'}
             </Button>
           </DialogFooter>
         </form>

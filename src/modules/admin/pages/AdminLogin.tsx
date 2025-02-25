@@ -1,226 +1,175 @@
-// src/pages/AdminLogin.tsx
-// Version: 1.9.1
-// Last Modified: 12-02-2025 17:15 IST
+// src/modules/admin/pages/AdminLogin.tsx
+// Version: 3.1.0
+// Last Modified: 24-02-2025 22:45 IST
+// Purpose: Refactored Admin Login page using custom hooks and components
 
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation, Link } from 'react-router-dom';
-// Update import paths
-import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/lib/supabase';
-import { AdminHeader } from '../components/AdminHeader';
-import { Lock, Shield, AlertCircle } from 'lucide-react';
+import React, { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { LoginContainer } from './AdminLogin/components/LoginContainer';
+import { PasswordLoginForm } from './AdminLogin/components/PasswordLoginForm';
+import { TokenLoginForm } from './AdminLogin/components/TokenLoginForm';
+import { SetupPasswordForm } from './AdminLogin/components/SetupPasswordForm';
+import { LoadingState } from './AdminLogin/components/LoadingState';
+import { SuccessState } from './AdminLogin/components/SuccessState';
+import { LoginHeader } from './AdminLogin/components/LoginHeader';
+import { ErrorMessage } from './AdminLogin/components/ErrorMessage';
+import { SuccessMessage } from './AdminLogin/components/SuccessMessage';
+import { useAdminAuth } from './AdminLogin/hooks/useAdminAuth';
+import { LOGIN_METHODS } from './AdminLogin/constants';
+
+// Debug helper component for development mode
+const DebugPanel = ({ state }) => {
+  if (!import.meta.env.DEV) return null;
+  
+  return (
+    <div className="mt-8 p-4 bg-gray-100 rounded text-xs">
+      <details>
+        <summary className="cursor-pointer text-gray-600 font-medium">Debug Info</summary>
+        <div className="mt-2 p-2 bg-white rounded">
+          <pre className="overflow-auto">{JSON.stringify(state, null, 2)}</pre>
+        </div>
+      </details>
+    </div>
+  );
+};
+
+// Force debug rendering if the page is blank with a code parameter
+const useEmergencyDebugRender = (code, componentState, needsPasswordSetup) => {
+  useEffect(() => {
+    if (code && document.body.contains(document.getElementById('admin-login-debug'))) {
+      console.log('Debug element found, clearing it');
+      document.getElementById('admin-login-debug').remove();
+    }
+    
+    if (code && !document.body.textContent?.trim()) {
+      console.log('Empty body detected with code parameter, forcing debug render');
+      const debugElement = document.createElement('div');
+      debugElement.id = 'admin-login-debug';
+      debugElement.innerHTML = `
+        <div style="padding: 20px; font-family: sans-serif;">
+          <h2>Debug Info - Blank Page Detected</h2>
+          <p>Code parameter: ${code}</p>
+          <p>Component State: ${componentState}</p>
+          <p>Needs Password Setup: ${needsPasswordSetup}</p>
+          <a href="/admin/login" style="padding: 10px; background: blue; color: white; display: inline-block; margin-top: 20px; text-decoration: none; border-radius: 4px;">Return to Login</a>
+        </div>
+      `;
+      document.body.appendChild(debugElement);
+    }
+  }, [code, componentState, needsPasswordSetup]);
+};
 
 export default function AdminLogin() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const [formData, setFormData] = useState({ email: '', password: '' });
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [isResending, setIsResending] = useState(false);
-  const { signInAdmin } = useAuth();
-
-  const isDevMode = import.meta.env.DEV;
-
+  
+  // Log component mount
   useEffect(() => {
-    document.title = 'Admin Login | Bhoomitalli Real Estate';
-    
-    // Check for existing session
-    const checkSession = async () => {
-      const { data: { session }, error } = await supabase.auth.getSession();
-      if (session) {
-        // Verify if user is admin
-        const { data: adminData, error: adminError } = await supabase
-          .from('admin_users')
-          .select('is_active')
-          .eq('user_id', session.user.id)
-          .single();
+    console.log('AdminLogin component mounted');
+  }, []);
+  
+  // Use our custom hook for all authentication logic
+  const {
+    loginMethod,
+    isLoading,
+    error,
+    success,
+    isResending,
+    needsPasswordSetup,
+    code,
+    emailParam,
+    tokenParam,
+    componentState,
+    setError,
+    setSuccess,
+    setIsLoading,
+    handleTokenVerification,
+    handlePasswordSetup,
+    handleResendToken,
+    toggleLoginMethod
+  } = useAdminAuth();
+  
+  // Emergency debug render if page is blank
+  useEmergencyDebugRender(code, componentState, needsPasswordSetup);
 
-        if (adminData?.is_active) {
-          navigate('/admin/dashboard');
-        }
-      }
-    };
+  // Main render logic - loading state
+  if (isLoading && !error && !success) {
+    console.log('Rendering loading state');
+    return <LoadingState />;
+  }
 
-    checkSession();
-  }, [navigate]);
+  // Main render logic - success state
+  if (success && !error) {
+    console.log('Rendering success state');
+    return <SuccessState message={success} />;
+  }
+  
+  // Special case for password setup - this is the key to fixing the blank page
+  if (needsPasswordSetup) {
+    console.log('Rendering password setup form');
+    return (
+      <LoginContainer>
+        <LoginHeader loginMethod="setup" onToggleMethod={null} />
+        
+        {error && <ErrorMessage error={error} />}
+        {success && <SuccessMessage message={success} />}
+        
+        <SetupPasswordForm 
+          isLoading={isLoading}
+          onSubmit={handlePasswordSetup}
+        />
+        
+        <DebugPanel state={{ needsPasswordSetup, code, componentState }} />
+      </LoginContainer>
+    );
+  }
 
-  const handleResendConfirmation = async () => {
-    if (!formData.email) {
-      setError('Please enter your email address');
-      return;
-    }
-
-    setIsResending(true);
-    try {
-      const { error: resendError } = await supabase.auth.resend({
-        type: 'signup',
-        email: formData.email,
-        options: {
-          emailRedirectTo: `${window.location.origin}/admin/login`
-        }
-      });
-
-      if (resendError) throw resendError;
-
-      setError('Confirmation email resent. Please check your inbox.');
-    } catch (err) {
-      console.error('Error resending confirmation:', err);
-      setError('Failed to resend confirmation email. Please try again.');
-    } finally {
-      setIsResending(false);
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setIsLoading(true);
-
-    try {
-      console.log('Attempting admin sign in for:', formData.email);
-      
-      const { error: signInError } = await signInAdmin(
-        formData.email,
-        formData.password
-      );
-
-      if (signInError) {
-        console.error('Sign in error:', signInError);
-        if (signInError.message.includes('not confirmed')) {
-          setError('Please confirm your email first');
-          return;
-        }
-        throw signInError;
-      }
-
-      console.log('Admin sign in successful, navigating to dashboard');
-      navigate('/admin/dashboard');
-    } catch (err) {
-      console.error('Login error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to sign in');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
-    setError('');
-  };
-
+  // Default login form - fallback for any other state
+  console.log('Rendering default login form');
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-500/10 to-indigo-100">
-      <div className="max-w-md w-full space-y-8 p-8 bg-white/80 backdrop-blur rounded-xl shadow-lg mx-4">
-        <div className="text-center">
-          <div className="mx-auto h-14 w-14 flex items-center justify-center rounded-full bg-indigo-100">
-            <Shield className="h-7 w-7 text-indigo-600" />
-          </div>
-          <h2 className="mt-6 text-3xl font-bold text-gray-900">Admin Portal</h2>
-          <p className="mt-2 text-sm text-gray-600">Sign in to access admin dashboard</p>
-          
-          {isDevMode && (
-            <div className="mt-4 space-y-2">
-              <p className="text-sm text-gray-500">Development Mode Options:</p>
-              <div className="flex justify-center gap-4">
-                <Link 
-                  to="/admin/register" 
-                  className="text-sm font-medium text-indigo-600 hover:text-indigo-500"
-                >
-                  Admin Registration
-                </Link>
-                <span className="text-gray-300">|</span>
-                <Link 
-                  to="/super-admin/register" 
-                  className="text-sm font-medium text-purple-600 hover:text-purple-500"
-                >
-                  Super Admin Registration
-                </Link>
-              </div>
-            </div>
-          )}
-        </div>
+    <LoginContainer>
+      <LoginHeader 
+        loginMethod={loginMethod} 
+        onToggleMethod={toggleLoginMethod} 
+      />
 
-        {error && (
-          <div className="bg-red-50 border border-red-200 p-4 rounded-lg flex flex-col gap-2">
-            <div className="flex items-start gap-3">
-              <AlertCircle className="h-5 w-5 text-red-600 mt-0.5 flex-shrink-0" />
-              <div>
-                <p className="text-sm font-medium text-red-800">Login Failed</p>
-                <p className="text-sm text-red-700 mt-0.5">{error}</p>
-              </div>
-            </div>
-            {error.includes('confirm your email') && (
-              <button
-                type="button"
-                onClick={handleResendConfirmation}
-                disabled={isResending}
-                className="text-sm font-medium text-red-600 hover:text-red-500 disabled:opacity-50"
-              >
-                {isResending ? 'Sending...' : 'Resend confirmation email'}
-              </button>
-            )}
-          </div>
-        )}
+      {error && (
+        <ErrorMessage 
+          error={error} 
+          showResendButton={loginMethod === LOGIN_METHODS.TOKEN}
+          onResend={() => handleResendToken(emailParam || '')}
+          isResending={isResending}
+        />
+      )}
+      
+      {success && <SuccessMessage message={success} />}
 
-        <form onSubmit={handleSubmit} className="mt-8 space-y-6">
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                Email address
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                required
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-white"
-                value={formData.email}
-                onChange={handleChange}
-                placeholder="admin@example.com"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                Password
-              </label>
-              <div className="mt-1 relative">
-                <input
-                  id="password"
-                  name="password"
-                  type="password"
-                  autoComplete="current-password"
-                  required
-                  className="block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-white"
-                  value={formData.password}
-                  onChange={handleChange}
-                  placeholder="••••••••"
-                />
-                <Lock className="absolute right-3 top-2 h-4 w-4 text-gray-400" />
-              </div>
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
-          >
-            {isLoading ? (
-              <span className="flex items-center gap-2">
-                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                </svg>
-                Signing in...
-              </span>
-            ) : (
-              'Sign in'
-            )}
-          </button>
-        </form>
-      </div>
-    </div>
+      {loginMethod === LOGIN_METHODS.PASSWORD ? (
+        <PasswordLoginForm 
+          setError={setError}
+          setSuccess={setSuccess}
+          setIsLoading={setIsLoading}
+          isLoading={isLoading}
+          navigate={navigate}
+        />
+      ) : (
+        <TokenLoginForm 
+          initialEmail={emailParam || ''}
+          initialToken={tokenParam || ''}
+          onVerify={handleTokenVerification}
+          setError={setError}
+          isLoading={isLoading}
+        />
+      )}
+      
+      <DebugPanel state={{ 
+        loginMethod, 
+        isLoading, 
+        error: error ? 'Error present' : 'No error', 
+        success: success ? 'Success present' : 'No success', 
+        needsPasswordSetup,
+        code,
+        componentState
+      }} />
+    </LoginContainer>
   );
 }
