@@ -1,7 +1,7 @@
 // src/pages/AdminSetup/services/adminSetupService.ts
-// Version: 2.0.0
-// Last Modified: 25-02-2025 22:30 IST
-// Purpose: Handle API calls for admin setup with improved profile handling
+// Version: 2.3.0
+// Last Modified: 25-02-2025 15:30 IST
+// Purpose: Fix password reset functionality with correct token handling
 
 import { supabase } from '@/lib/supabase';
 
@@ -19,10 +19,10 @@ export const verifyAdminUser = async (userId: string, roleId: string, email: str
       
     if (!existingProfile) {
       console.log('Profile does not exist - this should not happen with new invite flow');
-      return false;
+      // We don't need to create a profile here anymore since it's created during invitation
+    } else {
+      console.log('Profile exists:', existingProfile);
     }
-    
-    console.log('Profile exists:', existingProfile);
     
     // Ensure admin_user entry exists
     const { error: adminUserError } = await supabase
@@ -166,80 +166,26 @@ export const fixExistingUserProfile = async (email: string) => {
   }
 };
 
-// Signup/password setup
+// Signup/password setup - Corrected version with proper token handling
+// Simplified version using the new admin_set_password function
 export const setupAdminAccount = async (email: string, password: string, setupData: any) => {
   try {
-    // Get the token from session storage
-    const token = sessionStorage.getItem('auth_token');
-    
     console.log('Starting account setup for:', email);
     
-    // First try to verify OTP if we have a token
-    if (token) {
-      console.log('Using OTP verification flow');
-      
-      const { data: otpData, error: otpError } = await supabase.auth.verifyOtp({
-        email,
-        type: 'signup',
-        token: token
-      });
-      
-      if (otpError) {
-        console.warn('OTP verification failed:', otpError);
-        // Continue with alternative method
-      } else if (otpData?.user) {
-        console.log('OTP verification successful, updating password');
-        
-        // Update password for the verified user
-        const { error: updateError } = await supabase.auth.updateUser({
-          password
-        });
-        
-        if (updateError) {
-          throw new Error(`Failed to set password: ${updateError.message}`);
-        }
-        
-        console.log('Password updated successfully');
-        
-        // Verify admin user entry (profile should already exist)
-        if (setupData?.role_id && otpData.user.id) {
-          const verified = await verifyAdminUser(otpData.user.id, setupData.role_id, email);
-          if (!verified) {
-            console.warn('Admin user verification failed, but continuing with setup');
-          }
-        }
-        
-        // Sign out to ensure clean state
-        await supabase.auth.signOut();
-        
-        // Clear any stored tokens
-        sessionStorage.removeItem('auth_token');
-        
-        return { success: true, usePasswordReset: false };
+    // Use the new direct password set function
+    const { data: passwordResult, error: passwordError } = await supabase.rpc(
+      'admin_set_password',
+      {
+        user_email: email,
+        new_password: password
       }
-    }
+    );
     
-    // If OTP verification didn't work, try sign up flow
-    console.log('Using signup flow');
-    
-    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          is_admin: true,
-          role_id: setupData?.role_id,
-          role: setupData?.role || 'admin'
-        },
-        emailRedirectTo: `${window.location.origin}/admin/login`
-      }
-    });
-    
-    if (signUpError) {
-      console.error('Sign up failed:', signUpError);
+    if (passwordError || !passwordResult) {
+      console.error('Failed to set password using admin function:', passwordError);
       
-      // Try password reset flow as last resort
-      console.log('Attempting password reset flow');
+      // Fall back to password reset email
+      console.log('Falling back to password reset email');
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(
         email,
         {
@@ -248,29 +194,13 @@ export const setupAdminAccount = async (email: string, password: string, setupDa
       );
       
       if (resetError) {
-        throw new Error(`Unable to create or update account: ${resetError.message}`);
+        throw new Error(`Unable to reset password: ${resetError.message}`);
       }
       
-      // If password reset worked
       return { success: true, usePasswordReset: true };
     }
     
-    console.log('Sign up successful');
-    
-    // Verify admin user (profile should already exist)
-    if (signUpData?.user && setupData?.role_id) {
-      const verified = await verifyAdminUser(signUpData.user.id, setupData.role_id, email);
-      if (!verified) {
-        console.warn('Admin user verification failed, but continuing with setup');
-      }
-    }
-    
-    // Sign out to ensure clean state
-    await supabase.auth.signOut();
-    
-    // Clear any stored tokens
-    sessionStorage.removeItem('auth_token');
-    
+    console.log('Password set successfully!');
     return { success: true, usePasswordReset: false };
   } catch (err: any) {
     console.error('Password setup error:', err);

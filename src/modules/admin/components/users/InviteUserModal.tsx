@@ -1,7 +1,7 @@
 // src/modules/admin/components/users/InviteUserModal.tsx
-// Version: 5.0.0
-// Last Modified: 25-02-2025 23:45 IST
-// Purpose: Handle admin user invitations with email verification bypass
+// Version: 5.2.0
+// Last Modified: 26-02-2025 01:30 IST
+// Purpose: Handle admin user invitations with correct user and profile creation
 
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -67,6 +67,57 @@ export function InviteUserModal({ onSuccess }: InviteUserModalProps) {
     return btoa(JSON.stringify(tokenData));
   };
 
+  // Create profile for user (new function)
+  const createUserProfile = async (userId: string, userEmail: string, userRole: string) => {
+    try {
+      console.log('Creating profile for new user:', userEmail);
+      
+      // Call admin_create_profile RPC function
+      const { error: rpcError } = await supabase.rpc('admin_create_profile', {
+        user_id: userId,
+        user_email: userEmail,
+        user_role: userRole
+      });
+      
+      if (rpcError) {
+        console.error('Failed to create profile via RPC:', rpcError);
+        return false;
+      }
+      
+      console.log('Profile created successfully');
+      return true;
+    } catch (error) {
+      console.error('Error creating profile:', error);
+      return false;
+    }
+  };
+
+  // Get user ID for email (new function)
+  const getUserIdByEmail = async (userEmail: string) => {
+    try {
+      // First try to get all users
+      const { data, error } = await supabase.rpc('get_all_auth_users');
+      
+      if (error) {
+        console.error('Failed to get users via RPC:', error);
+        return null;
+      }
+      
+      // Find user with matching email
+      if (Array.isArray(data)) {
+        const user = data.find((u: any) => u.email === userEmail);
+        if (user && user.id) {
+          return user.id;
+        }
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Error fetching user ID:', error);
+      return null;
+    }
+  };
+
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -83,7 +134,7 @@ export function InviteUserModal({ onSuccess }: InviteUserModalProps) {
       // Step 1: Get role ID
       const { data: roleData, error: roleError } = await supabase
         .from('admin_roles')
-        .select('id')
+        .select('id, role_type')
         .eq('role_type', role)
         .single();
 
@@ -94,22 +145,15 @@ export function InviteUserModal({ onSuccess }: InviteUserModalProps) {
       const cleanEmail = email.trim().toLowerCase();
       console.log('Processing invitation for:', cleanEmail);
 
-      // Step 2: Check if user already exists
-      const { data: existingUser } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('email', cleanEmail)
-        .single();
-
-      // Step 3: Generate secure setup token
+      // Step 2: Generate secure setup token
       const setupToken = generateSetupToken(cleanEmail, roleData.id);
       const setupUrl = `${window.location.origin}/admin/setup?email=${encodeURIComponent(cleanEmail)}&setupToken=${encodeURIComponent(setupToken)}`;
       
       console.log('Setup URL generated:', setupUrl);
 
-      // Step 4: Send magic link email
-      // Using passwordless sign-in to send the email without creating account yet
-      const { error: magicLinkError } = await supabase.auth.signInWithOtp({
+      // Step 3: Send magic link email
+      // Using passwordless sign-in to send the email
+      const { data: authData, error: magicLinkError } = await supabase.auth.signInWithOtp({
         email: cleanEmail,
         options: {
           // Override the email template with our own setup link
@@ -126,6 +170,27 @@ export function InviteUserModal({ onSuccess }: InviteUserModalProps) {
       if (magicLinkError) {
         throw new Error(`Failed to send invitation email: ${magicLinkError.message}`);
       }
+
+      // Step 4 (new): Create profile for the user
+      // Wait a moment for user to be created in auth.users
+      setTimeout(async () => {
+        // Get user ID from email
+        const userId = await getUserIdByEmail(cleanEmail);
+        
+        if (userId) {
+          console.log('Found user ID for profile creation:', userId);
+          // Create profile using the RPC function
+          const profileCreated = await createUserProfile(userId, cleanEmail, roleData.role_type);
+          
+          if (profileCreated) {
+            console.log('Profile created successfully for invited user');
+          } else {
+            console.error('Failed to create profile for invited user');
+          }
+        } else {
+          console.error('Could not find user ID for invited user');
+        }
+      }, 2000); // Wait 2 seconds for user creation to complete
 
       // For development, show the setup URL directly
       if (import.meta.env.MODE === 'development') {

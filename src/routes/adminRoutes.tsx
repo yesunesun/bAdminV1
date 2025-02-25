@@ -11,6 +11,7 @@ import AdminForgotPassword from '@/modules/admin/pages/AdminForgotPassword';
 import AdminSetup from '@/pages/AdminSetup';
 import UsersList from '@/modules/admin/components/UsersList';
 import { AdminLayout } from '@/modules/admin/components/AdminLayout';
+import AdminDebugPage from '@/pages/AdminDebugPage';
 
 // Loading fallback component
 const LoadingFallback = () => (
@@ -52,6 +53,10 @@ export const adminRoutes = [
     errorElement: <ErrorFallback />,
     children: [
       // Public routes
+      {
+        path: '/admin/debug',
+        element: <AdminDebugPage />
+      },
       {
         path: 'login',
         element: <AdminLogin />
