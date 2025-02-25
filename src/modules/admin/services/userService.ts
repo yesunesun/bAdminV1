@@ -1,6 +1,6 @@
 // src/modules/admin/services/userService.ts
-// Version: 2.2.0
-// Last Modified: 24-02-2025 12:45 IST
+// Version: 2.3.0
+// Last Modified: 25-02-2025 21:30 IST
 
 import { supabase } from '@/lib/supabase';
 
@@ -105,11 +105,11 @@ export class UserService {
 
       // Log the function call details
       console.log('Calling RPC function: delete_user_completely');
-      console.log('With parameters:', { user_id: userId });
+      console.log('With parameters:', { user_id_param: userId });  // FIXED PARAMETER NAME
 
-      // Call the database function
+      // Call the database function with the correct parameter name
       const response = await supabase.rpc('delete_user_completely', {
-        user_id: userId
+        user_id_param: userId  // FIXED: Changed from 'user_id' to 'user_id_param'
       });
 
       // Log the raw response for debugging

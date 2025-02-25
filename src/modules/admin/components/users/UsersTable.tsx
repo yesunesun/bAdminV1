@@ -1,6 +1,6 @@
 // src/modules/admin/components/users/UsersTable.tsx
-// Version: 1.2.0
-// Last Modified: 24-02-2025 15:30 IST
+// Version: 1.3.0
+// Last Modified: 25-02-2025 18:15 IST
 
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
@@ -21,7 +21,9 @@ interface User {
 
 interface UsersTableProps {
   users: User[];
-  onViewDetails: (userId: string) => void;
+  onViewDetails?: (userId: string) => void;
+  onRefresh?: () => void;
+  onDeleteUser?: (userId: string) => Promise<void>;
 }
 
 const formatDate = (date: string | null | undefined): string => {
@@ -33,7 +35,18 @@ const formatDate = (date: string | null | undefined): string => {
   });
 };
 
-export const UsersTable: React.FC<UsersTableProps> = ({ users, onViewDetails }) => {
+export const UsersTable: React.FC<UsersTableProps> = ({ 
+  users, 
+  onViewDetails = () => {}, 
+  onRefresh = () => {},
+  onDeleteUser 
+}) => {
+  // Create a default delete function that logs a warning
+  const defaultDeleteFn = async (id: string) => {
+    console.warn('No delete function provided for user:', id);
+    throw new Error('Delete function not provided');
+  };
+
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200">
@@ -101,7 +114,7 @@ export const UsersTable: React.FC<UsersTableProps> = ({ users, onViewDetails }) 
                   userEmail={user.email}
                   onView={onViewDetails}
                   onEdit={onViewDetails}
-                  onDelete={async () => {}}
+                  onDelete={onDeleteUser || defaultDeleteFn}
                   hasProfile={user.hasProfile}
                 />
               </td>

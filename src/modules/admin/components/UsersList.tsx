@@ -1,6 +1,6 @@
 // src/modules/admin/components/UsersList.tsx
-// Version: 1.2.0
-// Last Modified: 21-02-2025 16:15 IST
+// Version: 1.3.0
+// Last Modified: 25-02-2025 14:30 IST
 
 import React from 'react';
 import { useUsers } from '../hooks/useUsers';
@@ -30,7 +30,8 @@ export const UsersList: React.FC = () => {
     loading: usersLoading,
     error: usersError,
     totalUsers,
-    refetch
+    refetch,
+    deleteUser
   } = useUsers({
     page,
     itemsPerPage,
@@ -71,7 +72,12 @@ export const UsersList: React.FC = () => {
         <UserListEmpty />
       ) : (
         <>
-          <UsersTable users={users} onRefresh={refetch} />
+          <UsersTable 
+            users={users} 
+            onRefresh={refetch} 
+            onViewDetails={() => {}} 
+            onDeleteUser={deleteUser}
+          />
           <UsersPagination
             currentPage={page}
             totalPages={totalPages}
