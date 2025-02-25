@@ -1,6 +1,6 @@
 // src/modules/moderator/pages/PropertyModerationDashboard.tsx
-// Version: 1.2.0
-// Last Modified: 25-02-2025 19:30 IST
+// Version: 1.7.0
+// Last Modified: 26-02-2025 21:45 IST
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -42,45 +42,54 @@ export default function PropertyModerationDashboard() {
     try {
       setLoading(true);
       
-      // Main query to get all properties
+      // Query the view directly
       const { data, error: fetchError } = await supabase
-        .from('properties')
-        .select(`
-          *,
-          property_images (
-            id,
-            url
-          )
-        `)
-        .order('created_at', { ascending: false });
+        .from('property_with_owner_emails')
+        .select('*');
 
-      if (fetchError) throw fetchError;
+      if (fetchError) {
+        console.error('Error with view query, falling back to standard query:', fetchError);
+        
+        // Fallback to standard query if view fails
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from('properties')
+          .select(`
+            *,
+            property_images (
+              id,
+              url
+            )
+          `)
+          .order('created_at', { ascending: false });
+          
+        if (fallbackError) throw fallbackError;
+        
+        // Transform the fallback data
+        const formattedProperties = fallbackData.map(item => ({
+          ...item,
+          images: item.property_images,
+          owner_email: item.owner_id
+        })) as Property[];
+        
+        setProperties(formattedProperties);
+        
+        // Calculate stats with fallback data
+        calculateStats(formattedProperties);
+        
+        return;
+      }
 
       // Transform the data to match the Property type
       const formattedProperties = data.map(item => ({
         ...item,
-        images: item.property_images
+        images: item.property_images || [],
+        owner_email: item.owner_email || item.owner_id
       })) as Property[];
 
       setProperties(formattedProperties);
       
       // Calculate stats
-      const now = new Date();
-      const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-      const uniqueLocations = new Set(formattedProperties.map(p => p.city).filter(Boolean));
-      const uniqueOwners = new Set(formattedProperties.map(p => p.owner_id));
-      
-      setStats({
-        total: formattedProperties.length,
-        pending: formattedProperties.filter(p => p.status === 'draft').length,
-        approved: formattedProperties.filter(p => p.status === 'published').length,
-        recent: formattedProperties.filter(p => {
-          const createdAt = new Date(p.created_at);
-          return createdAt >= twentyFourHoursAgo;
-        }).length,
-        locations: uniqueLocations.size,
-        owners: uniqueOwners.size
-      });
+      calculateStats(formattedProperties);
       
     } catch (err) {
       console.error('Error fetching properties:', err);
@@ -88,6 +97,26 @@ export default function PropertyModerationDashboard() {
     } finally {
       setLoading(false);
     }
+  };
+  
+  // Helper function to calculate statistics
+  const calculateStats = (propertyData: Property[]) => {
+    const now = new Date();
+    const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const uniqueLocations = new Set(propertyData.map(p => p.city).filter(Boolean));
+    const uniqueOwners = new Set(propertyData.map(p => p.owner_id));
+    
+    setStats({
+      total: propertyData.length,
+      pending: propertyData.filter(p => p.status === 'draft').length,
+      approved: propertyData.filter(p => p.status === 'published').length,
+      recent: propertyData.filter(p => {
+        const createdAt = new Date(p.created_at);
+        return createdAt >= twentyFourHoursAgo;
+      }).length,
+      locations: uniqueLocations.size,
+      owners: uniqueOwners.size
+    });
   };
 
   const handleApprove = async (id: string) => {

@@ -1,16 +1,17 @@
 // src/modules/moderator/hooks/usePropertyOwners.ts
-// Version: 1.0.0
-// Last Modified: 25-02-2025 20:30 IST
-// Purpose: Custom hook to fetch and manage property owner data
+// Version: 1.2.0
+// Last Modified: 26-02-2025 22:15 IST
+// Purpose: Custom hook to fetch and manage property owner data from property objects
 
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
 import { Property } from '@/components/property/types';
 
 export interface PropertyOwner {
   id: string;
   email: string;
   name?: string;
+  phone?: string;
+  role?: string;
 }
 
 export function usePropertyOwners(properties: Property[]) {
@@ -19,45 +20,45 @@ export function usePropertyOwners(properties: Property[]) {
   const [loadingOwners, setLoadingOwners] = useState(false);
 
   useEffect(() => {
-    const fetchOwners = async () => {
+    // Get owners directly from the property objects
+    const extractOwners = () => {
+      setLoadingOwners(true);
+      
       try {
-        setLoadingOwners(true);
+        // Get unique owner IDs and create owner objects with emails
+        const uniqueOwners = new Map<string, PropertyOwner>();
         
-        // Get unique owner IDs
-        const ownerIds = [...new Set(properties.map(p => p.owner_id))];
-        
-        if (ownerIds.length === 0) {
-          setOwners([]);
-          setOwnersMap({});
-          return;
-        }
-        
-        // Fetch owner information from profiles
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('id, email')
-          .in('id', ownerIds);
+        properties.forEach(property => {
+          // Skip if we already processed this owner
+          if (uniqueOwners.has(property.owner_id)) return;
           
-        if (error) throw error;
+          // Create owner object using the property's owner_email if available
+          uniqueOwners.set(property.owner_id, {
+            id: property.owner_id,
+            email: property.owner_email || property.owner_id,
+            name: property.owner_name
+          });
+        });
         
-        // Create a map for quick lookup
-        const ownersData = data as PropertyOwner[];
-        const ownersMapData = ownersData.reduce((acc, owner) => {
+        // Convert Map to array
+        const ownersArray = Array.from(uniqueOwners.values());
+        
+        // Create a lookup map
+        const ownersMapData = ownersArray.reduce((acc, owner) => {
           acc[owner.id] = owner;
           return acc;
         }, {} as Record<string, PropertyOwner>);
         
-        setOwners(ownersData);
+        setOwners(ownersArray);
         setOwnersMap(ownersMapData);
-        
       } catch (err) {
-        console.error('Error fetching property owners:', err);
+        console.error('Error processing property owners:', err);
       } finally {
         setLoadingOwners(false);
       }
     };
     
-    fetchOwners();
+    extractOwners();
   }, [properties]);
 
   return { owners, ownersMap, loadingOwners };

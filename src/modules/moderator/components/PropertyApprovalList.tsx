@@ -1,16 +1,21 @@
 // src/modules/moderator/components/PropertyApprovalList.tsx
-// Version: 2.0.0
-// Last Modified: 25-02-2025 20:30 IST
-// Purpose: Display and manage property approval listings with filters and actions
+// Version: 2.1.0
+// Last Modified: 26-02-2025 22:30 IST
+// Purpose: Display and manage property approval listings with correct owner email data
 
 import React, { useState, useEffect } from 'react';
 import { PropertyDetailModal } from './PropertyDetailModal';
 import { PropertyFilters } from './property-approval/PropertyFilters';
 import { PropertyTable } from './property-approval/PropertyTable';
 import { RejectReasonModal } from './property-approval/RejectReasonModal';
-import { usePropertyOwners } from '../hooks/usePropertyOwners';
 import { Property } from '@/components/property/types';
 import { supabase } from '@/lib/supabase';
+
+interface PropertyOwner {
+  id: string;
+  email: string;
+  name?: string;
+}
 
 interface PropertyApprovalListProps {
   properties: Property[];
@@ -44,8 +49,34 @@ export function PropertyApprovalList({
   // Get unique locations from properties
   const [locations, setLocations] = useState<string[]>([]);
   
-  // Use the custom hook to fetch and manage owners
-  const { owners, ownersMap, loadingOwners } = usePropertyOwners(properties);
+  // Create owners array and map directly from properties
+  const [owners, setOwners] = useState<PropertyOwner[]>([]);
+  const [ownersMap, setOwnersMap] = useState<Record<string, PropertyOwner>>({});
+
+  // Extract owner information directly from properties
+  useEffect(() => {
+    // Create unique owners from properties
+    const uniqueOwners = new Map<string, PropertyOwner>();
+    
+    properties.forEach(property => {
+      if (!uniqueOwners.has(property.owner_id)) {
+        uniqueOwners.set(property.owner_id, {
+          id: property.owner_id,
+          email: property.owner_email || property.owner_id
+        });
+      }
+    });
+    
+    // Convert to array and map
+    const ownersArray = Array.from(uniqueOwners.values());
+    const ownersMapData = ownersArray.reduce((acc, owner) => {
+      acc[owner.id] = owner;
+      return acc;
+    }, {} as Record<string, PropertyOwner>);
+    
+    setOwners(ownersArray);
+    setOwnersMap(ownersMapData);
+  }, [properties]);
 
   // Extract unique locations from properties
   useEffect(() => {
@@ -107,14 +138,21 @@ export function PropertyApprovalList({
   
   // Handle property updates (such as image removal)
   const handlePropertyUpdated = () => {
-    // This would typically trigger a re-fetch of the affected property
-    // But since our component receives properties from a parent, we'll pass this up
-    // A real implementation would likely have a callback to the parent or use context
     console.log('Property was updated (image removed)');
   };
 
   const handleViewProperty = (property: Property) => {
-    setSelectedProperty(property);
+    // Get owner details from ownersMap
+    const owner = ownersMap[property.owner_id];
+    
+    // Add owner information to the property object
+    const propertyWithOwner = {
+      ...property,
+      owner_email: property.owner_email || (owner?.email || ''),
+      owner_name: owner?.name || ''
+    };
+    
+    setSelectedProperty(propertyWithOwner);
   };
 
   // Get all unique property types for filter options
@@ -191,6 +229,8 @@ export function PropertyApprovalList({
           property={selectedProperty}
           onClose={() => setSelectedProperty(null)}
           onPropertyUpdated={handlePropertyUpdated}
+          onApprove={onApprove}
+          onReject={onReject}
         />
       )}
     </div>

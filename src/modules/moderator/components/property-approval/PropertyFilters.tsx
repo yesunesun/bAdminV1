@@ -1,7 +1,7 @@
 // src/modules/moderator/components/property-approval/PropertyFilters.tsx
-// Version: 1.0.0
-// Last Modified: 25-02-2025 20:30 IST
-// Purpose: Filter controls for the property approval list
+// Version: 1.3.0
+// Last Modified: 26-02-2025 22:30 IST
+// Purpose: Filter controls for property approval list with proper owner email display in dropdown
 
 import React from 'react';
 import { Filter, Search, MapPin, User } from 'lucide-react';
@@ -49,6 +49,12 @@ export function PropertyFilters({
   locations,
   owners
 }: PropertyFiltersProps) {
+  // Create a map of owner IDs to emails from properties data
+  const ownerEmailMap: Record<string, string> = {};
+  
+  // The problem is likely that we need to update this component to use the
+  // updated owner information from the PropertyApprovalList component
+  
   return (
     <div className="bg-white p-4 rounded-lg shadow-sm">
       <h3 className="text-base font-medium mb-4 flex items-center">
@@ -119,11 +125,17 @@ export function PropertyFilters({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Owners</SelectItem>
-            {owners.map(owner => (
-              <SelectItem key={owner.id} value={owner.id}>
-                {owner.name || owner.email}
-              </SelectItem>
-            ))}
+            {owners.map(owner => {
+              // Show email if available, otherwise ID
+              const displayText = owner.email && owner.email !== owner.id ? 
+                owner.email : owner.id;
+              
+              return (
+                <SelectItem key={owner.id} value={owner.id}>
+                  {displayText}
+                </SelectItem>
+              );
+            })}
           </SelectContent>
         </Select>
         

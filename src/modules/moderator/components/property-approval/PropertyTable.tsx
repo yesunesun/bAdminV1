@@ -1,22 +1,15 @@
 // src/modules/moderator/components/property-approval/PropertyTable.tsx
-// Version: 1.0.0
-// Last Modified: 25-02-2025 20:30 IST
-// Purpose: Display properties in a table with approval actions
+// Version: 2.2.0
+// Last Modified: 26-02-2025 21:45 IST
+// Purpose: Display properties in a table with owner emails
 
 import React from 'react';
-import { Eye, CheckCircle, XCircle } from 'lucide-react';
 import { Property } from '@/components/property/types';
 import { cn } from '@/lib/utils';
 
-interface PropertyOwner {
-  id: string;
-  email: string;
-  name?: string;
-}
-
 interface PropertyTableProps {
   filteredProperties: Property[];
-  ownersMap: Record<string, PropertyOwner>;
+  ownersMap: Record<string, any>;
   isProcessing: string | null;
   onApprove: (id: string) => Promise<void>;
   handleReject: (id: string) => void;
@@ -83,20 +76,13 @@ export function PropertyTable({
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Date Added
               </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Actions
-              </th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {filteredProperties.map((property) => {
-              const isPending = property.status === 'draft';
-              const isProcessingThis = isProcessing === property.id;
-              const owner = ownersMap[property.owner_id];
-              
               return (
-                <tr key={property.id}>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                <tr key={property.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 whitespace-nowrap cursor-pointer" onClick={() => handleViewProperty(property)}>
                     <div className="flex items-center">
                       <div className="h-10 w-10 rounded-md bg-gray-200 flex-shrink-0 overflow-hidden">
                         {property.images && property.images.length > 0 ? (
@@ -114,7 +100,7 @@ export function PropertyTable({
                         )}
                       </div>
                       <div className="ml-4">
-                        <div className="text-sm font-medium text-gray-900">
+                        <div className="text-sm font-medium text-indigo-600 hover:text-indigo-800 underline">
                           {property.title}
                         </div>
                         <div className="text-sm text-gray-500">
@@ -137,7 +123,7 @@ export function PropertyTable({
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900">
-                      {owner ? (owner.name || owner.email) : 'Unknown'}
+                      {property.owner_email}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -156,60 +142,6 @@ export function PropertyTable({
                       month: '2-digit',
                       year: 'numeric'
                     })}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex space-x-2">
-                      <div className="relative group">
-                        <button
-                          onClick={() => handleViewProperty(property)}
-                          className="text-indigo-600 hover:text-indigo-900"
-                          aria-label="View property details"
-                        >
-                          <Eye className="h-5 w-5" />
-                        </button>
-                        <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none transition-opacity">
-                          View details
-                        </div>
-                      </div>
-                      
-                      {isPending && (
-                        <>
-                          <div className="relative group">
-                            <button
-                              onClick={() => onApprove(property.id)}
-                              disabled={isProcessingThis}
-                              className={cn(
-                                "text-green-600 hover:text-green-900",
-                                isProcessingThis && "opacity-50 cursor-not-allowed"
-                              )}
-                              aria-label="Approve property"
-                            >
-                              <CheckCircle className="h-5 w-5" />
-                            </button>
-                            <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none transition-opacity">
-                              Approve property
-                            </div>
-                          </div>
-                          
-                          <div className="relative group">
-                            <button
-                              onClick={() => handleReject(property.id)}
-                              disabled={isProcessingThis}
-                              className={cn(
-                                "text-red-600 hover:text-red-900",
-                                isProcessingThis && "opacity-50 cursor-not-allowed"
-                              )}
-                              aria-label="Reject property"
-                            >
-                              <XCircle className="h-5 w-5" />
-                            </button>
-                            <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none transition-opacity">
-                              Reject property
-                            </div>
-                          </div>
-                        </>
-                      )}
-                    </div>
                   </td>
                 </tr>
               );

@@ -1,6 +1,6 @@
 // src/modules/moderator/components/PropertyDetailModal.tsx
 // Version: 2.0.0
-// Last Modified: 25-02-2025 21:15 IST
+// Last Modified: 25-02-2025 21:30 IST
 // Purpose: Enhanced property detail modal with image removal functionality
 
 import React, { useState } from 'react';
@@ -14,14 +14,22 @@ interface PropertyDetailModalProps {
   property: Property;
   onClose: () => void;
   onPropertyUpdated?: () => void;
+  onApprove?: (id: string) => Promise<void>;
+  onReject?: (id: string, reason: string) => Promise<void>;
 }
 
-export function PropertyDetailModal({ property, onClose, onPropertyUpdated }: PropertyDetailModalProps) {
+export function PropertyDetailModal({ property, onClose, onPropertyUpdated, onApprove, onReject }: PropertyDetailModalProps) {
   const [isRemovingImage, setIsRemovingImage] = useState<string | null>(null);
   const [removedImageIds, setRemovedImageIds] = useState<string[]>([]);
+  const [isProcessing, setIsProcessing] = useState<string | null>(null);
+  const [rejectReasonModalOpen, setRejectReasonModalOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
 
   // Filter out removed images
   const availableImages = property.images?.filter(img => !removedImageIds.includes(img.id)) || [];
+  
+  // Check if property is in pending state (draft)
+  const isPending = property.status === 'draft';
 
   const handleRemoveImage = async (imageId: string) => {
     try {
@@ -48,6 +56,45 @@ export function PropertyDetailModal({ property, onClose, onPropertyUpdated }: Pr
       alert('Failed to remove image. Please try again.');
     } finally {
       setIsRemovingImage(null);
+    }
+  };
+  
+  // Handle approve action
+  const handleApprove = async () => {
+    if (!onApprove) return;
+    
+    try {
+      setIsProcessing('approve');
+      await onApprove(property.id);
+      onClose(); // Close modal after successful approval
+    } catch (err) {
+      console.error('Error approving property:', err);
+      alert('Failed to approve property. Please try again.');
+    } finally {
+      setIsProcessing(null);
+    }
+  };
+  
+  // Open reject reason modal
+  const handleRejectClick = () => {
+    setRejectReasonModalOpen(true);
+  };
+  
+  // Handle reject confirmation
+  const confirmReject = async () => {
+    if (!onReject || !rejectReason.trim()) return;
+    
+    try {
+      setIsProcessing('reject');
+      await onReject(property.id, rejectReason);
+      setRejectReasonModalOpen(false);
+      setRejectReason('');
+      onClose(); // Close modal after successful rejection
+    } catch (err) {
+      console.error('Error rejecting property:', err);
+      alert('Failed to reject property. Please try again.');
+    } finally {
+      setIsProcessing(null);
     }
   };
 
@@ -95,10 +142,102 @@ export function PropertyDetailModal({ property, onClose, onPropertyUpdated }: Pr
                   </div>
                 ))}
               </div>
+              
+              {/* Moderation Action Buttons */}
+              {isPending && onApprove && onReject && (
+                <div className="mt-6 flex flex-wrap gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                  <Button 
+                    variant="success" 
+                    onClick={handleApprove}
+                    disabled={isProcessing !== null}
+                    className="bg-green-600 hover:bg-green-700 text-white py-3 px-6 text-lg font-medium flex-1"
+                    size="lg"
+                  >
+                    {isProcessing === 'approve' ? (
+                      <>
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                        Approving...
+                      </>
+                    ) : (
+                      'Approve Property'
+                    )}
+                  </Button>
+                  <Button 
+                    variant="destructive" 
+                    onClick={handleRejectClick}
+                    disabled={isProcessing !== null}
+                    className="py-3 px-6 text-lg font-medium flex-1 shadow-md"
+                    size="lg"
+                  >
+                    {isProcessing === 'reject' ? (
+                      <>
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                        Rejecting...
+                      </>
+                    ) : (
+                      'Reject Property'
+                    )}
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={onClose} 
+                    className="py-3 px-6 text-lg font-medium border-2 border-gray-300 hover:bg-gray-100 flex-1"
+                    size="lg"
+                  >
+                    Close
+                  </Button>
+                </div>
+              )}
             </div>
           ) : (
             <div className="mb-6 text-center py-8 bg-gray-50 rounded-md">
               <p className="text-gray-500">No images available for this property</p>
+              
+              {/* Moderation Action Buttons for properties without images */}
+              {isPending && onApprove && onReject && (
+                <div className="mt-6 flex flex-wrap gap-4 p-4">
+                  <Button 
+                    variant="success" 
+                    onClick={handleApprove}
+                    disabled={isProcessing !== null}
+                    className="bg-green-600 hover:bg-green-700 text-white py-3 px-6 text-lg font-medium flex-1"
+                    size="lg"
+                  >
+                    {isProcessing === 'approve' ? (
+                      <>
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                        Approving...
+                      </>
+                    ) : (
+                      'Approve Property'
+                    )}
+                  </Button>
+                  <Button 
+                    variant="destructive" 
+                    onClick={handleRejectClick}
+                    disabled={isProcessing !== null}
+                    className="py-3 px-6 text-lg font-medium flex-1 shadow-md"
+                    size="lg"
+                  >
+                    {isProcessing === 'reject' ? (
+                      <>
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                        Rejecting...
+                      </>
+                    ) : (
+                      'Reject Property'
+                    )}
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={onClose} 
+                    className="py-3 px-6 text-lg font-medium border-2 border-gray-300 hover:bg-gray-100 flex-1"
+                    size="lg"
+                  >
+                    Close
+                  </Button>
+                </div>
+              )}
             </div>
           )}
           
@@ -127,6 +266,10 @@ export function PropertyDetailModal({ property, onClose, onPropertyUpdated }: Pr
                   <p className="text-sm text-gray-500">Area</p>
                   <p className="font-medium">{property.square_feet ? `${property.square_feet} sq.ft.` : 'N/A'}</p>
                 </div>
+                <div>
+                  <p className="text-sm text-gray-500">Owner</p>
+                  <p className="font-medium">{property.owner_email || 'No Email Available'}</p>
+                </div>
               </div>
             </div>
             
@@ -149,6 +292,37 @@ export function PropertyDetailModal({ property, onClose, onPropertyUpdated }: Pr
                   <p className="text-sm text-gray-500">Zip Code</p>
                   <p className="font-medium">{property.zip_code || 'N/A'}</p>
                 </div>
+                <div>
+                  <p className="text-sm text-gray-500">Date Listed</p>
+                  <p className="font-medium">
+                    {property.created_at 
+                      ? new Date(property.created_at).toLocaleDateString('en-IN', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric'
+                        }) + ' at ' + new Date(property.created_at).toLocaleTimeString('en-IN', {
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })
+                      : 'N/A'
+                    }
+                  </p>
+                </div>
+                {property.status === 'published' && property.updated_at && (
+                  <div>
+                    <p className="text-sm text-gray-500">Date Published</p>
+                    <p className="font-medium">
+                      {new Date(property.updated_at).toLocaleDateString('en-IN', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric'
+                      }) + ' at ' + new Date(property.updated_at).toLocaleTimeString('en-IN', {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -177,10 +351,51 @@ export function PropertyDetailModal({ property, onClose, onPropertyUpdated }: Pr
           )}
         </div>
         
-        {/* Footer */}
-        <div className="border-t p-4 flex justify-end">
-          <Button variant="outline" onClick={onClose}>Close</Button>
-        </div>
+        {/* Footer - Only show if not in pending state or approval handlers aren't provided */}
+        {(!isPending || !onApprove || !onReject) && (
+          <div className="border-t p-4 flex justify-end">
+            <Button 
+              variant="outline" 
+              onClick={onClose}
+              className="py-2 px-4 text-base font-medium border-2 border-gray-300 hover:bg-gray-100"
+            >
+              Close
+            </Button>
+          </div>
+        )}
+        
+        {/* Reject Reason Modal */}
+        {rejectReasonModalOpen && (
+          <div className="fixed inset-0 bg-black bg-opacity-25 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Provide Rejection Reason</h3>
+              <textarea
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                className="w-full border border-gray-300 rounded-md p-2 h-32 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                placeholder="Please provide a reason for rejecting this property..."
+              />
+              <div className="mt-4 flex justify-end space-x-3">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setRejectReasonModalOpen(false);
+                    setRejectReason('');
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  variant="destructive"
+                  onClick={confirmReject}
+                  disabled={!rejectReason.trim() || isProcessing !== null}
+                >
+                  Reject Property
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
