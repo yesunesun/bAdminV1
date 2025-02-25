@@ -1,10 +1,10 @@
 // src/modules/moderator/components/PropertyApprovalList.tsx
-// Version: 2.1.0
-// Last Modified: 26-02-2025 22:30 IST
+// Version: 2.1.1
+// Last Modified: 26-02-2025 10:45 IST
 // Purpose: Display and manage property approval listings with correct owner email data
 
 import React, { useState, useEffect } from 'react';
-import { PropertyDetailModal } from './PropertyDetailModal';
+import { PropertyDetailModal } from './PropertyDetailModal/index'; // Updated import path
 import { PropertyFilters } from './property-approval/PropertyFilters';
 import { PropertyTable } from './property-approval/PropertyTable';
 import { RejectReasonModal } from './property-approval/RejectReasonModal';

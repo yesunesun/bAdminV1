@@ -1,10 +1,10 @@
 // src/modules/moderator/components/ModeratorHeader.tsx
-// Version: 1.1.0
-// Last Modified: 25-02-2025 19:30 IST
+// Version: 1.3.0
+// Last Modified: 26-02-2025 23:15 IST
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LogOut, LayoutDashboard, Home, ChevronDown, CheckCircle } from 'lucide-react';
+import { LogOut, LayoutDashboard, ChevronDown } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 
@@ -76,10 +76,9 @@ export function ModeratorHeader() {
       <div className="bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between">
-            {/* Logo */}
-            <Link to="/moderator/dashboard" className="flex-shrink-0 flex items-center">
+            {/* Logo only, without text */}
+            <Link to="/moderator/dashboard" className="flex-shrink-0">
               <img src="/bhumitallilogo.png" alt="Bhumitalli" className="h-8 w-auto" />
-              <span className="ml-3 text-xl font-semibold text-gray-900">Property Moderator</span>
             </Link>
 
             {/* User Menu */}
@@ -117,37 +116,18 @@ export function ModeratorHeader() {
       {/* Secondary Navigation */}
       <div className="bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex h-12 items-center space-x-8">
+          <div className="flex h-12 items-center">
             <Link
               to="/moderator/dashboard"
               className={cn(
-                "inline-flex items-center px-1 py-1 text-sm font-medium border-b-2 transition-colors",
+                "inline-flex items-center px-4 py-2 text-sm font-medium rounded-md transition-colors",
                 location.pathname === '/moderator/dashboard'
-                  ? "border-green-500 text-green-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                  ? "bg-green-50 text-green-700 border-green-500"
+                  : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
               )}
             >
               <LayoutDashboard className="h-4 w-4 mr-2" />
               Dashboard
-            </Link>
-
-            <Link
-              to="/moderator/dashboard" // This could be a direct link to pending approvals
-              className={cn(
-                "inline-flex items-center px-1 py-1 text-sm font-medium border-b-2 transition-colors",
-                "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-              )}
-            >
-              <CheckCircle className="h-4 w-4 mr-2" />
-              Pending Approvals
-            </Link>
-
-            <Link
-              to="/"
-              className="inline-flex items-center px-1 py-1 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 transition-colors"
-            >
-              <Home className="h-4 w-4 mr-2" />
-              Main Site
             </Link>
           </div>
         </div>
