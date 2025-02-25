@@ -1,21 +1,24 @@
 // src/App.tsx 
-// Version: 2.2.0
-// Last Modified: 20-02-2025 15:00 IST
+// Version: 2.4.0
+// Last Modified: 25-02-2025 17:15 IST
 
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Header } from '@/components/Header';
 import ChatBot from './components/ChatBot';
+import { useAdminAccess } from './modules/admin/hooks/useAdminAccess';
 
 // Route Configurations
 import { mainRoutes } from './routes/mainRoutes';
 import { authRoutes } from './routes/authRoutes';
 import { adminRoutes } from './routes/adminRoutes';
+import { moderatorRoutes } from './routes/moderatorRoutes';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
   adminOnly?: boolean;
+  moderatorOnly?: boolean;
 }
 
 const LoadingSpinner = () => (
@@ -24,19 +27,40 @@ const LoadingSpinner = () => (
   </div>
 );
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, adminOnly }) => {
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, adminOnly, moderatorOnly }) => {
   const { user, loading } = useAuth();
+  const { isAdmin, isPropertyModerator, loading: roleLoading } = useAdminAccess();
 
-  if (loading) {
+  if (loading || roleLoading) {
     return <LoadingSpinner />;
   }
 
   if (!user) {
-    return <Navigate to={adminOnly ? "/admin/login" : "/login"} replace />;
+    return <Navigate to={adminOnly ? "/admin/login" : moderatorOnly ? "/moderator/login" : "/login"} replace />;
   }
 
-  if (adminOnly && user.user_metadata?.role !== 'admin' && user.user_metadata?.role !== 'super_admin') {
-    return <Navigate to="/dashboard" replace />;
+  // Check for admin routes access
+  if (adminOnly) {
+    if (!isAdmin) {
+      // If they're a property moderator, send them to moderator dashboard
+      if (isPropertyModerator) {
+        return <Navigate to="/moderator/dashboard" replace />;
+      }
+      // Otherwise send to main dashboard
+      return <Navigate to="/dashboard" replace />;
+    }
+  }
+
+  // Check for moderator routes access
+  if (moderatorOnly) {
+    if (!isPropertyModerator) {
+      // If they're an admin, send them to admin dashboard
+      if (isAdmin) {
+        return <Navigate to="/admin/dashboard" replace />;
+      }
+      // Otherwise send to main dashboard
+      return <Navigate to="/dashboard" replace />;
+    }
   }
 
   return <>{children}</>;
@@ -44,19 +68,34 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, adminOnly }) 
 
 const PublicRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
+  const { isAdmin, isPropertyModerator, loading: roleLoading } = useAdminAccess();
 
-  if (loading) {
+  if (loading || roleLoading) {
     return <LoadingSpinner />;
   }
 
   if (user) {
-    const isAdminRoute = window.location.pathname.startsWith('/admin');
-    const isAdmin = user.user_metadata?.role === 'admin' || user.user_metadata?.role === 'super_admin';
+    // First check user metadata for role info
+    const userRole = user.user_metadata?.role;
     
-    if (isAdminRoute && isAdmin) {
+    if (userRole === 'property_moderator') {
+      return <Navigate to="/moderator/dashboard" replace />;
+    }
+    
+    if (userRole === 'admin' || userRole === 'super_admin') {
       return <Navigate to="/admin/dashboard" replace />;
     }
     
+    // If no metadata role, use the results from useAdminAccess
+    if (isPropertyModerator) {
+      return <Navigate to="/moderator/dashboard" replace />;
+    }
+    
+    if (isAdmin) {
+      return <Navigate to="/admin/dashboard" replace />;
+    }
+    
+    // Default to regular user dashboard
     return <Navigate to="/dashboard" replace />;
   }
 
@@ -87,13 +126,20 @@ const renderRoutes = (routes: any[], parentPath = '') => {
       );
     }
 
-    const element = route.requiresAuth ? (
-      <ProtectedRoute adminOnly={route.adminOnly}>{route.element}</ProtectedRoute>
-    ) : route.publicOnly ? (
-      <PublicRoute>{route.element}</PublicRoute>
-    ) : (
-      route.element
-    );
+    let element = route.element;
+    
+    if (route.requiresAuth) {
+      element = (
+        <ProtectedRoute 
+          adminOnly={route.adminOnly} 
+          moderatorOnly={route.moderatorOnly}
+        >
+          {route.element}
+        </ProtectedRoute>
+      );
+    } else if (route.publicOnly) {
+      element = <PublicRoute>{route.element}</PublicRoute>;
+    }
 
     return <Route key={i} path={route.path} element={element} index={route.index} />;
   });
@@ -111,8 +157,15 @@ function App() {
             {/* Admin Routes */}
             {renderRoutes(adminRoutes.map(route => ({ 
               ...route, 
-              requiresAuth: !route.path?.endsWith('login') && !route.path?.endsWith('register'),
-              adminOnly: !route.path?.endsWith('login') && !route.path?.endsWith('register')
+              requiresAuth: !route.path?.endsWith('login') && !route.path?.endsWith('register') && !route.path?.endsWith('forgot-password'),
+              adminOnly: !route.path?.endsWith('login') && !route.path?.endsWith('register') && !route.path?.endsWith('forgot-password')
+            })))}
+            
+            {/* Moderator Routes */}
+            {renderRoutes(moderatorRoutes.map(route => ({ 
+              ...route, 
+              requiresAuth: !route.path?.endsWith('login'),
+              moderatorOnly: !route.path?.endsWith('login')
             })))}
 
             {/* Main App Routes */}

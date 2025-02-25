@@ -1,6 +1,6 @@
 // src/modules/admin/hooks/useAdminAccess.ts
-// Version: 2.1.0
-// Last Modified: 21-02-2025 16:15 IST
+// Version: 2.3.0
+// Last Modified: 25-02-2025 18:00 IST
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -35,6 +35,24 @@ export const useAdminAccess = (): UseAdminAccessReturn => {
     }
 
     try {
+      // First check user metadata for role info
+      const userRole = user.user_metadata?.role;
+      
+      if (userRole) {
+        const isAdminUser = userRole === ADMIN_ROLES.ADMIN || userRole === ADMIN_ROLES.SUPER_ADMIN;
+        const isModeratorUser = userRole === ADMIN_ROLES.PROPERTY_MODERATOR;
+        
+        if (isAdminUser || isModeratorUser) {
+          setIsAdmin(isAdminUser);
+          setIsPropertyModerator(isModeratorUser);
+          setAdminRole(userRole as AdminRole);
+          setError(null);
+          setLoading(false);
+          return;
+        }
+      }
+
+      // If not found in metadata, check the database
       const { data, error: adminError } = await supabase
         .from('admin_roles')
         .select(`
