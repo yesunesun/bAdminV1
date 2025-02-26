@@ -8,7 +8,7 @@ import { PropertyDetailModal } from './PropertyDetailModal/index'; // Updated im
 import { PropertyFilters } from './property-approval/PropertyFilters';
 import { PropertyTable } from './property-approval/PropertyTable';
 import { RejectReasonModal } from './property-approval/RejectReasonModal';
-import { Property } from '@/components/property/types';
+import { Property } from '@/components/property/PropertyFormTypes';
 import { supabase } from '@/lib/supabase';
 
 interface PropertyOwner {

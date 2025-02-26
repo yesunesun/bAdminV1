@@ -5,7 +5,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { PropertyApprovalList } from '../components/PropertyApprovalList';
-import { Property } from '@/components/property/types';
+import { Property } from '@/components/property/PropertyFormTypes';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAdminAccess } from '@/modules/admin/hooks/useAdminAccess';
 import { AlertCircle, CheckCircle, Clock, Activity, MapPin, User } from 'lucide-react';

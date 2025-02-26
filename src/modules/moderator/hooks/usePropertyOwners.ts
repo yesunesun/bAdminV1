@@ -4,7 +4,7 @@
 // Purpose: Custom hook to fetch and manage property owner data from property objects
 
 import { useState, useEffect } from 'react';
-import { Property } from '@/components/property/types';
+import { Property } from '@/components/property/PropertyFormTypes';
 
 export interface PropertyOwner {
   id: string;

@@ -4,7 +4,7 @@
 // Purpose: Display properties in a table with owner emails
 
 import React from 'react';
-import { Property } from '@/components/property/types';
+import { Property } from '@/components/property/PropertyFormTypes';
 import { cn } from '@/lib/utils';
 
 interface PropertyTableProps {

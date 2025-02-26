@@ -1,14 +1,17 @@
 // src/routes/mainRoutes.tsx
-// Version: 1.0.0
-// Last Modified: 20-02-2025 15:00 IST
+// Version: 9.0.0
+// Last Modified: 28-02-2025 13:15 IST
+// Purpose: Routes with minimal changes to use owner module components
 
+import React from 'react';
 import { Navigate } from 'react-router-dom';
-import Dashboard from '@/pages/Dashboard';
-import Properties from '@/pages/Properties';
-import PropertyDetails from '@/pages/PropertyDetails';
-import PropertyPreview from '@/pages/PropertyPreview';
-import EditProperty from '@/pages/EditProperty';
-import ListYourProperty from '@/pages/ListYourProperty';
+// Import from the owner module
+import Dashboard from '../modules/owner/pages/Dashboard';
+import Properties from '../modules/owner/pages/Properties';
+import PropertyDetails from '../modules/owner/pages/PropertyDetails';
+import PropertyPreview from '../modules/owner/pages/PropertyPreview';
+import EditProperty from '../modules/owner/pages/EditProperty';
+import ListYourProperty from '../modules/owner/pages/ListYourProperty';
 
 export const mainRoutes = [
   {
@@ -19,19 +22,9 @@ export const mainRoutes = [
     path: '/properties',
     children: [
       { index: true, element: <Properties /> },
-      {
-        path: 'list',
-        children: [
-          { index: true, element: <ListYourProperty /> },
-          {
-            path: ':category/:type',
-            children: [
-              { index: true, element: <ListYourProperty /> },
-              { path: ':step', element: <ListYourProperty /> }
-            ]
-          }
-        ]
-      },
+      { path: 'list', element: <ListYourProperty /> },
+      { path: 'list/:category/:type', element: <ListYourProperty /> },
+      { path: 'list/:category/:type/:step', element: <ListYourProperty /> },
       { path: ':id/preview', element: <PropertyPreview /> },
       { path: ':id/edit', element: <EditProperty /> },
       { path: ':id', element: <PropertyDetails /> }

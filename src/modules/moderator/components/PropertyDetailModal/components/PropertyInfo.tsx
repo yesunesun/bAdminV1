@@ -4,7 +4,7 @@
 // Purpose: Display property information in the detail modal
 
 import React from 'react';
-import { Property } from '@/components/property/types';
+import { Property } from '@/components/property/PropertyFormTypes';
 
 interface PropertyInfoProps {
   property: Property;
