@@ -1,7 +1,7 @@
 // src/routes/mainRoutes.tsx
-// Version: 10.0.0
-// Last Modified: 26-02-2025 16:30 IST
-// Purpose: Routes with added Seeker module routes
+// Version: 11.0.0
+// Last Modified: 27-02-2025 16:15 IST
+// Purpose: Routes with added home page navigation hub
 
 import React from 'react';
 import { Navigate } from 'react-router-dom';
@@ -15,6 +15,8 @@ import ListYourProperty from '../modules/owner/pages/ListYourProperty';
 // Import from the seeker module
 import BrowseProperties from '../modules/seeker/pages/BrowseProperties';
 import PropertyDetailPage from '../modules/seeker/pages/PropertyDetailPage';
+// Import our new HomePage component
+import HomePage from '../pages/HomePage';
 
 export const mainRoutes = [
   {
@@ -40,5 +42,6 @@ export const mainRoutes = [
       { path: 'property/:id', element: <PropertyDetailPage /> }
     ]
   },
-  { path: '/', element: <Navigate to="/dashboard" replace /> }
+  // Change the root path to use our new HomePage instead of redirecting
+  { path: '/', element: <HomePage /> }
 ];

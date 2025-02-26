@@ -1,10 +1,10 @@
 // src/App.tsx 
-// Version: 5.0.0
-// Last Modified: 26-02-2025 16:35 IST
-// Purpose: App with added Seeker module support
+// Version: 5.5.0
+// Last Modified: 27-02-2025 21:30 IST
+// Purpose: Fixed password reset flow and admin navigation
 
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate, Outlet, Link } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Outlet, Link, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Header } from '@/components/Header';
 // import ChatBot from './components/ChatBot';
@@ -12,6 +12,8 @@ import { useAdminAccess } from './modules/admin/hooks/useAdminAccess';
 
 // Import Dashboard directly for test route
 import Dashboard from './modules/owner/pages/Dashboard';
+// Import HomePage directly
+import HomePage from './pages/HomePage';
 
 // Route Configurations
 import { mainRoutes } from './routes/mainRoutes';
@@ -59,8 +61,10 @@ const AdminAuthRoute = ({ children, adminOnly, moderatorOnly }: {
     return <Navigate to={adminOnly ? "/admin/login" : moderatorOnly ? "/moderator/login" : "/login"} replace />;
   }
   
+  // Change redirect location based on the type of route
   if ((adminOnly && !isAdmin) || (moderatorOnly && !isPropertyModerator)) {
-    return <Navigate to="/dashboard" replace />;
+    // If we're in admin route but user is not admin, keep them in the admin area
+    return <Navigate to={adminOnly ? "/admin/login" : moderatorOnly ? "/moderator/login" : "/dashboard"} replace />;
   }
   
   return <>{children}</>;
@@ -68,12 +72,29 @@ const AdminAuthRoute = ({ children, adminOnly, moderatorOnly }: {
 
 const PublicRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
+  const location = useLocation();
+  
+  // Don't redirect for recovery or reset password flows
+  const isPasswordReset = location.pathname.includes('reset-password');
+  const isRecoveryFlow = location.hash.includes('type=recovery') || 
+                          location.search.includes('type=recovery') ||
+                          location.search.includes('direct=true');
   
   if (loading) {
     return <LoadingSpinner />;
   }
   
-  if (user) {
+  // Only redirect if not on a recovery flow or reset password page
+  if (user && !isPasswordReset && !isRecoveryFlow) {
+    // For admin users, redirect to admin dashboard
+    if (location.pathname.startsWith('/admin')) {
+      return <Navigate to="/admin/dashboard" replace />;
+    }
+    // For moderator users, redirect to moderator dashboard
+    if (location.pathname.startsWith('/moderator')) {
+      return <Navigate to="/moderator/dashboard" replace />;
+    }
+    // For regular users
     return <Navigate to="/dashboard" replace />;
   }
   
@@ -109,6 +130,18 @@ function App() {
       <BrowserRouter>
         <div className="min-h-screen bg-background">
           <Routes>
+            {/* Make root path public with HomePage */}
+            <Route element={<AppLayout />}>
+              <Route 
+                path="/" 
+                element={
+                  <PublicOrProtectedRoute>
+                    <HomePage />
+                  </PublicOrProtectedRoute>
+                } 
+              />
+            </Route>
+            
             {/* Direct test route for dashboard */}
             <Route 
               path="/dashboard-test" 
@@ -137,7 +170,7 @@ function App() {
                 key={`admin-${i}`}
                 path={route.path} 
                 element={
-                  route.path?.endsWith('login') ? 
+                  route.path?.endsWith('login') || route.path?.includes('forgot-password') || route.path?.includes('reset-password') ? 
                     <PublicRoute>{route.element}</PublicRoute> : 
                     <AdminAuthRoute adminOnly>{route.element}</AdminAuthRoute>
                 } 
@@ -159,55 +192,57 @@ function App() {
 
             {/* Main App Routes with simplified protection */}
             <Route element={<AppLayout />}>
-              {mainRoutes.map((route, i) => {
-                // Handle routes with children
-                if (route.children) {
+              {mainRoutes
+                .filter(route => route.path !== '/') // Filter out root route as we've defined it separately
+                .map((route, i) => {
+                  // Handle routes with children
+                  if (route.children) {
+                    return (
+                      <Route key={`main-${i}`} path={route.path}>
+                        {route.children.map((childRoute, j) => (
+                          <Route
+                            key={`main-${i}-child-${j}`}
+                            path={childRoute.path}
+                            element={
+                              // Special handling for seeker routes - these should be accessible to all users
+                              route.path === '/seeker' ? (
+                                <PublicOrProtectedRoute>
+                                  {childRoute.element}
+                                </PublicOrProtectedRoute>
+                              ) : (
+                                <SimpleAuthRoute>
+                                  {childRoute.element}
+                                </SimpleAuthRoute>
+                              )
+                            }
+                            index={childRoute.index}
+                          />
+                        ))}
+                      </Route>
+                    );
+                  }
+                  
+                  // Handle regular routes
                   return (
-                    <Route key={`main-${i}`} path={route.path}>
-                      {route.children.map((childRoute, j) => (
-                        <Route
-                          key={`main-${i}-child-${j}`}
-                          path={childRoute.path}
-                          element={
-                            // Special handling for seeker routes - these should be accessible to all users
-                            route.path === '/seeker' ? (
-                              <PublicOrProtectedRoute>
-                                {childRoute.element}
-                              </PublicOrProtectedRoute>
-                            ) : (
-                              <SimpleAuthRoute>
-                                {childRoute.element}
-                              </SimpleAuthRoute>
-                            )
-                          }
-                          index={childRoute.index}
-                        />
-                      ))}
-                    </Route>
+                    <Route
+                      key={`main-${i}`}
+                      path={route.path}
+                      element={
+                        // Special handling for seeker routes at the top level if needed
+                        route.path === '/seeker' ? (
+                          <PublicOrProtectedRoute>
+                            {route.element}
+                          </PublicOrProtectedRoute>
+                        ) : (
+                          <SimpleAuthRoute>
+                            {route.element}
+                          </SimpleAuthRoute>
+                        )
+                      }
+                      index={route.index}
+                    />
                   );
-                }
-                
-                // Handle regular routes
-                return (
-                  <Route
-                    key={`main-${i}`}
-                    path={route.path}
-                    element={
-                      // Special handling for seeker routes at the top level if needed
-                      route.path === '/seeker' ? (
-                        <PublicOrProtectedRoute>
-                          {route.element}
-                        </PublicOrProtectedRoute>
-                      ) : (
-                        <SimpleAuthRoute>
-                          {route.element}
-                        </SimpleAuthRoute>
-                      )
-                    }
-                    index={route.index}
-                  />
-                );
-              })}
+                })}
             </Route>
           </Routes>
         </div>

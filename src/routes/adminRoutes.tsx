@@ -1,7 +1,10 @@
 // src/routes/adminRoutes.tsx
-// Full file with reset-password route
+// Version: 3.2.0
+// Last Modified: 27-02-2025 14:15 IST
+// Purpose: Updated admin routes with fixed forgot password route
 
-import { Suspense, lazy } from 'react';
+import { Suspense } from 'react';
+import { Navigate, Routes, Route } from 'react-router-dom';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import AdminDashboard from '@/modules/admin/pages/AdminDashboard';
 import AdminLogin from '@/modules/admin/pages/AdminLogin';
@@ -36,7 +39,7 @@ const ErrorFallback = () => (
   </div>
 );
 
-// Wrapper for theme and suspense
+// Wrapper component for admin routes
 const AdminWrapper = ({ children }: { children: React.ReactNode }) => (
   <ThemeProvider>
     <Suspense fallback={<LoadingFallback />}>
@@ -45,56 +48,66 @@ const AdminWrapper = ({ children }: { children: React.ReactNode }) => (
   </ThemeProvider>
 );
 
-// Export routes configuration for React Router
+// Export flattened routes for direct consumption by App.tsx
 export const adminRoutes = [
+  // Default admin route - redirects to login
   {
     path: '/admin',
-    element: <AdminWrapper />,
-    errorElement: <ErrorFallback />,
-    children: [
-      // Public routes
-      {
-        path: '/admin/debug',
-        element: <AdminDebugPage />
-      },
-      {
-        path: 'login',
-        element: <AdminLogin />
-      },
-      {
-        path: 'register',
-        element: <AdminRegister />
-      },
-      {
-        path: 'reset-password',
-        element: <AdminPasswordReset />
-      },
-      {
-        path: 'forgot-password',
-        element: <AdminForgotPassword />
-      },
-      {
-        path: 'setup',
-        element: <AdminSetup />
-      },
-      
-      // Protected routes
-      {
-        path: 'dashboard',
-        element: (
-          <AdminLayout>
-            <AdminDashboard />
-          </AdminLayout>
-        )
-      },
-      {
-        path: 'users',
-        element: (
-          <AdminLayout>
-            <UsersList />
-          </AdminLayout>
-        )
-      }
-    ]
+    element: <Navigate to="/admin/login" replace />
+  },
+  // Login route - explicitly defined
+  {
+    path: '/admin/login',
+    element: <AdminLogin />
+  },
+  // Forgot password route - explicitly defined
+  {
+    path: '/admin/forgot-password',
+    element: <AdminForgotPassword />
+  },
+  // Reset password route - explicitly defined
+  {
+    path: '/admin/reset-password',
+    element: <AdminPasswordReset />
+  },
+  // Register route - explicitly defined
+  {
+    path: '/admin/register',
+    element: <AdminRegister />
+  },
+  // Setup route - explicitly defined
+  {
+    path: '/admin/setup',
+    element: <AdminSetup />
+  },
+  // Debug route - explicitly defined
+  {
+    path: '/admin/debug',
+    element: <AdminDebugPage />,
+    errorElement: <ErrorFallback />
+  },
+  // Dashboard route - explicitly defined with layout
+  {
+    path: '/admin/dashboard',
+    element: (
+      <AdminWrapper>
+        <AdminLayout>
+          <AdminDashboard />
+        </AdminLayout>
+      </AdminWrapper>
+    ),
+    errorElement: <ErrorFallback />
+  },
+  // Users route - explicitly defined with layout
+  {
+    path: '/admin/users',
+    element: (
+      <AdminWrapper>
+        <AdminLayout>
+          <UsersList />
+        </AdminLayout>
+      </AdminWrapper>
+    ),
+    errorElement: <ErrorFallback />
   }
 ];

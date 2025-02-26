@@ -1,7 +1,7 @@
 // src/modules/admin/pages/AdminPasswordReset.tsx
-// Version: 3.1.0
-// Last Modified: 26-02-2025 17:30 IST
-// Purpose: Handle admin password reset with improved token extraction and debugging
+// Version: 3.3.0
+// Last Modified: 27-02-2025 21:15 IST
+// Purpose: Fixed automatic login issue during password reset
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, useLocation, Link } from 'react-router-dom';
@@ -27,6 +27,9 @@ export default function AdminPasswordReset() {
   const [mode, setMode] = useState<'request' | 'reset'>('request');
   const [token, setToken] = useState<string | null>(null);
   
+  // Check if we're in a direct reset flow (from email link)
+  const isDirectReset = searchParams.get('direct') === 'true';
+  
   // Debug URL parameters
   useEffect(() => {
     console.log('URL Path:', location.pathname);
@@ -34,30 +37,27 @@ export default function AdminPasswordReset() {
     console.log('URL Hash:', location.hash);
     console.log('Search Params:', Object.fromEntries(searchParams.entries()));
     console.log('Complete URL:', window.location.href);
-  }, [location, searchParams]);
+    console.log('Is Direct Reset:', isDirectReset);
+  }, [location, searchParams, isDirectReset]);
   
-  // Direct session check on page load
+  // If we're in a direct reset flow, we need to force logout first
   useEffect(() => {
-    const checkSession = async () => {
-      try {
-        const { data } = await supabase.auth.getSession();
-        if (data?.session) {
-          console.log('Active session found on page load');
-          setMode('reset');
-          if (data.session.user?.email) {
-            setEmail(data.session.user.email);
-          }
-        } else {
-          console.log('No active session found on page load');
+    const handleDirectReset = async () => {
+      if (isDirectReset) {
+        console.log('Direct reset flow detected, ensuring user is logged out first');
+        try {
+          // Sign out first to prevent auto-login
+          await supabase.auth.signOut();
+          console.log('User signed out successfully in direct reset flow');
+        } catch (error) {
+          console.error('Error signing out user:', error);
         }
-      } catch (error) {
-        console.error('Session check error:', error);
       }
     };
     
-    checkSession();
-  }, []);
-
+    handleDirectReset();
+  }, [isDirectReset]);
+  
   // Extract token from URL on component mount
   useEffect(() => {
     const extractTokenFromUrl = () => {
@@ -110,7 +110,30 @@ export default function AdminPasswordReset() {
       setError(null);
       
       try {
-        // Check for Supabase recovery flow
+        // Extract token from URL
+        const extractedToken = extractTokenFromUrl();
+        console.log('Token found in URL:', !!extractedToken);
+        
+        // Special handling for direct reset flow
+        if (isDirectReset) {
+          console.log('Direct reset flow, forcing reset mode');
+          setMode('reset');
+          
+          // Try to get user email from session
+          try {
+            const { data } = await supabase.auth.getSession();
+            if (data?.session?.user?.email) {
+              setEmail(data.session.user.email);
+            }
+          } catch (sessionErr) {
+            console.warn('Failed to get user email:', sessionErr);
+          }
+          
+          setLoading(false);
+          return;
+        }
+        
+        // Standard flow
         if (location.hash && location.hash.includes('type=recovery')) {
           console.log('Detected Supabase recovery flow');
           
@@ -126,10 +149,6 @@ export default function AdminPasswordReset() {
             return;
           }
         }
-        
-        // Extract token from URL
-        const extractedToken = extractTokenFromUrl();
-        console.log('Token found in URL:', !!extractedToken);
         
         if (extractedToken) {
           setToken(extractedToken);
@@ -179,7 +198,34 @@ export default function AdminPasswordReset() {
     };
 
     initializeResetPage();
-  }, [location, searchParams]);
+  }, [location, searchParams, isDirectReset]);
+
+  // Direct session check on load
+  useEffect(() => {
+    const checkSession = async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        if (data?.session) {
+          console.log('Active session found on page load');
+          
+          // If this is a direct reset, we don't want to auto-switch to reset mode
+          // as we've already done that in the initialization
+          if (!isDirectReset) {
+            setMode('reset');
+            if (data.session.user?.email) {
+              setEmail(data.session.user.email);
+            }
+          }
+        } else {
+          console.log('No active session found on page load');
+        }
+      } catch (error) {
+        console.error('Session check error:', error);
+      }
+    };
+    
+    checkSession();
+  }, [isDirectReset]);
 
   // Handle request for password reset email
   const handleRequestReset = async (e: React.FormEvent) => {
@@ -194,11 +240,14 @@ export default function AdminPasswordReset() {
     setError(null);
     
     try {
-      // Send password reset email
+      // Send password reset email with direct=true parameter
+      const resetUrl = new URL('/admin/reset-password?direct=true', window.location.origin).toString();
+      console.log('Using reset redirect URL:', resetUrl);
+      
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(
         email.trim(),
         {
-          redirectTo: `${window.location.origin}/admin/reset-password`
+          redirectTo: resetUrl
         }
       );
       
@@ -245,7 +294,7 @@ export default function AdminPasswordReset() {
     setError(null);
     
     try {
-      // Try to update the user's password
+      // Update the user's password
       console.log('Attempting to update password');
       const { error: updateError } = await supabase.auth.updateUser({
         password: password
@@ -261,11 +310,12 @@ export default function AdminPasswordReset() {
       // Password updated successfully
       setSuccess(true);
       
-      // Sign out to ensure clean state
+      // Sign out to ensure clean state - this prevents auto-login after password reset
       await supabase.auth.signOut();
       
-      // Redirect to login after 2 seconds
+      // Redirect to admin login after 2 seconds
       setTimeout(() => {
+        // Explicitly navigate to admin login with success parameter
         navigate('/admin/login?reset_success=true');
       }, 2000);
       
@@ -276,37 +326,13 @@ export default function AdminPasswordReset() {
     }
   };
 
-  // Add manual token verification for debugging
-  const attemptTokenVerification = async () => {
-    if (!token) return;
-    
-    try {
-      console.log('Attempting manual token verification');
-      
-      // This will vary based on Supabase version
-      const { error } = await supabase.auth.verifyOtp({
-        token_hash: token,
-        type: 'recovery'
-      });
-      
-      if (error) {
-        console.error('Manual token verification failed:', error);
-      } else {
-        console.log('Manual token verification succeeded');
-        setMode('reset');
-      }
-    } catch (err) {
-      console.error('Token verification error:', err);
-    }
-  };
-
   // Loading state
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen p-4">
         <div className="flex flex-col items-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
+          <p className="mt-4 text-gray-600">Loading the password reset page...</p>
         </div>
       </div>
     );
@@ -361,7 +387,7 @@ export default function AdminPasswordReset() {
             Your password has been reset successfully.
           </p>
           <p className="text-gray-600">
-            You will be redirected to the login page.
+            You will be redirected to the admin login page.
           </p>
         </div>
       </div>
@@ -500,18 +526,22 @@ export default function AdminPasswordReset() {
                 Toggle Mode: {mode === 'request' ? 'Show Reset Form' : 'Show Request Form'}
               </button>
               
-              {token && (
-                <button
-                  type="button"
-                  onClick={attemptTokenVerification}
-                  className="py-2 px-4 bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
-                >
-                  Verify Token Manually
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={async () => {
+                  await supabase.auth.signOut();
+                  alert('Signed out manually');
+                }}
+                className="py-2 px-4 bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
+              >
+                Force Sign Out
+              </button>
               
               <div className="text-xs text-gray-500 mt-1">
-                Current mode: {mode} | Token found: {token ? 'Yes' : 'No'}
+                Current mode: {mode} | Direct reset: {isDirectReset ? 'Yes' : 'No'} | Current URL: {window.location.href}
+              </div>
+              <div className="text-xs text-gray-500">
+                Reset URL: {new URL('/admin/reset-password?direct=true', window.location.origin).toString()}
               </div>
             </div>
           </div>
