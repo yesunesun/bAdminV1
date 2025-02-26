@@ -1,10 +1,10 @@
 // src/modules/owner/components/property/ImageGallery.tsx
-// Version: 2.0.0
-// Last Modified: 26-02-2025 16:30 IST
-// Purpose: Image gallery component for property display
+// Version: 2.3.0
+// Last Modified: 26-02-2025 21:00 IST
+// Purpose: Optimized image gallery with compact thumbnail strip
 
 import React, { useState } from 'react';
-import { X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Image as ImageIcon } from 'lucide-react';
 
 interface GalleryProps {
   images: { id: string; url: string }[];
@@ -41,63 +41,88 @@ const ImageGallery = ({ images, title }: GalleryProps) => {
   if (!images || images.length === 0) {
     return (
       <div className="w-full h-96 bg-gray-100 rounded-lg flex items-center justify-center">
-        <p className="text-gray-500">No images available</p>
+        <ImageIcon className="h-12 w-12 text-gray-400" />
+        <p className="ml-2 text-gray-500">No images available</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      {/* Main Gallery Layout */}
-      <div className="grid grid-cols-12 gap-4 h-[500px]">
-        {/* Hero Image */}
-        <div 
-          className="col-span-12 md:col-span-8 relative rounded-lg overflow-hidden cursor-pointer group"
-          onClick={() => setSelectedImage(0)}
-        >
-          <img
-            src={images[0].url}
-            alt={`${title} - Main Image`}
-            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-          />
-          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-300" />
-        </div>
-
-        {/* Side Images */}
-        <div className="col-span-12 md:col-span-4 grid grid-rows-2 gap-4 h-full">
-          {images.slice(1, 3).map((image, index) => (
-            <div
-              key={image.id}
-              className="relative rounded-lg overflow-hidden cursor-pointer group"
-              onClick={() => setSelectedImage(index + 1)}
+    <div>
+      {/* Main Gallery Area */}
+      <div className="w-full h-[500px] bg-gray-100 rounded-lg overflow-hidden">
+        {images.length === 1 ? (
+          // Single image layout
+          <div 
+            className="w-full h-full cursor-pointer"
+            onClick={() => setSelectedImage(0)}
+          >
+            <img
+              src={images[0].url}
+              alt={title}
+              className="w-full h-full object-cover"
+            />
+          </div>
+        ) : (
+          // Multiple images layout with grid
+          <div className="grid grid-cols-4 grid-rows-1 h-full gap-2">
+            {/* Main large image */}
+            <div 
+              className="col-span-3 row-span-1 relative cursor-pointer overflow-hidden"
+              onClick={() => setSelectedImage(0)}
             >
               <img
-                src={image.url}
-                alt={`${title} - Image ${index + 2}`}
-                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                src={images[0].url}
+                alt={`${title} - Main`}
+                className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
               />
-              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-300" />
+              <div className="absolute inset-0 bg-black/0 hover:bg-black/10 transition-colors duration-300" />
             </div>
-          ))}
-        </div>
+
+            {/* Side column with smaller images */}
+            <div className="col-span-1 row-span-1 grid grid-rows-2 gap-2">
+              {images.slice(1, 3).map((image, index) => (
+                <div 
+                  key={image.id}
+                  className="row-span-1 relative cursor-pointer overflow-hidden"
+                  onClick={() => setSelectedImage(index + 1)}
+                >
+                  <img
+                    src={image.url}
+                    alt={`${title} - ${index + 2}`}
+                    className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
+                  />
+                  <div className="absolute inset-0 bg-black/0 hover:bg-black/10 transition-colors duration-300" />
+                </div>
+              ))}
+              
+              {/* If we don't have enough side images, show a placeholder */}
+              {images.length < 3 && (
+                <div className="row-span-1 bg-gray-200 flex items-center justify-center">
+                  <ImageIcon className="h-8 w-8 text-gray-400" />
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Additional Images Strip */}
+      {/* Compact Thumbnail Strip - without title and with smaller thumbnails */}
       {images.length > 3 && (
-        <div className="overflow-x-auto pb-2">
-          <div className="flex gap-4">
+        <div className="mt-4 pt-2 border-t border-gray-100">
+          <div className="flex gap-2 overflow-x-auto pb-2">
             {images.slice(3).map((image, index) => (
               <div
                 key={image.id}
-                className="relative flex-none w-32 h-32 rounded-lg overflow-hidden cursor-pointer group"
+                className="flex-none w-24 h-24 rounded-md overflow-hidden cursor-pointer relative"
                 onClick={() => setSelectedImage(index + 3)}
               >
                 <img
                   src={image.url}
-                  alt={`${title} - Image ${index + 4}`}
-                  className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                  alt={`${title} - ${index + 4}`}
+                  className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
                 />
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-300" />
+                <div className="absolute inset-0 bg-black/0 hover:bg-black/10 transition-colors duration-300" />
               </div>
             ))}
           </div>

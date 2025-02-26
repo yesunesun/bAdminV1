@@ -1,6 +1,6 @@
 // src/modules/owner/pages/PropertyDetails.tsx
-// Version: 2.0.0
-// Last Modified: 26-02-2025 16:30 IST
+// Version: 2.1.0
+// Last Modified: 26-02-2025 19:30 IST
 // Purpose: Property details page for viewing a single property
 
 import React, { useEffect, useState } from 'react';
@@ -9,6 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Home, IndianRupee, Ruler, Bath, BedDouble, MapPin, Pencil, Trash2 } from 'lucide-react';
 import { propertyService } from '../services/propertyService';
 import { Property } from '../components/property/PropertyFormTypes';
+import ImageGallery from '../components/property/ImageGallery';
 
 // Format price in Indian numbering system (lakhs and crores)
 const formatIndianPrice = (price: number) => {
@@ -33,6 +34,8 @@ export default function PropertyDetails() {
         if (!id) throw new Error('Property ID is required');
         const data = await propertyService.getPropertyById(id);
         setProperty(data);
+        console.log('Fetched property data:', data);
+        console.log('Property images:', data.images);
       } catch (err) {
         console.error('Error fetching property:', err);
         setError(err instanceof Error ? err.message : 'Failed to load property');
@@ -75,25 +78,21 @@ export default function PropertyDetails() {
   }
 
   const isOwner = user?.id === property.owner_id;
+  
+  // Prepare images for the gallery
+  const galleryImages = property.images || [];
+  
+  console.log('Gallery images:', galleryImages);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="bg-white shadow-lg rounded-lg overflow-hidden">
         {/* Image Gallery */}
-        <div className="relative h-96">
-          {property.images && property.images.length > 0 ? (
-            <div className="grid grid-cols-2 gap-2 h-full">
-              {property.images.map((image, index) => (
-                <img
-                  key={image.id}
-                  src={image.url}
-                  alt={`Property ${index + 1}`}
-                  className="w-full h-full object-cover"
-                />
-              ))}
-            </div>
+        <div className="relative">
+          {galleryImages.length > 0 ? (
+            <ImageGallery images={galleryImages} title={property.title} />
           ) : (
-            <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+            <div className="w-full h-96 bg-gray-200 flex items-center justify-center">
               <Home className="h-16 w-16 text-gray-400" />
             </div>
           )}
@@ -166,7 +165,7 @@ export default function PropertyDetails() {
 
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
-        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg p-6 max-w-sm w-full">
             <h3 className="text-lg font-medium text-gray-900">Delete Property</h3>
             <p className="mt-2 text-sm text-gray-500">
