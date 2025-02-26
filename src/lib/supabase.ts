@@ -1,6 +1,6 @@
 // src/lib/supabase.ts
-// Version: 2.1.0
-// Last Modified: 23-02-2025 08:00 IST
+// Version: 2.1.1
+// Last Modified: 26-02-2025 18:30 IST
 // Purpose: Supabase client configuration with admin operations support
 
 import { createClient } from '@supabase/supabase-js';
@@ -93,12 +93,12 @@ export const adminSupabase = createClient<Database>(
   }
 );
 
-// Initialize auth state
-try {
-  await supabase.auth.getSession();
-} catch (error) {
-  console.warn('Session initialization warning:', error instanceof Error ? error.message : 'Unknown error');
-}
+// Initialize auth state - Wrapped in IIFE to avoid top-level await
+(function initializeAuth() {
+  supabase.auth.getSession().catch(error => {
+    console.warn('Session initialization warning:', error instanceof Error ? error.message : 'Unknown error');
+  });
+})();
 
 // Export types
 export type SupabaseClient = typeof supabase;
