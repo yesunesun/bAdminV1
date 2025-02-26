@@ -1,7 +1,7 @@
 // src/routes/mainRoutes.tsx
-// Version: 9.0.0
-// Last Modified: 28-02-2025 13:15 IST
-// Purpose: Routes with minimal changes to use owner module components
+// Version: 10.0.0
+// Last Modified: 26-02-2025 16:30 IST
+// Purpose: Routes with added Seeker module routes
 
 import React from 'react';
 import { Navigate } from 'react-router-dom';
@@ -12,6 +12,9 @@ import PropertyDetails from '../modules/owner/pages/PropertyDetails';
 import PropertyPreview from '../modules/owner/pages/PropertyPreview';
 import EditProperty from '../modules/owner/pages/EditProperty';
 import ListYourProperty from '../modules/owner/pages/ListYourProperty';
+// Import from the seeker module
+import BrowseProperties from '../modules/seeker/pages/BrowseProperties';
+import PropertyDetailPage from '../modules/seeker/pages/PropertyDetailPage';
 
 export const mainRoutes = [
   {
@@ -28,6 +31,13 @@ export const mainRoutes = [
       { path: ':id/preview', element: <PropertyPreview /> },
       { path: ':id/edit', element: <EditProperty /> },
       { path: ':id', element: <PropertyDetails /> }
+    ]
+  },
+  {
+    path: '/seeker',
+    children: [
+      { index: true, element: <BrowseProperties /> },
+      { path: 'property/:id', element: <PropertyDetailPage /> }
     ]
   },
   { path: '/', element: <Navigate to="/dashboard" replace /> }

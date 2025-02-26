@@ -1,13 +1,13 @@
 // src/App.tsx 
-// Version: 4.0.0
-// Last Modified: 26-02-2025 20:30 IST
-// Purpose: App with simplified route handling
+// Version: 5.0.0
+// Last Modified: 26-02-2025 16:35 IST
+// Purpose: App with added Seeker module support
 
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet, Link } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Header } from '@/components/Header';
-import ChatBot from './components/ChatBot';
+// import ChatBot from './components/ChatBot';
 import { useAdminAccess } from './modules/admin/hooks/useAdminAccess';
 
 // Import Dashboard directly for test route
@@ -80,6 +80,17 @@ const PublicRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+// Public or Protected route - allows both logged in and non-logged in users
+const PublicOrProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  const { loading } = useAuth();
+  
+  if (loading) {
+    return <LoadingSpinner />;
+  }
+  
+  return <>{children}</>;
+};
+
 function AppLayout() {
   return (
     <>
@@ -87,7 +98,7 @@ function AppLayout() {
       <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
         <Outlet />
       </main>
-      <ChatBot />
+      {/* <ChatBot /> */}
     </>
   );
 }
@@ -158,9 +169,16 @@ function App() {
                           key={`main-${i}-child-${j}`}
                           path={childRoute.path}
                           element={
-                            <SimpleAuthRoute>
-                              {childRoute.element}
-                            </SimpleAuthRoute>
+                            // Special handling for seeker routes - these should be accessible to all users
+                            route.path === '/seeker' ? (
+                              <PublicOrProtectedRoute>
+                                {childRoute.element}
+                              </PublicOrProtectedRoute>
+                            ) : (
+                              <SimpleAuthRoute>
+                                {childRoute.element}
+                              </SimpleAuthRoute>
+                            )
                           }
                           index={childRoute.index}
                         />
@@ -175,9 +193,16 @@ function App() {
                     key={`main-${i}`}
                     path={route.path}
                     element={
-                      <SimpleAuthRoute>
-                        {route.element}
-                      </SimpleAuthRoute>
+                      // Special handling for seeker routes at the top level if needed
+                      route.path === '/seeker' ? (
+                        <PublicOrProtectedRoute>
+                          {route.element}
+                        </PublicOrProtectedRoute>
+                      ) : (
+                        <SimpleAuthRoute>
+                          {route.element}
+                        </SimpleAuthRoute>
+                      )
                     }
                     index={route.index}
                   />
