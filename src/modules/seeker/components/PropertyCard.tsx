@@ -1,14 +1,15 @@
 // src/modules/seeker/components/PropertyCard.tsx
-// Version: 1.1.0
-// Last Modified: 27-02-2025 12:30 IST
-// Purpose: Improved card component for displaying property in grid view with better spacing and layout
+// Version: 1.2.0
+// Last Modified: 27-02-2025 13:30 IST
+// Purpose: Improved card component with fixed favorite functionality
 
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { PropertyType } from '@/modules/owner/components/property/types';
 import { formatCurrency } from '@/lib/utils';
-import { Card, CardContent, CardFooter } from '@/components/ui/card';
-import { HeartIcon, MapPinIcon, BedIcon, BathIcon, SquareIcon } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { MapPinIcon, BedIcon, BathIcon, SquareIcon } from 'lucide-react';
+import FavoriteButton from './FavoriteButton';
 
 interface PropertyCardProps {
   property: PropertyType;
@@ -16,20 +17,14 @@ interface PropertyCardProps {
   onLike?: (property: PropertyType) => void;
 }
 
-const PropertyCard: React.FC<PropertyCardProps> = ({ property, isLiked, onLike }) => {
+const PropertyCard: React.FC<PropertyCardProps> = ({ property, isLiked = false, onLike }) => {
   // Find primary image or use first image
   const primaryImage = property.property_images?.find(img => img.is_primary) || 
                        (property.property_images && property.property_images.length > 0 ? property.property_images[0] : null);
   
   const imageSrc = primaryImage?.url || '/placeholder-property.jpg';
 
-  const handleLikeClick = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (onLike) {
-      onLike(property);
-    }
-  };
+  // Removed handleLikeClick as it's now handled in the FavoriteButton component
 
   return (
     <Card className="overflow-hidden transition-all duration-300 hover:shadow-lg h-full flex flex-col">
@@ -41,18 +36,18 @@ const PropertyCard: React.FC<PropertyCardProps> = ({ property, isLiked, onLike }
             className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
           />
         </Link>
-        <button
-          onClick={handleLikeClick}
-          className="absolute top-3 right-3 p-2 bg-white bg-opacity-70 rounded-full hover:bg-opacity-100 transition-all shadow-sm"
-          aria-label={isLiked ? "Remove from favorites" : "Add to favorites"}
-        >
-          <HeartIcon className={`h-5 w-5 transition-colors ${isLiked ? 'text-red-500 fill-red-500' : 'text-gray-400 hover:text-red-400'}`} />
-        </button>
+        <FavoriteButton 
+          initialIsLiked={isLiked}
+          onToggle={(newLikedState) => {
+            if (onLike) {
+              onLike(property);
+            }
+          }}
+          className="absolute top-3 right-3 z-20"
+        />
       </div>
 
       <CardContent className="flex-grow p-5">
-        {/* Property type label removed as requested */}
-        
         <Link to={`/seeker/property/${property.id}`} className="block">
           <h3 className="text-lg font-semibold hover:text-primary transition-colors">
             {property.title}
@@ -95,8 +90,6 @@ const PropertyCard: React.FC<PropertyCardProps> = ({ property, isLiked, onLike }
           )}
         </div>
       </CardContent>
-
-      {/* CardFooter removed as requested */}
     </Card>
   );
 };

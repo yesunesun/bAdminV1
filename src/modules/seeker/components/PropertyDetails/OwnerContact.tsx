@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyDetails/OwnerContact.tsx
-// Version: 1.0.0
-// Last Modified: 26-02-2025 15:45 IST
-// Purpose: Owner contact information and contact form
+// Version: 1.1.0
+// Last Modified: 27-02-2025 10:30 IST
+// Purpose: Owner contact information and contact form with null safety
 
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,14 +10,14 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { PhoneIcon, MailIcon, UserIcon } from 'lucide-react';
+import { PhoneIcon, MailIcon, UserIcon, AlertCircleIcon } from 'lucide-react';
 
 interface OwnerContactProps {
-  ownerData: {
+  ownerData?: {
     id: string;
     email: string;
     phone?: string;
-  };
+  } | null;
   propertyTitle: string;
 }
 
@@ -59,6 +59,107 @@ const OwnerContact: React.FC<OwnerContactProps> = ({ ownerData, propertyTitle })
       setIsSubmitting(false);
     }, 1000);
   };
+
+  // Show a message if owner data is not available
+  if (!ownerData) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-xl">Contact Property Owner</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center p-4 bg-muted/50 rounded-md">
+            <AlertCircleIcon className="h-5 w-5 mr-2 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">
+              Owner contact information is not available at the moment. Please try again later.
+            </p>
+          </div>
+          
+          {/* Still show the contact form for inquiries */}
+          <form onSubmit={handleContactSubmit} className="space-y-4 mt-6">
+            <h3 className="text-lg font-medium">Send a General Inquiry</h3>
+            
+            <div className="space-y-2">
+              <label htmlFor="contact-name" className="text-sm font-medium">
+                Your Name <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <UserIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="contact-name"
+                  value={contactName}
+                  onChange={(e) => setContactName(e.target.value)}
+                  placeholder="Your full name"
+                  className="pl-10"
+                  required
+                />
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <label htmlFor="contact-email" className="text-sm font-medium">
+                Email Address <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <MailIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="contact-email"
+                  type="email"
+                  value={contactEmail}
+                  onChange={(e) => setContactEmail(e.target.value)}
+                  placeholder="Your email address"
+                  className="pl-10"
+                  required
+                />
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <label htmlFor="contact-phone" className="text-sm font-medium">
+                Phone Number
+              </label>
+              <div className="relative">
+                <PhoneIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="contact-phone"
+                  value={contactPhone}
+                  onChange={(e) => setContactPhone(e.target.value)}
+                  placeholder="Your phone number (optional)"
+                  className="pl-10"
+                />
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <label htmlFor="contact-message" className="text-sm font-medium">
+                Message <span className="text-red-500">*</span>
+              </label>
+              <Textarea
+                id="contact-message"
+                value={contactMessage}
+                onChange={(e) => setContactMessage(e.target.value)}
+                placeholder={`I'm interested in this property: ${propertyTitle}`}
+                rows={4}
+                required
+              />
+            </div>
+            
+            <Button 
+              type="submit" 
+              className="w-full" 
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? "Sending..." : "Send Inquiry"}
+            </Button>
+            
+            <p className="text-xs text-muted-foreground text-center">
+              By submitting this form, you agree to our terms of service and privacy policy.
+            </p>
+          </form>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>

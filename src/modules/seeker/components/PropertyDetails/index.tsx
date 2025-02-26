@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyDetails/index.tsx
-// Version: 1.0.0
-// Last Modified: 26-02-2025 15:50 IST
-// Purpose: Main container for property details page
+// Version: 1.1.0
+// Last Modified: 27-02-2025 10:30 IST
+// Purpose: Main container for property details page with null safety
 
 import React from 'react';
 import PropertyGallery from './PropertyGallery';
@@ -14,7 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 interface PropertyDetailsProps {
   property: PropertyType & { 
-    profiles: { id: string; email: string; phone: string; role: string }
+    profiles?: { id: string; email: string; phone: string; role: string } | null
   };
   isLiked: boolean;
   onToggleLike: () => Promise<{ success: boolean; message?: string }>;
@@ -80,7 +80,7 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
   );
 };
 
-// Loading skeleton component
+// Loading skeleton component remains unchanged
 const PropertyDetailsSkeleton: React.FC = () => {
   return (
     <div className="space-y-8">

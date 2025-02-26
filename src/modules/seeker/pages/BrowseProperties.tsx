@@ -67,6 +67,7 @@ const BrowseProperties: React.FC = () => {
 
   // Handle like toggle
   const handleLikeToggle = (propertyId: string, liked: boolean) => {
+    console.log(`Toggling property ${propertyId} like status to: ${liked}`);
     setLikedProperties(prev => ({
       ...prev,
       [propertyId]: liked

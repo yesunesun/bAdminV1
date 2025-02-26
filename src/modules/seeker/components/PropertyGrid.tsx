@@ -39,22 +39,33 @@ const PropertyGrid: React.FC<PropertyGridProps> = ({
     }
 
     try {
-      const { liked } = await togglePropertyLike(property.id, user.id);
+      // First, update the UI immediately (optimistic update)
+      const currentLikeStatus = likedProperties[property.id] || false;
+      const newLikeStatus = !currentLikeStatus;
       
-      // Call the parent component's handler to update state
+      // Call the parent component's handler to update state immediately
       if (onLikeToggle) {
-        onLikeToggle(property.id, liked);
+        onLikeToggle(property.id, newLikeStatus);
       }
       
+      // Then persist to backend
+      await togglePropertyLike(property.id, user.id);
+      
       toast({
-        title: liked ? "Property Liked" : "Property Unliked",
-        description: liked 
+        title: newLikeStatus ? "Property Liked" : "Property Unliked",
+        description: newLikeStatus 
           ? "This property has been added to your favorites" 
           : "This property has been removed from your favorites",
         variant: "default"
       });
     } catch (error) {
       console.error("Error toggling property like:", error);
+      
+      // If there was an error, revert the UI change
+      if (onLikeToggle && property.id in likedProperties) {
+        onLikeToggle(property.id, !likedProperties[property.id]);
+      }
+      
       toast({
         title: "Action Failed",
         description: "Unable to update like status. Please try again.",
