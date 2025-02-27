@@ -1,6 +1,7 @@
 // src/modules/moderator/pages/ModeratorLogin.tsx
-// Version: 1.0.3
-// Last Modified: 25-02-2025 18:00 IST
+// Version: 2.0.0
+// Last Modified: 27-02-2025 10:30 IST
+// Purpose: Added strict role verification at login
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -14,7 +15,6 @@ export default function ModeratorLogin() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
-  const { signInAdmin } = useAuth();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,7 +23,7 @@ export default function ModeratorLogin() {
       setLoading(true);
       setError(null);
       
-      // Use direct Supabase authentication to bypass admin-specific checks
+      // Check if user has proper role for moderator access
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password: password.trim()
@@ -32,35 +32,73 @@ export default function ModeratorLogin() {
       if (signInError) {
         throw signInError;
       }
-      
-      // After successful login, check if the user is a property moderator
-      if (data.user) {
-        const userRole = data.user.user_metadata?.role;
-        
-        if (userRole === 'property_moderator') {
-          // If they're a property moderator, send them to the moderator dashboard
-          navigate('/moderator/dashboard');
-        } else {
-          // Otherwise, redirect based on their role
-          const { data: adminData } = await supabase
-            .from('admin_roles')
-            .select('role_type')
-            .eq('admin_users.user_id', data.user.id)
-            .single();
-            
-          if (adminData?.role_type === 'property_moderator') {
-            navigate('/moderator/dashboard');
-          } else if (adminData?.role_type === 'admin' || adminData?.role_type === 'super_admin') {
-            navigate('/admin/dashboard');
-          } else {
-            navigate('/dashboard');
-          }
-        }
+
+      if (!data.user) {
+        throw new Error('No user returned from sign in');
       }
+      
+      // Check if the user has moderator or admin role in metadata
+      console.log('Checking user role in metadata:', data.user.user_metadata);
+      const userRole = data.user.user_metadata?.role;
+      const hasModeratorAccess = userRole === 'property_moderator' || 
+                                 userRole === 'admin' || 
+                                 userRole === 'super_admin';
+      
+      if (hasModeratorAccess) {
+        console.log('User has proper role in metadata:', userRole);
+        // User has proper role in metadata, proceed to dashboard
+        navigate('/moderator/dashboard');
+        return;
+      }
+      
+      // If role not in metadata, check database
+      console.log('Role not found in metadata, checking database');
+      
+      const { data: roleData, error: roleError } = await supabase
+        .from('admin_roles')
+        .select(`
+          id,
+          role_type,
+          admin_users!inner (
+            user_id,
+            is_active
+          )
+        `)
+        .eq('admin_users.user_id', data.user.id)
+        .in('role_type', ['property_moderator', 'admin', 'super_admin']);
+      
+      console.log('Database role check results:', { roleData, roleError });
+        
+      if (roleError) {
+        console.error('Error checking roles:', roleError);
+        await supabase.auth.signOut();
+        throw new Error('Authentication error occurred');
+      }
+      
+      if (!roleData || roleData.length === 0) {
+        // No proper role found, sign out and throw error
+        console.log('No proper role found in database');
+        await supabase.auth.signOut();
+        throw new Error('Invalid username or password');
+      }
+      
+      // Find the first active role
+      const activeRole = roleData.find(role => role.admin_users?.is_active);
+      
+      if (!activeRole) {
+        console.log('No active role found');
+        await supabase.auth.signOut();
+        throw new Error('Your account is pending activation');
+      }
+      
+      console.log('User has proper role in database:', activeRole.role_type);
+      
+      // User has proper role, redirect to dashboard
+      navigate('/moderator/dashboard');
       
     } catch (err: any) {
       console.error('Login error:', err);
-      setError(err.message || 'Failed to login. Please check your credentials.');
+      setError(err.message || 'Invalid username or password');
     } finally {
       setLoading(false);
     }

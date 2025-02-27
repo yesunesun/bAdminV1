@@ -1,6 +1,7 @@
 // src/modules/admin/hooks/useAdminAccess.ts
-// Version: 2.3.0
-// Last Modified: 25-02-2025 18:00 IST
+// Version: 3.0.0
+// Last Modified: 27-02-2025 11:30 IST
+// Purpose: Improved role checking with better debug logs
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -35,10 +36,14 @@ export const useAdminAccess = (): UseAdminAccessReturn => {
     }
 
     try {
+      console.log('Checking admin access for user:', user.id, user.email);
+      console.log('User metadata:', user.user_metadata);
+      
       // First check user metadata for role info
       const userRole = user.user_metadata?.role;
       
       if (userRole) {
+        console.log('Found role in metadata:', userRole);
         const isAdminUser = userRole === ADMIN_ROLES.ADMIN || userRole === ADMIN_ROLES.SUPER_ADMIN;
         const isModeratorUser = userRole === ADMIN_ROLES.PROPERTY_MODERATOR;
         
@@ -47,12 +52,14 @@ export const useAdminAccess = (): UseAdminAccessReturn => {
           setIsPropertyModerator(isModeratorUser);
           setAdminRole(userRole as AdminRole);
           setError(null);
+          console.log('Role set from metadata:', { isAdmin: isAdminUser, isPropertyModerator: isModeratorUser });
           setLoading(false);
           return;
         }
       }
 
       // If not found in metadata, check the database
+      console.log('No role in metadata, checking database');
       const { data, error: adminError } = await supabase
         .from('admin_roles')
         .select(`
@@ -65,17 +72,20 @@ export const useAdminAccess = (): UseAdminAccessReturn => {
         .single();
 
       if (adminError) {
+        console.error('Admin role check error:', adminError);
         debugError('Admin Check', 'Query failed', adminError);
         throw adminError;
       }
 
       if (!data?.role_type) {
+        console.log('No role found in database for user');
         setIsAdmin(false);
         setIsPropertyModerator(false);
         setAdminRole(null);
         return;
       }
 
+      console.log('Found role in database:', data.role_type);
       debugLog('Admin Check', 'Success', {
         userId: user.id,
         roleType: data.role_type
@@ -85,11 +95,16 @@ export const useAdminAccess = (): UseAdminAccessReturn => {
       setAdminRole(roleType);
       
       // Set appropriate access flags based on role
-      setIsAdmin(roleType === ADMIN_ROLES.ADMIN || roleType === ADMIN_ROLES.SUPER_ADMIN);
-      setIsPropertyModerator(roleType === ADMIN_ROLES.PROPERTY_MODERATOR);
+      const roleIsAdmin = roleType === ADMIN_ROLES.ADMIN || roleType === ADMIN_ROLES.SUPER_ADMIN;
+      const roleIsModerator = roleType === ADMIN_ROLES.PROPERTY_MODERATOR;
+      
+      setIsAdmin(roleIsAdmin);
+      setIsPropertyModerator(roleIsModerator);
+      console.log('Role set from database:', { isAdmin: roleIsAdmin, isPropertyModerator: roleIsModerator });
       setError(null);
 
     } catch (err) {
+      console.error('Admin role check completely failed:', err);
       debugError('Admin Check', 'Failed', err);
       setIsAdmin(false);
       setIsPropertyModerator(false);

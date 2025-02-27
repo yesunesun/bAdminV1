@@ -1,17 +1,14 @@
 // src/App.tsx 
-// Version: 5.5.0
-// Last Modified: 27-02-2025 21:30 IST
-// Purpose: Fixed password reset flow and admin navigation
+// Version: 6.0.0
+// Last Modified: 27-02-2025 09:45 IST
+// Purpose: Improved role-based access control for routes
 
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate, Outlet, Link, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Header } from '@/components/Header';
-// import ChatBot from './components/ChatBot';
 import { useAdminAccess } from './modules/admin/hooks/useAdminAccess';
 
-// Import Dashboard directly for test route
-import Dashboard from './modules/owner/pages/Dashboard';
 // Import HomePage directly
 import HomePage from './pages/HomePage';
 
@@ -27,11 +24,9 @@ const LoadingSpinner = () => (
   </div>
 );
 
-// Simple auth route that doesn't depend on admin access
-const SimpleAuthRoute = ({ children }: { children: React.ReactNode }) => {
+// Protected route for authenticated users
+const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
-  
-  console.log('SimpleAuthRoute check:', { user: !!user, loading });
   
   if (loading) {
     return <LoadingSpinner />;
@@ -44,58 +39,101 @@ const SimpleAuthRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-// Admin route with role checking
-const AdminAuthRoute = ({ children, adminOnly, moderatorOnly }: { 
-  children: React.ReactNode, 
-  adminOnly?: boolean, 
-  moderatorOnly?: boolean 
-}) => {
+// Admin route with strict role checking
+const AdminRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
-  const { isAdmin, isPropertyModerator, loading: roleLoading } = useAdminAccess();
+  const { isAdmin, loading: roleLoading } = useAdminAccess();
   
   if (loading || roleLoading) {
     return <LoadingSpinner />;
   }
   
   if (!user) {
-    return <Navigate to={adminOnly ? "/admin/login" : moderatorOnly ? "/moderator/login" : "/login"} replace />;
+    return <Navigate to="/admin/login" replace />;
   }
   
-  // Change redirect location based on the type of route
-  if ((adminOnly && !isAdmin) || (moderatorOnly && !isPropertyModerator)) {
-    // If we're in admin route but user is not admin, keep them in the admin area
-    return <Navigate to={adminOnly ? "/admin/login" : moderatorOnly ? "/moderator/login" : "/dashboard"} replace />;
+  if (!isAdmin) {
+    return <Navigate to="/admin/login" replace />;
   }
   
   return <>{children}</>;
 };
 
+// Moderator route with role checking (allows both moderators and admins)
+const ModeratorRoute = ({ children }: { children: React.ReactNode }) => {
+  const { user, loading } = useAuth();
+  const { isPropertyModerator, isAdmin, loading: roleLoading } = useAdminAccess();
+  
+  if (loading || roleLoading) {
+    return <LoadingSpinner />;
+  }
+  
+  if (!user) {
+    return <Navigate to="/moderator/login" replace />;
+  }
+  
+  // Debug log to check role values
+  console.log('ModeratorRoute check:', { 
+    isAdmin, 
+    isPropertyModerator, 
+    user: user.email,
+    metadata: user.user_metadata
+  });
+  
+  // Allow both moderators and admins to access moderator routes
+  if (!isPropertyModerator && !isAdmin) {
+    console.error('Access denied to moderator route - user lacks required role');
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-red-50 p-4">
+        <div className="max-w-md w-full bg-white p-8 rounded-lg shadow-md">
+          <svg className="w-12 h-12 text-red-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          <h2 className="text-xl font-bold text-center text-red-700 mb-2">Access Denied</h2>
+          <p className="text-gray-600 text-center mb-4">You do not have permission to access this page</p>
+          <button 
+            onClick={() => navigate('/')}
+            className="w-full py-2 px-4 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+          >
+            Return to Home
+          </button>
+        </div>
+      </div>
+    );
+  }
+  
+  return <>{children}</>;
+};
+
+// Public route that redirects authenticated users to their appropriate dashboard
 const PublicRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
+  const { isAdmin, isPropertyModerator, loading: roleLoading } = useAdminAccess();
   const location = useLocation();
   
   // Don't redirect for recovery or reset password flows
   const isPasswordReset = location.pathname.includes('reset-password');
   const isRecoveryFlow = location.hash.includes('type=recovery') || 
-                          location.search.includes('type=recovery') ||
-                          location.search.includes('direct=true');
+                         location.search.includes('type=recovery') ||
+                         location.search.includes('direct=true');
   
-  if (loading) {
+  if (loading || roleLoading) {
     return <LoadingSpinner />;
   }
   
   // Only redirect if not on a recovery flow or reset password page
   if (user && !isPasswordReset && !isRecoveryFlow) {
-    // For admin users, redirect to admin dashboard
-    if (location.pathname.startsWith('/admin')) {
+    // Route to the appropriate dashboard based on role
+    if (isAdmin && location.pathname.startsWith('/admin')) {
       return <Navigate to="/admin/dashboard" replace />;
     }
-    // For moderator users, redirect to moderator dashboard
-    if (location.pathname.startsWith('/moderator')) {
+    if ((isPropertyModerator || isAdmin) && location.pathname.startsWith('/moderator')) {
       return <Navigate to="/moderator/dashboard" replace />;
     }
-    // For regular users
-    return <Navigate to="/dashboard" replace />;
+    // For regular users, redirect to the main dashboard
+    if (!location.pathname.startsWith('/admin') && !location.pathname.startsWith('/moderator')) {
+      return <Navigate to="/dashboard" replace />;
+    }
   }
   
   return <>{children}</>;
@@ -119,7 +157,6 @@ function AppLayout() {
       <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
         <Outlet />
       </main>
-      {/* <ChatBot /> */}
     </>
   );
 }
@@ -142,20 +179,7 @@ function App() {
               />
             </Route>
             
-            {/* Direct test route for dashboard */}
-            <Route 
-              path="/dashboard-test" 
-              element={
-                <SimpleAuthRoute>
-                  <div className="p-8">
-                    <h1 className="text-3xl font-bold mb-4">Dashboard Test Route</h1>
-                    <Dashboard />
-                  </div>
-                </SimpleAuthRoute>
-              } 
-            />
-            
-            {/* Auth Routes */}
+            {/* Auth Routes - accessible to everyone */}
             {authRoutes.map((route, i) => (
               <Route 
                 key={`auth-${i}`}
@@ -164,33 +188,44 @@ function App() {
               />
             ))}
 
-            {/* Admin Routes */}
-            {adminRoutes.map((route, i) => (
-              <Route 
-                key={`admin-${i}`}
-                path={route.path} 
-                element={
-                  route.path?.endsWith('login') || route.path?.includes('forgot-password') || route.path?.includes('reset-password') ? 
-                    <PublicRoute>{route.element}</PublicRoute> : 
-                    <AdminAuthRoute adminOnly>{route.element}</AdminAuthRoute>
-                } 
-              />
-            ))}
+            {/* Admin Routes - accessible ONLY to admins */}
+            {adminRoutes.map((route, i) => {
+              const isPublicRoute = 
+                route.path?.endsWith('login') || 
+                route.path?.includes('forgot-password') || 
+                route.path?.includes('reset-password');
+              
+              return (
+                <Route 
+                  key={`admin-${i}`}
+                  path={route.path} 
+                  element={
+                    isPublicRoute ? 
+                      <PublicRoute>{route.element}</PublicRoute> : 
+                      <AdminRoute>{route.element}</AdminRoute>
+                  } 
+                />
+              );
+            })}
             
-            {/* Moderator Routes */}
-            {moderatorRoutes.map((route, i) => (
-              <Route 
-                key={`mod-${i}`}
-                path={route.path} 
-                element={
-                  route.path?.endsWith('login') ? 
-                    <PublicRoute>{route.element}</PublicRoute> : 
-                    <AdminAuthRoute moderatorOnly>{route.element}</AdminAuthRoute>
-                } 
-              />
-            ))}
+            {/* Moderator Routes - accessible to moderators and admins */}
+            {moderatorRoutes.map((route, i) => {
+              const isPublicRoute = route.path?.endsWith('login');
+              
+              return (
+                <Route 
+                  key={`mod-${i}`}
+                  path={route.path} 
+                  element={
+                    isPublicRoute ? 
+                      <PublicRoute>{route.element}</PublicRoute> : 
+                      <ModeratorRoute>{route.element}</ModeratorRoute>
+                  } 
+                />
+              );
+            })}
 
-            {/* Main App Routes with simplified protection */}
+            {/* Main App Routes */}
             <Route element={<AppLayout />}>
               {mainRoutes
                 .filter(route => route.path !== '/') // Filter out root route as we've defined it separately
@@ -204,15 +239,16 @@ function App() {
                             key={`main-${i}-child-${j}`}
                             path={childRoute.path}
                             element={
-                              // Special handling for seeker routes - these should be accessible to all users
+                              // Special handling for seeker routes - public
                               route.path === '/seeker' ? (
                                 <PublicOrProtectedRoute>
                                   {childRoute.element}
                                 </PublicOrProtectedRoute>
                               ) : (
-                                <SimpleAuthRoute>
+                                // All other routes require authentication
+                                <ProtectedRoute>
                                   {childRoute.element}
-                                </SimpleAuthRoute>
+                                </ProtectedRoute>
                               )
                             }
                             index={childRoute.index}
@@ -228,15 +264,16 @@ function App() {
                       key={`main-${i}`}
                       path={route.path}
                       element={
-                        // Special handling for seeker routes at the top level if needed
+                        // Special handling for seeker routes
                         route.path === '/seeker' ? (
                           <PublicOrProtectedRoute>
                             {route.element}
                           </PublicOrProtectedRoute>
                         ) : (
-                          <SimpleAuthRoute>
+                          // All other routes require authentication
+                          <ProtectedRoute>
                             {route.element}
-                          </SimpleAuthRoute>
+                          </ProtectedRoute>
                         )
                       }
                       index={route.index}
@@ -244,6 +281,9 @@ function App() {
                   );
                 })}
             </Route>
+
+            {/* Catch-all route - redirect to home */}
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>
       </BrowserRouter>

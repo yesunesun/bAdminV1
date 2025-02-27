@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/validationSchemas.ts
-// Version: 2.0.0
-// Last Modified: 27-02-2025 12:45 IST
-// Updates: Migrated to owner module
+// Version: 2.1.0
+// Last Modified: 28-02-2025 16:30 IST
+// Updates: Added latitude and longitude fields for Google Maps integration
 
 import { z } from 'zod';
 // Updated import to use the migrated constants file
@@ -31,6 +31,9 @@ export const propertyValidationSchema = z.object({
   landmark: z.string().optional(),
   address: z.string().min(1, 'Complete address is required'),
   pinCode: z.string().length(6, 'PIN code must be 6 digits').regex(/^\d+$/, 'Must contain only numbers'),
+  // Map coordinates - optional but should be valid numbers if provided
+  latitude: z.number().optional().or(z.string().regex(/^-?\d+(\.\d+)?$/).optional()),
+  longitude: z.number().optional().or(z.string().regex(/^-?\d+(\.\d+)?$/).optional()),
 
   // Rental Details
   rentalType: z.enum(['rent', 'lease']).min(1, 'Rental type is required'),
@@ -83,6 +86,9 @@ export const stepValidationSchemas = {
     locality: true,
     address: true,
     pinCode: true,
+    // We don't make these required for validation
+    latitude: true,
+    longitude: true, 
   }),
   3: propertyValidationSchema.pick({
     rentalType: true,
