@@ -1,9 +1,9 @@
 // src/modules/admin/pages/PropertyMapView/components/MapContainer.tsx
-// Version: 1.2.0
-// Last Modified: 01-03-2025 13:45 IST
-// Purpose: Fixed infinite re-render issue with markers
+// Version: 2.1.0
+// Last Modified: 01-03-2025 22:00 IST
+// Purpose: Fixed inconsistent info window behavior on mouseover
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { GoogleMap } from '@react-google-maps/api';
 import { useNavigate } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
@@ -17,39 +17,36 @@ const containerStyle = {
   height: 'calc(100vh - 172px)'
 };
 
-// Marker icons by property type
-const markerIcons = {
-  residential: {
-    url: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png',
-    scaledSize: { width: 32, height: 32 }
-  },
-  commercial: {
-    url: 'https://maps.google.com/mapfiles/ms/icons/blue-dot.png',
-    scaledSize: { width: 32, height: 32 }
-  },
-  land: {
-    url: 'https://maps.google.com/mapfiles/ms/icons/green-dot.png',
-    scaledSize: { width: 32, height: 32 }
-  },
-  default: {
-    url: 'https://maps.google.com/mapfiles/ms/icons/purple-dot.png',
-    scaledSize: { width: 32, height: 32 }
-  }
+// Simple colored marker URLs from Google Maps
+const markerPins = {
+  residential: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png',
+  apartment: 'https://maps.google.com/mapfiles/ms/icons/orange-dot.png',
+  commercial: 'https://maps.google.com/mapfiles/ms/icons/blue-dot.png',
+  land: 'https://maps.google.com/mapfiles/ms/icons/green-dot.png',
+  office: 'https://maps.google.com/mapfiles/ms/icons/purple-dot.png',
+  shop: 'https://maps.google.com/mapfiles/ms/icons/pink-dot.png',
+  default: 'https://maps.google.com/mapfiles/ms/icons/yellow-dot.png'
 };
 
-// Get marker icon based on property type
-const getMarkerIcon = (property: PropertyWithImages) => {
+// Get marker pin URL based on property type
+const getMarkerPin = (property: PropertyWithImages) => {
   const propertyType = property.property_details?.propertyType?.toLowerCase() || '';
   
-  if (propertyType.includes('residential') || propertyType.includes('house') || propertyType.includes('apartment')) {
-    return markerIcons.residential;
-  } else if (propertyType.includes('commercial') || propertyType.includes('office') || propertyType.includes('shop')) {
-    return markerIcons.commercial;
+  if (propertyType.includes('apartment')) {
+    return markerPins.apartment;
+  } else if (propertyType.includes('residential') || propertyType.includes('house')) {
+    return markerPins.residential;
+  } else if (propertyType.includes('office')) {
+    return markerPins.office;
+  } else if (propertyType.includes('shop') || propertyType.includes('retail')) {
+    return markerPins.shop;
+  } else if (propertyType.includes('commercial')) {
+    return markerPins.commercial;
   } else if (propertyType.includes('land') || propertyType.includes('plot')) {
-    return markerIcons.land;
+    return markerPins.land;
   }
   
-  return markerIcons.default;
+  return markerPins.default;
 };
 
 interface MapContainerProps {
@@ -68,8 +65,10 @@ export const MapContainer: React.FC<MapContainerProps> = ({
   isLoaded
 }) => {
   const navigate = useNavigate();
-  // Use useRef instead of useState for markers to prevent re-renders
   const markersRef = useRef<google.maps.Marker[]>([]);
+  const activeMarkerRef = useRef<google.maps.Marker | null>(null);
+  const mouseIsOverInfoWindowRef = useRef<boolean>(false);
+  const infoWindowTimeoutRef = useRef<number | null>(null);
   
   // Create markers when properties and map are ready
   useEffect(() => {
@@ -84,27 +83,37 @@ export const MapContainer: React.FC<MapContainerProps> = ({
     // Create new markers
     const newMarkers = properties.map(property => {
       const position = getPropertyPosition(property, defaultCenter);
+      const markerUrl = getMarkerPin(property);
       
-      // Create marker with custom icon based on property type
+      // Create marker with colored pin
       const marker = new google.maps.Marker({
         position,
         map: mapInstance,
         title: property.title,
         icon: {
-          url: getMarkerIcon(property).url,
-          scaledSize: new google.maps.Size(
-            getMarkerIcon(property).scaledSize.width,
-            getMarkerIcon(property).scaledSize.height
-          )
+          url: markerUrl,
+          scaledSize: new google.maps.Size(32, 32)
         },
         animation: google.maps.Animation.DROP
       });
       
-      // Create info window content
+      // Create info window content with property image and details
       const content = createInfoWindowContent(property);
       
       // Add mouseover event listener to show info window
       marker.addListener('mouseover', () => {
+        if (infoWindowTimeoutRef.current) {
+          clearTimeout(infoWindowTimeoutRef.current);
+          infoWindowTimeoutRef.current = null;
+        }
+        
+        // Close any open info window first
+        infoWindow.close();
+        
+        // Set this as the active marker
+        activeMarkerRef.current = marker;
+        
+        // Set the content and open the info window
         infoWindow.setContent(content);
         infoWindow.open(mapInstance, marker);
         
@@ -112,22 +121,26 @@ export const MapContainer: React.FC<MapContainerProps> = ({
         setTimeout(() => {
           const button = document.getElementById('viewDetailsBtn');
           if (button) {
-            button.addEventListener('click', () => {
+            button.addEventListener('click', (e) => {
+              e.preventDefault();
               navigate(`/admin/properties/${property.id}`);
             });
           }
-        }, 10);
+          
+          // Setup info window event listeners
+          setupInfoWindowListeners();
+        }, 50);
       });
       
       // Add mouseout event listener to close info window
       marker.addListener('mouseout', () => {
-        // Add a small delay to allow clicking the button
-        setTimeout(() => {
-          // Only close if mouse isn't over the infowindow
-          if (!isMouseOverInfoWindow()) {
+        // Add a delay before closing to allow moving mouse to info window
+        infoWindowTimeoutRef.current = window.setTimeout(() => {
+          if (!mouseIsOverInfoWindowRef.current) {
             infoWindow.close();
+            activeMarkerRef.current = null;
           }
-        }, 200);
+        }, 300);
       });
       
       // Add click listener to navigate to property details
@@ -138,40 +151,35 @@ export const MapContainer: React.FC<MapContainerProps> = ({
       return marker;
     });
     
-    // Store markers in ref instead of state
+    // Store markers in ref
     markersRef.current = newMarkers;
     
-    // Function to check if mouse is over info window
-    function isMouseOverInfoWindow() {
+    // Setup event listeners for info window to prevent closing when mouse is over it
+    const setupInfoWindowListeners = () => {
       const infoWindowElement = document.querySelector('.gm-style-iw-a');
-      if (!infoWindowElement) return false;
+      if (!infoWindowElement) return;
       
-      const rect = infoWindowElement.getBoundingClientRect();
-      const mouseX = event?.clientX || 0;
-      const mouseY = event?.clientY || 0;
+      // Mouse enters info window
+      infoWindowElement.addEventListener('mouseenter', () => {
+        mouseIsOverInfoWindowRef.current = true;
+        if (infoWindowTimeoutRef.current) {
+          clearTimeout(infoWindowTimeoutRef.current);
+          infoWindowTimeoutRef.current = null;
+        }
+      });
       
-      return (
-        mouseX >= rect.left &&
-        mouseX <= rect.right &&
-        mouseY >= rect.top &&
-        mouseY <= rect.bottom
-      );
-    }
-    
-    // Add listener to info window container to prevent closing on mouseout
-    setTimeout(() => {
-      const infoWindowElement = document.querySelector('.gm-style-iw-a');
-      if (infoWindowElement) {
-        infoWindowElement.addEventListener('mouseenter', () => {
-          // Keep info window open while mouse is over it
-          clearTimeout(infoWindow.timeout);
-        });
-        
-        infoWindowElement.addEventListener('mouseleave', () => {
-          infoWindow.close();
-        });
-      }
-    }, 100);
+      // Mouse leaves info window
+      infoWindowElement.addEventListener('mouseleave', () => {
+        mouseIsOverInfoWindowRef.current = false;
+        // Close the info window after a short delay
+        infoWindowTimeoutRef.current = window.setTimeout(() => {
+          if (activeMarkerRef.current) {
+            infoWindow.close();
+            activeMarkerRef.current = null;
+          }
+        }, 100);
+      });
+    };
     
     // Fit map to show all markers
     if (newMarkers.length > 0) {
@@ -193,8 +201,15 @@ export const MapContainer: React.FC<MapContainerProps> = ({
     // Cleanup function
     return () => {
       // Cleanup markers when component unmounts or properties change
-      markersRef.current.forEach(marker => marker.setMap(null));
+      markersRef.current.forEach(marker => {
+        marker.setMap(null);
+      });
       markersRef.current = [];
+      
+      // Clear any pending timeouts
+      if (infoWindowTimeoutRef.current) {
+        clearTimeout(infoWindowTimeoutRef.current);
+      }
     };
   }, [isLoaded, mapInstance, infoWindow, properties, navigate]);
 
@@ -209,7 +224,6 @@ export const MapContainer: React.FC<MapContainerProps> = ({
           fullscreenControl: true,
           mapTypeControl: true,
           streetViewControl: false,
-          // Only hide POI labels, not the map itself
           styles: [
             {
               featureType: "poi",

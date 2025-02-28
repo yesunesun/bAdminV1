@@ -1,7 +1,7 @@
 // src/modules/admin/pages/PropertyMapView/index.tsx
-// Version: 2.0.0
-// Last Modified: 01-03-2025 12:05 IST
-// Purpose: Refactored Property Map View into modular components with hooks and services
+// Version: 2.1.0
+// Last Modified: 01-03-2025 17:00 IST
+// Purpose: Added MapLegend component and fixed map container positioning for legend display
 
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -70,7 +70,7 @@ export default function PropertyMapView() {
           <MapControls onRefresh={refresh} />
         </div>
 
-        <div className="px-4 sm:px-0">
+        <div className="px-4 sm:px-0 relative">
           <MapContainer
             properties={properties}
             mapInstance={mapInstance}
