@@ -1,7 +1,7 @@
 // src/lib/supabase.ts
-// Version: 2.1.1
-// Last Modified: 26-02-2025 18:30 IST
-// Purpose: Supabase client configuration with admin operations support
+// Version: 2.2.0
+// Last Modified: 01-03-2025 15:30 IST
+// Purpose: Updated Supabase client configuration to fix 406 errors
 
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './database.types';
@@ -59,6 +59,11 @@ const supabaseOptions = {
   global: {
     headers: {
       'x-client-info': 'bhoomitalli-web-client',
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'Cache-Control': 'no-cache',
+      'Pragma': 'no-cache',
+      'Expires': '0',
     },
   },
   db: {

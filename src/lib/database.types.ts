@@ -1,6 +1,7 @@
 // src/lib/database.types.ts
-// Version: 1.1.0
-// Last Modified: 12-02-2025 17:15 IST
+// Version: 1.2.0
+// Last Modified: 01-03-2025 14:30 IST
+// Purpose: Added property_likes table definition
 
 export interface Database {
   public: {
@@ -81,6 +82,26 @@ export interface Database {
           id?: string;
           property_id?: string;
           url?: string;
+          created_at?: string;
+        };
+      };
+      property_likes: {
+        Row: {
+          id: string;
+          property_id: string;
+          user_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          property_id: string;
+          user_id: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          property_id?: string;
+          user_id?: string;
           created_at?: string;
         };
       };
