@@ -1,14 +1,14 @@
 // src/modules/seeker/components/PropertyCard.tsx
-// Version: 1.2.0
-// Last Modified: 27-02-2025 13:30 IST
-// Purpose: Improved card component with fixed favorite functionality
+// Version: 2.0.0
+// Last Modified: 01-03-2025 12:15 IST
+// Purpose: Modernized property card with enhanced visual design and improved UX
 
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { PropertyType } from '@/modules/owner/components/property/types';
 import { formatCurrency } from '@/lib/utils';
-import { Card, CardContent } from '@/components/ui/card';
-import { MapPinIcon, BedIcon, BathIcon, SquareIcon } from 'lucide-react';
+import { Card } from '@/components/ui/card';
+import { MapPinIcon, BedIcon, BathIcon, SquareIcon, HomeIcon } from 'lucide-react';
 import FavoriteButton from './FavoriteButton';
 
 interface PropertyCardProps {
@@ -24,17 +24,19 @@ const PropertyCard: React.FC<PropertyCardProps> = ({ property, isLiked = false, 
   
   const imageSrc = primaryImage?.url || '/placeholder-property.jpg';
 
-  // Removed handleLikeClick as it's now handled in the FavoriteButton component
-
   return (
-    <Card className="overflow-hidden transition-all duration-300 hover:shadow-lg h-full flex flex-col">
+    <Card className="overflow-hidden group h-full flex flex-col transition-all duration-300 hover:shadow-xl hover:translate-y-[-4px] border-none">
       <div className="relative">
-        <Link to={`/seeker/property/${property.id}`} className="block relative h-56 overflow-hidden">
+        <Link to={`/seeker/property/${property.id}`} className="block relative h-60 overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-b from-black/0 via-black/0 to-black/30 z-10" />
           <img 
             src={imageSrc} 
             alt={property.title} 
-            className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
           />
+          <div className="absolute bottom-3 left-3 z-20 bg-white/90 backdrop-blur-sm rounded-full px-3 py-1 text-xs font-medium text-primary shadow-sm">
+            {property.property_details?.propertyType || 'Property'}
+          </div>
         </Link>
         <FavoriteButton 
           initialIsLiked={isLiked}
@@ -43,53 +45,71 @@ const PropertyCard: React.FC<PropertyCardProps> = ({ property, isLiked = false, 
               onLike(property);
             }
           }}
-          className="absolute top-3 right-3 z-20"
+          className="absolute top-3 right-3 z-20 scale-110"
         />
       </div>
 
-      <CardContent className="flex-grow p-5">
-        <Link to={`/seeker/property/${property.id}`} className="block">
-          <h3 className="text-lg font-semibold hover:text-primary transition-colors">
-            {property.title}
-          </h3>
-        </Link>
+      <div className="flex-grow p-5 flex flex-col">
+        <div className="mb-auto">
+          <Link to={`/seeker/property/${property.id}`} className="block">
+            <h3 className="text-lg font-semibold line-clamp-2 group-hover:text-primary transition-colors">
+              {property.title}
+            </h3>
+          </Link>
         
-        <p className="text-2xl font-bold mt-3 text-primary">
-          ₹{formatCurrency(property.price)}
-        </p>
+          <div className="flex items-center mt-2.5 text-muted-foreground">
+            <MapPinIcon className="h-3.5 w-3.5 min-w-3.5 mr-1.5" />
+            <p className="text-sm line-clamp-1">
+              {[property.address, property.city, property.state]
+                .filter(Boolean)
+                .join(', ')}
+            </p>
+          </div>
+        </div>
         
-        <div className="flex items-center mt-3 text-muted-foreground">
-          <MapPinIcon className="h-4 w-4 min-w-4 mr-2" />
-          <p className="text-sm line-clamp-1">
-            {[property.address, property.city, property.state]
-              .filter(Boolean)
-              .join(', ')}
+        <div className="mt-4 flex justify-between items-center">
+          <div className="flex gap-2 flex-wrap">
+            {property.bedrooms && (
+              <div className="flex items-center gap-1.5 text-sm">
+                <BedIcon className="h-3.5 w-3.5 text-primary" />
+                <span className="font-medium">{property.bedrooms} Bed</span>
+              </div>
+            )}
+            
+            {property.bathrooms && (
+              <div className="flex items-center gap-1.5 text-sm ml-2">
+                <BathIcon className="h-3.5 w-3.5 text-primary" />
+                <span className="font-medium">{property.bathrooms} Bath</span>
+              </div>
+            )}
+            
+            {property.square_feet && (
+              <div className="flex items-center gap-1.5 text-sm ml-2">
+                <SquareIcon className="h-3.5 w-3.5 text-primary" />
+                <span className="font-medium">{property.square_feet} sqft</span>
+              </div>
+            )}
+          </div>
+        </div>
+        
+        <div className="mt-4 pt-4 border-t border-border/40 flex items-center justify-between">
+          <p className="text-xl font-bold text-primary flex items-center">
+            ₹{formatCurrency(property.price)}
+            {property.property_details?.rentalFrequency && (
+              <span className="text-xs font-normal text-muted-foreground ml-1">
+                /{property.property_details.rentalFrequency}
+              </span>
+            )}
           </p>
-        </div>
-        
-        <div className="flex items-center justify-between mt-4 gap-2">
-          {property.bedrooms && (
-            <div className="flex items-center gap-1.5 bg-muted/40 px-3 py-1.5 rounded-md">
-              <BedIcon className="h-4 w-4 text-primary" />
-              <span className="text-sm font-medium">{property.bedrooms}</span>
-            </div>
-          )}
           
-          {property.bathrooms && (
-            <div className="flex items-center gap-1.5 bg-muted/40 px-3 py-1.5 rounded-md">
-              <BathIcon className="h-4 w-4 text-primary" />
-              <span className="text-sm font-medium">{property.bathrooms}</span>
-            </div>
-          )}
-          
-          {property.square_feet && (
-            <div className="flex items-center gap-1.5 bg-muted/40 px-3 py-1.5 rounded-md">
-              <SquareIcon className="h-4 w-4 text-primary" />
-              <span className="text-sm font-medium">{property.square_feet}</span>
-            </div>
-          )}
+          <Link 
+            to={`/seeker/property/${property.id}`} 
+            className="text-xs font-medium bg-primary/10 text-primary px-3 py-1.5 rounded-full hover:bg-primary/20 transition-colors"
+          >
+            View Details
+          </Link>
         </div>
-      </CardContent>
+      </div>
     </Card>
   );
 };

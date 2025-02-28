@@ -1,9 +1,10 @@
 // src/modules/seeker/components/FavoriteButton.tsx
-// Version: 1.1.0
-// Last Modified: 27-02-2025 14:30 IST
-// Purpose: Fixed favorite button component with properly displayed heart icon
+// Version: 2.0.0
+// Last Modified: 01-03-2025 12:20 IST
+// Purpose: Modernized favorite button with animated heart icon and improved interaction
 
 import React, { useState } from 'react';
+import { Heart } from 'lucide-react';
 
 interface FavoriteButtonProps {
   initialIsLiked: boolean;
@@ -30,21 +31,14 @@ const FavoriteButton: React.FC<FavoriteButtonProps> = ({
   return (
     <button
       onClick={handleClick}
-      className={`flex items-center justify-center w-8 h-8 rounded-full bg-white shadow-sm hover:bg-opacity-100 transition-colors ${className}`}
-      style={{ backgroundColor: 'rgba(255, 255, 255, 0.9)' }}
+      className={`flex items-center justify-center w-9 h-9 rounded-full bg-white/90 backdrop-blur-sm shadow-md hover:shadow-lg transition-all duration-300 ${
+        isLiked ? 'hover:bg-pink-50' : 'hover:bg-primary/5'
+      } ${className}`}
       aria-label={isLiked ? "Remove from favorites" : "Add to favorites"}
     >
-      {isLiked ? (
-        // Using a custom approach for the filled heart to prevent cutoff
-        <div className="text-[#ff3b81]">
-          ♥
-        </div>
-      ) : (
-        // Simple outline heart
-        <div className="text-gray-500">
-          ♡
-        </div>
-      )}
+      <Heart 
+        className={`w-5 h-5 ${isLiked ? 'fill-rose-500 text-rose-500' : 'fill-transparent text-gray-500 hover:text-primary'} transition-all duration-300 ${isLiked ? 'scale-110' : 'scale-100'}`}
+      />
     </button>
   );
 };

@@ -1,14 +1,20 @@
 // src/modules/seeker/pages/PropertyDetailPage.tsx
-// Version: 1.0.0
-// Last Modified: 26-02-2025 16:00 IST
-// Purpose: Page component for property details
+// Version: 2.0.0
+// Last Modified: 01-03-2025 14:00 IST
+// Purpose: Modernized page component for property details
 
 import React from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { usePropertyDetails } from '../hooks/usePropertyDetails';
 import PropertyDetails from '../components/PropertyDetails';
 import { Button } from '@/components/ui/button';
-import { ChevronLeftIcon, HomeIcon, ArrowLeftIcon } from 'lucide-react';
+import { 
+  ChevronLeftIcon, 
+  HomeIcon, 
+  ArrowLeftIcon, 
+  Share2Icon,
+  PrinterIcon
+} from 'lucide-react';
 
 const PropertyDetailPage: React.FC = () => {
   const navigate = useNavigate();
@@ -20,15 +26,37 @@ const PropertyDetailPage: React.FC = () => {
     navigate(-1);
   };
 
+  // Handle share
+  const handleShare = () => {
+    if (navigator.share) {
+      navigator.share({
+        title: property?.title || 'Check out this property',
+        url: window.location.href
+      }).catch(() => {
+        navigator.clipboard.writeText(window.location.href);
+      });
+    } else {
+      navigator.clipboard.writeText(window.location.href);
+    }
+  };
+
+  // Handle print
+  const handlePrint = () => {
+    window.print();
+  };
+
   if (error) {
     return (
-      <div className="container mx-auto py-12 px-4 text-center">
-        <div className="max-w-lg mx-auto">
-          <h2 className="text-2xl font-bold mb-4">Property Not Found</h2>
+      <div className="min-h-[80vh] container mx-auto py-16 px-4 flex items-center justify-center">
+        <div className="max-w-lg mx-auto bg-background rounded-xl shadow-lg p-8 text-center border border-border/50">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-destructive/10 flex items-center justify-center">
+            <ArrowLeftIcon className="h-8 w-8 text-destructive" />
+          </div>
+          <h2 className="text-2xl font-bold mb-3">Property Not Found</h2>
           <p className="text-muted-foreground mb-6">
             We couldn't find the property you're looking for. It may have been removed or the URL might be incorrect.
           </p>
-          <Button onClick={handleBack}>
+          <Button size="lg" onClick={handleBack}>
             <ArrowLeftIcon className="h-4 w-4 mr-2" />
             Go Back
           </Button>
@@ -39,36 +67,61 @@ const PropertyDetailPage: React.FC = () => {
 
   return (
     <div className="container mx-auto py-8 px-4">
-      {/* Breadcrumbs */}
-      <div className="flex flex-wrap items-center mb-6 text-sm">
-        <Link to="/" className="text-muted-foreground hover:text-foreground flex items-center">
-          <HomeIcon className="h-4 w-4 mr-1" />
-          <span>Home</span>
-        </Link>
-        <span className="mx-2 text-muted-foreground">/</span>
-        <Link to="/seeker" className="text-muted-foreground hover:text-foreground">
-          Properties
-        </Link>
-        {property && (
-          <>
-            <span className="mx-2 text-muted-foreground">/</span>
-            <span className="text-foreground truncate max-w-[200px]">
-              {property.title}
-            </span>
-          </>
-        )}
-      </div>
+      {/* Navigation bar with breadcrumbs and actions */}
+      <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-sm py-3 px-4 rounded-lg mb-6 flex flex-wrap justify-between items-center border border-border/30 shadow-sm">
+        {/* Left side: Breadcrumbs */}
+        <div className="flex items-center text-sm overflow-hidden">
+          <Link to="/" className="text-muted-foreground hover:text-foreground flex items-center min-w-fit">
+            <HomeIcon className="h-4 w-4 mr-1" />
+            <span>Home</span>
+          </Link>
+          <span className="mx-2 text-muted-foreground">/</span>
+          <Link to="/seeker" className="text-muted-foreground hover:text-foreground min-w-fit">
+            Properties
+          </Link>
+          {property && (
+            <>
+              <span className="mx-2 text-muted-foreground">/</span>
+              <span className="text-foreground font-medium truncate max-w-[150px] sm:max-w-[250px]">
+                {property.title}
+              </span>
+            </>
+          )}
+        </div>
 
-      {/* Back button */}
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={handleBack}
-        className="mb-6"
-      >
-        <ChevronLeftIcon className="h-4 w-4 mr-2" />
-        Back to Search
-      </Button>
+        {/* Right side: Actions */}
+        <div className="flex items-center gap-2 ml-auto mt-2 sm:mt-0">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleBack}
+            className="text-xs"
+          >
+            <ChevronLeftIcon className="h-3.5 w-3.5 mr-1" />
+            Back
+          </Button>
+          
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleShare}
+            className="text-xs"
+          >
+            <Share2Icon className="h-3.5 w-3.5 mr-1" />
+            Share
+          </Button>
+          
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handlePrint}
+            className="text-xs"
+          >
+            <PrinterIcon className="h-3.5 w-3.5 mr-1" />
+            Print
+          </Button>
+        </div>
+      </div>
 
       {/* Property details */}
       <PropertyDetails
