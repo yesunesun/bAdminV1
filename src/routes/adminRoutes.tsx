@@ -1,7 +1,7 @@
 // src/routes/adminRoutes.tsx
-// Version: 3.2.0
-// Last Modified: 27-02-2025 14:15 IST
-// Purpose: Updated admin routes with fixed forgot password route
+// Version: 3.4.0
+// Last Modified: 01-03-2025 13:30 IST
+// Purpose: Updated property map view import to use new folder structure
 
 import { Suspense } from 'react';
 import { Navigate, Routes, Route } from 'react-router-dom';
@@ -15,6 +15,9 @@ import AdminSetup from '@/pages/AdminSetup';
 import UsersList from '@/modules/admin/components/UsersList';
 import { AdminLayout } from '@/modules/admin/components/AdminLayout';
 import AdminDebugPage from '@/pages/AdminDebugPage';
+import PropertyListView from '@/modules/admin/pages/PropertyListView';
+// Update import path to use the new folder structure for PropertyMapView
+import PropertyMapView from '@/modules/admin/pages/PropertyMapView/index';
 
 // Loading fallback component
 const LoadingFallback = () => (
@@ -105,6 +108,30 @@ export const adminRoutes = [
       <AdminWrapper>
         <AdminLayout>
           <UsersList />
+        </AdminLayout>
+      </AdminWrapper>
+    ),
+    errorElement: <ErrorFallback />
+  },
+  // Properties list route - explicitly defined with layout
+  {
+    path: '/admin/properties',
+    element: (
+      <AdminWrapper>
+        <AdminLayout>
+          <PropertyListView />
+        </AdminLayout>
+      </AdminWrapper>
+    ),
+    errorElement: <ErrorFallback />
+  },
+  // Property map view route - explicitly defined with layout
+  {
+    path: '/admin/property-map',
+    element: (
+      <AdminWrapper>
+        <AdminLayout>
+          <PropertyMapView />
         </AdminLayout>
       </AdminWrapper>
     ),

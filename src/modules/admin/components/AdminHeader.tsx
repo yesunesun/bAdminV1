@@ -1,10 +1,11 @@
 // src/modules/admin/components/AdminHeader.tsx
-// Version: 1.2.0
-// Last Modified: 21-02-2025 20:30 IST
+// Version: 1.4.0
+// Last Modified: 29-02-2025 10:15 IST
+// Purpose: Fixed Map View navigation with direct window location change
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LogOut, LayoutDashboard, Users, ChevronDown } from 'lucide-react';
+import { LogOut, LayoutDashboard, Users, ChevronDown, Map } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 
@@ -17,6 +18,10 @@ export function AdminHeader() {
 
   // Error boundary state
   const [error, setError] = useState<Error | null>(null);
+
+  useEffect(() => {
+    console.log('Current location pathname:', location.pathname);
+  }, [location]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -40,6 +45,12 @@ export function AdminHeader() {
       console.error('Error signing out:', error);
       setError(error instanceof Error ? error : new Error('Failed to sign out'));
     }
+  };
+
+  // Handle map view click using window.location for a hard navigation
+  const handleMapViewClick = () => {
+    // Using window.location for a hard navigation to ensure it works
+    window.location.href = '/admin/property-map';
   };
 
   if (error) {
@@ -142,6 +153,21 @@ export function AdminHeader() {
               <Users className="h-4 w-4 mr-2" />
               Users
             </Link>
+
+            {/* Using basic button with window.location.href for most direct approach */}
+            <button
+              onClick={handleMapViewClick}
+              type="button"
+              className={cn(
+                "inline-flex items-center px-1 py-1 text-sm font-medium border-b-2 transition-colors",
+                location.pathname === '/admin/property-map'
+                  ? "border-indigo-500 text-indigo-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+              )}
+            >
+              <Map className="h-4 w-4 mr-2" />
+              Map View
+            </button>
           </div>
         </div>
       </div>
