@@ -1,13 +1,14 @@
 // src/modules/seeker/components/PropertyDetails/index.tsx
-// Version: 2.0.0
-// Last Modified: 29-02-2025 16:30 IST
-// Purpose: Enhanced property details container with improved layout and features
+// Version: 2.1.0
+// Last Modified: 01-03-2025 20:30 IST
+// Purpose: Property details page with Google Maps integration
 
 import React from 'react';
 import PropertyGallery from './PropertyGallery';
 import PropertyInfo from './PropertyInfo';
 import PropertyActions from './PropertyActions';
 import OwnerContact from './OwnerContact';
+import PropertyLocationMap from './PropertyLocationMap';
 import { Card, CardContent } from '@/components/ui/card';
 import { PropertyType } from '@/modules/owner/components/property/types';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -42,6 +43,16 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
     );
   }
 
+  // Extract location details for the map
+  const mapProps = {
+    address: property.address || '',
+    city: property.city || '',
+    state: property.state || '',
+    zipCode: property.zip_code || '',
+    // Use coordinates from property_details if available
+    coordinates: property.property_details?.coordinates || undefined
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -61,6 +72,9 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
               />
             </CardContent>
           </Card>
+          
+          {/* Property Location Map */}
+          <PropertyLocationMap {...mapProps} />
           
           {/* Property Information */}
           <Card>
@@ -84,7 +98,7 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
   );
 };
 
-// Loading skeleton component remains unchanged
+// Loading skeleton component
 const PropertyDetailsSkeleton: React.FC = () => {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -98,6 +112,17 @@ const PropertyDetailsSkeleton: React.FC = () => {
                 <Skeleton className="h-10 w-24" />
                 <Skeleton className="h-10 w-24" />
                 <Skeleton className="h-10 w-24" />
+              </div>
+            </CardContent>
+          </Card>
+          
+          {/* Map Skeleton */}
+          <Card>
+            <CardContent className="p-6">
+              <Skeleton className="h-8 w-48 mb-4" />
+              <Skeleton className="w-full h-80 rounded-md" />
+              <div className="flex gap-2 mt-4">
+                <Skeleton className="h-10 flex-1" />
               </div>
             </CardContent>
           </Card>
