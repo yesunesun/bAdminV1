@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyDetails/PropertyInfo.tsx
-// Version: 1.0.0
-// Last Modified: 26-02-2025 15:35 IST
-// Purpose: Display detailed property information
+// Version: 2.0.0
+// Last Modified: 01-03-2025 11:15 IST
+// Purpose: Enhanced property info with Google Maps integration and additional details
 
 import React from 'react';
 import { formatCurrency } from '@/lib/utils';
@@ -11,10 +11,15 @@ import {
   BathIcon, 
   SquareIcon, 
   TagIcon, 
-  CalendarIcon 
+  CalendarIcon,
+  HomeIcon,
+  CompassIcon,
+  ClockIcon,
+  CheckSquareIcon
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { PropertyType } from '@/modules/owner/components/property/types';
+import { Button } from '@/components/ui/button';
 
 interface PropertyInfoProps {
   property: PropertyType;
@@ -32,6 +37,30 @@ const PropertyInfo: React.FC<PropertyInfoProps> = ({ property }) => {
       month: '2-digit',
       year: 'numeric'
     });
+  };
+  
+  // Generate Google Maps URL for the address
+  const getGoogleMapsUrl = () => {
+    const address = [
+      property.address,
+      property.city,
+      property.state,
+      property.zip_code
+    ].filter(Boolean).join(', ');
+    
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+  };
+  
+  // Generate Google Maps directions URL
+  const getDirectionsUrl = () => {
+    const destination = [
+      property.address,
+      property.city,
+      property.state,
+      property.zip_code
+    ].filter(Boolean).join(', ');
+    
+    return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}`;
   };
 
   return (
@@ -52,6 +81,9 @@ const PropertyInfo: React.FC<PropertyInfoProps> = ({ property }) => {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="text-3xl md:text-4xl font-bold text-primary">
           ₹{formatCurrency(property.price)}
+          {propertyDetails.rentNegotiable && (
+            <Badge className="ml-2 bg-success/10 text-success border-success/20">Negotiable</Badge>
+          )}
         </div>
         
         <div className="flex flex-wrap gap-2">
@@ -108,6 +140,72 @@ const PropertyInfo: React.FC<PropertyInfoProps> = ({ property }) => {
           {property.description || 'No description provided.'}
         </div>
       </div>
+      
+      {/* Property Specifications */}
+      <div className="bg-muted/30 p-4 rounded-lg">
+        <h2 className="text-xl font-semibold mb-3">Property Specifications</h2>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-y-4 gap-x-6">
+          {propertyDetails.propertyAge && (
+            <div className="flex items-center">
+              <ClockIcon className="h-5 w-5 text-muted-foreground mr-2" />
+              <div>
+                <div className="text-sm text-muted-foreground">Property Age</div>
+                <div className="font-medium">{propertyDetails.propertyAge}</div>
+              </div>
+            </div>
+          )}
+          
+          {propertyDetails.floor && (
+            <div className="flex items-center">
+              <HomeIcon className="h-5 w-5 text-muted-foreground mr-2" />
+              <div>
+                <div className="text-sm text-muted-foreground">Floor</div>
+                <div className="font-medium">{propertyDetails.floor}</div>
+              </div>
+            </div>
+          )}
+          
+          {propertyDetails.totalFloors && (
+            <div className="flex items-center">
+              <HomeIcon className="h-5 w-5 text-muted-foreground mr-2" />
+              <div>
+                <div className="text-sm text-muted-foreground">Total Floors</div>
+                <div className="font-medium">{propertyDetails.totalFloors}</div>
+              </div>
+            </div>
+          )}
+          
+          {propertyDetails.facing && (
+            <div className="flex items-center">
+              <CompassIcon className="h-5 w-5 text-muted-foreground mr-2" />
+              <div>
+                <div className="text-sm text-muted-foreground">Facing</div>
+                <div className="font-medium">{propertyDetails.facing}</div>
+              </div>
+            </div>
+          )}
+          
+          {propertyDetails.furnishing && (
+            <div className="flex items-center">
+              <HomeIcon className="h-5 w-5 text-muted-foreground mr-2" />
+              <div>
+                <div className="text-sm text-muted-foreground">Furnishing</div>
+                <div className="font-medium">{propertyDetails.furnishing}</div>
+              </div>
+            </div>
+          )}
+          
+          {propertyDetails.availableFrom && (
+            <div className="flex items-center">
+              <CalendarIcon className="h-5 w-5 text-muted-foreground mr-2" />
+              <div>
+                <div className="text-sm text-muted-foreground">Available From</div>
+                <div className="font-medium">{propertyDetails.availableFrom}</div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
 
       {amenities.length > 0 && (
         <div>
@@ -115,7 +213,7 @@ const PropertyInfo: React.FC<PropertyInfoProps> = ({ property }) => {
           <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
             {amenities.map((amenity, index) => (
               <div key={index} className="flex items-center">
-                <div className="h-2 w-2 bg-primary rounded-full mr-2"></div>
+                <CheckSquareIcon className="h-4 w-4 text-primary mr-2" />
                 <span>{amenity}</span>
               </div>
             ))}
@@ -136,6 +234,44 @@ const PropertyInfo: React.FC<PropertyInfoProps> = ({ property }) => {
           </div>
         </div>
       )}
+      
+      {/* Google Maps Integration */}
+      <div>
+        <h2 className="text-xl font-semibold mb-3">Location</h2>
+        <div className="rounded-lg overflow-hidden border border-border mb-3">
+          <iframe
+            title="Property Location"
+            width="100%"
+            height="300"
+            frameBorder="0"
+            style={{ border: 0 }}
+            src={`https://www.google.com/maps/embed/v1/place?key=YOUR_API_KEY&q=${encodeURIComponent(
+              [property.address, property.city, property.state, property.zip_code].filter(Boolean).join(', ')
+            )}`}
+            allowFullScreen
+          ></iframe>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <a 
+            href={getGoogleMapsUrl()} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
+          >
+            <MapPinIcon className="h-4 w-4 mr-1.5" />
+            View on Google Maps
+          </a>
+          <a 
+            href={getDirectionsUrl()} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="inline-flex items-center px-4 py-2 bg-secondary text-secondary-foreground rounded-lg text-sm font-medium hover:bg-secondary/90 transition-colors"
+          >
+            <MapPinIcon className="h-4 w-4 mr-1.5" />
+            Get Directions
+          </a>
+        </div>
+      </div>
     </div>
   );
 };

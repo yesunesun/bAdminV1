@@ -1,12 +1,26 @@
 // src/modules/owner/pages/PropertyDetails.tsx
-// Version: 2.1.0
-// Last Modified: 26-02-2025 19:30 IST
-// Purpose: Property details page for viewing a single property
+// Version: 3.0.0
+// Last Modified: 01-03-2025 14:45 IST
+// Purpose: Enhanced property details page with Google Maps and complete property information
 
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { Home, IndianRupee, Ruler, Bath, BedDouble, MapPin, Pencil, Trash2 } from 'lucide-react';
+import {
+  Home,
+  IndianRupee,
+  Ruler,
+  Bath,
+  BedDouble,
+  MapPin,
+  Pencil,
+  Trash2,
+  Calendar,
+  Compass,
+  Clock,
+  Check,
+  Building
+} from 'lucide-react';
 import { propertyService } from '../services/propertyService';
 import { Property } from '../components/property/PropertyFormTypes';
 import ImageGallery from '../components/property/ImageGallery';
@@ -35,7 +49,6 @@ export default function PropertyDetails() {
         const data = await propertyService.getPropertyById(id);
         setProperty(data);
         console.log('Fetched property data:', data);
-        console.log('Property images:', data.images);
       } catch (err) {
         console.error('Error fetching property:', err);
         setError(err instanceof Error ? err.message : 'Failed to load property');
@@ -58,6 +71,34 @@ export default function PropertyDetails() {
     }
   };
 
+  // Generate Google Maps URL for the address
+  const getGoogleMapsUrl = () => {
+    if (!property) return '';
+
+    const address = [
+      property.address,
+      property.city,
+      property.state,
+      property.zip_code
+    ].filter(Boolean).join(', ');
+
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+  };
+
+  // Generate Google Maps directions URL
+  const getDirectionsUrl = () => {
+    if (!property) return '';
+
+    const destination = [
+      property.address,
+      property.city,
+      property.state,
+      property.zip_code
+    ].filter(Boolean).join(', ');
+
+    return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}`;
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-[50vh]">
@@ -78,11 +119,13 @@ export default function PropertyDetails() {
   }
 
   const isOwner = user?.id === property.owner_id;
-  
+
   // Prepare images for the gallery
   const galleryImages = property.images || [];
-  
-  console.log('Gallery images:', galleryImages);
+
+  // Get property details
+  const propertyDetails = property.property_details || {};
+  const amenities = propertyDetails.amenities || [];
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -108,6 +151,11 @@ export default function PropertyDetails() {
                 <span className="ml-1 text-xl font-bold text-green-800">
                   {formatIndianPrice(property.price)}
                 </span>
+                {propertyDetails.rentNegotiable && (
+                  <span className="ml-2 text-sm bg-green-200 text-green-800 px-2 py-1 rounded-full">
+                    Negotiable
+                  </span>
+                )}
               </div>
             </div>
             {isOwner && (
@@ -115,12 +163,14 @@ export default function PropertyDetails() {
                 <button
                   onClick={() => navigate(`/properties/${property.id}/edit`)}
                   className="p-2 text-white bg-indigo-600 rounded-full hover:bg-indigo-700"
+                  aria-label="Edit property"
                 >
                   <Pencil className="h-5 w-5" />
                 </button>
                 <button
                   onClick={() => setShowDeleteModal(true)}
                   className="p-2 text-white bg-red-600 rounded-full hover:bg-red-700"
+                  aria-label="Delete property"
                 >
                   <Trash2 className="h-5 w-5" />
                 </button>
@@ -131,34 +181,164 @@ export default function PropertyDetails() {
           <div className="mt-4 flex items-center text-gray-600">
             <MapPin className="h-5 w-5" />
             <span className="ml-2">
-              {property.address}, {property.city}, {property.state}
+              {property.address}, {property.city}, {property.state} {property.zip_code}
             </span>
           </div>
 
-          <div className="mt-6 grid grid-cols-3 gap-6">
+          {/* Key Property Features */}
+          <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-6 p-4 bg-gray-50 rounded-lg">
             <div className="flex items-center">
-              <BedDouble className="h-6 w-6 text-gray-400" />
-              <span className="ml-2 text-lg text-gray-900">
-                {property.property_details.bhkType} 
-              </span>
+              <Building className="h-6 w-6 text-indigo-500" />
+              <div className="ml-2">
+                <div className="text-sm text-gray-500">Property Type</div>
+                <div className="font-medium">{propertyDetails.propertyType || "-"}</div>
+              </div>
             </div>
             <div className="flex items-center">
-              <Bath className="h-6 w-6 text-gray-400" />
-              <span className="ml-2 text-lg text-gray-900">
-                {property.property_details.bathrooms} {Number(property.property_details.bathrooms) === 1 ? 'Bathroom' : 'Bathrooms'}
-              </span>
+              <BedDouble className="h-6 w-6 text-indigo-500" />
+              <div className="ml-2">
+                <div className="text-sm text-gray-500">Bedrooms</div>
+                <div className="font-medium">{propertyDetails.bhkType || "-"}</div>
+              </div>
             </div>
             <div className="flex items-center">
-              <Ruler className="h-6 w-6 text-gray-400" />
-              <span className="ml-2 text-lg text-gray-900">
-                {property.property_details.builtUpArea} sq ft
-              </span>
+              <Bath className="h-6 w-6 text-indigo-500" />
+              <div className="ml-2">
+                <div className="text-sm text-gray-500">Bathrooms</div>
+                <div className="font-medium">{propertyDetails.bathrooms || "-"}</div>
+              </div>
+            </div>
+            <div className="flex items-center">
+              <Ruler className="h-6 w-6 text-indigo-500" />
+              <div className="ml-2">
+                <div className="text-sm text-gray-500">Area</div>
+                <div className="font-medium">{propertyDetails.builtUpArea || property.square_feet || "-"} sq ft</div>
+              </div>
             </div>
           </div>
 
+          {/* Description */}
           <div className="mt-8">
             <h2 className="text-xl font-semibold text-gray-900">Description</h2>
-            <p className="mt-4 text-gray-600 whitespace-pre-line">{property.property_details.description}</p>
+            <p className="mt-4 text-gray-600 whitespace-pre-line">{propertyDetails.description || property.description || "No description provided."}</p>
+          </div>
+
+          {/* Property Specifications */}
+          <div className="mt-8">
+            <h2 className="text-xl font-semibold text-gray-900">Property Specifications</h2>
+            <div className="mt-4 grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-4">
+              {propertyDetails.propertyAge && (
+                <div className="flex items-start">
+                  <Clock className="h-5 w-5 text-gray-400 mt-0.5" />
+                  <div className="ml-2">
+                    <div className="text-sm text-gray-500">Property Age</div>
+                    <div className="font-medium">{propertyDetails.propertyAge}</div>
+                  </div>
+                </div>
+              )}
+
+              {propertyDetails.floor !== undefined && (
+                <div className="flex items-start">
+                  <Building className="h-5 w-5 text-gray-400 mt-0.5" />
+                  <div className="ml-2">
+                    <div className="text-sm text-gray-500">Floor</div>
+                    <div className="font-medium">{propertyDetails.floor}</div>
+                  </div>
+                </div>
+              )}
+
+              {propertyDetails.totalFloors && (
+                <div className="flex items-start">
+                  <Building className="h-5 w-5 text-gray-400 mt-0.5" />
+                  <div className="ml-2">
+                    <div className="text-sm text-gray-500">Total Floors</div>
+                    <div className="font-medium">{propertyDetails.totalFloors}</div>
+                  </div>
+                </div>
+              )}
+
+              {propertyDetails.facing && (
+                <div className="flex items-start">
+                  <Compass className="h-5 w-5 text-gray-400 mt-0.5" />
+                  <div className="ml-2">
+                    <div className="text-sm text-gray-500">Facing</div>
+                    <div className="font-medium">{propertyDetails.facing}</div>
+                  </div>
+                </div>
+              )}
+
+              {propertyDetails.furnishing && (
+                <div className="flex items-start">
+                  <Home className="h-5 w-5 text-gray-400 mt-0.5" />
+                  <div className="ml-2">
+                    <div className="text-sm text-gray-500">Furnishing</div>
+                    <div className="font-medium">{propertyDetails.furnishing}</div>
+                  </div>
+                </div>
+              )}
+
+              {propertyDetails.availableFrom && (
+                <div className="flex items-start">
+                  <Calendar className="h-5 w-5 text-gray-400 mt-0.5" />
+                  <div className="ml-2">
+                    <div className="text-sm text-gray-500">Available From</div>
+                    <div className="font-medium">{propertyDetails.availableFrom}</div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Amenities */}
+          {amenities.length > 0 && (
+            <div className="mt-8">
+              <h2 className="text-xl font-semibold text-gray-900">Amenities</h2>
+              <div className="mt-4 grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-2">
+                {amenities.map((amenity, index) => (
+                  <div key={index} className="flex items-center">
+                    <Check className="h-5 w-5 text-green-500" />
+                    <span className="ml-2">{amenity}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Google Maps */}
+          <div className="mt-8">
+            <h2 className="text-xl font-semibold text-gray-900">Location</h2>
+            <div className="mt-4 rounded-lg overflow-hidden border border-gray-200">
+              <iframe
+                title="Property Location"
+                width="100%"
+                height="300"
+                frameBorder="0"
+                src={`https://www.google.com/maps/embed/v1/place?key=${import.meta.env.VITE_GOOGLE_MAPS_KEY}&q=${encodeURIComponent(
+                  [property.address, property.city, property.state, property.zip_code].filter(Boolean).join(', ')
+                )}`}
+                allowFullScreen
+              ></iframe>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-3">
+              <a
+                href={getGoogleMapsUrl()}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
+              >
+                <MapPin className="h-4 w-4 mr-2" />
+                View on Google Maps
+              </a>
+              <a
+                href={getDirectionsUrl()}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
+              >
+                <MapPin className="h-4 w-4 mr-2" />
+                Get Directions
+              </a>
+            </div>
           </div>
         </div>
       </div>

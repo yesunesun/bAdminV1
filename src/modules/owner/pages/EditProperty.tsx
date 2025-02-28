@@ -1,25 +1,30 @@
 // src/modules/owner/pages/EditProperty.tsx
-// Version: 2.1.1
-// Last Modified: 26-02-2025 19:00 IST
-// Purpose: Page for editing property listings with improved data handling
+// Version: 3.0.0
+// Last Modified: 01-03-2025 19:45 IST
+// Purpose: Direct patch to fix form field population in edit mode
 
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { PropertyForm } from '../components/property/wizard/PropertyForm';
 import { propertyService } from '../services/propertyService';
-import LoadingSpinner from '@/components/ui/LoadingSpinner'; // Fixed import to default import
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { Card } from '@/components/ui/card';
 import { Property, FormData } from '../components/property/PropertyFormTypes';
 
 export default function EditProperty() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [property, setProperty] = useState<Property | null>(null);
   const [initialData, setInitialData] = useState<FormData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [formDataReady, setFormDataReady] = useState(false);
+  
+  // Get current step from URL query parameter
+  const stepParam = searchParams.get('step');
 
   useEffect(() => {
     const fetchProperty = async () => {
@@ -43,7 +48,67 @@ export default function EditProperty() {
         // Extract initialData from property_details
         if (propertyData.property_details) {
           console.log('Setting form data from property_details');
-          setInitialData(propertyData.property_details as FormData);
+          
+          // Ensure all required fields exist
+          const formData = {
+            propertyType: propertyData.property_details.propertyType || '',
+            listingType: propertyData.property_details.listingType || 'rent',
+            title: propertyData.title || '',
+            bhkType: propertyData.property_details.bhkType || '',
+            floor: propertyData.property_details.floor || '',
+            totalFloors: propertyData.property_details.totalFloors || '',
+            propertyAge: propertyData.property_details.propertyAge || '',
+            facing: propertyData.property_details.facing || '',
+            builtUpArea: propertyData.property_details.builtUpArea || propertyData.square_feet?.toString() || '',
+            zone: propertyData.property_details.zone || '',
+            locality: propertyData.property_details.locality || propertyData.city || '',
+            landmark: propertyData.property_details.landmark || '',
+            address: propertyData.property_details.address || propertyData.address || '',
+            pinCode: propertyData.property_details.pinCode || propertyData.zip_code || '',
+            rentalType: propertyData.property_details.rentalType || 'rent',
+            rentAmount: propertyData.property_details.rentAmount || propertyData.price?.toString() || '',
+            securityDeposit: propertyData.property_details.securityDeposit || '',
+            rentNegotiable: propertyData.property_details.rentNegotiable || false,
+            maintenance: propertyData.property_details.maintenance || '',
+            availableFrom: propertyData.property_details.availableFrom || '',
+            preferredTenants: propertyData.property_details.preferredTenants || [],
+            furnishing: propertyData.property_details.furnishing || '',
+            parking: propertyData.property_details.parking || '',
+            description: propertyData.property_details.description || propertyData.description || '',
+            amenities: propertyData.property_details.amenities || [],
+            bathrooms: propertyData.property_details.bathrooms || propertyData.bathrooms?.toString() || '',
+            balconies: propertyData.property_details.balconies || '',
+            hasGym: propertyData.property_details.hasGym || false,
+            nonVegAllowed: propertyData.property_details.nonVegAllowed || false,
+            gatedSecurity: propertyData.property_details.gatedSecurity || false,
+            propertyShowOption: propertyData.property_details.propertyShowOption || '',
+            propertyCondition: propertyData.property_details.propertyCondition || '',
+            secondaryNumber: propertyData.property_details.secondaryNumber || '',
+            hasSimilarUnits: propertyData.property_details.hasSimilarUnits || false,
+            direction: propertyData.property_details.direction || ''
+          };
+          
+          // Log the populated form data for debugging
+          console.log('Populated form data for edit:', {
+            propertyType: formData.propertyType,
+            bhkType: formData.bhkType,
+            floor: formData.floor,
+            totalFloors: formData.totalFloors,
+            propertyAge: formData.propertyAge,
+            facing: formData.facing,
+            builtUpArea: formData.builtUpArea
+          });
+          
+          // Store in local storage as a direct workaround
+          if (user?.id) {
+            const storageKey = `propertyWizard_${user.id}_${id}_data`;
+            localStorage.setItem(storageKey, JSON.stringify(formData));
+            console.log('Saved form data to localStorage for direct access');
+          }
+          
+          setInitialData(formData as FormData);
+          // Mark form data as ready
+          setFormDataReady(true);
         } else {
           // Create form data from property if property_details not available
           console.log('Creating form data from property fields');
@@ -85,7 +150,16 @@ export default function EditProperty() {
             direction: ''
           };
           
+          // Store in local storage as a direct workaround
+          if (user?.id) {
+            const storageKey = `propertyWizard_${user.id}_${id}_data`;
+            localStorage.setItem(storageKey, JSON.stringify(formData));
+            console.log('Saved form data to localStorage for direct access');
+          }
+          
           setInitialData(formData);
+          // Mark form data as ready
+          setFormDataReady(true);
         }
       } catch (err) {
         console.error('Error fetching property:', err);
@@ -98,15 +172,53 @@ export default function EditProperty() {
     fetchProperty();
   }, [id, user]);
 
+  // Log step parameter when it changes
+  useEffect(() => {
+    console.log('Current step from URL query parameter:', stepParam);
+  }, [stepParam]);
+
+  // Force inputs to have values when they appear on screen
+  useEffect(() => {
+    if (formDataReady && initialData) {
+      // We need to force edit mode forms to show their values
+      // This is a direct fix that doesn't depend on react-hook-form
+      setTimeout(() => {
+        console.log('Attempting direct DOM manipulation to fill form values');
+        
+        // Try to find form inputs and set values directly
+        // For select inputs (dropdown values)
+        document.querySelectorAll('select').forEach(select => {
+          const name = select.name || select.id;
+          if (name && initialData[name as keyof FormData]) {
+            try {
+              select.value = initialData[name as keyof FormData] as string;
+            } catch (e) {
+              console.error('Error setting select value:', e);
+            }
+          }
+        });
+        
+        // For text/number inputs
+        document.querySelectorAll('input').forEach(input => {
+          const name = input.name || input.id;
+          if (name && initialData[name as keyof FormData]) {
+            try {
+              input.value = initialData[name as keyof FormData] as string;
+            } catch (e) {
+              console.error('Error setting input value:', e);
+            }
+          }
+        });
+        
+        console.log('Direct DOM manipulation finished');
+      }, 1000); // Allow time for the form to render
+    }
+  }, [formDataReady, initialData]);
+
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-[50vh]">
-        <Card className="w-full max-w-md p-8 text-center">
-          <div className="flex justify-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-          </div>
-          <p className="mt-4 text-slate-600">Loading property data...</p>
-        </Card>
+        <LoadingSpinner message="Loading property data..." />
       </div>
     );
   }
@@ -142,17 +254,59 @@ export default function EditProperty() {
   }
 
   console.log('Rendering PropertyForm with initialData:', initialData);
-  console.log('Property category:', property.property_details?.propertyType);
-  console.log('Property ad type:', property.property_details?.listingType);
+  console.log('Property category:', initialData.propertyType);
+  console.log('Property ad type:', initialData.listingType);
+  console.log('Current step from URL:', stepParam);
 
   return (
-    <PropertyForm
-      initialData={initialData}
-      propertyId={id}
-      mode="edit"
-      status={property.status as 'draft' | 'published'}
-      selectedCategory={property.property_details?.propertyType}
-      selectedAdType={property.property_details?.listingType}
-    />
+    <>
+      {/* Debug form values button */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="max-w-5xl mx-auto mb-4 p-2 bg-yellow-100 rounded-lg">
+          <button
+            onClick={() => {
+              // Reload form values from localStorage as a workaround
+              if (user?.id) {
+                const storageKey = `propertyWizard_${user.id}_${id}_data`;
+                const savedData = localStorage.getItem(storageKey);
+                if (savedData) {
+                  try {
+                    const formData = JSON.parse(savedData);
+                    console.log('Retrieved form data from localStorage:', formData);
+                    
+                    // Attempt to manually update inputs
+                    document.querySelectorAll('select, input').forEach(elem => {
+                      const name = elem.name || elem.id;
+                      if (name && formData[name]) {
+                        if (elem instanceof HTMLSelectElement) {
+                          elem.value = formData[name];
+                        } else if (elem instanceof HTMLInputElement) {
+                          elem.value = formData[name];
+                        }
+                      }
+                    });
+                  } catch (e) {
+                    console.error('Error parsing form data from localStorage:', e);
+                  }
+                }
+              }
+            }}
+            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+          >
+            Reload Form Values
+          </button>
+        </div>
+      )}
+      
+      <PropertyForm
+        initialData={initialData}
+        propertyId={id}
+        mode="edit"
+        status={property.status as 'draft' | 'published'}
+        selectedCategory={initialData.propertyType}
+        selectedAdType={initialData.listingType}
+        currentStep={stepParam || undefined}
+      />
+    </>
   );
 }

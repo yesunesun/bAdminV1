@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyDetails/index.tsx
-// Version: 1.1.0
-// Last Modified: 27-02-2025 10:30 IST
-// Purpose: Main container for property details page with null safety
+// Version: 2.0.0
+// Last Modified: 29-02-2025 16:30 IST
+// Purpose: Enhanced property details container with improved layout and features
 
 import React from 'react';
 import PropertyGallery from './PropertyGallery';
@@ -43,13 +43,15 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
   }
 
   return (
-    <div className="space-y-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
+          {/* Gallery */}
           <PropertyGallery 
             images={property.property_images || []} 
           />
           
+          {/* Actions */}
           <Card>
             <CardContent className="p-6">
               <PropertyActions 
@@ -60,6 +62,7 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
             </CardContent>
           </Card>
           
+          {/* Property Information */}
           <Card>
             <CardContent className="p-6">
               <PropertyInfo property={property} />
@@ -67,6 +70,7 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
           </Card>
         </div>
         
+        {/* Sidebar */}
         <div>
           <div className="sticky top-24">
             <OwnerContact 
@@ -83,7 +87,7 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
 // Loading skeleton component remains unchanged
 const PropertyDetailsSkeleton: React.FC = () => {
   return (
-    <div className="space-y-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
           <Skeleton className="w-full aspect-[16/9] rounded-lg" />
@@ -113,6 +117,8 @@ const PropertyDetailsSkeleton: React.FC = () => {
               
               <Skeleton className="h-6 w-40" />
               <Skeleton className="h-32 w-full" />
+              <Skeleton className="h-6 w-40" />
+              <Skeleton className="h-64 w-full" />
             </CardContent>
           </Card>
         </div>

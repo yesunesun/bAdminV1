@@ -1,11 +1,10 @@
 // src/pages/ListYourProperty.tsx
-// Version: 1.3.0
-// Last Modified: 26-02-2025 15:10 IST
+// Version: 1.4.0
+// Last Modified: 28-02-2025 15:35 IST
 
 import React, { useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { PropertyForm } from '@/modules/owner/components/property/wizard/PropertyForm';
-// ^--- The import path has been fixed to match the actual file location
 
 export default function ListYourProperty() {
   const { category, type, step } = useParams();
@@ -14,7 +13,14 @@ export default function ListYourProperty() {
   // Add debugging for development
   useEffect(() => {
     console.log('ListYourProperty params:', { category, type, step });
-  }, [category, type, step]);
+    
+    // Clear any stored form data on component mount
+    const userId = localStorage.getItem('userId');
+    if (userId) {
+      localStorage.removeItem(`propertyWizard_${userId}_data`);
+      localStorage.removeItem(`propertyWizard_${userId}_step`);
+    }
+  }, []);
 
   const handlePropertyTypeSelect = (selectedCategory: string, selectedType: string, selectedCity: string) => {
     console.log('PropertyType selection:', { selectedCategory, selectedType, selectedCity });

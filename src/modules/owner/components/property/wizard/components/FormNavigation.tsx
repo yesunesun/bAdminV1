@@ -1,9 +1,10 @@
-// src/components/property/wizard/components/FormNavigation.tsx
-// Version: 1.2.0
-// Last Modified: 18-02-2025 17:00 IST
+// src/modules/owner/components/property/wizard/components/FormNavigation.tsx
+// Version: 1.4.0
+// Last Modified: 28-02-2025 19:15 IST
+// Purpose: Fixed navigation in edit mode to preserve property ID
 
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { STEPS } from '../constants';
 
@@ -25,6 +26,7 @@ export function FormNavigation({
   adType
 }: FormNavigationProps) {
   const navigate = useNavigate();
+  const location = useLocation();
 
   const isStepAccessible = (stepIndex: number) => {
     const isPhotoStep = stepIndex === STEPS.length - 1;
@@ -38,9 +40,22 @@ export function FormNavigation({
     if (!isStepAccessible(index)) return;
 
     const step = STEPS[index];
-    if (category && adType) {
-      navigate(`/properties/list/${category}/${adType}/${step.id}`, { replace: true });
+    
+    // Debug logging
+    console.log("Navigation params:", { mode, propertyId, category, adType, step: step.id });
+    
+    if (mode === 'edit' && propertyId) {
+      // Keep property ID in URL for edit mode
+      console.log(`Navigating to edit mode tab: /properties/${propertyId}/edit?step=${step.id}`);
+      navigate(`/properties/${propertyId}/edit?step=${step.id}`, { replace: true });
+    } else if (category && adType) {
+      // For create mode, use the category/adType pattern
+      console.log(`Navigating to create mode tab: /properties/list/${category.toLowerCase()}/${adType.toLowerCase()}/${step.id}`);
+      navigate(`/properties/list/${category.toLowerCase()}/${adType.toLowerCase()}/${step.id}`, { replace: true });
+    } else {
+      console.warn("Missing navigation parameters:", { mode, propertyId, category, adType });
     }
+    
     onStepChange(index + 1);
   };
 

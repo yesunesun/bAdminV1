@@ -1,6 +1,6 @@
 // src/modules/owner/components/property/wizard/hooks/usePropertyForm.ts
-// Version: 1.6.0
-// Last Modified: 26-02-2025 18:25 IST
+// Version: 1.7.0
+// Last Modified: 28-02-2025 15:30 IST
 // Purpose: Custom hook for property form state management with enhanced error handling
 
 import { useState, useCallback, useEffect } from 'react';
@@ -67,7 +67,7 @@ export function usePropertyForm({
       propertyType: propertyCategory || category || '',
       listingType: adType || type || '',
       
-      // Standard form fields
+      // Standard form fields with empty values
       title: '',
       bhkType: '',
       floor: '',
@@ -157,13 +157,13 @@ export function usePropertyForm({
     }
   }, [propertyCategory, adType, city, category, type, form]);
 
-  // Load form data from localStorage if in create mode and no initialData provided
+  // Load form data from localStorage if in edit mode and no initialData provided
   useEffect(() => {
-    if (user?.id && !initialData && mode === 'create') {
-      const savedData = localStorage.getItem(`propertyWizard_${user.id}_data`);
+    if (user?.id && !initialData && mode === 'edit' && existingPropertyId) {
+      const savedData = localStorage.getItem(`propertyWizard_${user.id}_${existingPropertyId}_data`);
       if (savedData) {
         try {
-          console.log('Loading saved form data from localStorage');
+          console.log('Loading saved form data from localStorage for edit mode');
           const parsedData = JSON.parse(savedData);
           Object.entries(parsedData).forEach(([key, value]) => {
             form.setValue(key as keyof FormData, value);
@@ -173,7 +173,12 @@ export function usePropertyForm({
         }
       }
     }
-  }, [user?.id, initialData, form, mode]);
+    
+    // Clear stored form data if in create mode to avoid pre-populated data
+    if (mode === 'create' && user?.id) {
+      localStorage.removeItem(`propertyWizard_${user.id}_data`);
+    }
+  }, [user?.id, initialData, form, mode, existingPropertyId]);
 
   // Update URL when step changes
   const updateUrl = useCallback((newStep: number) => {
@@ -240,7 +245,7 @@ export function usePropertyForm({
     }
   }, [user?.id, mode, existingPropertyId]);
 
-  // Handle form auto-fill (development only)
+  // Handle form auto-fill (development only) - now only triggered by explicit button click
   const handleAutoFill = useCallback(() => {
     setError('');
     Object.entries(TEST_DATA).forEach(([key, value]) => {

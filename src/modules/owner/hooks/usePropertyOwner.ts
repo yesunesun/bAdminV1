@@ -1,7 +1,7 @@
 // src/modules/owner/hooks/usePropertyOwner.ts
-// Version: 5.0.0
-// Last Modified: 27-02-2025 00:30 IST
-// Purpose: Optimized property owner hook with caching
+// Version: 5.1.0
+// Last Modified: 28-02-2025 17:10 IST
+// Purpose: Optimized property owner hook with caching and fixed publish functionality
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -73,14 +73,22 @@ export const usePropertyOwner = () => {
   };
 
   const handleTogglePublishStatus = async (propertyId: string, currentStatus: 'draft' | 'published') => {
+    if (!user) {
+      setError('You must be logged in to update properties');
+      return;
+    }
+    
     try {
       setUpdating(propertyId);
+      setError(null);
       
       // Determine new status (toggle between draft and published)
       const newStatus = currentStatus === 'published' ? 'draft' : 'published';
       
-      // Update property status using service
-      await propertyService.updatePropertyStatus(propertyId, newStatus);
+      console.log(`Updating property ${propertyId} status from ${currentStatus} to ${newStatus}`);
+      
+      // Update property status using service - FIXED: Added user.id parameter
+      await propertyService.updatePropertyStatus(propertyId, newStatus, user.id);
       
       // Update local state after successful update
       setProperties(prev => 
@@ -89,9 +97,12 @@ export const usePropertyOwner = () => {
         )
       );
       
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error toggling property status:', err);
-      setError('Failed to update property status');
+      setError(err.message || 'Failed to update property status');
+      
+      // Show the error for 5 seconds, then clear it
+      setTimeout(() => setError(null), 5000);
     } finally {
       setUpdating(null);
     }
