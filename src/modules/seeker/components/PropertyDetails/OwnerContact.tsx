@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyDetails/OwnerContact.tsx
-// Version: 2.0.0
-// Last Modified: 01-03-2025 15:30 IST
-// Purpose: Enhanced contact component with improved form UX and visual design
+// Version: 2.1.0
+// Last Modified: 01-03-2025 16:45 IST
+// Purpose: Enhanced contact component with improved form UX, visual design and theme support
 
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -10,6 +10,8 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTheme } from '@/contexts/ThemeContext';
+import { cn } from '@/lib/utils';
 import { 
   PhoneIcon, 
   MailIcon, 
@@ -19,7 +21,6 @@ import {
   ShieldCheckIcon,
   CheckCircleIcon
 } from 'lucide-react';
-// Remove separator import as it's not available
 
 interface OwnerContactProps {
   ownerData?: {
@@ -33,6 +34,7 @@ interface OwnerContactProps {
 const OwnerContact: React.FC<OwnerContactProps> = ({ ownerData, propertyTitle }) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { theme } = useTheme();
   
   // Form state
   const [contactName, setContactName] = useState(user?.user_metadata?.full_name || '');
@@ -81,16 +83,30 @@ const OwnerContact: React.FC<OwnerContactProps> = ({ ownerData, propertyTitle })
   // Show a success message if the message was sent
   if (messageSent) {
     return (
-      <Card className="border-primary/20 bg-gradient-to-b from-background to-primary/5">
+      <Card className={cn(
+        "border-primary/20",
+        theme === 'ocean' 
+          ? "bg-gradient-to-b from-background to-primary/5" 
+          : "bg-gradient-to-b from-background to-primary/5"
+      )}>
         <CardContent className="pt-6 pb-4 flex flex-col items-center text-center">
-          <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4">
+          <div className={cn(
+            "w-16 h-16 rounded-full flex items-center justify-center mb-4",
+            theme === 'ocean' ? "bg-primary/10" : "bg-primary/10"
+          )}>
             <CheckCircleIcon className="h-8 w-8 text-primary" />
           </div>
           <h3 className="text-xl font-semibold mb-2">Message Sent!</h3>
           <p className="text-muted-foreground mb-6">
             Your message has been sent to the property owner. They will contact you soon.
           </p>
-          <Button onClick={resetForm} className="w-full">
+          <Button 
+            onClick={resetForm} 
+            className={cn(
+              "w-full",
+              theme === 'ocean' ? "bg-primary text-primary-foreground hover:bg-primary/90" : "bg-primary text-primary-foreground hover:bg-primary/90"
+            )}
+          >
             Send Another Message
           </Button>
         </CardContent>
@@ -101,7 +117,10 @@ const OwnerContact: React.FC<OwnerContactProps> = ({ ownerData, propertyTitle })
   // Show a message if owner data is not available
   if (!ownerData) {
     return (
-      <Card>
+      <Card className={cn(
+        "border-border",
+        theme === 'ocean' ? "bg-card" : "bg-card"
+      )}>
         <CardHeader className="pb-3">
           <CardTitle className="text-xl flex items-center">
             <MessageSquareIcon className="h-5 w-5 mr-2 text-primary" />
@@ -109,7 +128,10 @@ const OwnerContact: React.FC<OwnerContactProps> = ({ ownerData, propertyTitle })
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center p-4 bg-muted/50 rounded-md">
+          <div className={cn(
+            "flex items-center p-4 rounded-md",
+            theme === 'ocean' ? "bg-muted/50" : "bg-muted/50"
+          )}>
             <AlertCircleIcon className="h-5 w-5 mr-2 text-muted-foreground flex-shrink-0" />
             <p className="text-sm text-muted-foreground">
               Owner contact information is not available at the moment. Please try again later.
@@ -187,12 +209,15 @@ const OwnerContact: React.FC<OwnerContactProps> = ({ ownerData, propertyTitle })
             
             <Button 
               type="submit" 
-              className="w-full" 
+              className={cn(
+                "w-full",
+                theme === 'ocean' ? "bg-primary text-primary-foreground hover:bg-primary/90" : "bg-primary text-primary-foreground hover:bg-primary/90"
+              )}
               disabled={isSubmitting || !isFormValid}
             >
               {isSubmitting ? (
                 <>
-                  <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
+                  <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent"></div>
                   Sending...
                 </>
               ) : "Send Inquiry"}
@@ -209,8 +234,14 @@ const OwnerContact: React.FC<OwnerContactProps> = ({ ownerData, propertyTitle })
   }
 
   return (
-    <Card className="border-primary/20 shadow-md">
-      <CardHeader className="pb-2 border-b border-border/30">
+    <Card className={cn(
+      "border-primary/20 shadow-md",
+      theme === 'ocean' ? "bg-card" : "bg-card"
+    )}>
+      <CardHeader className={cn(
+        "pb-2 border-b",
+        theme === 'ocean' ? "border-border/30" : "border-border/30"
+      )}>
         <CardTitle className="text-xl flex items-center">
           <MessageSquareIcon className="h-5 w-5 mr-2 text-primary" />
           Contact Property Owner
@@ -219,10 +250,18 @@ const OwnerContact: React.FC<OwnerContactProps> = ({ ownerData, propertyTitle })
       
       <CardContent className="p-6 space-y-6">
         {/* Owner contact info with styled container */}
-        <div className="bg-muted/30 rounded-lg p-4 space-y-3 border border-border/50">
+        <div className={cn(
+          "rounded-lg p-4 space-y-3 border",
+          theme === 'ocean' 
+            ? "bg-muted/30 border-border/50" 
+            : "bg-muted/30 border-border/50"
+        )}>
           {ownerData.email && (
             <div className="flex items-center">
-              <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center mr-3">
+              <div className={cn(
+                "h-8 w-8 rounded-full flex items-center justify-center mr-3",
+                theme === 'ocean' ? "bg-primary/10" : "bg-primary/10"
+              )}>
                 <MailIcon className="h-4 w-4 text-primary" />
               </div>
               <div>
@@ -236,7 +275,10 @@ const OwnerContact: React.FC<OwnerContactProps> = ({ ownerData, propertyTitle })
           
           {ownerData.phone && (
             <div className="flex items-center">
-              <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center mr-3">
+              <div className={cn(
+                "h-8 w-8 rounded-full flex items-center justify-center mr-3",
+                theme === 'ocean' ? "bg-primary/10" : "bg-primary/10"
+              )}>
                 <PhoneIcon className="h-4 w-4 text-primary" />
               </div>
               <div>
@@ -252,10 +294,16 @@ const OwnerContact: React.FC<OwnerContactProps> = ({ ownerData, propertyTitle })
         {/* Custom separator with text */}
         <div className="relative">
           <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-border"></div>
+            <div className={cn(
+              "w-full border-t",
+              theme === 'ocean' ? "border-border" : "border-border"
+            )}></div>
           </div>
           <div className="relative flex justify-center">
-            <span className="bg-background px-2 text-xs text-muted-foreground">OR SEND A MESSAGE</span>
+            <span className={cn(
+              "px-2 text-xs text-muted-foreground",
+              theme === 'ocean' ? "bg-background" : "bg-background"
+            )}>OR SEND A MESSAGE</span>
           </div>
         </div>
         
@@ -328,7 +376,10 @@ const OwnerContact: React.FC<OwnerContactProps> = ({ ownerData, propertyTitle })
           
           <Button 
             type="submit" 
-            className="w-full" 
+            className={cn(
+              "w-full",
+              theme === 'ocean' ? "bg-primary text-primary-foreground hover:bg-primary/90" : "bg-primary text-primary-foreground hover:bg-primary/90"
+            )}
             disabled={isSubmitting || !isFormValid}
           >
             {isSubmitting ? (

@@ -1,15 +1,16 @@
 // src/modules/seeker/components/PropertyCard.tsx
-// Version: 2.0.0
-// Last Modified: 01-03-2025 12:15 IST
-// Purpose: Modernized property card with enhanced visual design and improved UX
+// Version: 2.2.0
+// Last Modified: 01-03-2025 18:45 IST
+// Purpose: Updated to show default noimage.png when no property image is available
 
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { PropertyType } from '@/modules/owner/components/property/types';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, cn } from '@/lib/utils';
 import { Card } from '@/components/ui/card';
 import { MapPinIcon, BedIcon, BathIcon, SquareIcon, HomeIcon } from 'lucide-react';
 import FavoriteButton from './FavoriteButton';
+import { useTheme } from '@/contexts/ThemeContext';
 
 interface PropertyCardProps {
   property: PropertyType;
@@ -18,11 +19,13 @@ interface PropertyCardProps {
 }
 
 const PropertyCard: React.FC<PropertyCardProps> = ({ property, isLiked = false, onLike }) => {
+  const { theme } = useTheme();
+  
   // Find primary image or use first image
   const primaryImage = property.property_images?.find(img => img.is_primary) || 
                        (property.property_images && property.property_images.length > 0 ? property.property_images[0] : null);
   
-  const imageSrc = primaryImage?.url || '/placeholder-property.jpg';
+  const imageSrc = primaryImage?.url || '/noimage.png';
 
   return (
     <Card className="overflow-hidden group h-full flex flex-col transition-all duration-300 hover:shadow-xl hover:translate-y-[-4px] border-none">
@@ -33,8 +36,16 @@ const PropertyCard: React.FC<PropertyCardProps> = ({ property, isLiked = false, 
             src={imageSrc} 
             alt={property.title} 
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+            onError={(e) => {
+              const target = e.target as HTMLImageElement;
+              target.onerror = null; // Prevent infinite loop
+              target.src = '/noimage.png';
+            }}
           />
-          <div className="absolute bottom-3 left-3 z-20 bg-white/90 backdrop-blur-sm rounded-full px-3 py-1 text-xs font-medium text-primary shadow-sm">
+          <div className={cn(
+            "absolute bottom-3 left-3 z-20 bg-white/90 backdrop-blur-sm rounded-full px-3 py-1 text-xs font-medium shadow-sm",
+            theme === 'ocean' ? "text-primary" : "text-primary"
+          )}>
             {property.property_details?.propertyType || 'Property'}
           </div>
         </Link>
@@ -93,7 +104,10 @@ const PropertyCard: React.FC<PropertyCardProps> = ({ property, isLiked = false, 
         </div>
         
         <div className="mt-4 pt-4 border-t border-border/40 flex items-center justify-between">
-          <p className="text-xl font-bold text-primary flex items-center">
+          <p className={cn(
+            "text-xl font-bold flex items-center",
+            theme === 'ocean' ? "text-primary" : "text-primary"
+          )}>
             ₹{formatCurrency(property.price)}
             {property.property_details?.rentalFrequency && (
               <span className="text-xs font-normal text-muted-foreground ml-1">
@@ -104,7 +118,12 @@ const PropertyCard: React.FC<PropertyCardProps> = ({ property, isLiked = false, 
           
           <Link 
             to={`/seeker/property/${property.id}`} 
-            className="text-xs font-medium bg-primary/10 text-primary px-3 py-1.5 rounded-full hover:bg-primary/20 transition-colors"
+            className={cn(
+              "text-xs font-medium px-3 py-1.5 rounded-full transition-colors",
+              theme === 'ocean' 
+                ? "bg-primary/10 text-primary hover:bg-primary/20" 
+                : "bg-primary/10 text-primary hover:bg-primary/20"
+            )}
           >
             View Details
           </Link>

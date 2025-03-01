@@ -1,16 +1,18 @@
 // src/modules/seeker/components/PropertyGrid.tsx
-// Version: 1.2.0
-// Last Modified: 27-02-2025 12:35 IST
-// Purpose: Improved property grid with better responsive layout and loading states
+// Version: 1.3.0
+// Last Modified: 01-03-2025 15:30 IST
+// Purpose: Improved property grid with better responsive layout, loading states and theme support
 
 import React from 'react';
 import { PropertyType } from '@/modules/owner/components/property/types';
 import PropertyCard from './PropertyCard';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTheme } from '@/contexts/ThemeContext';
 import { togglePropertyLike } from '../services/seekerService';
 import { useToast } from '@/components/ui/use-toast';
 import { Card, CardContent } from '@/components/ui/card';
 import { SearchIcon } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface PropertyGridProps {
   properties: PropertyType[];
@@ -26,6 +28,7 @@ const PropertyGrid: React.FC<PropertyGridProps> = ({
   isLoading = false 
 }) => {
   const { user } = useAuth();
+  const { theme } = useTheme();
   const { toast } = useToast();
 
   const handleLike = async (property: PropertyType) => {
@@ -78,18 +81,45 @@ const PropertyGrid: React.FC<PropertyGridProps> = ({
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {[...Array(6)].map((_, index) => (
-          <Card key={index} className="overflow-hidden h-full">
+          <Card key={index} className={cn(
+            "overflow-hidden h-full",
+            theme === 'ocean' ? "border-border" : "border-border"
+          )}>
             <div className="animate-pulse">
-              <div className="bg-muted h-56 rounded-t-lg"></div>
+              <div className={cn(
+                "h-56 rounded-t-lg",
+                theme === 'ocean' ? "bg-muted" : "bg-muted"
+              )}></div>
               <div className="p-5 space-y-4">
-                <div className="h-3 bg-muted rounded w-1/3"></div>
-                <div className="h-5 bg-muted rounded w-3/4"></div>
-                <div className="h-7 bg-muted rounded w-1/2"></div>
-                <div className="h-4 bg-muted rounded w-full"></div>
+                <div className={cn(
+                  "h-3 rounded w-1/3",
+                  theme === 'ocean' ? "bg-muted" : "bg-muted"
+                )}></div>
+                <div className={cn(
+                  "h-5 rounded w-3/4",
+                  theme === 'ocean' ? "bg-muted" : "bg-muted"
+                )}></div>
+                <div className={cn(
+                  "h-7 rounded w-1/2",
+                  theme === 'ocean' ? "bg-muted" : "bg-muted"
+                )}></div>
+                <div className={cn(
+                  "h-4 rounded w-full",
+                  theme === 'ocean' ? "bg-muted" : "bg-muted"
+                )}></div>
                 <div className="flex justify-between gap-2 pt-2">
-                  <div className="h-8 bg-muted rounded w-1/4"></div>
-                  <div className="h-8 bg-muted rounded w-1/4"></div>
-                  <div className="h-8 bg-muted rounded w-1/4"></div>
+                  <div className={cn(
+                    "h-8 rounded w-1/4",
+                    theme === 'ocean' ? "bg-muted" : "bg-muted"
+                  )}></div>
+                  <div className={cn(
+                    "h-8 rounded w-1/4",
+                    theme === 'ocean' ? "bg-muted" : "bg-muted"
+                  )}></div>
+                  <div className={cn(
+                    "h-8 rounded w-1/4",
+                    theme === 'ocean' ? "bg-muted" : "bg-muted"
+                  )}></div>
                 </div>
               </div>
             </div>
@@ -101,9 +131,15 @@ const PropertyGrid: React.FC<PropertyGridProps> = ({
 
   if (properties.length === 0) {
     return (
-      <Card className="w-full">
+      <Card className={cn(
+        "w-full",
+        theme === 'ocean' ? "border-border" : "border-border"
+      )}>
         <CardContent className="flex flex-col items-center justify-center py-16">
-          <div className="rounded-full bg-muted p-6 mb-4">
+          <div className={cn(
+            "rounded-full p-6 mb-4",
+            theme === 'ocean' ? "bg-muted" : "bg-muted"
+          )}>
             <SearchIcon className="h-10 w-10 text-muted-foreground" />
           </div>
           <h3 className="text-xl font-semibold mb-2">No properties found</h3>

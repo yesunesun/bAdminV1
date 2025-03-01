@@ -1,7 +1,7 @@
 // src/modules/seeker/components/Search/FilterPanel.tsx
-// Version: 2.1.0
-// Last Modified: 27-02-2025 12:45 IST
-// Purpose: Improved filter panel with better mobile responsiveness
+// Version: 2.3.0
+// Last Modified: 01-03-2025 19:15 IST
+// Purpose: Fixed Apply Filters button to properly apply theme colors
 
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,8 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { FilterIcon, XIcon } from 'lucide-react';
 import { PropertyFilters } from '../../services/seekerService';
+import { cn } from '@/lib/utils';
+import { useTheme } from '@/contexts/ThemeContext';
 
 interface FilterPanelProps {
   filters: PropertyFilters;
@@ -21,6 +23,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
   onApplyFilters, 
   onResetFilters 
 }) => {
+  const { theme } = useTheme();
   const [localFilters, setLocalFilters] = useState<PropertyFilters>(filters);
   const [priceRange, setPriceRange] = useState<[number, number]>([
     filters.minPrice || 0, 
@@ -84,7 +87,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
     <Card className="h-fit sticky top-4 border border-border bg-card shadow-sm">
       <CardContent className="p-5">
         <div className="flex justify-between items-center mb-6">
-          <h3 className="text-lg font-semibold">Filters</h3>
+          <h3 className="text-lg font-semibold text-foreground">Filters</h3>
           <div className="flex space-x-2">
             <Button 
               variant="outline" 
@@ -111,7 +114,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
         <div className={`space-y-6 ${isExpanded ? 'block' : 'hidden md:block'}`}>
           {/* Location Filter */}
           <div className="space-y-2">
-            <label className="text-sm font-medium block mb-1.5">Location</label>
+            <label className="text-sm font-medium block mb-1.5 text-foreground">Location</label>
             <Input 
               placeholder="City, state, or address" 
               value={localFilters.location || ''} 
@@ -122,18 +125,18 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
 
           {/* Property Type Filter */}
           <div className="space-y-2">
-            <label className="text-sm font-medium block mb-1.5">Property Type</label>
+            <label className="text-sm font-medium block mb-1.5 text-foreground">Property Type</label>
             <div className="grid grid-cols-2 gap-2">
               {propertyTypes.map((type) => (
                 <div 
                   key={type.value}
                   onClick={() => handleFilterChange('propertyType', type.value)}
-                  className={`
-                    px-4 py-2 rounded-md border cursor-pointer transition-colors text-center text-sm
-                    ${localFilters.propertyType === type.value 
-                      ? 'bg-primary text-primary-foreground border-primary font-medium' 
-                      : 'bg-background hover:bg-muted/50 border-input'}
-                  `}
+                  className={cn(
+                    "px-4 py-2 rounded-md border cursor-pointer transition-colors text-center text-sm",
+                    localFilters.propertyType === type.value 
+                      ? "bg-primary text-primary-foreground border-primary font-medium" 
+                      : "bg-background hover:bg-muted/50 border-input text-foreground"
+                  )}
                 >
                   {type.label}
                 </div>
@@ -143,18 +146,18 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
 
           {/* Bedrooms Filter */}
           <div className="space-y-2">
-            <label className="text-sm font-medium block mb-1.5">Bedrooms</label>
+            <label className="text-sm font-medium block mb-1.5 text-foreground">Bedrooms</label>
             <div className="grid grid-cols-3 gap-2">
               {bedroomOptions.map((option) => (
                 <div 
                   key={option.value}
                   onClick={() => handleFilterChange('bedrooms', option.value)}
-                  className={`
-                    px-3 py-2 rounded-md border cursor-pointer transition-colors text-center text-sm
-                    ${String(localFilters.bedrooms) === option.value 
-                      ? 'bg-primary text-primary-foreground border-primary font-medium' 
-                      : 'bg-background hover:bg-muted/50 border-input'}
-                  `}
+                  className={cn(
+                    "px-3 py-2 rounded-md border cursor-pointer transition-colors text-center text-sm",
+                    String(localFilters.bedrooms) === option.value 
+                      ? "bg-primary text-primary-foreground border-primary font-medium" 
+                      : "bg-background hover:bg-muted/50 border-input text-foreground"
+                  )}
                 >
                   {option.label}
                 </div>
@@ -165,7 +168,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
           {/* Price Range Filter */}
           <div className="space-y-4">
             <div className="flex justify-between items-center">
-              <label className="text-sm font-medium">Price Range (₹)</label>
+              <label className="text-sm font-medium text-foreground">Price Range (₹)</label>
               <span className="text-sm text-muted-foreground">
                 {formatPrice(priceRange[0])} - {formatPrice(priceRange[1])}
               </span>
@@ -209,7 +212,11 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
 
           <Button 
             onClick={handleApplyFilters}
-            className="w-full mt-6"
+            className={cn(
+              "w-full mt-6",
+              "bg-primary text-primary-foreground hover:bg-primary/90",
+              "dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
+            )}
           >
             Apply Filters
           </Button>

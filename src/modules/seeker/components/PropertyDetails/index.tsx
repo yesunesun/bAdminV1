@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyDetails/index.tsx
-// Version: 2.1.0
-// Last Modified: 01-03-2025 20:30 IST
-// Purpose: Property details page with Google Maps integration
+// Version: 2.2.0
+// Last Modified: 01-03-2025 14:45 IST
+// Purpose: Property details page with Google Maps integration and theme support
 
 import React from 'react';
 import PropertyGallery from './PropertyGallery';
@@ -12,6 +12,8 @@ import PropertyLocationMap from './PropertyLocationMap';
 import { Card, CardContent } from '@/components/ui/card';
 import { PropertyType } from '@/modules/owner/components/property/types';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useTheme } from '@/contexts/ThemeContext';
+import { cn } from '@/lib/utils';
 
 interface PropertyDetailsProps {
   property: PropertyType & { 
@@ -28,13 +30,18 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
   onToggleLike,
   isLoading
 }) => {
+  const { theme } = useTheme();
+  
   if (isLoading) {
     return <PropertyDetailsSkeleton />;
   }
 
   if (!property) {
     return (
-      <div className="text-center py-12">
+      <div className={cn(
+        "text-center py-12",
+        theme === 'ocean' ? "text-foreground" : "text-foreground"
+      )}>
         <h2 className="text-2xl font-bold">Property Not Found</h2>
         <p className="text-muted-foreground mt-2">
           This property may have been removed or is no longer available.
@@ -63,7 +70,10 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
           />
           
           {/* Actions */}
-          <Card>
+          <Card className={cn(
+            "border-border",
+            theme === 'ocean' ? "bg-card" : "bg-card"
+          )}>
             <CardContent className="p-6">
               <PropertyActions 
                 propertyId={property.id}
@@ -77,7 +87,10 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
           <PropertyLocationMap {...mapProps} />
           
           {/* Property Information */}
-          <Card>
+          <Card className={cn(
+            "border-border",
+            theme === 'ocean' ? "bg-card" : "bg-card"
+          )}>
             <CardContent className="p-6">
               <PropertyInfo property={property} />
             </CardContent>
@@ -100,11 +113,16 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
 
 // Loading skeleton component
 const PropertyDetailsSkeleton: React.FC = () => {
+  const { theme } = useTheme();
+  
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
-          <Skeleton className="w-full aspect-[16/9] rounded-lg" />
+          <Skeleton className={cn(
+            "w-full aspect-[16/9] rounded-lg",
+            theme === 'ocean' ? "bg-muted/60" : "bg-muted/60"
+          )} />
           
           <Card>
             <CardContent className="p-6">

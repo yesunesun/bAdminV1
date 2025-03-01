@@ -1,10 +1,11 @@
 // src/modules/seeker/pages/BrowseProperties.tsx
-// Version: 1.4.0
-// Last Modified: 27-02-2025 13:00 IST
-// Purpose: Improved layout with better spacing, alignment, and mobile responsiveness
+// Version: 1.5.0
+// Last Modified: 01-03-2025 15:00 IST
+// Purpose: Improved layout with better spacing, alignment, mobile responsiveness and theme integration
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTheme } from '@/contexts/ThemeContext';
 import { useProperties } from '../hooks/useProperties';
 import { checkPropertyLike } from '../services/seekerService';
 import PropertyGrid from '../components/PropertyGrid';
@@ -14,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { HomeIcon, MapPinIcon, ArrowLeftIcon, ArrowRightIcon, SearchIcon, PlusIcon, FilterIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { cn } from '@/lib/utils';
 
 const BrowseProperties: React.FC = () => {
   const { 
@@ -27,6 +29,7 @@ const BrowseProperties: React.FC = () => {
   } = useProperties();
   
   const { user } = useAuth();
+  const { theme } = useTheme();
   const [likedProperties, setLikedProperties] = useState<Record<string, boolean>>({});
   const [loadingLikes, setLoadingLikes] = useState(false);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
@@ -79,27 +82,16 @@ const BrowseProperties: React.FC = () => {
   };
 
   return (
-    <div className="container mx-auto py-8 px-4 max-w-7xl">
-      {/* Page Header */}
-      <div className="mb-8 text-center md:text-left">
-        <h1 className="text-3xl font-bold mb-3">Find Your Dream Property</h1>
-        <div className="flex items-center justify-center md:justify-start text-muted-foreground">
-          <HomeIcon className="h-4 w-4 mr-2" />
-          <span>Browse our collection of premium properties</span>
-        </div>
-      </div>
-
-      {/* Search Bar */}
-      <div className="mb-8">
-        <SearchBar 
-          initialValue={filters.searchQuery || ''} 
-          onSearch={handleSearch} 
-        />
-      </div>
-
+    <div className={cn(
+      "container mx-auto py-8 px-4 max-w-7xl",
+      theme === 'ocean' ? "text-foreground" : "text-foreground"
+    )}>
       {/* Error Message */}
       {error && (
-        <div className="bg-destructive/10 text-destructive p-5 rounded-lg mb-8">
+        <div className={cn(
+          "p-5 rounded-lg mb-8",
+          theme === 'ocean' ? "bg-destructive/10 text-destructive" : "bg-destructive/10 text-destructive"
+        )}>
           <h3 className="font-semibold">Error Loading Properties</h3>
           <p>There was a problem loading the properties. Please try again later.</p>
           <pre className="mt-2 text-xs overflow-auto">{error.message}</pre>
@@ -131,7 +123,10 @@ const BrowseProperties: React.FC = () => {
 
         {/* Property listing - right column */}
         <div className="w-full md:flex-1">
-          <div className="mb-5 flex items-center justify-between bg-muted/20 p-4 rounded-lg">
+          <div className={cn(
+            "mb-5 flex items-center justify-between p-4 rounded-lg",
+            theme === 'ocean' ? "bg-muted/20" : "bg-muted/20"
+          )}>
             <div className="text-muted-foreground">
               {loading ? (
                 <span>Loading properties...</span>
@@ -167,9 +162,15 @@ const BrowseProperties: React.FC = () => {
             />
           ) : (
             // No properties found state
-            <Card className="w-full border border-border">
+            <Card className={cn(
+              "w-full border",
+              theme === 'ocean' ? "border-border" : "border-border"
+            )}>
               <CardContent className="flex flex-col items-center justify-center py-16">
-                <div className="rounded-full bg-muted p-6 mb-4">
+                <div className={cn(
+                  "rounded-full p-6 mb-4",
+                  theme === 'ocean' ? "bg-muted" : "bg-muted"
+                )}>
                   <SearchIcon className="h-10 w-10 text-muted-foreground" />
                 </div>
                 <h3 className="text-xl font-semibold mb-2">No properties found</h3>
@@ -267,13 +268,5 @@ const BrowseProperties: React.FC = () => {
     </div>
   );
 };
-
-// Input component
-const Input = ({ className, ...props }) => (
-  <input
-    className={`w-full px-3 py-2 rounded-md border border-input bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${className}`}
-    {...props}
-  />
-);
 
 export default BrowseProperties;
