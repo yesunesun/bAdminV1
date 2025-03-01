@@ -1,7 +1,7 @@
 // src/lib/supabase.ts
-// Version: 2.2.0
-// Last Modified: 01-03-2025 15:30 IST
-// Purpose: Updated Supabase client configuration to fix 406 errors
+// Version: 2.3.0
+// Last Modified: 01-03-2025 19:30 IST
+// Purpose: Updated Supabase client configuration to fix file upload issues
 
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './database.types';
@@ -59,12 +59,24 @@ const supabaseOptions = {
   global: {
     headers: {
       'x-client-info': 'bhoomitalli-web-client',
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      'Cache-Control': 'no-cache',
-      'Pragma': 'no-cache',
-      'Expires': '0',
+      'Accept': '*/*',
     },
+    // Custom fetch handler to properly handle FormData uploads
+    fetch: (url: RequestInfo | URL, options: RequestInit = {}) => {
+      // For FormData, let the browser set the Content-Type with boundary
+      if (options.body instanceof FormData) {
+        const headers = new Headers(options.headers);
+        headers.delete('Content-Type');
+        
+        return fetch(url, {
+          ...options,
+          headers
+        });
+      }
+      
+      // Default behavior for non-FormData requests
+      return fetch(url, options);
+    }
   },
   db: {
     schema: 'public',
@@ -72,6 +84,11 @@ const supabaseOptions = {
   realtime: {
     reconnectAfterMs: (tries: number) => Math.min(1000 + tries * 1000, 10000),
   },
+  // Storage-specific options
+  storage: {
+    // Prevent auto-setting of Content-Type
+    multipart: true
+  }
 };
 
 // Create and export the Supabase client
@@ -164,6 +181,53 @@ export const isUserAdmin = async (): Promise<boolean> => {
   } catch (error) {
     console.error('Error checking admin status:', error);
     return false;
+  }
+};
+
+// Helper function for direct file uploads to bypass Supabase client issues
+export const directFileUpload = async (
+  bucket: string,
+  path: string,
+  file: File,
+  options?: { cacheControl?: string }
+): Promise<{ publicUrl: string | null; error: Error | null }> => {
+  try {
+    // Get auth session
+    const { data: { session } } = await supabase.auth.getSession();
+    const authToken = session?.access_token || supabaseAnonKey;
+    
+    // Create FormData
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    // Add cache control if specified
+    if (options?.cacheControl) {
+      formData.append('cacheControl', options.cacheControl);
+    }
+    
+    // Direct API call
+    const response = await fetch(
+      `${supabaseUrl}/storage/v1/object/${bucket}/${path}`, 
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: formData
+      }
+    );
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`Upload failed: ${response.status} - ${errorData.error}`);
+    }
+    
+    // Get public URL
+    const publicUrl = `${supabaseUrl}/storage/v1/object/public/${bucket}/${path}`;
+    return { publicUrl, error: null };
+  } catch (error) {
+    console.error('Direct file upload failed:', error);
+    return { publicUrl: null, error: error instanceof Error ? error : new Error('Unknown error') };
   }
 };
 
