@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/components/FormNavigation.tsx
-// Version: 1.4.0
-// Last Modified: 28-02-2025 19:15 IST
-// Purpose: Fixed navigation in edit mode to preserve property ID
+// Version: 1.5.0
+// Last Modified: 01-03-2025 14:45 IST
+// Purpose: Fixed navigation in property form to ensure correct tab selection
 
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';

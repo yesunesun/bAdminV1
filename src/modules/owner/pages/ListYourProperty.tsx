@@ -1,6 +1,7 @@
 // src/pages/ListYourProperty.tsx
-// Version: 1.4.0
-// Last Modified: 28-02-2025 15:35 IST
+// Version: 1.5.0
+// Last Modified: 01-03-2025 14:35 IST
+// Purpose: Entry point for property listing with fixed navigation
 
 import React, { useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -20,12 +21,18 @@ export default function ListYourProperty() {
       localStorage.removeItem(`propertyWizard_${userId}_data`);
       localStorage.removeItem(`propertyWizard_${userId}_step`);
     }
-  }, []);
+
+    // Fix for navigation: If no step specified, redirect to details step
+    if (category && type && !step) {
+      console.log('No step specified, redirecting to details step');
+      navigate(`/properties/list/${category.toLowerCase()}/${type.toLowerCase()}/details`, { replace: true });
+    }
+  }, [category, type, step, navigate]);
 
   const handlePropertyTypeSelect = (selectedCategory: string, selectedType: string, selectedCity: string) => {
     console.log('PropertyType selection:', { selectedCategory, selectedType, selectedCity });
     
-    // Ensure proper URL path formation
+    // Ensure proper URL path formation with 'details' as default step
     const path = `/properties/list/${selectedCategory.toLowerCase()}/${selectedType.toLowerCase()}/details`;
     console.log('Navigating to:', path);
     

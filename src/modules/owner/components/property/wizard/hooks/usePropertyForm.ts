@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/hooks/usePropertyForm.ts
-// Version: 1.7.0
-// Last Modified: 28-02-2025 15:30 IST
-// Purpose: Custom hook for property form state management with enhanced error handling
+// Version: 1.8.0
+// Last Modified: 01-03-2025 14:30 IST
+// Purpose: Custom hook for property form state management with enhanced error handling and fixed navigation
 
 import { useState, useCallback, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
@@ -104,20 +104,21 @@ export function usePropertyForm({
     }
   });
 
-  // Initialize currentStep from URL or localStorage
+  // Initialize currentStep from URL or localStorage - IMPORTANT FIX HERE
   const [currentStep, setCurrentStep] = useState(() => {
-    // If we're in edit mode, prioritize loading from local storage
+    // If step is in URL, prioritize that regardless of mode
+    if (step) {
+      const stepIndex = STEPS.findIndex(s => s.id === step) + 1;
+      // Ensure a valid step index, defaulting to 1 (details) if not found or invalid
+      return stepIndex > 0 ? stepIndex : 1;
+    }
+    
+    // If we're in edit mode, try loading from local storage
     if (mode === 'edit') {
       const savedStep = localStorage.getItem(`propertyWizard_${user?.id}_${existingPropertyId}_step`);
       if (savedStep) {
         return parseInt(savedStep);
       }
-    }
-    
-    // Otherwise, check URL step parameter
-    if (step) {
-      const stepIndex = STEPS.findIndex(s => s.id === step) + 1;
-      return stepIndex > 0 ? stepIndex : 1;
     }
     
     // Fall back to general saved step
@@ -126,6 +127,7 @@ export function usePropertyForm({
       return parseInt(savedStep);
     }
     
+    // Default to first step (Basic Details)
     return 1;
   });
 

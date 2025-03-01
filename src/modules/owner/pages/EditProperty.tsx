@@ -1,7 +1,7 @@
 // src/modules/owner/pages/EditProperty.tsx
-// Version: 3.0.0
-// Last Modified: 01-03-2025 19:45 IST
-// Purpose: Direct patch to fix form field population in edit mode
+// Version: 3.1.0
+// Last Modified: 01-03-2025 20:30 IST
+// Purpose: Fixed tab selection for edit mode to always default to details tab
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
@@ -25,6 +25,14 @@ export default function EditProperty() {
   
   // Get current step from URL query parameter
   const stepParam = searchParams.get('step');
+
+  // Force navigation to details tab if no step is specified
+  useEffect(() => {
+    if (id && !stepParam && !loading && property) {
+      console.log('No step specified in edit mode, redirecting to details tab');
+      navigate(`/properties/${id}/edit?step=details`, { replace: true });
+    }
+  }, [id, stepParam, navigate, loading, property]);
 
   useEffect(() => {
     const fetchProperty = async () => {
@@ -104,6 +112,10 @@ export default function EditProperty() {
             const storageKey = `propertyWizard_${user.id}_${id}_data`;
             localStorage.setItem(storageKey, JSON.stringify(formData));
             console.log('Saved form data to localStorage for direct access');
+            
+            // Always set step to 1 (details) in localStorage
+            localStorage.setItem(`propertyWizard_${user.id}_${id}_step`, '1');
+            console.log('Reset step to 1 (details) in localStorage');
           }
           
           setInitialData(formData as FormData);
@@ -155,6 +167,10 @@ export default function EditProperty() {
             const storageKey = `propertyWizard_${user.id}_${id}_data`;
             localStorage.setItem(storageKey, JSON.stringify(formData));
             console.log('Saved form data to localStorage for direct access');
+            
+            // Always set step to 1 (details) in localStorage
+            localStorage.setItem(`propertyWizard_${user.id}_${id}_step`, '1');
+            console.log('Reset step to 1 (details) in localStorage');
           }
           
           setInitialData(formData);
@@ -170,7 +186,7 @@ export default function EditProperty() {
     };
 
     fetchProperty();
-  }, [id, user]);
+  }, [id, user, navigate]);
 
   // Log step parameter when it changes
   useEffect(() => {
@@ -305,7 +321,7 @@ export default function EditProperty() {
         status={property.status as 'draft' | 'published'}
         selectedCategory={initialData.propertyType}
         selectedAdType={initialData.listingType}
-        currentStep={stepParam || undefined}
+        currentStep={stepParam || "details"} // Default to details if no step is specified
       />
     </>
   );

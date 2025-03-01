@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/PropertyDetails.tsx
-// Version: 3.1.0
-// Last Modified: 28-02-2025 15:45 IST
-// Purpose: Fixed property details form to properly display initial values in edit mode
+// Version: 3.2.0
+// Last Modified: 01-03-2025 12:30 IST
+// Purpose: Fixed Built-up Area field to allow manual editing and improved input handling
 
 import React, { useEffect, useState } from 'react';
 import { FormSection } from '@/components/FormSection';
@@ -237,20 +237,33 @@ export function PropertyDetails({ form, mode = 'create', category, adType }: For
             <RequiredLabel required className="text-base">Built-up Area</RequiredLabel>
             <div className="relative">
               <Input
-                type="number"
-                min="100"
+                type="text"
+                inputMode="numeric"
                 className="h-11 text-base pr-16"
                 value={values.builtUpArea}
                 placeholder="Area (min. 100)"
                 onChange={(e) => {
                   const val = e.target.value;
+                  
+                  // Allow empty value for manual editing
                   if (val === '') {
                     updateFormAndState('builtUpArea', '');
                     return;
                   }
-                  const numValue = parseInt(val);
-                  if (!isNaN(numValue) && numValue >= 100) {
-                    updateFormAndState('builtUpArea', numValue.toString());
+                  
+                  // Allow typing numbers only
+                  if (/^\d*$/.test(val)) {
+                    updateFormAndState('builtUpArea', val);
+                    
+                    // Validate the minimum value only when submitting or leaving the field
+                    // This allows free editing while typing
+                  }
+                }}
+                onBlur={(e) => {
+                  // Validate minimum value when field loses focus
+                  const val = e.target.value;
+                  if (val && parseInt(val) < 100) {
+                    updateFormAndState('builtUpArea', '100');
                   }
                 }}
               />
