@@ -1,6 +1,6 @@
 // src/components/property/PropertyFormTypes.ts
-// Version: 1.3.0
-// Last Modified: 26-02-2025 14:55 IST
+// Version: 1.5.0
+// Last Modified: 03-03-2025 19:15 IST
 
 import { UseFormReturn } from 'react-hook-form';
 import { PropertyValidationSchema } from './validationSchemas';
@@ -18,6 +18,8 @@ export type FormData = {
   propertyAge: string;
   facing: string;
   builtUpArea: string;
+  builtUpAreaUnit: 'sqft' | 'sqyd'; // Add the built-up area unit
+  possessionDate: string; // Added possession date field
   zone: string;
   locality: string;
   landmark: string;
@@ -59,11 +61,6 @@ export type FormData = {
   }>;
   primaryImage?: string;
 };
-
-export interface FormSectionProps {
-  form: UseFormReturn<FormData>;
-  mode?: 'create' | 'edit';
-}
 
 export interface Property {
   id: string;

@@ -1,6 +1,6 @@
 // src/modules/owner/components/property/wizard/constants.ts
-// Version: 2.0.0
-// Last Modified: 2025-02-27T12:30:00+05:30 (IST)
+// Version: 2.1.0
+// Last Modified: 2025-03-03T14:45:00+05:30 (IST)
 // Author: Bhoomitalli Team
 
 import { 
@@ -85,6 +85,11 @@ export const FACING_OPTIONS = [
   'North West',
   'South East',
   'South West'
+] as const;
+
+export const AREA_UNITS = [
+  { value: 'sqft', label: 'sq ft' },
+  { value: 'sqyd', label: 'sq yard' }
 ] as const;
 
 export const RENTAL_TYPES = [

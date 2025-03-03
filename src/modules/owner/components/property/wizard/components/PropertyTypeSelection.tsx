@@ -16,7 +16,7 @@ const propertyCategories = [
     id: 'residential',
     title: 'Residential',
     icon: Home,
-    listingTypes: ['Rent', 'Resale', 'PG/Hostel', 'Flatmates']
+    listingTypes: ['Rent', 'Sale', 'PG/Hostel', 'Flatmates']
   },
   {
     id: 'commercial',

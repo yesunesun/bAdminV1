@@ -1,7 +1,7 @@
 // src/modules/owner/pages/EditProperty.tsx
-// Version: 3.1.0
-// Last Modified: 01-03-2025 20:30 IST
-// Purpose: Fixed tab selection for edit mode to always default to details tab
+// Version: 3.3.0
+// Last Modified: 03-03-2025 19:15 IST
+// Purpose: Added possessionDate field handling
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
@@ -68,6 +68,8 @@ export default function EditProperty() {
             propertyAge: propertyData.property_details.propertyAge || '',
             facing: propertyData.property_details.facing || '',
             builtUpArea: propertyData.property_details.builtUpArea || propertyData.square_feet?.toString() || '',
+            builtUpAreaUnit: propertyData.property_details.builtUpAreaUnit || 'sqft',
+            possessionDate: propertyData.property_details.possessionDate || '', // Add possessionDate
             zone: propertyData.property_details.zone || '',
             locality: propertyData.property_details.locality || propertyData.city || '',
             landmark: propertyData.property_details.landmark || '',
@@ -104,7 +106,9 @@ export default function EditProperty() {
             totalFloors: formData.totalFloors,
             propertyAge: formData.propertyAge,
             facing: formData.facing,
-            builtUpArea: formData.builtUpArea
+            builtUpArea: formData.builtUpArea,
+            builtUpAreaUnit: formData.builtUpAreaUnit,
+            possessionDate: formData.possessionDate // Log for debugging
           });
           
           // Store in local storage as a direct workaround
@@ -134,6 +138,8 @@ export default function EditProperty() {
             propertyAge: '',
             facing: '',
             builtUpArea: propertyData.square_feet?.toString() || '',
+            builtUpAreaUnit: 'sqft', // Default to 'sqft' for new properties
+            possessionDate: '', // Add default empty possessionDate field
             zone: '',
             locality: propertyData.city || '',
             landmark: '',

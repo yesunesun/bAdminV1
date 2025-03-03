@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/types.ts
-// Version: 2.0.0
-// Last Modified: 27-02-2025 12:30 IST
-// Updates: Migrated to owner module
+// Version: 2.2.0
+// Last Modified: 03-03-2025 19:15 IST
+// Updates: Added possessionDate field
 
 import { UseFormReturn } from 'react-hook-form';
 // Update this import to point to the new location
@@ -22,6 +22,8 @@ export type FormData = {
   propertyAge: string;
   facing: string;
   builtUpArea: string;
+  builtUpAreaUnit: 'sqft' | 'sqyd'; // For area unit
+  possessionDate: string; // New field for possession date
   zone: string;
   locality: string;
   landmark: string;

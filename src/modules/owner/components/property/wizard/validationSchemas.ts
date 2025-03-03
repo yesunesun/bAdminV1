@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/validationSchemas.ts
-// Version: 2.1.0
-// Last Modified: 28-02-2025 16:30 IST
-// Updates: Added latitude and longitude fields for Google Maps integration
+// Version: 2.3.0
+// Last Modified: 03-03-2025 19:15 IST
+// Updates: Added possessionDate field validation
 
 import { z } from 'zod';
 // Updated import to use the migrated constants file
@@ -24,6 +24,8 @@ export const propertyValidationSchema = z.object({
   propertyAge: z.enum(PROPERTY_AGE as [string, ...string[]]).min(1, 'Property age is required'),
   facing: z.enum(FACING_OPTIONS as [string, ...string[]]).min(1, 'Facing direction is required'),
   builtUpArea: z.string().min(1, 'Built-up area is required'),
+  builtUpAreaUnit: z.enum(['sqft', 'sqyd']).default('sqft'),
+  possessionDate: z.string().optional(), // Added possession date as optional
 
   // Location Details
   zone: z.string().min(1, 'Zone is required'),
@@ -80,6 +82,8 @@ export const stepValidationSchemas = {
     propertyAge: true,
     facing: true,
     builtUpArea: true,
+    builtUpAreaUnit: true,
+    possessionDate: true, // Added to step 1 validation
   }),
   2: propertyValidationSchema.pick({
     zone: true,

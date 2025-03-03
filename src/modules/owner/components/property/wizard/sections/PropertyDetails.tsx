@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/PropertyDetails.tsx
-// Version: 3.2.0
-// Last Modified: 01-03-2025 12:30 IST
-// Purpose: Fixed Built-up Area field to allow manual editing and improved input handling
+// Version: 3.7.0
+// Last Modified: 03-03-2025 19:15 IST
+// Purpose: Added Possession Date field to Property Details
 
 import React, { useEffect, useState } from 'react';
 import { FormSection } from '@/components/FormSection';
@@ -14,11 +14,32 @@ import {
   BHK_TYPES,
   PROPERTY_AGE,
   FACING_OPTIONS,
+  AREA_UNITS,
 } from '../constants';
 
 export function PropertyDetails({ form, mode = 'create', category, adType }: FormSectionProps) {
   // Get initial form values directly
   const initialValues = form.getValues();
+  
+  // Ensure builtUpAreaUnit has a default value of 'sqft' if it's not already set
+  useEffect(() => {
+    // Always check if builtUpAreaUnit is empty or undefined and set default
+    const currentUnit = form.getValues().builtUpAreaUnit;
+    console.log('Initial builtUpAreaUnit:', currentUnit);
+    
+    if (!currentUnit) {
+      console.log('Setting default builtUpAreaUnit to sqft');
+      form.setValue('builtUpAreaUnit', 'sqft', { shouldValidate: false });
+    }
+    
+    // Log all form values to debug
+    console.log('All form values on mount:', form.getValues());
+  }, [form]);
+  
+  // Get tomorrow's date in YYYY-MM-DD format for min date
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const minDate = tomorrow.toISOString().split('T')[0];
   
   // Use component state to render values with proper initialization
   const [values, setValues] = useState({
@@ -29,24 +50,30 @@ export function PropertyDetails({ form, mode = 'create', category, adType }: For
     propertyAge: initialValues.propertyAge || '',
     facing: initialValues.facing || '',
     builtUpArea: initialValues.builtUpArea || '',
+    builtUpAreaUnit: initialValues.builtUpAreaUnit || 'sqft', // Always default to sqft
+    possessionDate: initialValues.possessionDate || '',
     title: initialValues.title || ''
   });
   
-  // Log initial values for debugging
+  // Force set default value for builtUpAreaUnit if not present in initial state
   useEffect(() => {
-    console.log('PropertyDetails component mount with initial values:', initialValues);
-    console.log('State values initialized as:', values);
+    if (!values.builtUpAreaUnit) {
+      setValues(prev => ({
+        ...prev,
+        builtUpAreaUnit: 'sqft'
+      }));
+    }
   }, []);
   
   // Subscribe to form changes to keep local state in sync
   useEffect(() => {
     const subscription = form.watch((value, { name }) => {
       // Only update our state if specific fields we care about change
-      if (name && ['propertyType', 'bhkType', 'floor', 'totalFloors', 'propertyAge', 'facing', 'builtUpArea', 'title'].includes(name)) {
+      if (name && ['propertyType', 'bhkType', 'floor', 'totalFloors', 'propertyAge', 'facing', 'builtUpArea', 'builtUpAreaUnit', 'possessionDate', 'title'].includes(name)) {
         console.log(`Form field "${name}" changed to:`, value[name]);
         setValues(prev => ({
           ...prev,
-          [name]: value[name] || ''
+          [name]: value[name] || (name === 'builtUpAreaUnit' ? 'sqft' : '')
         }));
       }
     });
@@ -57,6 +84,11 @@ export function PropertyDetails({ form, mode = 'create', category, adType }: For
   // After the component mounts, check if we need to sync state with form
   useEffect(() => {
     const formValues = form.getValues();
+    console.log('Checking sync - current form values:', formValues);
+    
+    // Ensure builtUpAreaUnit has a value
+    const areaUnit = formValues.builtUpAreaUnit || 'sqft';
+    
     const needsSync = Object.entries({
       propertyType: formValues.propertyType || category || '',
       bhkType: formValues.bhkType || '',
@@ -65,8 +97,16 @@ export function PropertyDetails({ form, mode = 'create', category, adType }: For
       propertyAge: formValues.propertyAge || '',
       facing: formValues.facing || '',
       builtUpArea: formValues.builtUpArea || '',
+      builtUpAreaUnit: areaUnit,
+      possessionDate: formValues.possessionDate || '',
       title: formValues.title || ''
-    }).some(([key, value]) => values[key as keyof typeof values] !== value);
+    }).some(([key, value]) => {
+      const isDifferent = values[key as keyof typeof values] !== value;
+      if (isDifferent) {
+        console.log(`Field ${key} needs sync: state=${values[key as keyof typeof values]}, form=${value}`);
+      }
+      return isDifferent;
+    });
     
     if (needsSync) {
       console.log('Syncing component state with form values');
@@ -78,6 +118,8 @@ export function PropertyDetails({ form, mode = 'create', category, adType }: For
         propertyAge: formValues.propertyAge || '',
         facing: formValues.facing || '',
         builtUpArea: formValues.builtUpArea || '',
+        builtUpAreaUnit: areaUnit,
+        possessionDate: formValues.possessionDate || '',
         title: formValues.title || ''
       });
     }
@@ -93,6 +135,10 @@ export function PropertyDetails({ form, mode = 'create', category, adType }: For
     
     // Update form
     form.setValue(field, value, { shouldValidate: true });
+    
+    // Debug log
+    console.log(`Updated ${field} to:`, value);
+    console.log('Current form values after update:', form.getValues());
   };
   
   // Process numeric input
@@ -114,6 +160,10 @@ export function PropertyDetails({ form, mode = 'create', category, adType }: For
     
     updateFormAndState(fieldName, numValue.toString());
   };
+
+  // Force a unit value to avoid blank display
+  const unitValue = values.builtUpAreaUnit || 'sqft';
+  console.log('Current unitValue for rendering:', unitValue);
 
   return (
     <FormSection
@@ -231,61 +281,102 @@ export function PropertyDetails({ form, mode = 'create', category, adType }: For
           </div>
         </div>
 
-        {/* Area and Title - Two Column */}
+        {/* Area and Possession Date - Two Column */}
         <div className="grid grid-cols-2 gap-4">
           <div>
             <RequiredLabel required className="text-base">Built-up Area</RequiredLabel>
-            <div className="relative">
-              <Input
-                type="text"
-                inputMode="numeric"
-                className="h-11 text-base pr-16"
-                value={values.builtUpArea}
-                placeholder="Area (min. 100)"
-                onChange={(e) => {
-                  const val = e.target.value;
-                  
-                  // Allow empty value for manual editing
-                  if (val === '') {
-                    updateFormAndState('builtUpArea', '');
-                    return;
-                  }
-                  
-                  // Allow typing numbers only
-                  if (/^\d*$/.test(val)) {
-                    updateFormAndState('builtUpArea', val);
+            <div className="flex space-x-2">
+              <div className="relative flex-grow">
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  className="h-11 text-base"
+                  value={values.builtUpArea}
+                  placeholder="Area (min. 100)"
+                  onChange={(e) => {
+                    const val = e.target.value;
                     
-                    // Validate the minimum value only when submitting or leaving the field
-                    // This allows free editing while typing
-                  }
+                    // Allow empty value for manual editing
+                    if (val === '') {
+                      updateFormAndState('builtUpArea', '');
+                      return;
+                    }
+                    
+                    // Allow typing numbers only
+                    if (/^\d*$/.test(val)) {
+                      updateFormAndState('builtUpArea', val);
+                    }
+                  }}
+                  onBlur={(e) => {
+                    // Validate minimum value when field loses focus
+                    const val = e.target.value;
+                    if (val && parseInt(val) < 100) {
+                      updateFormAndState('builtUpArea', '100');
+                    }
+                  }}
+                />
+              </div>
+              <Select 
+                // Ensure a default value is always set
+                defaultValue="sqft"
+                value={unitValue}
+                onValueChange={(value) => {
+                  console.log('Area unit selected:', value);
+                  updateFormAndState('builtUpAreaUnit', value);
                 }}
-                onBlur={(e) => {
-                  // Validate minimum value when field loses focus
-                  const val = e.target.value;
-                  if (val && parseInt(val) < 100) {
-                    updateFormAndState('builtUpArea', '100');
-                  }
-                }}
-              />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-base text-slate-500 pointer-events-none">
-                sq ft
-              </span>
+              >
+                <SelectTrigger className="h-11 text-base w-28">
+                  <SelectValue>
+                    {unitValue === 'sqft' ? 'sq ft' : 'sq yard'}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent className="text-base">
+                  {AREA_UNITS.map(unit => (
+                    <SelectItem key={unit.value} value={unit.value} className="text-base">
+                      {unit.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
-          {mode === 'edit' && (
-            <div>
-              <RequiredLabel className="text-base">Title</RequiredLabel>
-              <Input
-                className="h-11 text-base"
-                value={values.title}
-                onChange={(e) => updateFormAndState('title', e.target.value)}
-                placeholder="E.g., Spacious 2BHK in Gachibowli"
-              />
-            </div>
-          )}
+          <div>
+            <RequiredLabel className="text-base">Possession Date</RequiredLabel>
+            <Input
+              type="date"
+              className="h-11 text-base"
+              min={minDate}
+              value={values.possessionDate}
+              onChange={(e) => updateFormAndState('possessionDate', e.target.value)}
+            />
+          </div>
         </div>
+
+        {/* Title (Only in edit mode) */}
+        {mode === 'edit' && (
+          <div>
+            <RequiredLabel className="text-base">Title</RequiredLabel>
+            <Input
+              className="h-11 text-base"
+              value={values.title}
+              onChange={(e) => updateFormAndState('title', e.target.value)}
+              placeholder="E.g., Spacious 2BHK in Gachibowli"
+            />
+          </div>
+        )}
       </div>
+      
+      {/* Debug output in development mode */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="mt-4 p-2 bg-gray-100 rounded text-xs">
+          <div>Current builtUpAreaUnit value: {unitValue}</div>
+          <div>Current possessionDate value: {values.possessionDate || 'not set'}</div>
+          <div>Form builtUpAreaUnit value: {form.getValues().builtUpAreaUnit || 'not set'}</div>
+          <div>Form possessionDate value: {form.getValues().possessionDate || 'not set'}</div>
+          <div>Mode: {mode}</div>
+        </div>
+      )}
       
       {/* Add a special auto-refresh button in development */}
       {process.env.NODE_ENV === 'development' && (
@@ -305,6 +396,8 @@ export function PropertyDetails({ form, mode = 'create', category, adType }: For
               propertyAge: currentValues.propertyAge || '',
               facing: currentValues.facing || '',
               builtUpArea: currentValues.builtUpArea || '',
+              builtUpAreaUnit: currentValues.builtUpAreaUnit || 'sqft',
+              possessionDate: currentValues.possessionDate || '',
               title: currentValues.title || ''
             });
           }}

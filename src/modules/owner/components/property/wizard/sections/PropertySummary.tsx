@@ -1,6 +1,6 @@
 // src/components/property/wizard/sections/PropertySummary.tsx
-// Version: 1.3.0
-// Last Modified: 2025-02-06T16:45:00+05:30 (IST)
+// Version: 1.4.0
+// Last Modified: 2025-03-03T18:30:00+05:30 (IST)
 
 import React from 'react';
 import { FormSection } from '@/components/FormSection';
@@ -52,6 +52,14 @@ const formatCurrency = (value?: string | number) => {
   return `₹${Number(value).toLocaleString('en-IN')}`;
 };
 
+// Function to format area with the correct unit
+const formatArea = (area?: string, unit?: string) => {
+  if (!area) return '-';
+  // Display the appropriate unit based on the builtUpAreaUnit value
+  const displayUnit = unit === 'sqyd' ? 'sq.yard' : 'sq.ft.';
+  return `${area} ${displayUnit}`;
+};
+
 export function PropertySummary({
   formData,
   onPrevious,
@@ -63,6 +71,12 @@ export function PropertySummary({
   propertyId
 }: PropertySummaryProps) {
   const isPublished = status === 'published';
+
+  // Debug log to verify area unit data
+  console.log('PropertySummary - Area data:', { 
+    area: formData.builtUpArea, 
+    unit: formData.builtUpAreaUnit 
+  });
 
   const renderButtons = () => {
     if (saving) {
@@ -145,7 +159,7 @@ export function PropertySummary({
             items={[
               { label: 'Property Type', value: formData.propertyType },
               { label: 'BHK Type', value: formData.bhkType },
-              { label: 'Built-up Area', value: `${formData.builtUpArea} sq.ft.` },
+              { label: 'Built-up Area', value: formatArea(formData.builtUpArea, formData.builtUpAreaUnit) },
               { label: 'Floor', value: `${formData.floor} of ${formData.totalFloors}` },
               { label: 'Property Age', value: formData.propertyAge },
               { label: 'Facing', value: formData.facing },
