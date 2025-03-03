@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/LocationDetails/hooks/useMapInteractions.ts
-// Version: 1.1.0
-// Last Modified: 28-02-2025 21:15 IST
-// Purpose: Custom hook for map interaction functionality
+// Version: 1.2.0
+// Last Modified: 03-03-2025 12:30 IST
+// Purpose: Custom hook for map interaction functionality with default current location
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { UseFormReturn } from 'react-hook-form';
@@ -122,10 +122,9 @@ export function useMapInteractions({ form, mapLoaded, mapRef }: UseMapInteractio
         }
       });
       
-      // Try to get user's current location if no coordinates are set
-      if (!latitude && !longitude) {
-        getUserCurrentLocation();
-      }
+      // Always attempt to get user's current location initially
+      getUserCurrentLocationWithMarker();
+      
     } catch (error) {
       console.error('Error initializing map:', error);
       setMapError('Failed to initialize map. Please refresh the page and try again.');
@@ -195,23 +194,51 @@ export function useMapInteractions({ form, mapLoaded, mapRef }: UseMapInteractio
     }
   }, [setValue, zone]);
   
-  // Get user's current location
-  const getUserCurrentLocation = useCallback(async () => {
+  // Get user's current location and set marker with form values
+  const getUserCurrentLocationWithMarker = useCallback(async () => {
     if (!googleMapRef.current) return;
     
     setIsGeolocating(true);
+    setMapError('');
     
     try {
       const position = await MapService.getUserLocation();
-      const { latitude, longitude } = position.coords;
+      const { latitude: lat, longitude: lng } = position.coords;
       
       // Update map center and zoom
-      const userLocation = new window.google.maps.LatLng(latitude, longitude);
+      const userLocation = new window.google.maps.LatLng(lat, lng);
       googleMapRef.current.setCenter(userLocation);
       googleMapRef.current.setZoom(15);
       
-      // Don't automatically set marker or form values
-      // Let user confirm this is the right location first
+      // Set marker at current location
+      if (markerRef.current) {
+        markerRef.current.setPosition(userLocation);
+      } else {
+        markerRef.current = new window.google.maps.Marker({
+          position: userLocation,
+          map: googleMapRef.current,
+          draggable: true,
+          animation: window.google.maps.Animation.DROP,
+        });
+        
+        // Add drag listener
+        markerRef.current.addListener('dragend', () => {
+          const newPosition = markerRef.current?.getPosition();
+          if (newPosition) {
+            setValue('latitude', newPosition.lat());
+            setValue('longitude', newPosition.lng());
+            updateAddressFromPosition(newPosition);
+          }
+        });
+      }
+      
+      // Update form values
+      setValue('latitude', lat);
+      setValue('longitude', lng);
+      
+      // Reverse geocode to update address fields
+      updateAddressFromPosition(userLocation);
+      
     } catch (error) {
       console.error('Error getting user location:', error);
       setMapError('Could not get your current location. Please allow location access or set the location manually.');
@@ -219,7 +246,12 @@ export function useMapInteractions({ form, mapLoaded, mapRef }: UseMapInteractio
     } finally {
       setIsGeolocating(false);
     }
-  }, []);
+  }, [googleMapRef, setValue, updateAddressFromPosition]);
+  
+  // Legacy method - keep for backward compatibility with button
+  const getUserCurrentLocation = useCallback(async () => {
+    getUserCurrentLocationWithMarker();
+  }, [getUserCurrentLocationWithMarker]);
   
   // Function to find address on map
   const findAddressOnMap = useCallback(async () => {

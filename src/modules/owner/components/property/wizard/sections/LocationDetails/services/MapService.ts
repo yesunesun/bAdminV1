@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/LocationDetails/services/MapService.ts
-// Version: 1.4.0
-// Last Modified: 29-02-2025 10:00 IST
-// Purpose: Fixed Google Maps loading with async pattern
+// Version: 1.6.0
+// Last Modified: 03-03-2025 13:15 IST
+// Purpose: Fixed Google Maps loading with correct async implementation
 
 export class MapService {
   // Get API key in a browser-compatible way
@@ -37,14 +37,15 @@ export class MapService {
       
       // 1. Define the callback function before creating the script
       window.initGoogleMaps = () => {
+        console.log("Google Maps API loaded successfully");
         resolve();
       };
 
-      // 2. Create script element with async
+      // 2. Create script element with async attribute (not as URL parameter)
       const script = document.createElement('script');
       script.id = 'google-maps-script';
       script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&callback=initGoogleMaps`;
-      script.async = true; // Keep this for async loading
+      script.async = true; // Proper way to set async
       script.defer = true;
 
       // 3. Handle errors
@@ -55,6 +56,8 @@ export class MapService {
 
       // 4. Add the script to the document
       document.head.appendChild(script);
+      
+      console.log("Google Maps script tag added to document head");
     });
   }
 
@@ -65,12 +68,19 @@ export class MapService {
         return;
       }
 
+      console.log("Requesting user geolocation...");
       navigator.geolocation.getCurrentPosition(
-        (position) => resolve(position),
-        (error) => reject(error),
+        (position) => {
+          console.log("Got user position:", position.coords.latitude, position.coords.longitude);
+          resolve(position);
+        },
+        (error) => {
+          console.error("Geolocation error:", error.message);
+          reject(error);
+        },
         {
           enableHighAccuracy: true,
-          timeout: 5000,
+          timeout: 10000, // Increased timeout for slower connections
           maximumAge: 0
         }
       );
@@ -82,10 +92,13 @@ export class MapService {
     address: string
   ): Promise<google.maps.GeocoderResult[]> {
     return new Promise((resolve, reject) => {
+      console.log("Geocoding address:", address);
       geocoder.geocode({ address }, (results, status) => {
         if (status === 'OK' && results && results.length > 0) {
+          console.log("Geocoding successful:", results[0].formatted_address);
           resolve(results);
         } else {
+          console.error("Geocoding failed:", status);
           reject(new Error(`Geocoding failed with status: ${status}`));
         }
       });
@@ -97,10 +110,13 @@ export class MapService {
     position: google.maps.LatLng
   ): Promise<google.maps.GeocoderResult[]> {
     return new Promise((resolve, reject) => {
+      console.log("Reverse geocoding position:", position.lat(), position.lng());
       geocoder.geocode({ location: position }, (results, status) => {
         if (status === 'OK' && results && results.length > 0) {
+          console.log("Reverse geocoding successful:", results[0].formatted_address);
           resolve(results);
         } else {
+          console.error("Reverse geocoding failed:", status);
           reject(new Error(`Reverse geocoding failed with status: ${status}`));
         }
       });

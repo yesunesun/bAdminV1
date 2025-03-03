@@ -1,20 +1,18 @@
 // src/modules/owner/components/property/wizard/sections/LocationDetails/index.tsx
-// Version: 1.2.0
-// Last Modified: 28-02-2025 21:15 IST
-// Purpose: Main LocationDetails component with local constants
+// Version: 2.0.0
+// Last Modified: 03-03-2025 22:45 IST
+// Purpose: Main LocationDetails component with updated location fields
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useRef } from 'react';
 import { FormSection } from '@/components/FormSection';
 import { FormSectionProps } from '../../../types';
 import { useGoogleMaps } from './hooks/useGoogleMaps';
 import { useMapInteractions } from './hooks/useMapInteractions';
-import { ZoneLocalitySelectors } from './components/ZoneLocalitySelectors';
+import { LocationSelectors } from './components/LocationSelectors';
 import { LandmarkPincodeInputs } from './components/LandmarkPincodeInputs';
 import { AddressInput } from './components/AddressInput';
 import { MapControls } from './components/MapControls';
 import { MapContainer } from './components/MapContainer';
-// Import from local constants file
-import { HYDERABAD_LOCATIONS } from './constants';
 
 // Define global initialization function
 if (typeof window !== 'undefined') {
@@ -25,12 +23,9 @@ if (typeof window !== 'undefined') {
 
 export function LocationDetails({ form }: FormSectionProps) {
   const { setValue, watch } = form;
-  const [selectedZone, setSelectedZone] = useState<string>('');
-  const [localities, setLocalities] = useState<string[]>([]);
   const mapRef = useRef<HTMLDivElement>(null);
 
-  const zone = watch('zone');
-  const locality = watch('locality');
+  // Get form values
   const address = watch('address');
   const latitude = watch('latitude');
   const longitude = watch('longitude');
@@ -48,18 +43,6 @@ export function LocationDetails({ form }: FormSectionProps) {
     resetMarker
   } = useMapInteractions({ form, mapLoaded, mapRef });
 
-  // Update localities when zone changes
-  useEffect(() => {
-    if (zone) {
-      setSelectedZone(zone);
-      setLocalities(HYDERABAD_LOCATIONS[zone as keyof typeof HYDERABAD_LOCATIONS] || []);
-      // Clear locality when zone changes
-      if (!HYDERABAD_LOCATIONS[zone as keyof typeof HYDERABAD_LOCATIONS]?.includes(locality)) {
-        setValue('locality', '');
-      }
-    }
-  }, [zone, locality, setValue]);
-
   // Handle pin code input to only allow numbers
   const handlePinCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.replace(/\D/g, '').slice(0, 6);
@@ -75,12 +58,8 @@ export function LocationDetails({ form }: FormSectionProps) {
       description="Where is your property located?"
     >
       <div className="space-y-4">
-        {/* Zone and Locality Selection */}
-        <ZoneLocalitySelectors 
-          form={form} 
-          selectedZone={selectedZone} 
-          localities={localities} 
-        />
+        {/* Location Selection Fields (District, City, Locality, Area) */}
+        <LocationSelectors form={form} />
 
         {/* Landmark and PIN Code */}
         <LandmarkPincodeInputs 

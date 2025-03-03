@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/validationSchemas.ts
-// Version: 2.3.0
-// Last Modified: 03-03-2025 19:15 IST
-// Updates: Added possessionDate field validation
+// Version: 2.4.0
+// Last Modified: 03-03-2025 22:45 IST
+// Updates: Updated location fields validation
 
 import { z } from 'zod';
 // Updated import to use the migrated constants file
@@ -27,9 +27,12 @@ export const propertyValidationSchema = z.object({
   builtUpAreaUnit: z.enum(['sqft', 'sqyd']).default('sqft'),
   possessionDate: z.string().optional(), // Added possession date as optional
 
-  // Location Details
-  zone: z.string().min(1, 'Zone is required'),
+  // Location Details - Updated fields
+  state: z.string().min(1, 'State is required'),
+  district: z.string().min(1, 'District is required'),
+  city: z.string().min(1, 'City is required'),
   locality: z.string().min(1, 'Locality is required'),
+  area: z.string().min(1, 'Area is required'),
   landmark: z.string().optional(),
   address: z.string().min(1, 'Complete address is required'),
   pinCode: z.string().length(6, 'PIN code must be 6 digits').regex(/^\d+$/, 'Must contain only numbers'),
@@ -86,8 +89,11 @@ export const stepValidationSchemas = {
     possessionDate: true, // Added to step 1 validation
   }),
   2: propertyValidationSchema.pick({
-    zone: true,
+    state: true,
+    district: true,
+    city: true,
     locality: true,
+    area: true,
     address: true,
     pinCode: true,
     // We don't make these required for validation

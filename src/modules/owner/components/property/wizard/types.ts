@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/types.ts
-// Version: 2.2.0
-// Last Modified: 03-03-2025 19:15 IST
-// Updates: Added possessionDate field
+// Version: 2.3.0
+// Last Modified: 03-03-2025 22:45 IST
+// Updates: Updated location fields
 
 import { UseFormReturn } from 'react-hook-form';
 // Update this import to point to the new location
@@ -24,8 +24,12 @@ export type FormData = {
   builtUpArea: string;
   builtUpAreaUnit: 'sqft' | 'sqyd'; // For area unit
   possessionDate: string; // New field for possession date
-  zone: string;
+  // Location fields - updated
+  state: string;
+  district: string;
+  city: string;
   locality: string;
+  area: string;
   landmark: string;
   address: string;
   pinCode: string;
@@ -119,7 +123,9 @@ export type StepValidationStatus = {
 };
 
 export type PropertyFilter = {
-  zone?: string;
+  state?: string;
+  district?: string;
+  city?: string;
   locality?: string;
   propertyType?: string;
   bhkType?: string;
