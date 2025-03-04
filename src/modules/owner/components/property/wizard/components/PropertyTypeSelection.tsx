@@ -1,6 +1,6 @@
 // src/components/property/wizard/components/PropertyTypeSelection.tsx
-// Version: 1.4.0
-// Last Modified: 26-02-2025 14:30 IST
+// Version: 1.5.0
+// Last Modified: 05-03-2025 14:35 IST
 
 import React, { useState, useEffect } from 'react';
 import { 
@@ -72,7 +72,7 @@ export default function PropertyTypeSelection({
     if (initialAdType) setSelectedListingType(initialAdType);
   }, [initialCategory, initialAdType]);
 
-  // This is the key function that was causing the issue
+  // Modified to ensure proper navigation to details step
   const handleSubmit = () => {
     if (selectedCategory && selectedListingType) {
       // Ensure consistent casing for category and listing type

@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/hooks/usePropertyForm.ts
-// Version: 1.8.0
-// Last Modified: 01-03-2025 14:30 IST
-// Purpose: Custom hook for property form state management with enhanced error handling and fixed navigation
+// Version: 1.9.0
+// Last Modified: 05-03-2025 14:30 IST
+// Purpose: Custom hook for property form state management with fixed navigation flow
 
 import { useState, useCallback, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
@@ -104,13 +104,18 @@ export function usePropertyForm({
     }
   });
 
-  // Initialize currentStep from URL or localStorage - IMPORTANT FIX HERE
+  // Initialize currentStep from URL or localStorage - FIXED INITIALIZATION
   const [currentStep, setCurrentStep] = useState(() => {
     // If step is in URL, prioritize that regardless of mode
     if (step) {
       const stepIndex = STEPS.findIndex(s => s.id === step) + 1;
       // Ensure a valid step index, defaulting to 1 (details) if not found or invalid
       return stepIndex > 0 ? stepIndex : 1;
+    }
+    
+    // For newly created listings after property type selection, always start at step 1
+    if (mode === 'create' && !existingPropertyId) {
+      return 1; // Always start with Basic Details (step 1)
     }
     
     // If we're in edit mode, try loading from local storage
@@ -195,7 +200,9 @@ export function usePropertyForm({
     const stepData = STEPS[newStep - 1];
     if (!stepData) return;
 
-    const newPath = `/properties/list/${effectiveCategory.toLowerCase()}/${effectiveType.toLowerCase()}/${stepData.id}`;
+    // Ensure 'details' is the first step after property type selection
+    const stepId = newStep === 1 ? 'details' : stepData.id;
+    const newPath = `/properties/list/${effectiveCategory.toLowerCase()}/${effectiveType.toLowerCase()}/${stepId}`;
     console.log('Updating URL to:', newPath);
     navigate(newPath, { replace: true });
   }, [propertyCategory, category, adType, type, navigate, form]);

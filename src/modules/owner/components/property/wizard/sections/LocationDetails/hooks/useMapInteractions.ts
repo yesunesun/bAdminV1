@@ -1,14 +1,18 @@
 // src/modules/owner/components/property/wizard/sections/LocationDetails/hooks/useMapInteractions.ts
-// Version: 1.2.0
-// Last Modified: 03-03-2025 12:30 IST
-// Purpose: Custom hook for map interaction functionality with default current location
+// Version: 2.1.0
+// Last Modified: 05-03-2025 20:45 IST
+// Purpose: Enhanced map interactions with direct locality setting for text input field
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { UseFormReturn } from 'react-hook-form';
 import { FormData } from '../../../../types';
 import { MapService } from '../services/MapService';
-// Update import to use local constants
-import { HYDERABAD_LOCATIONS } from '../constants';
+// Import location constants
+import { 
+  HYDERABAD_LOCATIONS, 
+  LOCALITIES_BY_CITY, 
+  CITIES_BY_DISTRICT 
+} from '../constants';
 
 interface UseMapInteractionsProps {
   form: UseFormReturn<FormData>;
@@ -29,8 +33,14 @@ export function useMapInteractions({ form, mapLoaded, mapRef }: UseMapInteractio
   const latitude = watch('latitude');
   const longitude = watch('longitude');
   const zone = watch('zone');
+  const city = watch('city');
   const locality = watch('locality');
   const address = watch('address');
+
+  // Always set district to Hyderabad when component mounts
+  useEffect(() => {
+    setValue('district', 'Hyderabad');
+  }, [setValue]);
 
   // Initialize map when Google Maps API is loaded
   useEffect(() => {
@@ -131,68 +141,142 @@ export function useMapInteractions({ form, mapLoaded, mapRef }: UseMapInteractio
     }
   }, [mapLoaded, latitude, longitude, setValue, mapRef]);
 
-  // Function to update address fields from a position (reverse geocoding)
+  // Determine city from address components
+  const determineCityFromComponents = useCallback((addressComponents: google.maps.GeocoderAddressComponent[]): string => {
+    let detectedCity = '';
+    
+    // First look for explicit city component
+    for (const component of addressComponents) {
+      const types = component.types;
+      const name = component.long_name;
+      
+      if (types.includes('locality') && 
+         (name.includes('Hyderabad') || name.includes('Secunderabad'))) {
+        detectedCity = name;
+        break;
+      }
+    }
+    
+    // If still no city, check for Secunderabad references in other components
+    if (!detectedCity) {
+      for (const component of addressComponents) {
+        if (component.long_name.includes('Secunderabad')) {
+          detectedCity = 'Secunderabad';
+          break;
+        }
+      }
+    }
+    
+    // Default to Hyderabad if no city detected
+    return detectedCity || 'Hyderabad';
+  }, []);
+
+  // Improved function to update address fields from a position (reverse geocoding)
   const updateAddressFromPosition = useCallback(async (position: google.maps.LatLng) => {
     if (!geocoderRef.current) return;
     
     try {
       const results = await MapService.reverseGeocode(geocoderRef.current, position);
+      
+      if (!results || results.length === 0) {
+        console.warn('No geocoding results found');
+        return;
+      }
+      
       const result = results[0];
+      console.log('Geocoding result:', result);
       
       // Extract address components
-      let foundZone = '';
-      let foundLocality = '';
-      let foundPinCode = '';
+      let detectedLocalityName = '';
+      let area = '';
+      let pinCode = '';
       
-      // Extract address components
+      // Always set district to Hyderabad
+      setValue('district', 'Hyderabad');
+      
+      // Determine city (Hyderabad or Secunderabad)
+      const detectedCity = determineCityFromComponents(result.address_components);
+      setValue('city', detectedCity);
+      
+      // Extract other address components
       result.address_components.forEach(component => {
         const types = component.types;
+        const name = component.long_name;
         
-        if (types.includes('sublocality_level_1') || types.includes('sublocality')) {
-          // This could be a locality or zone
-          foundLocality = component.long_name;
-        }
-        
+        // Extract PIN/ZIP code
         if (types.includes('postal_code')) {
-          foundPinCode = component.long_name;
+          pinCode = name;
         }
         
-        // Try to determine zone from administrative areas
-        if (types.includes('administrative_area_level_2')) {
-          // Could be a zone in some cases
-          // Check if it matches any of our known zones
-          const zoneName = component.long_name;
-          Object.keys(HYDERABAD_LOCATIONS).forEach(knownZone => {
-            if (knownZone.includes(zoneName) || zoneName.includes(knownZone)) {
-              foundZone = knownZone;
-            }
-          });
+        // Extract locality/neighborhood
+        if (types.includes('sublocality_level_1') || 
+            types.includes('sublocality') || 
+            types.includes('neighborhood')) {
+          detectedLocalityName = name;
+        }
+        
+        // Extract smaller area
+        if (types.includes('sublocality_level_2') || 
+            types.includes('route') ||
+            types.includes('premise')) {
+          area = name;
         }
       });
       
-      // Set full address
+      // Set full address from formatted_address
       setValue('address', result.formatted_address);
       
-      // Try to set zone, locality and pincode if found
-      if (foundZone && Object.keys(HYDERABAD_LOCATIONS).includes(foundZone)) {
-        setValue('zone', foundZone);
+      // Set postal code if found
+      if (pinCode) {
+        setValue('pinCode', pinCode);
       }
       
-      if (foundLocality) {
-        // Check if locality is in our list for the zone
-        const zoneValue = foundZone || zone;
-        if (zoneValue && HYDERABAD_LOCATIONS[zoneValue as keyof typeof HYDERABAD_LOCATIONS]?.includes(foundLocality)) {
-          setValue('locality', foundLocality);
+      // Directly set the detected locality (no need to match against predefined list)
+      if (detectedLocalityName) {
+        setValue('locality', detectedLocalityName);
+        console.log(`Setting locality to detected value: ${detectedLocalityName}`);
+      } else {
+        // Try to extract a locality from the formatted address if no locality component was found
+        const formattedAddress = result.formatted_address || '';
+        const addressParts = formattedAddress.split(',').map(part => part.trim());
+        
+        // Usually the locality is the second or third part of the address
+        if (addressParts.length > 2) {
+          // Skip the last parts which are typically city, state, country, zip
+          const potentialLocality = addressParts[1];
+          if (potentialLocality && 
+              !potentialLocality.includes('Hyderabad') && 
+              !potentialLocality.includes('Telangana') &&
+              !potentialLocality.includes('India') &&
+              !/^\d+$/.test(potentialLocality)) { // Make sure it's not just a number
+            
+            setValue('locality', potentialLocality);
+            console.log(`Setting locality from formatted address: ${potentialLocality}`);
+          }
         }
       }
       
-      if (foundPinCode && foundPinCode.length === 6) {
-        setValue('pinCode', foundPinCode);
+      // Set area/neighborhood
+      if (area) {
+        setValue('area', area);
+      } else if (detectedLocalityName) {
+        // If no specific area but we have a locality, use that as area too
+        setValue('area', detectedLocalityName);
       }
+      
+      // Debug log the updated fields
+      console.log('Updated location fields:', {
+        district: 'Hyderabad',
+        city: detectedCity,
+        detectedLocality: detectedLocalityName,
+        area,
+        pinCode
+      });
+      
     } catch (error) {
       console.error('Error in reverse geocoding:', error);
     }
-  }, [setValue, zone]);
+  }, [setValue, determineCityFromComponents]);
   
   // Get user's current location and set marker with form values
   const getUserCurrentLocationWithMarker = useCallback(async () => {
@@ -265,15 +349,11 @@ export function useMapInteractions({ form, mapLoaded, mapRef }: UseMapInteractio
       searchAddress += `, ${formValues.locality}`;
     }
     
-    if (formValues.zone) {
-      searchAddress += `, ${formValues.zone}`;
-    }
-    
     if (formValues.pinCode) {
       searchAddress += `, ${formValues.pinCode}`;
     }
     
-    // Add city and state
+    // Add city and state - always use Hyderabad, Telangana
     searchAddress += ', Hyderabad, Telangana, India';
     
     if (!searchAddress.trim()) {
@@ -315,6 +395,9 @@ export function useMapInteractions({ form, mapLoaded, mapRef }: UseMapInteractio
       // Update form values
       setValue('latitude', location.lat());
       setValue('longitude', location.lng());
+      
+      // Get full address details
+      updateAddressFromPosition(location);
     } catch (error) {
       console.error('Error geocoding address:', error);
       setMapError('Could not find the address on the map. Please try being more specific or pin the location manually.');

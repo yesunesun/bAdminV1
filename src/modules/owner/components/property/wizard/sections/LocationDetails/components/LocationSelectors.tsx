@@ -1,52 +1,54 @@
 // src/modules/owner/components/property/wizard/sections/LocationDetails/components/LocationSelectors.tsx
-// Version: 1.0.0
-// Last Modified: 03-03-2025 22:45 IST
-// Purpose: Location selectors component for Telangana state
+// Version: 1.2.0
+// Last Modified: 05-03-2025 20:45 IST
+// Purpose: Location selectors component with editable locality text input
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { UseFormReturn } from 'react-hook-form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RequiredLabel } from '@/components/ui/RequiredLabel';
 import { Input } from '@/components/ui/input';
 import { FormData } from '../../../../types';
-import { TELANGANA_DISTRICTS, CITIES_BY_DISTRICT, LOCALITIES_BY_CITY } from '../constants';
+import { CITIES_BY_DISTRICT, LOCALITIES_BY_CITY } from '../constants';
 
 interface LocationSelectorsProps {
   form: UseFormReturn<FormData>;
 }
 
 export function LocationSelectors({ form }: LocationSelectorsProps) {
-  const { setValue, formState: { errors }, watch } = form;
-  const district = watch('district');
+  const { setValue, formState: { errors }, watch, register } = form;
   const city = watch('city');
-  const locality = watch('locality');
   
-  // Set Telangana as default state
+  // State to hold suggested localities for autofill
+  const [suggestedLocalities, setSuggestedLocalities] = useState<string[]>([]);
+  
+  // Set defaults - Telangana state and Hyderabad district
   useEffect(() => {
     if (!form.getValues('state')) {
       setValue('state', 'Telangana');
     }
+    
+    // Always set district to Hyderabad - the only supported district
+    setValue('district', 'Hyderabad');
   }, [form, setValue]);
   
-  // Reset dependent fields when parent field changes
+  // Update suggested localities when city changes
   useEffect(() => {
-    if (district && !CITIES_BY_DISTRICT[district]?.includes(city)) {
-      setValue('city', '');
-      setValue('locality', '');
+    if (city) {
+      const localities = LOCALITIES_BY_CITY[city] || [];
+      setSuggestedLocalities(localities);
+      
+      // Auto-fill locality with the first locality in the list if available and locality is not set
+      if (localities.length > 0 && !form.getValues('locality')) {
+        setValue('locality', localities[0]);
+      }
+    } else {
+      setSuggestedLocalities([]);
     }
-  }, [district, city, setValue]);
+  }, [city, setValue, form]);
   
-  useEffect(() => {
-    if (city && !LOCALITIES_BY_CITY[city]?.includes(locality)) {
-      setValue('locality', '');
-    }
-  }, [city, locality, setValue]);
-  
-  // Get the list of cities based on selected district
-  const cities = district ? (CITIES_BY_DISTRICT[district] || []) : [];
-  
-  // Get the list of localities based on selected city
-  const localities = city ? (LOCALITIES_BY_CITY[city] || []) : [];
+  // Get the list of cities based on Hyderabad district
+  const cities = CITIES_BY_DISTRICT['Hyderabad'] || [];
   
   return (
     <div className="space-y-4">
@@ -58,43 +60,30 @@ export function LocationSelectors({ form }: LocationSelectorsProps) {
           readOnly
           className="h-11 text-base bg-slate-50"
         />
-        <input type="hidden" {...form.register('state')} value="Telangana" />
+        <input type="hidden" {...register('state')} value="Telangana" />
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        {/* District Selector */}
+        {/* District - Hardcoded to Hyderabad */}
         <div>
           <RequiredLabel required>District</RequiredLabel>
-          <Select
-            value={district}
-            onValueChange={value => setValue('district', value)}
-          >
-            <SelectTrigger className="h-11 text-base">
-              <SelectValue placeholder="Select district" />
-            </SelectTrigger>
-            <SelectContent>
-              {TELANGANA_DISTRICTS.map(dist => (
-                <SelectItem key={dist} value={dist} className="text-base">
-                  {dist}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {errors.district && (
-            <p className="text-sm text-red-600 mt-0.5">{errors.district.message}</p>
-          )}
+          <Input
+            value="Hyderabad"
+            readOnly
+            className="h-11 text-base bg-slate-50"
+          />
+          <input type="hidden" {...register('district')} value="Hyderabad" />
         </div>
 
-        {/* City Selector */}
+        {/* City Selector - Only cities in Hyderabad district */}
         <div>
           <RequiredLabel required>City</RequiredLabel>
           <Select
             value={city}
             onValueChange={value => setValue('city', value)}
-            disabled={!district}
           >
             <SelectTrigger className="h-11 text-base">
-              <SelectValue placeholder={district ? "Select city" : "Select district first"} />
+              <SelectValue placeholder="Select city" />
             </SelectTrigger>
             <SelectContent>
               {cities.map(cityOption => (
@@ -111,25 +100,24 @@ export function LocationSelectors({ form }: LocationSelectorsProps) {
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        {/* Locality Selector */}
+        {/* Locality Input (replaced dropdown) */}
         <div>
           <RequiredLabel required>Locality</RequiredLabel>
-          <Select
-            value={locality}
-            onValueChange={value => setValue('locality', value)}
-            disabled={!city}
-          >
-            <SelectTrigger className="h-11 text-base">
-              <SelectValue placeholder={city ? "Select locality" : "Select city first"} />
-            </SelectTrigger>
-            <SelectContent>
-              {localities.map(loc => (
-                <SelectItem key={loc} value={loc} className="text-base">
-                  {loc}
-                </SelectItem>
+          <div>
+            <Input
+              {...register('locality')}
+              placeholder={city ? "Enter locality" : "Select city first"}
+              disabled={!city}
+              className="h-11 text-base"
+              list="locality-suggestions"
+            />
+            {/* Datalist for suggestions */}
+            <datalist id="locality-suggestions">
+              {suggestedLocalities.map(loc => (
+                <option key={loc} value={loc} />
               ))}
-            </SelectContent>
-          </Select>
+            </datalist>
+          </div>
           {errors.locality && (
             <p className="text-sm text-red-600 mt-0.5">{errors.locality.message}</p>
           )}
@@ -139,7 +127,7 @@ export function LocationSelectors({ form }: LocationSelectorsProps) {
         <div>
           <RequiredLabel required>Area</RequiredLabel>
           <Input
-            {...form.register('area')}
+            {...register('area')}
             placeholder="Enter area name"
             className="h-11 text-base"
           />
