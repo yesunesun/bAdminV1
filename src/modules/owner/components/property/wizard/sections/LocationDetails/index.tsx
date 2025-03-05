@@ -1,9 +1,9 @@
 // src/modules/owner/components/property/wizard/sections/LocationDetails/index.tsx
-// Version: 3.0.0
-// Last Modified: 06-03-2025 15:30 IST
-// Purpose: Simplified LocationDetails component with address and PIN code only
+// Version: 3.1.0
+// Last Modified: 07-03-2025 00:00 IST
+// Purpose: Enhanced Location Details to better handle flat/plot number
 
-import React, { useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { FormSection } from '@/components/FormSection';
 import { FormSectionProps } from '../../../types';
 import { useGoogleMaps } from './hooks/useGoogleMaps';
@@ -23,13 +23,30 @@ if (typeof window !== 'undefined') {
 }
 
 export function LocationDetails({ form }: FormSectionProps) {
-  const { setValue, watch } = form;
+  const { setValue, watch, getValues } = form;
   const mapRef = useRef<HTMLDivElement>(null);
 
   // Get form values
   const address = watch('address');
+  const flatPlotNo = watch('flatPlotNo');
   const latitude = watch('latitude');
   const longitude = watch('longitude');
+  
+  // Debug logging when component mounts or values change
+  useEffect(() => {
+    console.log('LocationDetails component - current values:', {
+      address,
+      flatPlotNo,
+      latitude,
+      longitude
+    });
+    
+    // Ensure flatPlotNo exists if missing
+    if (flatPlotNo === undefined) {
+      console.log('flatPlotNo is undefined, setting default empty string');
+      setValue('flatPlotNo', '');
+    }
+  }, [address, flatPlotNo, latitude, longitude, setValue]);
 
   // Load Google Maps API
   const { mapLoaded, mapError: apiError } = useGoogleMaps();

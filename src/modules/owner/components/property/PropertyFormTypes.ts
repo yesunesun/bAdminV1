@@ -1,6 +1,7 @@
 // src/components/property/PropertyFormTypes.ts
-// Version: 1.5.0
-// Last Modified: 03-03-2025 19:15 IST
+// Version: 1.6.0
+// Last Modified: 06-03-2025 22:15 IST
+// Purpose: Updated form types to include flat/plot number field
 
 import { UseFormReturn } from 'react-hook-form';
 import { PropertyValidationSchema } from './validationSchemas';
@@ -24,6 +25,7 @@ export type FormData = {
   locality: string;
   landmark: string;
   address: string;
+  flatPlotNo: string; // Added flat/plot number field
   pinCode: string;
   rentalType: 'rent' | 'lease';
   rentAmount: string;

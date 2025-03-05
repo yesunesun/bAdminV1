@@ -1,7 +1,7 @@
 // src/modules/owner/services/propertyService.ts
-// Version: 4.1.0
-// Last Modified: 26-02-2025 18:30 IST
-// Purpose: Enhanced property service with improved data handling
+// Version: 4.3.0
+// Last Modified: 06-03-2025 23:15 IST
+// Purpose: Fixed flat/plot number field saving and loading with explicit handling
 
 import { supabase } from '@/lib/supabase';
 import { Property, FormData } from '../components/property/PropertyFormTypes';
@@ -49,6 +49,16 @@ export const propertyService = {
               type: img.is_primary ? 'primary' : 'additional',
             }))
           : [];
+        
+        // Ensure property_details exists
+        if (!property.property_details) {
+          property.property_details = {};
+        }
+        
+        // Ensure flatPlotNo exists in property_details
+        if (!property.property_details.flatPlotNo) {
+          property.property_details.flatPlotNo = '';
+        }
         
         return {
           ...property,
@@ -115,6 +125,19 @@ export const propertyService = {
         data.property_details = {};
       }
       
+      // IMPORTANT: Explicitly check and set the flatPlotNo field
+      if (data.property_details && !data.property_details.flatPlotNo) {
+        console.log('Property has no flatPlotNo field, initializing with empty string');
+        data.property_details.flatPlotNo = '';
+      }
+      
+      // Log property details for debugging
+      console.log('Property details (partial):', {
+        flatPlotNo: data.property_details.flatPlotNo,
+        address: data.property_details.address,
+        pinCode: data.property_details.pinCode
+      });
+      
       // Ensure required properties exist
       if (!data.property_details.propertyType) {
         // Try to derive from title if available
@@ -144,20 +167,29 @@ export const propertyService = {
     try {
       console.log('Creating property with status:', status);
       
+      // Ensure flatPlotNo field is included in the property details
+      console.log('flatPlotNo value:', propertyData.flatPlotNo);
+      
+      // Create a safe version of property data with flatPlotNo guaranteed
+      const safePropertyData = {
+        ...propertyData,
+        flatPlotNo: propertyData.flatPlotNo || ''
+      };
+      
       const dbPropertyData = {
         owner_id: userId,
-        title: propertyData.title || `${propertyData.bhkType} ${propertyData.propertyType} in ${propertyData.locality}`,
-        description: propertyData.description || '',
-        price: parseFloat(propertyData.rentAmount) || 0,
-        bedrooms: propertyData.bhkType ? parseInt(propertyData.bhkType.split(' ')[0]) : 0,
-        bathrooms: propertyData.bathrooms ? parseInt(propertyData.bathrooms) : 0,
-        square_feet: propertyData.builtUpArea ? parseFloat(propertyData.builtUpArea) : null,
-        address: propertyData.address || '',
-        city: propertyData.locality,
+        title: safePropertyData.title || `${safePropertyData.bhkType} ${safePropertyData.propertyType} in ${safePropertyData.locality}`,
+        description: safePropertyData.description || '',
+        price: parseFloat(safePropertyData.rentAmount) || 0,
+        bedrooms: safePropertyData.bhkType ? parseInt(safePropertyData.bhkType.split(' ')[0]) : 0,
+        bathrooms: safePropertyData.bathrooms ? parseInt(safePropertyData.bathrooms) : 0,
+        square_feet: safePropertyData.builtUpArea ? parseFloat(safePropertyData.builtUpArea) : null,
+        address: safePropertyData.address || '',
+        city: safePropertyData.locality,
         state: 'Telangana',
-        zip_code: propertyData.pinCode || '',
+        zip_code: safePropertyData.pinCode || '',
         status,
-        property_details: propertyData,
+        property_details: safePropertyData,
         tags: status === 'published' ? ['public'] : []
       };
       
@@ -191,19 +223,26 @@ export const propertyService = {
   ): Promise<Property> {
     try {
       console.log('Updating property:', propertyId);
+      console.log('flatPlotNo value:', propertyData.flatPlotNo);
+      
+      // Create a safe version of property data with flatPlotNo guaranteed
+      const safePropertyData = {
+        ...propertyData,
+        flatPlotNo: propertyData.flatPlotNo || ''
+      };
       
       const updateData: any = {
-        title: propertyData.title || `${propertyData.bhkType} ${propertyData.propertyType} in ${propertyData.locality}`,
-        description: propertyData.description || '',
-        price: parseFloat(propertyData.rentAmount) || 0,
-        bedrooms: propertyData.bhkType ? parseInt(propertyData.bhkType.split(' ')[0]) : 0,
-        bathrooms: propertyData.bathrooms ? parseInt(propertyData.bathrooms) : 0,
-        square_feet: propertyData.builtUpArea ? parseFloat(propertyData.builtUpArea) : null,
-        address: propertyData.address || '',
-        city: propertyData.locality,
+        title: safePropertyData.title || `${safePropertyData.bhkType} ${safePropertyData.propertyType} in ${safePropertyData.locality}`,
+        description: safePropertyData.description || '',
+        price: parseFloat(safePropertyData.rentAmount) || 0,
+        bedrooms: safePropertyData.bhkType ? parseInt(safePropertyData.bhkType.split(' ')[0]) : 0,
+        bathrooms: safePropertyData.bathrooms ? parseInt(safePropertyData.bathrooms) : 0,
+        square_feet: safePropertyData.builtUpArea ? parseFloat(safePropertyData.builtUpArea) : null,
+        address: safePropertyData.address || '',
+        city: safePropertyData.locality,
         state: 'Telangana',
-        zip_code: propertyData.pinCode || '',
-        property_details: propertyData,
+        zip_code: safePropertyData.pinCode || '',
+        property_details: safePropertyData,
       };
 
       // Only update status if provided
