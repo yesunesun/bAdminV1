@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/validationSchemas.ts
-// Version: 2.4.0
-// Last Modified: 03-03-2025 22:45 IST
-// Updates: Updated location fields validation
+// Version: 3.0.0
+// Last Modified: 06-03-2025 15:30 IST
+// Updates: Made location fields (state, district, city, locality, area) optional
 
 import { z } from 'zod';
 // Updated import to use the migrated constants file
@@ -27,12 +27,12 @@ export const propertyValidationSchema = z.object({
   builtUpAreaUnit: z.enum(['sqft', 'sqyd']).default('sqft'),
   possessionDate: z.string().optional(), // Added possession date as optional
 
-  // Location Details - Updated fields
-  state: z.string().min(1, 'State is required'),
-  district: z.string().min(1, 'District is required'),
-  city: z.string().min(1, 'City is required'),
-  locality: z.string().min(1, 'Locality is required'),
-  area: z.string().min(1, 'Area is required'),
+  // Location Details - Updated fields to be optional
+  state: z.string().optional(),
+  district: z.string().optional(),
+  city: z.string().optional(),
+  locality: z.string().optional(),
+  area: z.string().optional(),
   landmark: z.string().optional(),
   address: z.string().min(1, 'Complete address is required'),
   pinCode: z.string().length(6, 'PIN code must be 6 digits').regex(/^\d+$/, 'Must contain only numbers'),
@@ -89,14 +89,16 @@ export const stepValidationSchemas = {
     possessionDate: true, // Added to step 1 validation
   }),
   2: propertyValidationSchema.pick({
+    // Removed required fields, only keeping address and pinCode as required
+    address: true,
+    pinCode: true,
+    // Keep these optional fields
+    landmark: true,
     state: true,
     district: true,
     city: true,
     locality: true,
     area: true,
-    address: true,
-    pinCode: true,
-    // We don't make these required for validation
     latitude: true,
     longitude: true, 
   }),

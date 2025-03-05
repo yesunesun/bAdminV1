@@ -1,18 +1,19 @@
 // src/modules/owner/components/property/wizard/sections/LocationDetails/index.tsx
-// Version: 2.0.0
-// Last Modified: 03-03-2025 22:45 IST
-// Purpose: Main LocationDetails component with updated location fields
+// Version: 3.0.0
+// Last Modified: 06-03-2025 15:30 IST
+// Purpose: Simplified LocationDetails component with address and PIN code only
 
 import React, { useRef } from 'react';
 import { FormSection } from '@/components/FormSection';
 import { FormSectionProps } from '../../../types';
 import { useGoogleMaps } from './hooks/useGoogleMaps';
 import { useMapInteractions } from './hooks/useMapInteractions';
-import { LocationSelectors } from './components/LocationSelectors';
 import { LandmarkPincodeInputs } from './components/LandmarkPincodeInputs';
 import { AddressInput } from './components/AddressInput';
-import { MapControls } from './components/MapControls';
+import { FlatPlotInput } from './components/FlatPlotInput';
 import { MapContainer } from './components/MapContainer';
+import { Button } from '@/components/ui/button';
+import { MapPin, Navigation } from 'lucide-react';
 
 // Define global initialization function
 if (typeof window !== 'undefined') {
@@ -58,26 +59,44 @@ export function LocationDetails({ form }: FormSectionProps) {
       description="Where is your property located?"
     >
       <div className="space-y-4">
-        {/* Location Selection Fields (District, City, Locality, Area) */}
-        <LocationSelectors form={form} />
+        {/* Flat No/Plot No Field */}
+        <FlatPlotInput form={form} />
+        
+        {/* Address with Map Controls */}
+        <div>
+          <AddressInput form={form} />
+          
+          <div className="flex justify-end mt-2 gap-4">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="flex items-center gap-2 text-slate-700 hover:text-slate-900"
+              onClick={findAddressOnMap}
+              disabled={!mapLoaded || !address || isGeocoding}
+            >
+              <MapPin className="h-5 w-5" />
+              <span>{isGeocoding ? 'Finding...' : 'Find on Map'}</span>
+            </Button>
+            
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="flex items-center gap-2 text-slate-700 hover:text-slate-900"
+              onClick={getUserCurrentLocation}
+              disabled={!mapLoaded || isGeolocating}
+            >
+              <Navigation className="h-5 w-5" />
+              <span>{isGeolocating ? 'Locating...' : 'Use My Location'}</span>
+            </Button>
+          </div>
+        </div>
 
         {/* Landmark and PIN Code */}
         <LandmarkPincodeInputs 
           form={form} 
           handlePinCodeChange={handlePinCodeChange} 
-        />
-
-        {/* Complete Address */}
-        <AddressInput form={form} />
-
-        {/* Map Controls */}
-        <MapControls
-          findAddressOnMap={findAddressOnMap}
-          getUserCurrentLocation={getUserCurrentLocation}
-          isGeocoding={isGeocoding}
-          isGeolocating={isGeolocating}
-          mapLoaded={mapLoaded}
-          address={address}
         />
 
         {/* Map Container */}
@@ -90,9 +109,14 @@ export function LocationDetails({ form }: FormSectionProps) {
           longitude={longitude}
         />
 
-        {/* Hidden inputs for coordinates */}
+        {/* Hidden inputs for coordinates and removed fields */}
         <input type="hidden" {...form.register('latitude')} />
         <input type="hidden" {...form.register('longitude')} />
+        <input type="hidden" {...form.register('state')} value="" />
+        <input type="hidden" {...form.register('district')} value="" />
+        <input type="hidden" {...form.register('city')} value="" />
+        <input type="hidden" {...form.register('locality')} value="" />
+        <input type="hidden" {...form.register('area')} value="" />
       </div>
     </FormSection>
   );

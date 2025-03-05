@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/types.ts
-// Version: 2.3.0
-// Last Modified: 03-03-2025 22:45 IST
-// Updates: Updated location fields
+// Version: 3.0.0
+// Last Modified: 06-03-2025 15:30 IST
+// Updates: Updated location fields to be optional
 
 import { UseFormReturn } from 'react-hook-form';
 // Update this import to point to the new location
@@ -24,15 +24,19 @@ export type FormData = {
   builtUpArea: string;
   builtUpAreaUnit: 'sqft' | 'sqyd'; // For area unit
   possessionDate: string; // New field for possession date
-  // Location fields - updated
-  state: string;
-  district: string;
-  city: string;
-  locality: string;
-  area: string;
-  landmark: string;
+  
+  // Location fields - updated to be optional
+  state?: string;
+  district?: string;
+  city?: string;
+  locality?: string;
+  area?: string;
+  landmark?: string;
+  
+  // Required location fields
   address: string;
   pinCode: string;
+  
   rentalType: 'rent' | 'lease';
   rentAmount: string;
   securityDeposit: string;
@@ -78,8 +82,8 @@ export interface Property {
   title: string;
   price: number;
   address: string;
-  city: string;
-  state: string;
+  city?: string;
+  state?: string;
   zip_code: string;
   status: 'draft' | 'published' | 'archived';
   tags: string[];

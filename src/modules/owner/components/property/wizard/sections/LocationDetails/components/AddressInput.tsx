@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/LocationDetails/components/AddressInput.tsx
-// Version: 1.0.0
-// Last Modified: 28-02-2025 19:25 IST
-// Purpose: Address input component
+// Version: 2.1.0
+// Last Modified: 06-03-2025 18:45 IST
+// Purpose: Updated address input component with simplified label
 
 import React from 'react';
 import { UseFormReturn } from 'react-hook-form';
@@ -18,7 +18,7 @@ export function AddressInput({ form }: AddressInputProps) {
   
   return (
     <div>
-      <RequiredLabel required>Complete Address</RequiredLabel>
+      <RequiredLabel required>Address</RequiredLabel>
       <div className="relative">
         <textarea
           {...register('address')}
