@@ -1,12 +1,14 @@
-// src/components/property/wizard/sections/PropertySummary.tsx
-// Version: 1.4.0
-// Last Modified: 2025-03-03T18:30:00+05:30 (IST)
+// src/modules/owner/components/property/wizard/sections/PropertySummary.tsx
+// Version: 2.2.0
+// Last Modified: 06-03-2025 17:15 IST
+// Purpose: Removed zone, locality, and direction fields from location details
 
 import React from 'react';
 import { FormSection } from '@/components/FormSection';
 import { cn } from '@/lib/utils';
 import { FormData } from '../types';
-import { Save, FileEdit, Send, Loader2 } from 'lucide-react';
+import { Save, FileEdit, Send, Loader2, MapPin, Home, SquareStack, Sparkles } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface PropertySummaryProps {
   formData: FormData;
@@ -21,30 +23,38 @@ interface PropertySummaryProps {
 
 interface SummarySectionProps {
   title: string;
+  icon: React.ReactNode;
   items: Array<{
     label: string;
     value?: string | number | boolean | string[];
   }>;
 }
 
-const SummarySection: React.FC<SummarySectionProps> = ({ title, items }) => (
-  <div className="rounded-lg border border-border p-4">
-    <h3 className="text-sm font-medium text-foreground mb-3">{title}</h3>
-    <dl className="grid gap-2">
-      {items.map(({ label, value }) => (
-        <div key={label} className="grid grid-cols-2 gap-2">
-          <dt className="text-sm text-muted-foreground">{label}:</dt>
-          <dd className="text-sm text-foreground">
-            {typeof value === 'boolean'
-              ? value ? 'Yes' : 'No'
-              : Array.isArray(value)
-                ? value.join(', ') || '-'
-                : value || '-'}
-          </dd>
-        </div>
-      ))}
-    </dl>
-  </div>
+const SummarySection: React.FC<SummarySectionProps> = ({ title, icon, items }) => (
+  <Card className="overflow-hidden border-border hover:shadow-md transition-all duration-200">
+    <CardHeader className="bg-secondary/20 py-3 px-4">
+      <CardTitle className="text-base font-medium flex items-center gap-2">
+        {icon}
+        {title}
+      </CardTitle>
+    </CardHeader>
+    <CardContent className="p-4">
+      <dl className="grid gap-2">
+        {items.map(({ label, value }) => (
+          <div key={label} className="grid grid-cols-2 gap-2 py-1 border-b border-border/30 last:border-0">
+            <dt className="text-sm font-medium text-muted-foreground">{label}:</dt>
+            <dd className="text-sm text-foreground font-medium">
+              {typeof value === 'boolean'
+                ? value ? 'Yes' : 'No'
+                : Array.isArray(value)
+                  ? value.length > 0 ? value.join(', ') : '-'
+                  : value || '-'}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </CardContent>
+  </Card>
 );
 
 const formatCurrency = (value?: string | number) => {
@@ -72,11 +82,13 @@ export function PropertySummary({
 }: PropertySummaryProps) {
   const isPublished = status === 'published';
 
-  // Debug log to verify area unit data
-  console.log('PropertySummary - Area data:', { 
-    area: formData.builtUpArea, 
-    unit: formData.builtUpAreaUnit 
-  });
+  // Format coordinates for display
+  const coordinates = formData.latitude && formData.longitude 
+    ? `${formData.latitude.toFixed(6)}, ${formData.longitude.toFixed(6)}`
+    : '-';
+
+  // Full address without flat/plot number for summary display
+  const fullAddress = formData.address || '-';
 
   const renderButtons = () => {
     if (saving) {
@@ -153,9 +165,16 @@ export function PropertySummary({
       description="Review all details before saving or publishing"
     >
       <div className="space-y-6">
-        <div className="grid gap-6">
+        {/* Property title preview */}
+        <div className="mb-6">
+          <h2 className="text-xl font-semibold text-foreground">{formData.title || "Unnamed Property"}</h2>
+          <p className="text-muted-foreground text-sm mt-1">{fullAddress}</p>
+        </div>
+        
+        <div className="grid gap-6 md:grid-cols-2">
           <SummarySection
             title="Basic Details"
+            icon={<Home className="h-4 w-4" />}
             items={[
               { label: 'Property Type', value: formData.propertyType },
               { label: 'BHK Type', value: formData.bhkType },
@@ -171,18 +190,19 @@ export function PropertySummary({
 
           <SummarySection
             title="Location Details"
+            icon={<MapPin className="h-4 w-4" />}
             items={[
-              { label: 'Zone', value: formData.zone },
-              { label: 'Locality', value: formData.locality },
-              { label: 'Landmark', value: formData.landmark },
+              { label: 'Flat/Plot No.', value: formData.flatPlotNo },
               { label: 'Address', value: formData.address },
+              { label: 'Landmark', value: formData.landmark },
               { label: 'PIN Code', value: formData.pinCode },
-              { label: 'Direction', value: formData.direction }
+              { label: 'Coordinates', value: coordinates }
             ]}
           />
 
           <SummarySection
             title="Rental Details"
+            icon={<SquareStack className="h-4 w-4" />}
             items={[
               { label: 'Rental Type', value: formData.rentalType },
               { label: 'Rent Amount', value: formatCurrency(formData.rentAmount) },
@@ -196,6 +216,7 @@ export function PropertySummary({
 
           <SummarySection
             title="Features & Amenities"
+            icon={<Sparkles className="h-4 w-4" />}
             items={[
               { label: 'Furnishing', value: formData.furnishing },
               { label: 'Parking', value: formData.parking },
@@ -206,14 +227,18 @@ export function PropertySummary({
               { label: 'Amenities', value: formData.amenities }
             ]}
           />
-
-          {formData.description && (
-            <div className="rounded-lg border border-border p-4">
-              <h3 className="text-sm font-medium text-foreground mb-2">Description</h3>
-              <p className="text-sm text-muted-foreground whitespace-pre-wrap">{formData.description}</p>
-            </div>
-          )}
         </div>
+
+        {formData.description && (
+          <Card className="overflow-hidden">
+            <CardHeader className="bg-secondary/20 py-3 px-4">
+              <CardTitle className="text-base font-medium">Description</CardTitle>
+            </CardHeader>
+            <CardContent className="p-4">
+              <p className="text-sm text-foreground whitespace-pre-wrap">{formData.description}</p>
+            </CardContent>
+          </Card>
+        )}
 
         <div className="flex justify-between items-center pt-6 border-t border-border">
           <button
