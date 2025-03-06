@@ -1,6 +1,6 @@
 // src/components/property/wizard/sections/AmenitiesSection.tsx
-// Version: 1.2.4
-// Last Modified: 2025-02-06T22:15:00+05:30 (IST)
+// Version: 1.4.0
+// Last Modified: 2025-03-06T16:45:00+05:30 (IST)
 
 import React from 'react';
 import { FormSection } from '@/components/FormSection';
@@ -61,9 +61,9 @@ export function AmenitiesSection({ form }: FormSectionProps) {
     }
   };
 
+  // Removed "Non-Veg Allowed" from quick amenities
   const quickAmenities = [
     { id: 'hasGym', label: 'Gym', icon: HeartPulse },           // Heart pulse for gym/fitness
-    { id: 'nonVegAllowed', label: 'Non-Veg Allowed', icon: Utensils },  // Utensils for food
     { id: 'gatedSecurity', label: 'Gated Security', icon: Shield }      // Shield for security
   ];
 
@@ -158,7 +158,7 @@ export function AmenitiesSection({ form }: FormSectionProps) {
         </div>
 
         {/* Quick Amenities */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 gap-4">
           {quickAmenities.map(({ id, label, icon: Icon }) => (
             <div
               key={id}
@@ -223,33 +223,22 @@ export function AmenitiesSection({ form }: FormSectionProps) {
           </div>
         </div>
 
-        {/* Contact and Direction */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <RequiredLabel>Alternate Contact</RequiredLabel>
-            <div className="relative">
-              <span className="absolute left-3 inset-y-0 flex items-center text-gray-400">
-                <Phone className="h-4 w-4" />
-              </span>
-              <span className="absolute left-9 inset-y-0 flex items-center text-gray-400">
-                +91
-              </span>
-              <Input
-                type="tel"
-                className="h-12 pl-16"
-                maxLength={10}
-                {...register('secondaryNumber')}
-                placeholder="Additional contact number"
-              />
-            </div>
-          </div>
-
-          <div>
-            <RequiredLabel>Directions</RequiredLabel>
+        {/* Alternate Contact - Now full width since Directions is removed */}
+        <div>
+          <RequiredLabel>Alternate Contact</RequiredLabel>
+          <div className="relative">
+            <span className="absolute left-3 inset-y-0 flex items-center text-gray-400">
+              <Phone className="h-4 w-4" />
+            </span>
+            <span className="absolute left-9 inset-y-0 flex items-center text-gray-400">
+              +91
+            </span>
             <Input
-              className="h-12"
-              {...register('direction')}
-              placeholder="How to reach the property?"
+              type="tel"
+              className="h-12 pl-16"
+              maxLength={10}
+              {...register('secondaryNumber')}
+              placeholder="Additional contact number"
             />
           </div>
         </div>

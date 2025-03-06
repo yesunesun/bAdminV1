@@ -1,6 +1,6 @@
 // src/components/property/RentalDetails.tsx
-// Version: 1.1.0
-// Last Modified: 2025-01-30T16:45:00+05:30 (IST)
+// Version: 1.2.0
+// Last Modified: 2025-03-06T15:25:00+05:30 (IST)
 // Author: Bhoomitalli Team
 
 import React from 'react';

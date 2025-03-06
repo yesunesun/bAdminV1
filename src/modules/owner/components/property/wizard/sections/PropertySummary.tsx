@@ -1,13 +1,13 @@
 // src/modules/owner/components/property/wizard/sections/PropertySummary.tsx
-// Version: 2.2.0
-// Last Modified: 06-03-2025 17:15 IST
-// Purpose: Removed zone, locality, and direction fields from location details
+// Version: 2.3.0
+// Last Modified: 06-03-2025 18:30 IST
+// Purpose: Renamed "Save & Publish" button to "Save and Upload Photos" for new listings
 
 import React from 'react';
 import { FormSection } from '@/components/FormSection';
 import { cn } from '@/lib/utils';
 import { FormData } from '../types';
-import { Save, FileEdit, Send, Loader2, MapPin, Home, SquareStack, Sparkles } from 'lucide-react';
+import { Save, FileEdit, Send, Loader2, MapPin, Home, SquareStack, Sparkles, ImagePlus } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface PropertySummaryProps {
@@ -81,6 +81,7 @@ export function PropertySummary({
   propertyId
 }: PropertySummaryProps) {
   const isPublished = status === 'published';
+  const isNewListing = !propertyId;
 
   // Format coordinates for display
   const coordinates = formData.latitude && formData.longitude 
@@ -152,8 +153,17 @@ export function PropertySummary({
           )}
           disabled={saving}
         >
-          <Send className="h-4 w-4 mr-2" />
-          Save & Publish
+          {isNewListing ? (
+            <>
+              <ImagePlus className="h-4 w-4 mr-2" />
+              Save and Upload Photos
+            </>
+          ) : (
+            <>
+              <Send className="h-4 w-4 mr-2" />
+              Save & Publish
+            </>
+          )}
         </button>
       </div>
     );

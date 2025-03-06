@@ -1,6 +1,6 @@
 // src/modules/owner/components/property/wizard/constants.ts
-// Version: 2.1.0
-// Last Modified: 2025-03-03T14:45:00+05:30 (IST)
+// Version: 2.2.0
+// Last Modified: 2025-03-06T15:35:00+05:30 (IST)
 // Author: Bhoomitalli Team
 
 import { 
@@ -108,6 +108,7 @@ export const TENANT_PREFERENCES = [
   'Bachelor Male',
   'Bachelor Female',
   'Company',
+  'Only Vegetarian',
   'Any'
 ] as const;
 
