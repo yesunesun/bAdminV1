@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/PropertySummary.tsx
-// Version: 2.6.0
-// Last Modified: 09-03-2025 01:30 IST
-// Purpose: Added navigation to Photos tab after saving
+// Version: 2.7.0
+// Last Modified: 09-03-2025 03:45 IST
+// Purpose: Fixed Previous button to navigate back to Features tab
 
 import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -103,13 +103,19 @@ export function PropertySummary({
     return isSaleListingType || (hasExpectedPrice && hasNoRentAmount) || hasMaintenanceCost;
   }, [formData]);
 
-  // Format coordinates for display
-  const coordinates = formData.latitude && formData.longitude 
-    ? `${formData.latitude.toFixed(6)}, ${formData.longitude.toFixed(6)}`
-    : '-';
-
-  // Full address without flat/plot number for summary display
-  const fullAddress = formData.address || '-';
+  // Custom previous button handler to navigate directly to Features tab
+  const handlePreviousClick = () => {
+    try {
+      // Extract the base URL (everything before the last segment)
+      const baseUrl = window.location.pathname.replace(/\/[^\/]*$/, '');
+      
+      // Always navigate to Features tab, which is the correct previous step for Review
+      navigate(`${baseUrl}/features`);
+    } catch (error) {
+      // Fallback to the provided onPrevious handler
+      onPrevious();
+    }
+  };
 
   // Handler for Save and Photos navigation
   const handleSaveAndNavigateToPhotos = async () => {
@@ -118,14 +124,20 @@ export function PropertySummary({
       await onSaveAndPublish();
       
       // After successful save, navigate to photos tab
-      // Extract the base URL without the current step
       const baseUrl = window.location.pathname.replace(/\/[^\/]*$/, '');
-      // Navigate directly to the photos tab
       navigate(`${baseUrl}/photos`);
     } catch (error) {
       console.error('Error saving property:', error);
     }
   };
+
+  // Format coordinates for display
+  const coordinates = formData.latitude && formData.longitude 
+    ? `${formData.latitude.toFixed(6)}, ${formData.longitude.toFixed(6)}`
+    : '-';
+
+  // Full address without flat/plot number for summary display
+  const fullAddress = formData.address || '-';
 
   const renderButtons = () => {
     if (saving) {
@@ -303,7 +315,7 @@ export function PropertySummary({
         <div className="flex justify-between items-center pt-6 border-t border-border">
           <button
             type="button"
-            onClick={onPrevious}
+            onClick={handlePreviousClick}
             className={cn(
               "px-6 py-3 text-sm font-medium rounded-lg",
               "bg-secondary text-secondary-foreground",
