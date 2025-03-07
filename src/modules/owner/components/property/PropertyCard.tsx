@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/PropertyCard.tsx
-// Version: 3.1.0
-// Last Modified: 28-02-2025 16:45 IST
-// Purpose: Modern themed property card with icon-only buttons
+// Version: 3.2.0
+// Last Modified: 07-03-2025 14:15 IST
+// Purpose: Added listing type indicator (Rent/Sale) to property card
 
 import React from 'react';
 import { Link } from 'react-router-dom';
@@ -45,6 +45,10 @@ export function PropertyCard({
   const mainImage = property.images && property.images.length > 0 
     ? property.images[0].url 
     : null;
+  
+  // Determine if the property is for rent or sale
+  const listingType = property.property_details?.listingType || 'rent';
+  const isForRent = listingType === 'rent';
 
   return (
     <div className="relative overflow-hidden rounded-xl bg-card shadow-sm transition-all hover:shadow-md border border-border/30">
@@ -56,6 +60,16 @@ export function PropertyCard({
           : "bg-primary/10 text-primary"
       )}>
         {property.status}
+      </div>
+      
+      {/* Listing Type Badge (For Rent/Sale) */}
+      <div className={cn(
+        "absolute top-3 left-3 z-10 px-3 py-1 rounded-full text-xs font-medium",
+        isForRent
+          ? "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
+          : "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300"
+      )}>
+        {isForRent ? 'For Rent' : 'For Sale'}
       </div>
       
       {/* Property Image */}
@@ -93,6 +107,9 @@ export function PropertyCard({
           <span>
             {property.price.toLocaleString('en-IN')}
           </span>
+          {isForRent && (
+            <span className="ml-1 text-sm font-normal text-muted-foreground">/month</span>
+          )}
         </div>
         
         {/* Actions - Icon-only buttons */}

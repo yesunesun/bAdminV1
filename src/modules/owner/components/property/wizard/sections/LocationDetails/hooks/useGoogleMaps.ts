@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/LocationDetails/hooks/useGoogleMaps.ts
-// Version: 2.0.0
-// Last Modified: 03-03-2025 23:45 IST
-// Purpose: Hook to load Google Maps API asynchronously
+// Version: 3.0.0
+// Last Modified: 07-03-2025 22:15 IST
+// Purpose: Extremely simplified map integration
 
 import { useState, useEffect } from 'react';
 
@@ -10,49 +10,55 @@ export function useGoogleMaps() {
   const [mapError, setMapError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Define the callback function for when Google Maps loads
+    // Check if Google Maps is already loaded
+    if (window.google && window.google.maps) {
+      setMapLoaded(true);
+      return;
+    }
+
+    // Define callback for when Google Maps loads
     window.initGoogleMaps = () => {
       console.log("Google Maps initialized");
       setMapLoaded(true);
     };
 
-    // Only load the script if it's not already loaded
-    if (!document.querySelector('script[src*="maps.googleapis.com/maps/api"]')) {
-      // Get API key from environment variable
+    try {
+      // Get API key
       const apiKey = import.meta.env.VITE_GOOGLE_MAPS_KEY;
       
       if (!apiKey) {
-        setMapError('Google Maps API key is missing. Please check your environment configuration.');
+        setMapError('Google Maps API key is missing');
         return;
       }
 
-      // Create the script element for Google Maps API
+      // Create script element
       const script = document.createElement('script');
       script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&callback=initGoogleMaps`;
       script.async = true;
       script.defer = true;
+      script.id = 'google-maps-script';
       
-      // Handle load errors
+      // Handle errors
       script.onerror = () => {
-        setMapError('Failed to load Google Maps API. Please try again later.');
+        setMapError('Failed to load Google Maps API');
       };
 
-      // Add the script to the document
+      // Add script to document
       document.head.appendChild(script);
-
-      // Cleanup
+      
+      // Clean up on unmount
       return () => {
-        // Remove the script when component unmounts
-        const scriptElement = document.querySelector('script[src*="maps.googleapis.com/maps/api"]');
-        if (scriptElement) {
-          document.head.removeChild(scriptElement);
+        // Only remove if it's our script
+        const ourScript = document.getElementById('google-maps-script');
+        if (ourScript) {
+          document.head.removeChild(ourScript);
         }
-        // Remove the global callback
+        // Clean up global callback
         delete window.initGoogleMaps;
       };
-    } else if (window.google && window.google.maps) {
-      // If Google Maps is already loaded
-      setMapLoaded(true);
+    } catch (error) {
+      console.error('Error setting up Google Maps:', error);
+      setMapError('Error setting up Google Maps');
     }
   }, []);
 

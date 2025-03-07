@@ -1,19 +1,19 @@
 // src/modules/owner/components/property/wizard/sections/LocationDetails/index.tsx
-// Version: 3.1.0
-// Last Modified: 07-03-2025 00:00 IST
-// Purpose: Enhanced Location Details to better handle flat/plot number
+// Version: 4.0.0
+// Last Modified: 07-03-2025 22:15 IST
+// Purpose: Completely rebuilt with minimal React-Maps interaction
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { FormSection } from '@/components/FormSection';
 import { FormSectionProps } from '../../../types';
 import { useGoogleMaps } from './hooks/useGoogleMaps';
-import { useMapInteractions } from './hooks/useMapInteractions';
 import { LandmarkPincodeInputs } from './components/LandmarkPincodeInputs';
 import { AddressInput } from './components/AddressInput';
 import { FlatPlotInput } from './components/FlatPlotInput';
-import { MapContainer } from './components/MapContainer';
 import { Button } from '@/components/ui/button';
 import { MapPin, Navigation } from 'lucide-react';
+import { RequiredLabel } from '@/components/ui/RequiredLabel';
+import ErrorBoundary from '@/components/ui/ErrorBoundary';
 
 // Define global initialization function
 if (typeof window !== 'undefined') {
@@ -24,7 +24,12 @@ if (typeof window !== 'undefined') {
 
 export function LocationDetails({ form }: FormSectionProps) {
   const { setValue, watch, getValues } = form;
-  const mapRef = useRef<HTMLDivElement>(null);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const [isGeolocating, setIsGeolocating] = useState(false);
+  const [isGeocoding, setIsGeocoding] = useState(false);
+  const [mapInstance, setMapInstance] = useState<any>(null);
+  const [markerInstance, setMarkerInstance] = useState<any>(null);
+  const [locationError, setLocationError] = useState<string | null>(null);
 
   // Get form values
   const address = watch('address');
@@ -32,43 +37,275 @@ export function LocationDetails({ form }: FormSectionProps) {
   const latitude = watch('latitude');
   const longitude = watch('longitude');
   
-  // Debug logging when component mounts or values change
-  useEffect(() => {
-    console.log('LocationDetails component - current values:', {
-      address,
-      flatPlotNo,
-      latitude,
-      longitude
-    });
-    
-    // Ensure flatPlotNo exists if missing
-    if (flatPlotNo === undefined) {
-      console.log('flatPlotNo is undefined, setting default empty string');
-      setValue('flatPlotNo', '');
-    }
-  }, [address, flatPlotNo, latitude, longitude, setValue]);
-
+  // Check for edit mode by looking at URL
+  const isEditMode = window.location.pathname.includes('/edit');
+  
   // Load Google Maps API
-  const { mapLoaded, mapError: apiError } = useGoogleMaps();
-
-  // Setup map interactions
-  const {
-    isGeolocating,
-    isGeocoding,
-    mapError: interactionError,
-    getUserCurrentLocation,
-    findAddressOnMap,
-    resetMarker
-  } = useMapInteractions({ form, mapLoaded, mapRef });
-
-  // Handle pin code input to only allow numbers
+  const { mapLoaded, mapError } = useGoogleMaps();
+  
+  // Combined error message
+  const mapErrorMessage = mapError || locationError;
+  
+  // Initialize map once when component mounts and maps API is loaded
+  useEffect(() => {
+    if (!mapLoaded || !mapContainerRef.current || mapInstance) return;
+    
+    try {
+      // Create map instance
+      const map = new window.google.maps.Map(mapContainerRef.current, {
+        center: { lat: 17.385, lng: 78.4867 },
+        zoom: 15,
+        mapTypeControl: true,
+        streetViewControl: false,
+        fullscreenControl: true,
+        zoomControl: true,
+      });
+      
+      setMapInstance(map);
+      
+      // Add click listener to map
+      const clickListener = map.addListener('click', (event: any) => {
+        if (!event.latLng) return;
+        
+        // Update form coordinates
+        setValue('latitude', event.latLng.lat());
+        setValue('longitude', event.latLng.lng());
+        
+        // Update marker
+        updateMarkerPosition(event.latLng);
+      });
+      
+      // Auto-load address if in edit mode
+      if (isEditMode && address && (!latitude || !longitude)) {
+        setTimeout(() => {
+          geocodeAddress(address);
+        }, 1000);
+      } else if (latitude && longitude) {
+        // If we have coordinates, show them on map
+        const position = {
+          lat: parseFloat(String(latitude)),
+          lng: parseFloat(String(longitude))
+        };
+        
+        map.setCenter(position);
+        updateMarkerPosition(position);
+      }
+      
+      // Cleanup function
+      return () => {
+        if (clickListener) {
+          window.google.maps.event.removeListener(clickListener);
+        }
+      };
+    } catch (error) {
+      console.error('Error initializing map:', error);
+      setLocationError('Error initializing map');
+    }
+  }, [mapLoaded, mapInstance, isEditMode, address, latitude, longitude]);
+  
+  // Function to update marker position
+  const updateMarkerPosition = (position: any) => {
+    if (!mapInstance) return;
+    
+    try {
+      // Remove existing marker if any
+      if (markerInstance) {
+        markerInstance.setMap(null);
+      }
+      
+      // Create new marker
+      const marker = new window.google.maps.Marker({
+        position,
+        map: mapInstance,
+        draggable: true
+      });
+      
+      // Add dragend listener
+      const dragendListener = marker.addListener('dragend', function() {
+        const newPosition = marker.getPosition();
+        if (!newPosition) return;
+        
+        // Update form coordinates
+        setValue('latitude', newPosition.lat());
+        setValue('longitude', newPosition.lng());
+        
+        // Optionally reverse geocode
+        reverseGeocode(newPosition);
+      });
+      
+      setMarkerInstance(marker);
+    } catch (error) {
+      console.error('Error updating marker:', error);
+    }
+  };
+  
+  // Function to geocode address
+  const geocodeAddress = (addressText: string) => {
+    if (!mapLoaded || !window.google || !addressText) {
+      return;
+    }
+    
+    setIsGeocoding(true);
+    setLocationError(null);
+    
+    try {
+      console.log('Geocoding address:', addressText);
+      
+      const geocoder = new window.google.maps.Geocoder();
+      geocoder.geocode({ address: addressText }, (results: any, status: string) => {
+        setIsGeocoding(false);
+        
+        if (status === 'OK' && results && results.length > 0) {
+          const location = results[0].geometry.location;
+          
+          // Update form
+          setValue('latitude', location.lat());
+          setValue('longitude', location.lng());
+          
+          // Update map and marker
+          if (mapInstance) {
+            mapInstance.setCenter(location);
+            updateMarkerPosition(location);
+          }
+          
+          // Extract PIN code if available
+          const addressComponents = results[0].address_components || [];
+          const postalCodeComponent = addressComponents.find(
+            (component: any) => component.types.includes('postal_code')
+          );
+          
+          if (postalCodeComponent && postalCodeComponent.long_name) {
+            setValue('pinCode', postalCodeComponent.long_name);
+          }
+        } else {
+          console.error('Geocoding failed with status:', status);
+          setLocationError(`Couldn't find the address on the map`);
+        }
+      });
+    } catch (error) {
+      console.error('Error geocoding address:', error);
+      setIsGeocoding(false);
+      setLocationError('Error finding address');
+    }
+  };
+  
+  // Function to reverse geocode
+  const reverseGeocode = (position: any) => {
+    if (!window.google || !position) return;
+    
+    try {
+      const geocoder = new window.google.maps.Geocoder();
+      geocoder.geocode({ location: position }, (results: any, status: string) => {
+        if (status === 'OK' && results && results.length > 0) {
+          const address = results[0].formatted_address;
+          setValue('address', address);
+          
+          // Extract PIN code if available
+          const addressComponents = results[0].address_components || [];
+          const postalCodeComponent = addressComponents.find(
+            (component: any) => component.types.includes('postal_code')
+          );
+          
+          if (postalCodeComponent && postalCodeComponent.long_name) {
+            setValue('pinCode', postalCodeComponent.long_name);
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Error reverse geocoding:', error);
+    }
+  };
+  
+  // Function to find address on map (called by button)
+  const findAddressOnMap = () => {
+    if (!address) {
+      setLocationError('Please enter an address to search');
+      return;
+    }
+    
+    geocodeAddress(address);
+  };
+  
+  // Function to get user's current location
+  const getUserCurrentLocation = () => {
+    if (!mapLoaded || !window.google) {
+      setLocationError('Google Maps is not yet loaded');
+      return;
+    }
+    
+    if (!navigator.geolocation) {
+      setLocationError('Geolocation is not supported by your browser');
+      return;
+    }
+    
+    setIsGeolocating(true);
+    setLocationError(null);
+    
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        
+        // Update form
+        setValue('latitude', latitude);
+        setValue('longitude', longitude);
+        
+        // Update map
+        const latlng = { lat: latitude, lng: longitude };
+        if (mapInstance) {
+          mapInstance.setCenter(latlng);
+          updateMarkerPosition(latlng);
+        }
+        
+        // Perform reverse geocoding
+        reverseGeocode(latlng);
+        
+        setIsGeolocating(false);
+      },
+      (error) => {
+        setIsGeolocating(false);
+        
+        switch(error.code) {
+          case error.PERMISSION_DENIED:
+            setLocationError('Location permission denied');
+            break;
+          case error.POSITION_UNAVAILABLE:
+            setLocationError('Location unavailable');
+            break;
+          case error.TIMEOUT:
+            setLocationError('Location request timed out');
+            break;
+          default:
+            setLocationError('Error getting location');
+            break;
+        }
+      }
+    );
+  };
+  
+  // Reset marker and map view
+  const resetMarker = () => {
+    if (!mapInstance) return;
+    
+    try {
+      // Get current values or use defaults
+      const lat = latitude ? parseFloat(String(latitude)) : 17.385;
+      const lng = longitude ? parseFloat(String(longitude)) : 78.4867;
+      
+      // Center map
+      mapInstance.setCenter({ lat, lng });
+      
+      // Update marker
+      updateMarkerPosition({ lat, lng });
+    } catch (error) {
+      console.error('Error resetting marker:', error);
+    }
+  };
+  
+  // Handle PIN code input to only allow numbers
   const handlePinCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.replace(/\D/g, '').slice(0, 6);
     setValue('pinCode', value);
   };
-
-  // Combine error messages
-  const mapError = apiError || interactionError;
 
   return (
     <FormSection
@@ -116,15 +353,91 @@ export function LocationDetails({ form }: FormSectionProps) {
           handlePinCodeChange={handlePinCodeChange} 
         />
 
-        {/* Map Container */}
-        <MapContainer
-          mapRef={mapRef}
-          mapLoaded={mapLoaded}
-          mapError={mapError}
-          resetMarker={resetMarker}
-          latitude={latitude}
-          longitude={longitude}
-        />
+        {/* Map Container - Wrapped in ErrorBoundary */}
+        <div className="space-y-2">
+          <RequiredLabel>Location on Map</RequiredLabel>
+          <ErrorBoundary
+            fallback={
+              <div className="h-64 w-full bg-slate-100 flex items-center justify-center text-red-500 p-4 text-center rounded-xl border border-slate-200">
+                <p>There was an error loading the map. Please refresh the page and try again.</p>
+              </div>
+            }
+          >
+            <div className="relative rounded-xl border border-slate-200 overflow-hidden">
+              {/* Map Container */}
+              <div className="h-64 w-full">
+                {mapErrorMessage ? (
+                  <div className="w-full h-full bg-slate-100 flex items-center justify-center text-red-500 p-4 text-center">
+                    <p>{mapErrorMessage}</p>
+                  </div>
+                ) : (
+                  <div 
+                    id="property-map"
+                    ref={mapContainerRef}
+                    className="w-full h-full bg-slate-100 relative"
+                  >
+                    {!mapLoaded && (
+                      <div className="absolute inset-0 flex items-center justify-center text-slate-500">
+                        <div className="flex flex-col items-center">
+                          <svg className="animate-spin h-8 w-8 text-slate-400 mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          <p className="text-sm">Loading map...</p>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Loading overlays */}
+                    {mapLoaded && (isGeocoding || isGeolocating) && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-80 z-10">
+                        <div className="flex flex-col items-center">
+                          <svg className="animate-spin h-8 w-8 text-blue-500 mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          <p className="text-sm">{isGeocoding ? 'Finding location...' : 'Getting your location...'}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+              
+              {/* Map Controls */}
+              <div className="absolute bottom-3 right-3 flex gap-2">
+                <button
+                  type="button"
+                  className="p-2 bg-white rounded-lg shadow-sm border border-slate-200 hover:bg-slate-50"
+                  onClick={resetMarker}
+                  title="Reset marker"
+                  disabled={!mapLoaded || !mapInstance || isGeocoding || isGeolocating}
+                >
+                  <MapPin className="h-4 w-4 text-slate-600" />
+                </button>
+              </div>
+            </div>
+          </ErrorBoundary>
+          
+          {/* Display selected coordinates if any */}
+          {latitude && longitude && (
+            <div className="text-xs text-slate-500 flex justify-between">
+              <span>Coordinates: {parseFloat(String(latitude)).toFixed(6)}, {parseFloat(String(longitude)).toFixed(6)}</span>
+              <button 
+                type="button" 
+                className="text-blue-500 hover:text-blue-700"
+                onClick={resetMarker}
+                disabled={isGeocoding || isGeolocating}
+              >
+                Reset location
+              </button>
+            </div>
+          )}
+          
+          <p className="text-xs text-slate-500">
+            * Click on the map to mark your property location or use the "Find on Map" button
+          </p>
+        </div>
 
         {/* Hidden inputs for coordinates and removed fields */}
         <input type="hidden" {...form.register('latitude')} />
