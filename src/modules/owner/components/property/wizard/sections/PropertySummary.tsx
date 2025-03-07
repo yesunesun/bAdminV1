@@ -1,13 +1,13 @@
 // src/modules/owner/components/property/wizard/sections/PropertySummary.tsx
-// Version: 2.3.0
-// Last Modified: 06-03-2025 18:30 IST
-// Purpose: Renamed "Save & Publish" button to "Save and Upload Photos" for new listings
+// Version: 2.4.0
+// Last Modified: 07-03-2025 18:30 IST
+// Purpose: Added support for displaying sale details in property summary
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { FormSection } from '@/components/FormSection';
 import { cn } from '@/lib/utils';
 import { FormData } from '../types';
-import { Save, FileEdit, Send, Loader2, MapPin, Home, SquareStack, Sparkles, ImagePlus } from 'lucide-react';
+import { Save, FileEdit, Send, Loader2, MapPin, Home, SquareStack, Sparkles, ImagePlus, IndianRupee } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface PropertySummaryProps {
@@ -82,6 +82,12 @@ export function PropertySummary({
 }: PropertySummaryProps) {
   const isPublished = status === 'published';
   const isNewListing = !propertyId;
+  
+  // Determine if this is a sale property
+  const isSaleProperty = useMemo(() => {
+    const listingType = formData.listingType?.toLowerCase();
+    return listingType === 'sale' || listingType === 'sell';
+  }, [formData.listingType]);
 
   // Format coordinates for display
   const coordinates = formData.latitude && formData.longitude 
@@ -210,19 +216,33 @@ export function PropertySummary({
             ]}
           />
 
-          <SummarySection
-            title="Rental Details"
-            icon={<SquareStack className="h-4 w-4" />}
-            items={[
-              { label: 'Rental Type', value: formData.rentalType },
-              { label: 'Rent Amount', value: formatCurrency(formData.rentAmount) },
-              { label: 'Security Deposit', value: formatCurrency(formData.securityDeposit) },
-              { label: 'Maintenance', value: formData.maintenance },
-              { label: 'Available From', value: formData.availableFrom },
-              { label: 'Rent Negotiable', value: formData.rentNegotiable },
-              { label: 'Preferred Tenants', value: formData.preferredTenants }
-            ]}
-          />
+          {isSaleProperty ? (
+            <SummarySection
+              title="Sale Details"
+              icon={<IndianRupee className="h-4 w-4" />}
+              items={[
+                { label: 'Expected Price', value: formatCurrency(formData.expectedPrice) },
+                { label: 'Maintenance Cost', value: formatCurrency(formData.maintenanceCost) },
+                { label: 'Kitchen Type', value: formData.kitchenType },
+                { label: 'Available From', value: formData.availableFrom },
+                { label: 'Price Negotiable', value: formData.priceNegotiable }
+              ]}
+            />
+          ) : (
+            <SummarySection
+              title="Rental Details"
+              icon={<SquareStack className="h-4 w-4" />}
+              items={[
+                { label: 'Rental Type', value: formData.rentalType },
+                { label: 'Rent Amount', value: formatCurrency(formData.rentAmount) },
+                { label: 'Security Deposit', value: formatCurrency(formData.securityDeposit) },
+                { label: 'Maintenance', value: formData.maintenance },
+                { label: 'Available From', value: formData.availableFrom },
+                { label: 'Rent Negotiable', value: formData.rentNegotiable },
+                { label: 'Preferred Tenants', value: formData.preferredTenants }
+              ]}
+            />
+          )}
 
           <SummarySection
             title="Features & Amenities"

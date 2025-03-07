@@ -1,7 +1,8 @@
 // src/modules/owner/components/property/wizard/constants.ts
-// Version: 2.2.0
-// Last Modified: 2025-03-06T15:35:00+05:30 (IST)
+// Version: 2.3.0
+// Last Modified: 2025-03-06T18:35:00+05:30 (IST)
 // Author: Bhoomitalli Team
+// Purpose: Updated with sale flow and kitchen types
 
 import { 
   Home, 
@@ -30,6 +31,12 @@ export const STEPS = [
     title: 'Rental',
     icon: IndianRupee,
     description: 'Rental terms'
+  },
+  {
+    id: 'sale',
+    title: 'Sale Details',
+    icon: IndianRupee,
+    description: 'Sale details'
   },
   {
     id: 'features',
@@ -116,6 +123,12 @@ export const FURNISHING_OPTIONS = [
   'Fully Furnished',
   'Semi Furnished',
   'Unfurnished'
+] as const;
+
+export const KITCHEN_TYPES = [
+  'Modular',
+  'Covered Shelves',
+  'Open Shelves'
 ] as const;
 
 export const PARKING_OPTIONS = [

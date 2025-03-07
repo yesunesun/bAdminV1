@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/types.ts
-// Version: 3.0.0
-// Last Modified: 06-03-2025 15:30 IST
-// Updates: Updated location fields to be optional
+// Version: 3.1.0
+// Last Modified: 06-03-2025 18:40 IST
+// Purpose: Added sale-specific fields (expectedPrice, maintenanceCost, kitchenType)
 
 import { UseFormReturn } from 'react-hook-form';
 // Update this import to point to the new location
@@ -37,17 +37,26 @@ export type FormData = {
   address: string;
   pinCode: string;
   
+  // Rental-specific fields
   rentalType: 'rent' | 'lease';
   rentAmount: string;
   securityDeposit: string;
   rentNegotiable: boolean;
   maintenance: string;
-  availableFrom: string;
   preferredTenants: string[];
+  
+  // Sale-specific fields
+  expectedPrice: string;
+  maintenanceCost: string;
+  kitchenType: string;
+  
+  // Common fields for both rental and sale
+  availableFrom: string;
   furnishing: string;
   parking: string;
   description: string;
   amenities: string[];
+  
   // Additional fields
   bathrooms: string;
   balconies: string;
@@ -59,9 +68,11 @@ export type FormData = {
   secondaryNumber: string;
   hasSimilarUnits: boolean;
   direction: string;
+  
   // Optional fields for mapping
   latitude?: number;
   longitude?: number;
+  
   // Image related fields
   images?: Array<{
     id: string;
@@ -74,6 +85,8 @@ export type FormData = {
 export interface FormSectionProps {
   form: UseFormReturn<FormData>;
   mode?: 'create' | 'edit';
+  category?: string;
+  adType?: string;
 }
 
 export interface Property {

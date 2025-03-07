@@ -1,11 +1,11 @@
 // src/modules/owner/components/property/wizard/validationSchemas.ts
-// Version: 3.0.0
-// Last Modified: 06-03-2025 15:30 IST
-// Updates: Made location fields (state, district, city, locality, area) optional
+// Version: 3.1.0
+// Last Modified: 06-03-2025 18:45 IST
+// Purpose: Added validation for sale-specific fields
 
 import { z } from 'zod';
 // Updated import to use the migrated constants file
-import { PROPERTY_TYPES, BHK_TYPES, PROPERTY_AGE, FACING_OPTIONS } from './constants';
+import { PROPERTY_TYPES, BHK_TYPES, PROPERTY_AGE, FACING_OPTIONS, KITCHEN_TYPES } from './constants';
 
 export const propertyValidationSchema = z.object({
   // Property Selection
@@ -46,8 +46,15 @@ export const propertyValidationSchema = z.object({
   securityDeposit: z.string().min(1, 'Security deposit is required'),
   rentNegotiable: z.boolean().default(false),
   maintenance: z.string().min(1, 'Maintenance option is required'),
-  availableFrom: z.string().min(1, 'Available date is required'),
   preferredTenants: z.array(z.string()).min(1, 'Select at least one preferred tenant'),
+  
+  // Sale Details
+  expectedPrice: z.string().min(1, 'Expected price is required'),
+  maintenanceCost: z.string().min(1, 'Maintenance cost is required'),
+  kitchenType: z.enum(KITCHEN_TYPES as [string, ...string[]]).min(1, 'Kitchen type is required'),
+  
+  // Common fields
+  availableFrom: z.string().min(1, 'Available date is required'),
   furnishing: z.string().min(1, 'Furnishing status is required'),
   parking: z.string().min(1, 'Parking option is required'),
   description: z.string().optional(),
@@ -102,14 +109,24 @@ export const stepValidationSchemas = {
     latitude: true,
     longitude: true, 
   }),
-  3: propertyValidationSchema.pick({
-    rentalType: true,
-    rentAmount: true,
-    securityDeposit: true,
-    maintenance: true,
-    availableFrom: true,
-    preferredTenants: true,
-  }),
+  3: z.union([
+    // Rental Details Validation
+    propertyValidationSchema.pick({
+      rentalType: true,
+      rentAmount: true,
+      securityDeposit: true,
+      maintenance: true,
+      availableFrom: true,
+      preferredTenants: true,
+    }),
+    // Sale Details Validation
+    propertyValidationSchema.pick({
+      expectedPrice: true,
+      maintenanceCost: true,
+      kitchenType: true,
+      availableFrom: true,
+    })
+  ]),
   4: propertyValidationSchema.pick({
     bathrooms: true,
     propertyShowOption: true,
