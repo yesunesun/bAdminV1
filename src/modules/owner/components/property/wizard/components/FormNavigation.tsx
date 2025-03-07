@@ -1,10 +1,10 @@
 // src/modules/owner/components/property/wizard/components/FormNavigation.tsx
-// Version: 1.6.0
-// Last Modified: 06-03-2025 21:15 IST
-// Purpose: Updated to conditionally display either Rental or Sale tab based on listing type
+// Version: 1.7.0
+// Last Modified: 07-03-2025 14:30 IST
+// Purpose: Updated to sync URL with tab navigation and properly handle URL updates
 
-import React, { useMemo } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import React, { useMemo, useEffect } from 'react';
+import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { STEPS } from '../constants';
 
@@ -15,6 +15,7 @@ interface FormNavigationProps {
   mode?: 'create' | 'edit';
   category?: string;
   adType?: string;
+  steps?: typeof STEPS;
 }
 
 export function FormNavigation({ 
@@ -23,10 +24,26 @@ export function FormNavigation({
   propertyId, 
   mode,
   category,
-  adType
+  adType,
+  steps = STEPS
 }: FormNavigationProps) {
   const navigate = useNavigate();
   const location = useLocation();
+  const { step: urlStep } = useParams();
+
+  // Sync URL step parameter with current step if they don't match
+  useEffect(() => {
+    if (urlStep) {
+      const stepIndex = STEPS.findIndex(s => s.id === urlStep);
+      if (stepIndex !== -1 && currentStep !== stepIndex + 1) {
+        // If URL step exists but doesn't match current step, update current step
+        onStepChange(stepIndex + 1);
+      }
+    } else if (currentStep > 1) {
+      // If no URL step but we're not on first step, update URL
+      updateUrlWithCurrentStep();
+    }
+  }, [urlStep, currentStep]);
 
   // Determine if we're in sale mode
   const isSaleMode = useMemo(() => {
@@ -35,7 +52,7 @@ export function FormNavigation({
 
   // Filter steps to show either Rental or Sale tab based on listing type
   const filteredSteps = useMemo(() => {
-    return STEPS.filter(step => {
+    return (steps || STEPS).filter(step => {
       // Skip 'rental' step if in sale mode
       if (step.id === 'rental' && isSaleMode) {
         return false;
@@ -46,7 +63,7 @@ export function FormNavigation({
       }
       return true;
     });
-  }, [isSaleMode]);
+  }, [isSaleMode, steps]);
 
   // Function to map current step index to filtered steps index
   const mapStepIndex = (currentIndex: number): number => {
@@ -73,6 +90,23 @@ export function FormNavigation({
     return true;
   };
 
+  // Function to update URL with current step
+  const updateUrlWithCurrentStep = () => {
+    if (!category || !adType) {
+      console.warn("Missing navigation parameters:", { category, adType });
+      return;
+    }
+
+    const stepId = STEPS[currentStep - 1]?.id;
+    if (!stepId) return;
+
+    if (mode === 'edit' && propertyId) {
+      navigate(`/properties/${propertyId}/edit?step=${stepId}`, { replace: true });
+    } else {
+      navigate(`/properties/list/${category.toLowerCase()}/${adType.toLowerCase()}/${stepId}`, { replace: true });
+    }
+  };
+
   const handleStepClick = (index: number) => {
     if (!isStepAccessible(index)) return;
 
@@ -80,22 +114,17 @@ export function FormNavigation({
     const originalIndex = mapToOriginalIndex(index);
     const step = STEPS[originalIndex];
     
-    // Debug logging
-    console.log("Navigation params:", { mode, propertyId, category, adType, step: step.id });
+    // Update the current step in the form state
+    onStepChange(originalIndex + 1);
     
+    // Update URL to reflect the new step
     if (mode === 'edit' && propertyId) {
-      // Keep property ID in URL for edit mode
-      console.log(`Navigating to edit mode tab: /properties/${propertyId}/edit?step=${step.id}`);
       navigate(`/properties/${propertyId}/edit?step=${step.id}`, { replace: true });
     } else if (category && adType) {
-      // For create mode, use the category/adType pattern
-      console.log(`Navigating to create mode tab: /properties/list/${category.toLowerCase()}/${adType.toLowerCase()}/${step.id}`);
       navigate(`/properties/list/${category.toLowerCase()}/${adType.toLowerCase()}/${step.id}`, { replace: true });
     } else {
       console.warn("Missing navigation parameters:", { mode, propertyId, category, adType });
     }
-    
-    onStepChange(originalIndex + 1);
   };
 
   // Map the current step to filtered index for display purposes

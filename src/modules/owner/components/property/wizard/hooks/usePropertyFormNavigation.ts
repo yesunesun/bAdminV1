@@ -1,10 +1,10 @@
 // src/modules/owner/components/property/wizard/hooks/usePropertyFormNavigation.ts
-// Version: 1.1.0
-// Last Modified: 08-03-2025 11:30 IST
-// Purpose: Fixed JSX syntax error in navigation component
+// Version: 1.2.0
+// Last Modified: 08-03-2025 14:30 IST
+// Purpose: Improved URL step synchronization and navigation controls
 
 import { useState, useCallback, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { UseFormReturn } from 'react-hook-form';
 import { FormData } from '../types';
 import { STEPS } from '../constants';
@@ -27,13 +27,21 @@ export function usePropertyFormNavigation({
   setError
 }: UsePropertyFormNavigationProps) {
   const navigate = useNavigate();
-  const { step } = useParams();
+  const { step: urlStep } = useParams();
+  const location = useLocation();
+  
+  // Check for step parameter in query string for edit mode
+  const queryParams = new URLSearchParams(location.search);
+  const queryStep = queryParams.get('step');
+  
+  // Combine URL parameter step and query parameter step
+  const effectiveUrlStep = urlStep || queryStep;
   
   // Define currentStep state
   const [currentStep, setCurrentStep] = useState<number>(() => {
-    // If step is in URL, prioritize that regardless of mode
-    if (step) {
-      const stepIndex = STEPS.findIndex(s => s.id === step) + 1;
+    // If step is in URL or query params, prioritize that regardless of mode
+    if (effectiveUrlStep) {
+      const stepIndex = STEPS.findIndex(s => s.id === effectiveUrlStep) + 1;
       // Ensure a valid step index, defaulting to 1 (details) if not found or invalid
       return stepIndex > 0 ? stepIndex : 1;
     }
@@ -85,15 +93,31 @@ export function usePropertyFormNavigation({
         return;
       }
 
-      // Ensure 'details' is the first step after property type selection
-      const stepId = newStep === 1 ? 'details' : stepData.id;
+      // For edit mode, use query parameter
+      if (mode === 'edit' && existingPropertyId) {
+        const newPath = `/properties/${existingPropertyId}/edit?step=${stepData.id}`;
+        console.log('Updating URL to:', newPath);
+        navigate(newPath, { replace: true });
+        return;
+      }
+
+      // For create mode, use path parameter
+      const stepId = stepData.id;
       const newPath = `/properties/list/${effectiveCategory.toLowerCase()}/${effectiveType.toLowerCase()}/${stepId}`;
       console.log('Updating URL to:', newPath);
       navigate(newPath, { replace: true });
     } catch (err) {
       console.error('Error updating URL:', err);
     }
-  }, [navigate, form]);
+  }, [navigate, form, mode, existingPropertyId]);
+
+  // Effect to sync URL with current step
+  useEffect(() => {
+    // Only update URL when form is properly initialized
+    if (form && typeof form.getValues === 'function') {
+      updateUrl(currentStep);
+    }
+  }, [currentStep, updateUrl, form]);
 
   // Save form data to localStorage
   const saveFormToStorage = useCallback((data: Partial<FormData>) => {
@@ -119,7 +143,7 @@ export function usePropertyFormNavigation({
     }
   }, [user?.id, mode, existingPropertyId]);
 
-  // Enhanced setCurrentStep with URL and localStorage updates
+  // Enhanced setCurrentStep with localStorage updates
   const setCurrentStepWithPersistence = useCallback((step: number) => {
     try {
       console.log('Setting current step to:', step);
@@ -133,15 +157,10 @@ export function usePropertyFormNavigation({
           localStorage.setItem(`propertyWizard_${user.id}_step`, step.toString());
         }
       }
-      
-      // Only update URL in create mode
-      if (mode === 'create') {
-        updateUrl(step);
-      }
     } catch (err) {
       console.error('Error setting current step:', err);
     }
-  }, [user?.id, updateUrl, mode, existingPropertyId]);
+  }, [user?.id, mode, existingPropertyId]);
 
   // Handle next step with special case for Rental -> Features navigation
   const handleNextStep = useCallback(() => {
