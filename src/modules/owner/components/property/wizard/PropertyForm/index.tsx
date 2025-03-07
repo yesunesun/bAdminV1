@@ -1,13 +1,15 @@
 // src/modules/owner/components/property/wizard/PropertyForm/index.tsx
-// Version: 4.0.0
-// Last Modified: 07-03-2025 16:30 IST
-// Purpose: Refactored PropertyForm into smaller components for better maintainability
+// Version: 4.4.0
+// Last Modified: 07-03-2025 22:45 IST
+// Purpose: Fixed FormNavigation props and proper next step handling
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { usePropertyForm } from '../../hooks/usePropertyForm';
-import { FormData } from '../../types';
-import { STEPS } from '../../constants';
+
+// Fix hook and utility imports
+import { usePropertyForm } from '../hooks/usePropertyForm';
+import { FormData } from '../types'
+import { STEPS } from '../constants'
 
 // Components
 import FormHeader from './components/FormHeader';
@@ -15,9 +17,9 @@ import FormContent from './components/FormContent';
 import StepNavigation from './components/StepNavigation';
 import StatusIndicator from './components/StatusIndicator';
 import LoginPrompt from './components/LoginPrompt';
-import PropertyTypeSelection from '../../components/PropertyTypeSelection';
-import WizardBreadcrumbs from '../../components/WizardBreadcrumbs';
-import FormNavigation from '../../components/FormNavigation';
+import PropertyTypeSelection from '../components/PropertyTypeSelection';
+import WizardBreadcrumbs from '../components/WizardBreadcrumbs';
+import { FormNavigation } from '../components/FormNavigation'; // Changed to named import
 
 // Hooks
 import { useStepNavigation } from './hooks/useStepNavigation';
@@ -188,6 +190,9 @@ export function PropertyForm({
     });
   }
 
+  // Get the filtered steps for the form navigation
+  const visibleSteps = getVisibleSteps();
+
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="bg-card rounded-xl shadow-lg">
@@ -213,7 +218,7 @@ export function PropertyForm({
           mode={mode}
           category={effectiveCategory}
           adType={effectiveAdType}
-          steps={getVisibleSteps()}
+          steps={visibleSteps}
         />
 
         <div className="p-6">

@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/PropertyForm/hooks/useStepNavigation.ts
-// Version: 1.0.0
-// Last Modified: 07-03-2025 16:30 IST
-// Purpose: Hook for managing step navigation in property form wizard
+// Version: 1.1.0
+// Last Modified: 07-03-2025 22:45 IST
+// Purpose: Enhanced navigation logic to fix Rental to Features tab navigation
 
 import { useMemo } from 'react';
 import { UseFormReturn } from 'react-hook-form';
@@ -72,6 +72,7 @@ export function useStepNavigation({
     const currentStepId = STEPS[formStep - 1]?.id;
     console.log('Current step ID:', currentStepId);
     console.log('Is sale mode:', isSaleMode);
+    console.log('Current form step index:', formStep);
     
     // If we're on the Location step and this is a sale property,
     // we should skip the Rental tab and go directly to Sale Details
@@ -99,10 +100,9 @@ export function useStepNavigation({
       }
     }
     
-    // If we're on the Rental tab and this is a sale property,
-    // we should skip to Features
-    if (currentStepId === 'rental' && isSaleMode) {
-      console.log('Sale property on rental tab, skipping to features');
+    // If we're on the Rental tab, navigate to Features tab
+    if (currentStepId === 'rental') {
+      console.log('Navigating from Rental tab to Features tab');
       // Find the index of the features step
       const featuresStepIndex = STEPS.findIndex(step => step.id === 'features');
       if (featuresStepIndex !== -1) {
@@ -112,10 +112,9 @@ export function useStepNavigation({
       }
     }
     
-    // If we're on the Sale tab and this is a rental property,
-    // we should skip to Features
-    if (currentStepId === 'sale' && !isSaleMode) {
-      console.log('Rental property on sale tab, skipping to features');
+    // If we're on the Sale tab, navigate to Features tab
+    if (currentStepId === 'sale') {
+      console.log('Navigating from Sale tab to Features tab');
       // Find the index of the features step
       const featuresStepIndex = STEPS.findIndex(step => step.id === 'features');
       if (featuresStepIndex !== -1) {

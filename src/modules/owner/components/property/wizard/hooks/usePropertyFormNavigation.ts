@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/hooks/usePropertyFormNavigation.ts
-// Version: 1.0.0
-// Last Modified: 08-03-2025 16:30 IST
-// Purpose: Handle form navigation, steps and URL management
+// Version: 1.1.0
+// Last Modified: 08-03-2025 11:30 IST
+// Purpose: Fixed JSX syntax error in navigation component
 
 import { useState, useCallback, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -143,9 +143,11 @@ export function usePropertyFormNavigation({
     }
   }, [user?.id, updateUrl, mode, existingPropertyId]);
 
-  // Handle next step
+  // Handle next step with special case for Rental -> Features navigation
   const handleNextStep = useCallback(() => {
     try {
+      console.log('=== handleNextStep called ===');
+      
       if (!validateCurrentStep()) {
         setError('Please fill in all required fields');
         return;
@@ -159,6 +161,25 @@ export function usePropertyFormNavigation({
       }
       
       const formData = form.getValues();
+      console.log('Current form data:', formData);
+      console.log('Current step:', currentStep);
+      
+      // Special case: If current step is rental tab, force navigate to features tab
+      const currentStepId = STEPS[currentStep - 1]?.id;
+      console.log('Current step ID:', currentStepId);
+      
+      if (currentStepId === 'rental') {
+        console.log('On rental tab, navigating to features tab');
+        const featuresIndex = STEPS.findIndex(step => step.id === 'features');
+        if (featuresIndex !== -1) {
+          console.log('Found features tab at index:', featuresIndex);
+          // Save form data before navigation
+          saveFormToStorage(formData);
+          // Navigate to features tab
+          setCurrentStepWithPersistence(featuresIndex + 1);
+          return;
+        }
+      }
       
       // Make sure flatPlotNo exists in the data
       const safeFormData = {

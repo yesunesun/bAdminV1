@@ -1,11 +1,11 @@
 // src/pages/ListYourProperty.tsx
-// Version: 1.5.0
-// Last Modified: 01-03-2025 14:35 IST
-// Purpose: Entry point for property listing with fixed navigation
+// Version: 1.6.0
+// Last Modified: 07-03-2025 19:00 IST
+// Purpose: Updated import path for restructured PropertyForm component
 
 import React, { useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { PropertyForm } from '@/modules/owner/components/property/wizard/PropertyForm';
+import { PropertyForm } from '@/modules/owner/components/property/wizard/PropertyForm/index';
 
 export default function ListYourProperty() {
   const { category, type, step } = useParams();

@@ -1,20 +1,20 @@
 // src/modules/owner/components/property/wizard/PropertyForm/components/FormContent.tsx
-// Version: 1.0.0
-// Last Modified: 07-03-2025 16:30 IST
-// Purpose: Component to render the appropriate form step content
+// Version: 1.4.0
+// Last Modified: 07-03-2025 21:15 IST
+// Purpose: Using corrected relative import paths
 
 import React from 'react';
 import { UseFormReturn } from 'react-hook-form';
-import { FormData } from '../../../types';
+import { FormData } from '../../types';
 
-// Import all step components
-import { PropertyDetails } from '../../../sections/PropertyDetails';
-import { LocationDetails } from '../../../sections/LocationDetails';
-import { RentalDetails } from '../../../sections/RentalDetails';
-import { SaleDetails } from '../../../sections/SaleDetails';
-import { AmenitiesSection } from '../../../sections/AmenitiesSection';
-import { PropertySummary } from '../../../sections/PropertySummary';
-import { ImageUploadSection } from '../../../sections/ImageUploadSection';
+// Use corrected relative import paths
+import { PropertyDetails } from '../../sections/PropertyDetails';
+import { LocationDetails } from '../../sections/LocationDetails';
+import { RentalDetails } from '../../sections/RentalDetails';
+import { SaleDetails } from '../../sections/SaleDetails';
+import { AmenitiesSection } from '../../sections/AmenitiesSection';
+import { PropertySummary } from '../../sections/PropertySummary';
+import { ImageUploadSection } from '../../sections/ImageUploadSection';
 
 interface FormContentProps {
   form: UseFormReturn<FormData>;

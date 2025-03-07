@@ -1,12 +1,12 @@
 // src/modules/owner/pages/EditProperty.tsx
-// Version: 3.4.0
-// Last Modified: 07-03-2025 00:15 IST
-// Purpose: Added flatPlotNo field handling
+// Version: 3.5.0
+// Last Modified: 07-03-2025 17:55 IST
+// Purpose: Fixed import path for restructured PropertyForm component
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { PropertyForm } from '../components/property/wizard/PropertyForm';
+import { PropertyForm } from '../components/property/wizard/PropertyForm/index'; // Fixed import path
 import { propertyService } from '../services/propertyService';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { Card } from '@/components/ui/card';
