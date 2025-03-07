@@ -184,6 +184,49 @@ When adding a new flow (like sale or rent) to your property wizard, follow these
 | `src/modules/owner/services/propertyService.ts` | Backend service calls | Add API methods for new flow if needed |
 | `src/modules/owner/routes.tsx` | Route definitions | Add routes for the new flow |
 
+## Navigation Button Handling
+
+When implementing navigation buttons in wizard flows, it's critical to handle the Previous and Next buttons correctly for each step:
+
+```typescript
+// Custom previous button handler example
+const onPreviousClick = () => {
+  try {
+    // Extract the base URL without the current step
+    const baseUrl = window.location.pathname.replace(/\/[^\/]*$/, '');
+    
+    // Special handling for Previous from Rental or Sale tabs
+    if (currentStepId === 'rental' || currentStepId === 'sale') {
+      // Always go back to location from rental/sale
+      navigate(`${baseUrl}/location`);
+      return;
+    }
+    
+    // Special handling for Previous from Features
+    if (currentStepId === 'features') {
+      if (isSaleProperty()) {
+        // Go back to sale from features in sale flow
+        navigate(`${baseUrl}/sale`);
+      } else {
+        // Go back to rental from features in rental flow
+        navigate(`${baseUrl}/rental`);
+      }
+      return;
+    }
+    
+    // Get the previous step ID
+    const prevStepIndex = formStep - 2;
+    const prevStepId = prevStepIndex >= 0 ? STEPS[prevStepIndex]?.id : 'details';
+    
+    // Navigate to previous step
+    navigate(`${baseUrl}/${prevStepId}`);
+  } catch (error) {
+    // Fallback to original handler
+    handlePreviousStep();
+  }
+};
+```
+
 ## Best Practices to Remember
 
 1. **Single Source of Truth**
@@ -202,7 +245,12 @@ When adding a new flow (like sale or rent) to your property wizard, follow these
    - Define flow detection logic in one place
    - Use memoization to prevent recalculating flow type unnecessarily
 
-5. **Clear Error Handling**
+5. **Direct Navigation Handlers**
+   - Implement specific logic for each step transition
+   - Handle special cases (like Previous from Sale/Rental to Location)
+   - Provide fallbacks when direct navigation fails
+
+6. **Clear Error Handling**
    - Add specific error messages for navigation failures
    - Provide fallback paths when navigation fails
 
