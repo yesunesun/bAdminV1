@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/PropertySummary.tsx
-// Version: 2.4.0
-// Last Modified: 07-03-2025 18:30 IST
-// Purpose: Added support for displaying sale details in property summary
+// Version: 2.5.0
+// Last Modified: 08-03-2025 10:45 IST
+// Purpose: Fixed sale/rental details logic in property summary
 
 import React, { useMemo } from 'react';
 import { FormSection } from '@/components/FormSection';
@@ -83,11 +83,32 @@ export function PropertySummary({
   const isPublished = status === 'published';
   const isNewListing = !propertyId;
   
-  // Determine if this is a sale property
+  // Improved logic to detect if this is a sale property
   const isSaleProperty = useMemo(() => {
+    // Check multiple indicators for sale property
     const listingType = formData.listingType?.toLowerCase();
-    return listingType === 'sale' || listingType === 'sell';
-  }, [formData.listingType]);
+    const isSaleListingType = listingType === 'sale' || listingType === 'sell';
+    
+    // Check if expected price exists (sale property) and rental amount doesn't
+    const hasExpectedPrice = !!formData.expectedPrice;
+    const hasNoRentAmount = !formData.rentAmount;
+    
+    // Check other sale-specific fields
+    const hasMaintenanceCost = !!formData.maintenanceCost;
+    const hasKitchenType = !!formData.kitchenType;
+    
+    console.log('Sale property detection:', {
+      listingType,
+      isSaleListingType,
+      hasExpectedPrice,
+      hasNoRentAmount,
+      hasMaintenanceCost,
+      hasKitchenType
+    });
+    
+    // Return true if ANY of these indicators suggest it's a sale property
+    return isSaleListingType || (hasExpectedPrice && hasNoRentAmount) || hasMaintenanceCost;
+  }, [formData]);
 
   // Format coordinates for display
   const coordinates = formData.latitude && formData.longitude 

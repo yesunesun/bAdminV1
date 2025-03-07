@@ -1,7 +1,7 @@
 // src/modules/owner/services/propertyService.ts
-// Version: 4.6.1
-// Last Modified: 09-03-2025 13:00 IST
-// Purpose: Fixed syntax error in property service methods
+// Version: 4.7.0
+// Last Modified: 07-03-2025 15:30 IST
+// Purpose: Added deleteProperty function to fix property deletion functionality
 
 import { supabase } from '@/lib/supabase';
 import { Property, FormData } from '../components/property/PropertyFormTypes';
@@ -491,5 +491,74 @@ export const propertyService = {
     }
   },
 
-  // Rest of the service methods...
+  // Update property status
+  async updatePropertyStatus(
+    propertyId: string,
+    status: 'draft' | 'published',
+    userId: string
+  ): Promise<void> {
+    try {
+      console.log(`Updating property ${propertyId} status to ${status}`);
+      
+      const updateData = {
+        status,
+        tags: status === 'published' ? ['public'] : []
+      };
+      
+      const { error } = await supabase
+        .from('properties')
+        .update(updateData)
+        .eq('id', propertyId)
+        .eq('owner_id', userId); // Security check
+      
+      if (error) throw error;
+      
+      // Clear cache for this user
+      propertiesCache.delete(userId);
+      
+    } catch (error) {
+      console.error('Error in updatePropertyStatus:', error);
+      throw error;
+    }
+  },
+
+  // Delete a property
+  async deleteProperty(propertyId: string, userId: string): Promise<void> {
+    try {
+      console.log('=========== DEBUG: DELETE PROPERTY START ===========');
+      console.log(`Deleting property ${propertyId} for user ${userId}`);
+      
+      // First, delete all property images (this handles the foreign key constraint)
+      const { error: imagesError } = await supabase
+        .from('property_images')
+        .delete()
+        .eq('property_id', propertyId);
+      
+      if (imagesError) {
+        console.error('Error deleting property images:', imagesError);
+        throw imagesError;
+      }
+      
+      // Then delete the property
+      const { error } = await supabase
+        .from('properties')
+        .delete()
+        .eq('id', propertyId)
+        .eq('owner_id', userId); // Security check
+      
+      if (error) {
+        console.error('Error deleting property:', error);
+        throw error;
+      }
+      
+      // Clear cache for this user
+      propertiesCache.delete(userId);
+      
+      console.log(`Property ${propertyId} successfully deleted`);
+      console.log('=========== DEBUG: DELETE PROPERTY END ===========');
+    } catch (error) {
+      console.error('Error in deleteProperty:', error);
+      throw error;
+    }
+  }
 };

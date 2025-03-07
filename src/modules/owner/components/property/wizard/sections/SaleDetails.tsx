@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/SaleDetails.tsx
-// Version: 3.1.0
-// Last Modified: 07-03-2025 14:30 IST
-// Purpose: Fixed state synchronization and form initialization issues
+// Version: 4.0.0
+// Last Modified: 07-03-2025 21:00 IST
+// Purpose: Fixed pricing data loading with direct database access
 
 import React, { useEffect, useState } from 'react';
 import { FormSection } from '@/components/FormSection';
@@ -10,8 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { IndianRupee } from 'lucide-react';
 import { FormSectionProps } from '../types';
-import { cn } from '@/lib/utils';
 import { RequiredLabel } from '@/components/ui/RequiredLabel';
+import { supabase } from '@/lib/supabase';
 import {
   FURNISHING_OPTIONS,
   PARKING_OPTIONS,
@@ -19,195 +19,166 @@ import {
 } from '../constants';
 
 export function SaleDetails({ form, adType }: FormSectionProps) {
-  const { register, watch, setValue, getValues, formState: { errors } } = form;
+  const { watch, setValue, getValues, formState: { errors } } = form;
+  
+  // Component state
+  const [expectedPriceValue, setExpectedPriceValue] = useState('');
+  const [maintenanceCostValue, setMaintenanceCostValue] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   
   // Initialize local state from form values
-  const [expectedPriceValue, setExpectedPriceValue] = useState(() => {
-    return getValues('expectedPrice') || '';
-  });
-  
-  const [maintenanceCostValue, setMaintenanceCostValue] = useState(() => {
-    return getValues('maintenanceCost') || '';
-  });
-  
-  const [initialized, setInitialized] = useState(false);
-  
-  // Force component updates
-  const [forceUpdate, setForceUpdate] = useState(0);
-  const triggerUpdate = () => setForceUpdate(prev => prev + 1);
-
-  // Debug helper to inspect all form values
-  const debugSaleFieldSources = () => {
-    const currentValues = form.getValues();
-    
-    console.log('========= SALE FIELD DEBUG SOURCES ===========');
-    console.log('Current form values:', currentValues);
-    console.log('Sale-specific fields:', {
-      expectedPrice: currentValues.expectedPrice,
-      maintenanceCost: currentValues.maintenanceCost,
-      kitchenType: currentValues.kitchenType,
-      priceNegotiable: currentValues.priceNegotiable,
-      listingType: currentValues.listingType,
-      isSaleProperty: currentValues.isSaleProperty,
-      propertyPriceType: currentValues.propertyPriceType
-    });
-    console.log('Local state values:', {
-      expectedPriceValue, 
-      maintenanceCostValue
-    });
-    console.log('========= SALE FIELD DEBUG SOURCES END ===========');
-  };
-
-  // Initialize the component when it first mounts
   useEffect(() => {
-    if (initialized) return;
-    
-    console.log('=========== DEBUG: SALE DETAILS COMPONENT INITIALIZING ===========');
-    
-    // Get all possible values from form
     const formValues = form.getValues();
-    
-    console.log('Form values on component mount:', formValues);
-    
-    // Extract sale prices from form
-    let expectedPrice = formValues.expectedPrice || '';
-    let maintenanceCost = formValues.maintenanceCost || '';
-    
-    console.log('Loading initial values:', {
-      expectedPrice,
-      maintenanceCost
+    console.log('Initial form values in SaleDetails:', {
+      expectedPrice: formValues.expectedPrice,
+      maintenanceCost: formValues.maintenanceCost,
+      kitchenType: formValues.kitchenType,
+      priceNegotiable: formValues.priceNegotiable,
+      id: formValues.id
     });
     
-    // Update state and form values
-    setExpectedPriceValue(expectedPrice);
-    setMaintenanceCostValue(maintenanceCost);
-    
-    // Also update the form - this is critical for when submitting
-    setValue('expectedPrice', expectedPrice, { shouldValidate: false });
-    setValue('maintenanceCost', maintenanceCost, { shouldValidate: false });
-    
-    // Set flags that explicitly mark this as a sale property
-    setValue('isSaleProperty', true, { shouldValidate: false });
-    setValue('propertyPriceType', 'sale', { shouldValidate: false });
-    
-    // Set initialization flag
-    setInitialized(true);
-    
-    console.log('=========== DEBUG: SALE DETAILS COMPONENT INITIALIZED ===========');
-  }, []);
+    // Set local state from form
+    setExpectedPriceValue(formValues.expectedPrice || '');
+    setMaintenanceCostValue(formValues.maintenanceCost || '');
+  }, [form]);
   
-  // Handle updates if form values change externally
+  // Update local state when form values change
   useEffect(() => {
-    if (!initialized) return;
+    const formExpectedPrice = form.getValues('expectedPrice');
+    const formMaintenanceCost = form.getValues('maintenanceCost');
     
-    const formValues = form.getValues();
-    
-    // Check if form values differ from local state
-    if (formValues.expectedPrice && formValues.expectedPrice !== expectedPriceValue) {
-      console.log('Updating local expectedPrice from form:', formValues.expectedPrice);
-      setExpectedPriceValue(formValues.expectedPrice);
+    if (formExpectedPrice !== expectedPriceValue && formExpectedPrice) {
+      setExpectedPriceValue(formExpectedPrice);
     }
     
-    if (formValues.maintenanceCost && formValues.maintenanceCost !== maintenanceCostValue) {
-      console.log('Updating local maintenanceCost from form:', formValues.maintenanceCost);
-      setMaintenanceCostValue(formValues.maintenanceCost);
+    if (formMaintenanceCost !== maintenanceCostValue && formMaintenanceCost) {
+      setMaintenanceCostValue(formMaintenanceCost);
     }
-  }, [initialized, form, forceUpdate]);
-
-  // Function to reload all form values
-  const reloadFormValues = () => {
-    console.log('=========== DEBUG: RELOADING SALE FORM VALUES ===========');
-    const formValues = form.getValues();
-    
-    // Get current form values
-    const expectedPrice = formValues.expectedPrice || '';
-    const maintenanceCost = formValues.maintenanceCost || '';
-    
-    console.log('Reloaded values:', {
-      expectedPrice,
-      maintenanceCost
-    });
-    
-    // Update both local state and form
-    setExpectedPriceValue(expectedPrice);
-    setMaintenanceCostValue(maintenanceCost);
-    
-    // Update form values and mark as touched to ensure they're included in submission
-    setValue('expectedPrice', expectedPrice, { shouldValidate: false, shouldTouch: true });
-    setValue('maintenanceCost', maintenanceCost, { shouldValidate: false, shouldTouch: true });
-    
-    // Set flags that explicitly mark this as a sale property
-    setValue('isSaleProperty', true, { shouldValidate: false });
-    setValue('propertyPriceType', 'sale', { shouldValidate: false });
-    
-    // Force a UI update
-    triggerUpdate();
-    
-    console.log('=========== DEBUG: RELOADED SALE FORM VALUES ===========');
-  };
-
-  // Handle input changes with controlled components
+  }, [form.watch('expectedPrice'), form.watch('maintenanceCost')]);
+  
+  // Handle direct input changes
   const handleExpectedPriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.replace(/[^0-9]/g, '');
-    console.log('Setting expectedPrice to:', value);
-    
-    // Update local state
     setExpectedPriceValue(value);
-    
-    // Update form with validation
-    setValue('expectedPrice', value, { 
-      shouldValidate: true,
-      shouldDirty: true,
-      shouldTouch: true
-    });
+    setValue('expectedPrice', value, { shouldValidate: true, shouldDirty: true });
   };
-
+  
   const handleMaintenanceCostChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.replace(/[^0-9]/g, '');
-    console.log('Setting maintenanceCost to:', value);
-    
-    // Update local state
     setMaintenanceCostValue(value);
-    
-    // Update form with validation
-    setValue('maintenanceCost', value, { 
-      shouldValidate: true,
-      shouldDirty: true,
-      shouldTouch: true
+    setValue('maintenanceCost', value, { shouldValidate: true, shouldDirty: true });
+  };
+  
+  // Debug function to view current values
+  const debugFields = () => {
+    const values = form.getValues();
+    console.log('Current form values:', values);
+    console.log('Sale fields:', {
+      expectedPrice: values.expectedPrice,
+      maintenanceCost: values.maintenanceCost,
+      kitchenType: values.kitchenType,
+      priceNegotiable: values.priceNegotiable,
+      id: values.id,
+      price: values.price
+    });
+    console.log('Local state:', {
+      expectedPriceValue,
+      maintenanceCostValue
     });
   };
-
-  // Get tomorrow's date in YYYY-MM-DD format
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const minDate = tomorrow.toISOString().split('T')[0];
-
-  // Watch form values for other fields
+  
+  // Function to load price data directly from database
+  const loadPriceData = async () => {
+    const propertyId = form.getValues('id');
+    
+    if (!propertyId) {
+      console.log('No property ID, cannot load from database');
+      return;
+    }
+    
+    setIsLoading(true);
+    
+    try {
+      console.log('Loading price data from DB for property:', propertyId);
+      
+      // Query the database directly
+      const { data, error } = await supabase
+        .from('properties')
+        .select('price, property_details')
+        .eq('id', propertyId)
+        .single();
+      
+      if (error) {
+        console.error('Error loading price data:', error);
+        return;
+      }
+      
+      console.log('DB query result:', data);
+      
+      // Prioritize price data from property_details
+      let newExpectedPrice = '';
+      let newMaintenanceCost = '';
+      
+      if (data.property_details?.expectedPrice) {
+        newExpectedPrice = data.property_details.expectedPrice;
+        console.log('Found expectedPrice in property_details:', newExpectedPrice);
+      } else if (data.price) {
+        newExpectedPrice = data.price.toString();
+        console.log('Using price for expectedPrice:', newExpectedPrice);
+      }
+      
+      if (data.property_details?.maintenanceCost) {
+        newMaintenanceCost = data.property_details.maintenanceCost;
+        console.log('Found maintenanceCost in property_details:', newMaintenanceCost);
+      } else if (newExpectedPrice) {
+        // Calculate default maintenance
+        const priceValue = parseFloat(newExpectedPrice);
+        if (!isNaN(priceValue)) {
+          newMaintenanceCost = Math.min(
+            Math.round(priceValue * 0.005),
+            10000
+          ).toString();
+          console.log('Calculated default maintenanceCost:', newMaintenanceCost);
+        }
+      }
+      
+      // Update form and local state
+      if (newExpectedPrice) {
+        setValue('expectedPrice', newExpectedPrice, { shouldValidate: false });
+        setExpectedPriceValue(newExpectedPrice);
+      }
+      
+      if (newMaintenanceCost) {
+        setValue('maintenanceCost', newMaintenanceCost, { shouldValidate: false });
+        setMaintenanceCostValue(newMaintenanceCost);
+      }
+      
+      // Set sale property flags
+      setValue('isSaleProperty', true, { shouldValidate: false });
+      setValue('propertyPriceType', 'sale', { shouldValidate: false });
+      
+      console.log('Updated form values after DB load:', {
+        expectedPrice: form.getValues('expectedPrice'),
+        maintenanceCost: form.getValues('maintenanceCost')
+      });
+    } catch (err) {
+      console.error('Error in loadPriceData:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Watch other form fields
   const kitchenType = watch('kitchenType') || '';
   const availableFrom = watch('availableFrom') || '';
   const furnishing = watch('furnishing') || '';
   const parking = watch('parking') || '';
   const priceNegotiable = watch('priceNegotiable') || false;
-
-  // Log changes to sale fields
-  useEffect(() => {
-    console.log('Sale field values updated:', {
-      expectedPrice: expectedPriceValue,
-      maintenanceCost: maintenanceCostValue,
-      kitchenType,
-      priceNegotiable
-    });
-  }, [expectedPriceValue, maintenanceCostValue, kitchenType, priceNegotiable]);
-
-  // Ensure form values stay synchronized with local state
-  useEffect(() => {
-    if (!initialized) return;
-    
-    // Synchronize form values with local state
-    setValue('expectedPrice', expectedPriceValue, { shouldValidate: false });
-    setValue('maintenanceCost', maintenanceCostValue, { shouldValidate: false });
-    
-  }, [initialized, expectedPriceValue, maintenanceCostValue, setValue]);
+  
+  // Get tomorrow's date for date picker
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const minDate = tomorrow.toISOString().split('T')[0];
 
   return (
     <FormSection
@@ -215,33 +186,30 @@ export function SaleDetails({ form, adType }: FormSectionProps) {
       description="Specify your property sale details"
     >
       <div className="space-y-4">
-        {/* Debug Button - Only in development */}
-        {process.env.NODE_ENV === 'development' && (
-          <div className="bg-gray-100 p-3 rounded-lg mb-3">
-            <div className="flex space-x-2 mb-2">
-              <button
-                type="button"
-                onClick={debugSaleFieldSources}
-                className="px-3 py-1 bg-blue-500 text-white rounded text-sm"
-              >
-                Debug Sale Fields
-              </button>
-              <button
-                type="button"
-                onClick={reloadFormValues}
-                className="px-3 py-1 bg-green-500 text-white rounded text-sm"
-              >
-                Reload Form Values
-              </button>
-            </div>
-            <div className="mt-2 text-xs">
-              <p>Expected Price: {expectedPriceValue || 'empty'}</p>
-              <p>Maintenance Cost: {maintenanceCostValue || 'empty'}</p>
-              <p>Form EP: {getValues().expectedPrice || 'empty'}</p>
-              <p>Form MC: {getValues().maintenanceCost || 'empty'}</p>
-            </div>
+        {/* Debug panel */}
+        <div className="bg-gray-100 p-3 rounded-lg mb-3">
+          <div className="flex space-x-2 mb-2">
+            <button
+              type="button"
+              onClick={debugFields}
+              className="px-3 py-1 bg-blue-500 text-white rounded text-sm"
+            >
+              Debug Fields
+            </button>
+            <button
+              type="button"
+              onClick={loadPriceData}
+              disabled={isLoading}
+              className={`px-3 py-1 ${isLoading ? 'bg-gray-400' : 'bg-green-500 text-white'} rounded text-sm`}
+            >
+              {isLoading ? 'Loading...' : 'Load Price Data'}
+            </button>
           </div>
-        )}
+          <div className="mt-2 text-xs">
+            <p>Expected Price: {expectedPriceValue || 'empty'}</p>
+            <p>Maintenance Cost: {maintenanceCostValue || 'empty'}</p>
+          </div>
+        </div>
 
         {/* Expected Price and Maintenance Cost - Two Column */}
         <div className="grid grid-cols-2 gap-4">
