@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/PropertyCard.tsx
-// Version: 3.2.0
-// Last Modified: 07-03-2025 14:15 IST
-// Purpose: Added listing type indicator (Rent/Sale) to property card
+// Version: 3.3.0
+// Last Modified: 08-03-2025 12:45 IST
+// Purpose: Made edit and delete property options visible only in dev mode
 
 import React from 'react';
 import { Link } from 'react-router-dom';
@@ -32,6 +32,11 @@ interface PropertyCardProps {
   isUpdating: boolean;
 }
 
+// Helper function to check if we're in development mode
+const isDevelopmentMode = () => {
+  return process.env.NODE_ENV === 'development';
+};
+
 export function PropertyCard({ 
   property, 
   completionStatus, 
@@ -49,6 +54,9 @@ export function PropertyCard({
   // Determine if the property is for rent or sale
   const listingType = property.property_details?.listingType || 'rent';
   const isForRent = listingType === 'rent';
+
+  // Check if we're in development mode
+  const isDevMode = isDevelopmentMode();
 
   return (
     <div className="relative overflow-hidden rounded-xl bg-card shadow-sm transition-all hover:shadow-md border border-border/30">
@@ -114,7 +122,7 @@ export function PropertyCard({
         
         {/* Actions - Icon-only buttons */}
         <div className="flex justify-between">
-          {/* View Button */}
+          {/* View Button - Always visible */}
           <Link 
             to={`/properties/${property.id}`}
             className="flex items-center justify-center h-10 w-10 rounded-full bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
@@ -123,16 +131,18 @@ export function PropertyCard({
             <Eye className="h-5 w-5" />
           </Link>
           
-          {/* Edit Button */}
-          <Link 
-            to={`/properties/${property.id}/edit`}
-            className="flex items-center justify-center h-10 w-10 rounded-full bg-card border border-border hover:bg-muted/50 text-card-foreground transition-colors"
-            title="Edit Property"
-          >
-            <Pencil className="h-4.5 w-4.5" />
-          </Link>
+          {/* Edit Button - Only visible in development mode */}
+          {isDevMode && (
+            <Link 
+              to={`/properties/${property.id}/edit`}
+              className="flex items-center justify-center h-10 w-10 rounded-full bg-card border border-border hover:bg-muted/50 text-card-foreground transition-colors"
+              title="Edit Property"
+            >
+              <Pencil className="h-4.5 w-4.5" />
+            </Link>
+          )}
           
-          {/* Publish/Unpublish Button */}
+          {/* Publish/Unpublish Button - Always visible */}
           <button
             onClick={() => onTogglePublish(property.id, property.status)}
             disabled={isDraft && !isComplete || isUpdating}
@@ -156,14 +166,16 @@ export function PropertyCard({
             )}
           </button>
           
-          {/* Delete Button */}
-          <button
-            onClick={() => onDelete(property.id)}
-            className="flex items-center justify-center h-10 w-10 rounded-full bg-card border border-border hover:bg-destructive/10 hover:border-destructive/30 text-destructive transition-colors"
-            title="Delete Property"
-          >
-            <Trash2 className="h-5 w-5" />
-          </button>
+          {/* Delete Button - Only visible in development mode */}
+          {isDevMode && (
+            <button
+              onClick={() => onDelete(property.id)}
+              className="flex items-center justify-center h-10 w-10 rounded-full bg-card border border-border hover:bg-destructive/10 hover:border-destructive/30 text-destructive transition-colors"
+              title="Delete Property"
+            >
+              <Trash2 className="h-5 w-5" />
+            </button>
+          )}
         </div>
       </div>
     </div>
