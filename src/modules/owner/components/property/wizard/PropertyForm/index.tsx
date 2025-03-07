@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/PropertyForm/index.tsx
-// Version: 4.4.0
-// Last Modified: 07-03-2025 22:45 IST
-// Purpose: Fixed FormNavigation props and proper next step handling
+// Version: 4.5.0
+// Last Modified: 08-03-2025 18:00 IST
+// Purpose: Fixed navigation flow between different property types
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';

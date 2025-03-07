@@ -1,9 +1,10 @@
 // src/modules/owner/components/property/wizard/sections/PropertySummary.tsx
-// Version: 2.5.0
-// Last Modified: 08-03-2025 10:45 IST
-// Purpose: Fixed sale/rental details logic in property summary
+// Version: 2.6.0
+// Last Modified: 09-03-2025 01:30 IST
+// Purpose: Added navigation to Photos tab after saving
 
 import React, { useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { FormSection } from '@/components/FormSection';
 import { cn } from '@/lib/utils';
 import { FormData } from '../types';
@@ -80,6 +81,7 @@ export function PropertySummary({
   status = 'draft',
   propertyId
 }: PropertySummaryProps) {
+  const navigate = useNavigate();
   const isPublished = status === 'published';
   const isNewListing = !propertyId;
   
@@ -97,15 +99,6 @@ export function PropertySummary({
     const hasMaintenanceCost = !!formData.maintenanceCost;
     const hasKitchenType = !!formData.kitchenType;
     
-    console.log('Sale property detection:', {
-      listingType,
-      isSaleListingType,
-      hasExpectedPrice,
-      hasNoRentAmount,
-      hasMaintenanceCost,
-      hasKitchenType
-    });
-    
     // Return true if ANY of these indicators suggest it's a sale property
     return isSaleListingType || (hasExpectedPrice && hasNoRentAmount) || hasMaintenanceCost;
   }, [formData]);
@@ -117,6 +110,22 @@ export function PropertySummary({
 
   // Full address without flat/plot number for summary display
   const fullAddress = formData.address || '-';
+
+  // Handler for Save and Photos navigation
+  const handleSaveAndNavigateToPhotos = async () => {
+    try {
+      // Save the property
+      await onSaveAndPublish();
+      
+      // After successful save, navigate to photos tab
+      // Extract the base URL without the current step
+      const baseUrl = window.location.pathname.replace(/\/[^\/]*$/, '');
+      // Navigate directly to the photos tab
+      navigate(`${baseUrl}/photos`);
+    } catch (error) {
+      console.error('Error saving property:', error);
+    }
+  };
 
   const renderButtons = () => {
     if (saving) {
@@ -169,7 +178,7 @@ export function PropertySummary({
         </button>
         <button
           type="button"
-          onClick={onSaveAndPublish}
+          onClick={isNewListing ? handleSaveAndNavigateToPhotos : onSaveAndPublish}
           className={cn(
             "flex items-center px-6 py-3 rounded-lg",
             "text-sm font-medium",

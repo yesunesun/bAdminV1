@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/hooks/usePropertyFormNavigation.ts
-// Version: 1.2.0
-// Last Modified: 08-03-2025 14:30 IST
-// Purpose: Improved URL step synchronization and navigation controls
+// Version: 2.0.0
+// Last Modified: 08-03-2025 22:00 IST
+// Purpose: Removed excessive logging and simplified navigation logic
 
 import { useState, useCallback, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
@@ -71,11 +71,10 @@ export function usePropertyFormNavigation({
     return 1;
   });
 
-  // Update URL when step changes
+  // Update URL when step changes - simplified to avoid excessive re-renders
   const updateUrl = useCallback((newStep: number) => {
     try {
       if (!form || typeof form.getValues !== 'function') {
-        console.error('Form is not properly initialized for URL update');
         return;
       }
       
@@ -83,20 +82,17 @@ export function usePropertyFormNavigation({
       const effectiveType = form.getValues('listingType');
       
       if (!effectiveCategory || !effectiveType) {
-        console.error('Cannot update URL: missing category or type');
         return;
       }
 
       const stepData = STEPS[newStep - 1];
       if (!stepData) {
-        console.error('Invalid step index for URL update:', newStep);
         return;
       }
 
       // For edit mode, use query parameter
       if (mode === 'edit' && existingPropertyId) {
         const newPath = `/properties/${existingPropertyId}/edit?step=${stepData.id}`;
-        console.log('Updating URL to:', newPath);
         navigate(newPath, { replace: true });
         return;
       }
@@ -104,27 +100,28 @@ export function usePropertyFormNavigation({
       // For create mode, use path parameter
       const stepId = stepData.id;
       const newPath = `/properties/list/${effectiveCategory.toLowerCase()}/${effectiveType.toLowerCase()}/${stepId}`;
-      console.log('Updating URL to:', newPath);
       navigate(newPath, { replace: true });
     } catch (err) {
-      console.error('Error updating URL:', err);
+      // Silent error handling to avoid console spam
     }
   }, [navigate, form, mode, existingPropertyId]);
 
-  // Effect to sync URL with current step
+  // Effect to sync URL with current step - with debounce to prevent rapid updates
   useEffect(() => {
-    // Only update URL when form is properly initialized
-    if (form && typeof form.getValues === 'function') {
-      updateUrl(currentStep);
-    }
+    const timer = setTimeout(() => {
+      // Only update URL when form is properly initialized
+      if (form && typeof form.getValues === 'function') {
+        updateUrl(currentStep);
+      }
+    }, 100); // Small delay to avoid multiple URL updates
+    
+    return () => clearTimeout(timer);
   }, [currentStep, updateUrl, form]);
 
-  // Save form data to localStorage
+  // Save form data to localStorage - simplified
   const saveFormToStorage = useCallback((data: Partial<FormData>) => {
     try {
       if (user?.id) {
-        console.log('Saving form data to localStorage');
-        
         // Make sure flatPlotNo exists in the data
         const safeData = {
           ...data,
@@ -139,14 +136,13 @@ export function usePropertyFormNavigation({
         }
       }
     } catch (err) {
-      console.error('Error saving form data to localStorage:', err);
+      // Silent error handling
     }
   }, [user?.id, mode, existingPropertyId]);
 
   // Enhanced setCurrentStep with localStorage updates
   const setCurrentStepWithPersistence = useCallback((step: number) => {
     try {
-      console.log('Setting current step to:', step);
       setCurrentStep(step);
       
       if (user?.id) {
@@ -158,15 +154,13 @@ export function usePropertyFormNavigation({
         }
       }
     } catch (err) {
-      console.error('Error setting current step:', err);
+      // Silent error handling
     }
   }, [user?.id, mode, existingPropertyId]);
 
-  // Handle next step with special case for Rental -> Features navigation
+  // Simplified next step handler
   const handleNextStep = useCallback(() => {
     try {
-      console.log('=== handleNextStep called ===');
-      
       if (!validateCurrentStep()) {
         setError('Please fill in all required fields');
         return;
@@ -175,30 +169,10 @@ export function usePropertyFormNavigation({
       setError('');
       
       if (!form || typeof form.getValues !== 'function') {
-        console.error('Form is not properly initialized for next step');
         return;
       }
       
       const formData = form.getValues();
-      console.log('Current form data:', formData);
-      console.log('Current step:', currentStep);
-      
-      // Special case: If current step is rental tab, force navigate to features tab
-      const currentStepId = STEPS[currentStep - 1]?.id;
-      console.log('Current step ID:', currentStepId);
-      
-      if (currentStepId === 'rental') {
-        console.log('On rental tab, navigating to features tab');
-        const featuresIndex = STEPS.findIndex(step => step.id === 'features');
-        if (featuresIndex !== -1) {
-          console.log('Found features tab at index:', featuresIndex);
-          // Save form data before navigation
-          saveFormToStorage(formData);
-          // Navigate to features tab
-          setCurrentStepWithPersistence(featuresIndex + 1);
-          return;
-        }
-      }
       
       // Make sure flatPlotNo exists in the data
       const safeFormData = {
@@ -209,16 +183,14 @@ export function usePropertyFormNavigation({
       saveFormToStorage(safeFormData);
       setCurrentStepWithPersistence(Math.min(currentStep + 1, STEPS.length));
     } catch (err) {
-      console.error('Error in handleNextStep:', err);
       setError('An error occurred while proceeding to the next step. Please try again.');
     }
   }, [currentStep, form, saveFormToStorage, setCurrentStepWithPersistence, validateCurrentStep, setError]);
 
-  // Handle previous step
+  // Simplified previous step handler
   const handlePreviousStep = useCallback(() => {
     try {
       if (!form || typeof form.getValues !== 'function') {
-        console.error('Form is not properly initialized for previous step');
         return;
       }
       
@@ -233,7 +205,6 @@ export function usePropertyFormNavigation({
       saveFormToStorage(safeFormData);
       setCurrentStepWithPersistence(Math.max(currentStep - 1, 1));
     } catch (err) {
-      console.error('Error in handlePreviousStep:', err);
       setError('An error occurred while going back to the previous step. Please try again.');
     }
   }, [currentStep, form, saveFormToStorage, setCurrentStepWithPersistence, setError]);
@@ -242,7 +213,6 @@ export function usePropertyFormNavigation({
   const clearStorage = useCallback(() => {
     try {
       if (user?.id) {
-        console.log('Clearing form data from localStorage');
         if (mode === 'edit' && existingPropertyId) {
           localStorage.removeItem(`propertyWizard_${user.id}_${existingPropertyId}_step`);
           localStorage.removeItem(`propertyWizard_${user.id}_${existingPropertyId}_data`);
@@ -252,7 +222,7 @@ export function usePropertyFormNavigation({
         }
       }
     } catch (err) {
-      console.error('Error clearing storage:', err);
+      // Silent error handling
     }
   }, [user?.id, mode, existingPropertyId]);
 
@@ -261,7 +231,7 @@ export function usePropertyFormNavigation({
       clearStorage();
       navigate('/properties');
     } catch (err) {
-      console.error('Error in handleImageUploadComplete:', err);
+      // Silent error handling
     }
   }, [clearStorage, navigate]);
 

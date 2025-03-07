@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/PropertyForm/components/FormContent.tsx
-// Version: 1.4.0
-// Last Modified: 07-03-2025 21:15 IST
-// Purpose: Using corrected relative import paths
+// Version: 2.0.0
+// Last Modified: 08-03-2025 23:00 IST
+// Purpose: Fixed component rendering and removed console logs
 
 import React from 'react';
 import { UseFormReturn } from 'react-hook-form';
@@ -35,7 +35,7 @@ interface FormContentProps {
   handleImageUploadComplete: () => void;
 }
 
-const FormContent: React.FC<FormContentProps> = ({
+const FormContent = ({
   form,
   formStep,
   STEPS,
@@ -52,117 +52,109 @@ const FormContent: React.FC<FormContentProps> = ({
   status,
   savedPropertyId,
   handleImageUploadComplete
-}) => {
-  // Get the current step ID
-  const currentStepId = STEPS[formStep - 1]?.id;
+}: FormContentProps) => {
+  // Get the current step ID safely
+  const currentStepId = formStep > 0 && formStep <= STEPS.length 
+    ? STEPS[formStep - 1]?.id 
+    : null;
   
-  console.log('=========== DEBUG: RENDERING STEP CONTENT ===========');
-  console.log('Current step ID:', currentStepId);
-  console.log('Form mode detection:', {
-    effectiveAdType,
-    isSaleMode,
-    listingType: form.getValues('listingType'),
-    isSaleProperty: form.getValues('isSaleProperty'),
-    propertyPriceType: form.getValues('propertyPriceType')
-  });
-  
-  // Match content based on step ID 
-  switch (currentStepId) {
-    case 'details':
-      return (
-        <PropertyDetails 
-          form={form} 
-          mode={mode} 
-          category={effectiveCategory}
-          adType={effectiveAdType}
-        />
-      );
-    
-    case 'location':
-      return (
-        <LocationDetails 
-          form={form} 
-          selectedCity={selectedCity}
-        />
-      );
-    
-    case 'rental':
-      // CRITICAL: This is for the RENTAL tab - we show rental details when NOT in sale mode
-      if (isSaleMode) {
-        console.log('Current tab is rental but property is for sale, showing not applicable message');
-        return (
-          <div className="py-6 text-center">
-            <p className="text-muted-foreground">This section is not applicable for sale properties.</p>
-          </div>
-        );
-      }
-      
-      console.log('Showing rental details for rental property');
-      return (
-        <RentalDetails 
-          form={form}
-          adType={effectiveAdType}
-        />
-      );
-    
-    case 'sale':
-      // CRITICAL: This is for the SALE tab - we show sale details when IN sale mode
-      if (!isSaleMode) {
-        console.log('Current tab is sale but property is for rent, showing not applicable message');
-        return (
-          <div className="py-6 text-center">
-            <p className="text-muted-foreground">This section is not applicable for rental properties.</p>
-          </div>
-        );
-      }
-      
-      console.log('Showing sale details for sale property:', {
-        expectedPrice: form.getValues('expectedPrice'),
-        maintenanceCost: form.getValues('maintenanceCost')
-      });
-      
-      return (
-        <SaleDetails 
-          form={form}
-          adType={effectiveAdType}
-        />
-      );
-    
-    case 'features':
-      return (
-        <AmenitiesSection 
-          form={form}
-          category={effectiveCategory}
-        />
-      );
-    
-    case 'review':
-      return (
-        <PropertySummary
-          formData={form.watch()}
-          onPrevious={handlePreviousStep}
-          onSaveAsDraft={handleSaveAsDraft}
-          onSaveAndPublish={handleSaveAndPublish}
-          onUpdate={handleUpdate}
-          saving={saving}
-          status={status}
-          propertyId={savedPropertyId}
-        />
-      );
-    
-    case 'photos':
-      return (
-        <ImageUploadSection
-          propertyId={savedPropertyId!}
-          onUploadComplete={handleImageUploadComplete}
-          onPrevious={handlePreviousStep}
-        />
-      );
-    
-    default:
-      console.error('Unknown step ID:', currentStepId);
-      return null;
+  // Render content based on the current step
+  if (currentStepId === 'details') {
+    return (
+      <PropertyDetails 
+        form={form} 
+        mode={mode} 
+        category={effectiveCategory}
+        adType={effectiveAdType}
+      />
+    );
   }
+  
+  if (currentStepId === 'location') {
+    return (
+      <LocationDetails 
+        form={form} 
+        selectedCity={selectedCity}
+      />
+    );
+  }
+  
+  if (currentStepId === 'rental') {
+    // Only show rental details for rental properties
+    if (isSaleMode) {
+      return (
+        <div className="py-6 text-center">
+          <p className="text-muted-foreground">This section is not applicable for sale properties.</p>
+        </div>
+      );
+    }
+    
+    return (
+      <RentalDetails 
+        form={form}
+        adType={effectiveAdType}
+      />
+    );
+  }
+  
+  if (currentStepId === 'sale') {
+    // Only show sale details for sale properties
+    if (!isSaleMode) {
+      return (
+        <div className="py-6 text-center">
+          <p className="text-muted-foreground">This section is not applicable for rental properties.</p>
+        </div>
+      );
+    }
+    
+    return (
+      <SaleDetails 
+        form={form}
+        adType={effectiveAdType}
+      />
+    );
+  }
+  
+  if (currentStepId === 'features') {
+    return (
+      <AmenitiesSection 
+        form={form}
+        category={effectiveCategory}
+      />
+    );
+  }
+  
+  if (currentStepId === 'review') {
+    return (
+      <PropertySummary
+        formData={form.watch()}
+        onPrevious={handlePreviousStep}
+        onSaveAsDraft={handleSaveAsDraft}
+        onSaveAndPublish={handleSaveAndPublish}
+        onUpdate={handleUpdate}
+        saving={saving}
+        status={status}
+        propertyId={savedPropertyId}
+      />
+    );
+  }
+  
+  if (currentStepId === 'photos') {
+    return (
+      <ImageUploadSection
+        propertyId={savedPropertyId!}
+        onUploadComplete={handleImageUploadComplete}
+        onPrevious={handlePreviousStep}
+      />
+    );
+  }
+  
+  // Default fallback
+  return (
+    <div className="py-6 text-center">
+      <p className="text-muted-foreground">Section not available</p>
+    </div>
+  );
 };
 
 export default FormContent;
