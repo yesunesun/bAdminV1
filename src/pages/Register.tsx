@@ -1,6 +1,6 @@
 // src/pages/Register.tsx
-// Version: 1.3.0
-// Last Modified: 10-02-2025 14:45 IST
+// Version: 1.4.0
+// Last Modified: 01-04-2025 12:45 IST
 
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
@@ -39,7 +39,7 @@ export default function Register() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [showVerification, setShowVerification] = useState(false);
-  const { registerUser, verifyOtp } = useAuth();
+  const { registerUser, verifyOTP } = useAuth();
 
   const handleRegistrationSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,17 +52,20 @@ export default function Register() {
     setIsLoading(true);
     
     try {
+      console.log(`Registering ${selectedRole} with email: ${email}`);
       const { error: registerError } = await registerUser(email, selectedRole);
       
       if (registerError) {
+        console.error('Registration API error:', registerError);
         setError(registerError.message);
         return;
       }
       
+      console.log('Registration successful, proceeding to verification');
       setShowVerification(true);
     } catch (err) {
-      setError('An unexpected error occurred. Please try again later.');
       console.error('Registration error:', err);
+      setError('An unexpected error occurred. Please try again later.');
     } finally {
       setIsLoading(false);
     }
@@ -74,20 +77,37 @@ export default function Register() {
     setIsLoading(true);
 
     try {
-      const { error: verifyError } = await verifyOtp(email, token);
+      // Basic validation
+      if (!token.trim()) {
+        setError('Please enter the verification code');
+        setIsLoading(false);
+        return;
+      }
+      
+      console.log(`Verifying OTP for ${email} with code: ${token}`);
+      const { error: verifyError } = await verifyOTP(email, token);
 
       if (verifyError) {
+        console.error('Verification API error:', verifyError);
         setError(verifyError.message);
+        setIsLoading(false);
         return;
       }
 
+      console.log('Verification successful, redirecting to dashboard');
       navigate('/dashboard');
     } catch (err) {
-      setError('An unexpected error occurred. Please try again later.');
       console.error('Verification error:', err);
+      setError('An unexpected error occurred. Please try again later.');
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleStartOver = () => {
+    setShowVerification(false);
+    setToken('');
+    setError('');
   };
 
   return (
@@ -122,13 +142,23 @@ export default function Register() {
                   name="token"
                   type="text"
                   required
+                  pattern="[0-9]*"
+                  inputMode="numeric"
                   className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                  placeholder="Enter verification code"
+                  placeholder="Enter 6-digit code"
                   value={token}
-                  onChange={(e) => setToken(e.target.value)}
+                  onChange={(e) => {
+                    // Only allow digits
+                    const value = e.target.value.replace(/\D/g, '');
+                    setToken(value);
+                  }}
                   disabled={isLoading}
+                  maxLength={6}
                 />
               </div>
+              <p className="mt-1 text-xs text-gray-500">
+                Enter the 6-digit code sent to {email}
+              </p>
             </div>
 
             <div>
@@ -144,11 +174,7 @@ export default function Register() {
             <div className="text-center">
               <button
                 type="button"
-                onClick={() => {
-                  setShowVerification(false);
-                  setToken('');
-                  setError('');
-                }}
+                onClick={handleStartOver}
                 className="text-sm text-indigo-600 hover:text-indigo-500"
               >
                 Start over

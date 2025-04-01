@@ -1,6 +1,6 @@
 // src/contexts/AuthContext.tsx
-// Version: 3.2.1
-// Last Modified: 19-02-2025 14:45 IST
+// Version: 3.4.0
+// Last Modified: 01-04-2025 12:45 IST
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
@@ -15,6 +15,7 @@ interface AuthContextType {
   signInWithPassword: (email: string, password: string) => Promise<{ error?: AuthError }>;
   verifyOTP: (email: string, token: string) => Promise<{ error?: AuthError }>;
   signOut: () => Promise<void>;
+  registerUser: (email: string, role: string) => Promise<{ error?: AuthError }>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -60,6 +61,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signInWithOTP = async (email: string) => {
     try {
+      console.log('Attempting OTP sign in for email:', email);
       const { error } = await supabase.auth.signInWithOtp({
         email: email.trim(),
         options: {
@@ -68,6 +70,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (error) throw error;
+      console.log('OTP sign in successful, email sent');
       return { error: undefined };
     } catch (err) {
       console.error('OTP sign in error:', err);
@@ -88,15 +91,68 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const verifyOTP = async (email: string, token: string) => {
+  const registerUser = async (email: string, role: string) => {
     try {
-      const { error } = await supabase.auth.verifyOtp({
+      console.log('Registering user with email:', email, 'and role:', role);
+      
+      // Sign up with OTP (passwordless)
+      const { error } = await supabase.auth.signInWithOtp({
         email: email.trim(),
-        token: token.trim(),
-        type: 'email',
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          data: {
+            role: role, // Store the user's role in the metadata
+          }
+        },
       });
 
       if (error) throw error;
+      console.log('Registration successful, verification email sent');
+      return { error: undefined };
+    } catch (err) {
+      console.error('Registration error:', err);
+      if (err instanceof Error) {
+        return {
+          error: {
+            message: err.message,
+            name: 'AuthError'
+          } as AuthError
+        };
+      }
+      return {
+        error: {
+          message: 'An unexpected error occurred during registration',
+          name: 'AuthError'
+        } as AuthError
+      };
+    }
+  };
+
+  const verifyOTP = async (email: string, token: string) => {
+    try {
+      console.log('Verifying OTP for email:', email, 'with token length:', token.length);
+      
+      if (!token || token.trim().length === 0) {
+        throw new Error('Verification code cannot be empty');
+      }
+      
+      // Ensure token contains only digits
+      if (!/^\d+$/.test(token.trim())) {
+        throw new Error('Verification code must contain only numbers');
+      }
+      
+      const { data, error } = await supabase.auth.verifyOtp({
+        email: email.trim(),
+        token: token.trim(),
+        type: 'signup', // Change from 'email' to 'signup' for new user registrations
+      });
+
+      if (error) {
+        console.error('OTP verification API error:', error);
+        throw error;
+      }
+      
+      console.log('OTP verification successful. User data:', data?.user ? 'User exists' : 'No user');
       return { error: undefined };
     } catch (err) {
       console.error('OTP verification error:', err);
@@ -201,6 +257,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const signInWithPassword = async (email: string, password: string) => {
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: password.trim()
+      });
+
+      if (error) throw error;
+      return { error: undefined };
+    } catch (err) {
+      console.error('Password sign in error:', err);
+      if (err instanceof Error) {
+        return {
+          error: {
+            message: err.message,
+            name: 'AuthError'
+          } as AuthError
+        };
+      }
+      return {
+        error: {
+          message: 'An unexpected error occurred during sign in',
+          name: 'AuthError'
+        } as AuthError
+      };
+    }
+  };
+
   const signOut = async () => {
     try {
       const { error } = await supabase.auth.signOut();
@@ -217,6 +301,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loading,
     signInAdmin,
     signInWithOTP,
+    signInWithPassword,
+    registerUser,
     verifyOTP,
     signOut,
   };
