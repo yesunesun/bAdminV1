@@ -1,7 +1,7 @@
 // src/routes/mainRoutes.tsx
-// Version: 11.1.0
-// Last Modified: 01-04-2025 10:00 IST
-// Purpose: Routes with added home page navigation hub and moving HomePage to /home
+// Version: 11.2.0
+// Last Modified: 01-04-2025 10:45 IST
+// Purpose: Keep HomePage at /home, add route mapping
 
 import React from 'react';
 import { Navigate } from 'react-router-dom';
@@ -15,7 +15,7 @@ import ListYourProperty from '../modules/owner/pages/ListYourProperty';
 // Import from the seeker module
 import BrowseProperties from '../modules/seeker/pages/BrowseProperties';
 import PropertyDetailPage from '../modules/seeker/pages/PropertyDetailPage';
-// Import our new HomePage component
+// Import our HomePage component
 import HomePage from '../pages/HomePage';
 
 export const mainRoutes = [
@@ -42,7 +42,7 @@ export const mainRoutes = [
       { path: 'property/:id', element: <PropertyDetailPage /> }
     ]
   },
-  // Move HomePage to /home path
-  { path: '/home', element: <HomePage /> },
-  // Root path will be defined directly in App.tsx with a simple message
-]
+  // Keep existing HomePage at /home path unchanged
+  { path: '/home', element: <HomePage /> }
+  // Root path will be handled directly in App.tsx with PropertyMapHome component
+];

@@ -13,7 +13,7 @@ const SheetTrigger = Dialog.Trigger;
 const SheetClose = Dialog.Close;
 const SheetPortal = Dialog.Portal;
 
-const SheetOverlay = React.forwardRef
+const SheetOverlay = React.forwardRef<
   React.ElementRef<typeof Dialog.Overlay>,
   React.ComponentPropsWithoutRef<typeof Dialog.Overlay>
 >(({ className, ...props }, ref) => (
@@ -30,7 +30,7 @@ interface SheetContentProps
   side?: "top" | "right" | "bottom" | "left";
 }
 
-const SheetContent = React.forwardRef
+const SheetContent = React.forwardRef<
   React.ElementRef<typeof Dialog.Content>,
   SheetContentProps
 >(({ side = "right", className, children, ...props }, ref) => {
@@ -54,10 +54,10 @@ const SheetContent = React.forwardRef
         {...props}
       >
         {children}
-        <Dialog.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
+        <SheetClose className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
           <X className="h-4 w-4" />
           <span className="sr-only">Close</span>
-        </Dialog.Close>
+        </SheetClose>
       </Dialog.Content>
     </SheetPortal>
   );
@@ -92,7 +92,7 @@ const SheetFooter = ({
 );
 SheetFooter.displayName = "SheetFooter";
 
-const SheetTitle = React.forwardRef
+const SheetTitle = React.forwardRef<
   React.ElementRef<typeof Dialog.Title>,
   React.ComponentPropsWithoutRef<typeof Dialog.Title>
 >(({ className, ...props }, ref) => (
@@ -104,7 +104,7 @@ const SheetTitle = React.forwardRef
 ));
 SheetTitle.displayName = Dialog.Title.displayName;
 
-const SheetDescription = React.forwardRef
+const SheetDescription = React.forwardRef<
   React.ElementRef<typeof Dialog.Description>,
   React.ComponentPropsWithoutRef<typeof Dialog.Description>
 >(({ className, ...props }, ref) => (

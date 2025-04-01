@@ -1,7 +1,7 @@
 // src/App.tsx 
-// Version: 6.1.0
-// Last Modified: 01-04-2025 10:00 IST
-// Purpose: Moved root path to /home and added simple message at root path
+// Version: 6.3.0
+// Last Modified: 02-04-2025 14:35 IST
+// Purpose: Updated PropertyMapHome import path to new module location
 
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
@@ -9,8 +9,9 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Header } from '@/components/Header';
 import { useAdminAccess } from './modules/admin/hooks/useAdminAccess';
 
-// Import HomePage directly
+// Import HomePage and PropertyMapHome (updated path)
 import HomePage from './pages/HomePage';
+import PropertyMapHome from './modules/properties';
 
 // Route Configurations
 import { mainRoutes } from './routes/mainRoutes';
@@ -21,17 +22,6 @@ import { moderatorRoutes } from './routes/moderatorRoutes';
 const LoadingSpinner = () => (
   <div className="min-h-screen flex items-center justify-center">
     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-  </div>
-);
-
-// Simple Root Page Component
-const RootPage = () => (
-  <div className="min-h-screen flex items-center justify-center flex-col p-4">
-    <h1 className="text-2xl font-bold mb-4">Welcome to Bhoomitalli</h1>
-    <p className="text-xl mb-6 text-center">This site has moved to a new location.</p>
-    <a href="/home" className="py-2 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
-      Go to Home Page
-    </a>
   </div>
 );
 
@@ -178,10 +168,14 @@ function App() {
       <BrowserRouter>
         <div className="min-h-screen bg-background">
           <Routes>
-            {/* Root path now shows a simple message */}
+            {/* Root path with PropertyMapHome component - full width (no header or container) */}
             <Route 
               path="/" 
-              element={<RootPage />} 
+              element={
+                <PublicOrProtectedRoute>
+                  <PropertyMapHome />
+                </PublicOrProtectedRoute>
+              } 
             />
             
             {/* Auth Routes - accessible to everyone */}
@@ -285,8 +279,8 @@ function App() {
               })}
             </Route>
 
-            {/* Catch-all route - redirect to home */}
-            <Route path="*" element={<Navigate to="/home" replace />} />
+            {/* Catch-all route - redirect to root */}
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>
       </BrowserRouter>

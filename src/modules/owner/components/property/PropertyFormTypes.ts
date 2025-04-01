@@ -1,13 +1,55 @@
-// src/components/property/PropertyFormTypes.ts
-// Version: 1.6.0
-// Last Modified: 06-03-2025 22:15 IST
-// Purpose: Updated form types to include flat/plot number field
+// src/modules/owner/components/property/PropertyFormTypes.ts
+// Version: 1.7.0
+// Last Modified: 02-04-2025 21:15 IST
+// Purpose: Enhanced type definitions with robust image handling
 
 import { UseFormReturn } from 'react-hook-form';
 import { PropertyValidationSchema } from './validationSchemas';
 
+// Image Type Definition
+export interface PropertyImage {
+  id: string;
+  url: string;
+  is_primary?: boolean;
+  display_order?: number;
+  type?: 'primary' | 'additional';
+}
+
+// Core Property Type
+export type PropertyType = {
+  id: string;
+  owner_id: string;
+  title: string;
+  price: number;
+  address: string;
+  city: string;
+  state: string;
+  zip_code: string;
+  bedrooms?: number;
+  bathrooms?: number;
+  square_feet?: number;
+  status: 'draft' | 'published' | 'archived';
+  tags?: string[];
+  created_at: string;
+  updated_at: string;
+  
+  // Comprehensive image handling
+  property_images?: PropertyImage[];
+  image?: string; // Legacy support for single image
+
+  // Detailed property information
+  property_details?: {
+    propertyType?: string;
+    rentalFrequency?: string;
+    latitude?: number;
+    longitude?: number;
+    [key: string]: any; // Allow for additional dynamic properties
+  };
+}
+
+// Form Data Type for Property Submission
 export type FormData = {
-  // These should match the URL parameters
+  // Existing fields from previous implementation
   propertyType: string;
   listingType: string;
   
@@ -19,14 +61,16 @@ export type FormData = {
   propertyAge: string;
   facing: string;
   builtUpArea: string;
-  builtUpAreaUnit: 'sqft' | 'sqyd'; // Add the built-up area unit
-  possessionDate: string; // Added possession date field
+  builtUpAreaUnit: 'sqft' | 'sqyd';
+  possessionDate: string;
   zone: string;
   locality: string;
   landmark: string;
   address: string;
-  flatPlotNo: string; // Added flat/plot number field
+  flatPlotNo: string;
   pinCode: string;
+  
+  // Rental/Sale Details
   rentalType: 'rent' | 'lease';
   rentAmount: string;
   securityDeposit: string;
@@ -34,12 +78,14 @@ export type FormData = {
   maintenance: string;
   availableFrom: string;
   preferredTenants: string[];
+  
+  // Property Characteristics
   furnishing: string;
   parking: string;
   description: string;
   amenities: string[];
   
-  // Additional fields
+  // Additional Fields
   bathrooms: string;
   balconies: string;
   hasGym: boolean;
@@ -51,43 +97,23 @@ export type FormData = {
   hasSimilarUnits: boolean;
   direction: string;
   
-  // Optional fields for mapping
+  // Mapping and Location
   latitude?: number;
   longitude?: number;
   
-  // Image related fields
-  images?: Array<{
-    id: string;
-    url: string;
-    type: 'primary' | 'additional';
-  }>;
+  // Enhanced Image Handling
+  images?: PropertyImage[];
   primaryImage?: string;
-};
-
-export interface Property {
-  id: string;
-  owner_id: string;
-  title: string;
-  price: number;
-  address: string;
-  city: string;
-  state: string;
-  zip_code: string;
-  status: 'draft' | 'published' | 'archived';
-  tags: string[];
-  created_at: string;
-  updated_at: string;
-  property_details: FormData;
-  images?: Array<{
-    id: string;
-    url: string;
-    type: 'primary' | 'additional';
-  }>;
 }
 
+// Interfaces for Form Steps and Validation
 export interface FormStepProps extends FormSectionProps {
   onNext: () => void;
   onPrevious: () => void;
+}
+
+export interface FormSectionProps {
+  form: UseFormReturn<FormData>;
 }
 
 export interface PropertySelectionSectionProps extends FormSectionProps {
@@ -111,10 +137,12 @@ export interface PropertySummaryProps {
   propertyId?: string;
 }
 
+// Validation and Tracking Types
 export type StepValidationStatus = {
   [key: number]: boolean;
 };
 
+// Property Filtering and Search Types
 export type PropertyFilter = {
   zone?: string;
   locality?: string;
@@ -129,6 +157,7 @@ export type PropertyFilter = {
   sortBy?: 'price_asc' | 'price_desc' | 'latest';
 };
 
+// Property Statistics Type
 export type PropertyStats = {
   total: number;
   published: number;
@@ -145,6 +174,7 @@ export type PropertyTypeFormData = {
   city?: string;
 };
 
+// Property Category Interface
 export interface PropertyCategoryOption {
   id: string;
   title: string;
@@ -152,8 +182,20 @@ export interface PropertyCategoryOption {
   icon: React.FC<{ className?: string }>;
 }
 
+// How It Works Component Props
 export interface HowItWorksProps {
   onStartListing?: () => void;
   showCTA?: boolean;
   className?: string;
 }
+
+// Export the types for use in other components
+export default {
+  PropertyType,
+  FormData,
+  PropertyImage,
+  PropertyFilter,
+  PropertyStats,
+  PropertyTypeFormData,
+  PropertyCategoryOption
+};

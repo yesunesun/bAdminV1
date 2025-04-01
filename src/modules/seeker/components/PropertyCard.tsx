@@ -1,14 +1,20 @@
 // src/modules/seeker/components/PropertyCard.tsx
-// Version: 2.2.0
-// Last Modified: 01-03-2025 18:45 IST
-// Purpose: Updated to show default noimage.png when no property image is available
+// Version: 2.3.0
+// Last Modified: 02-04-2025 21:15 IST
+// Purpose: Enhanced property card with robust image handling
 
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { PropertyType } from '@/modules/owner/components/property/types';
 import { formatCurrency, cn } from '@/lib/utils';
 import { Card } from '@/components/ui/card';
-import { MapPinIcon, BedIcon, BathIcon, SquareIcon, HomeIcon } from 'lucide-react';
+import { 
+  MapPinIcon, 
+  BedIcon, 
+  BathIcon, 
+  SquareIcon, 
+  HomeIcon 
+} from 'lucide-react';
 import FavoriteButton from './FavoriteButton';
 import { useTheme } from '@/contexts/ThemeContext';
 
@@ -18,23 +24,37 @@ interface PropertyCardProps {
   onLike?: (property: PropertyType) => void;
 }
 
-const PropertyCard: React.FC<PropertyCardProps> = ({ property, isLiked = false, onLike }) => {
+const PropertyCard: React.FC<PropertyCardProps> = ({ 
+  property, 
+  isLiked = false, 
+  onLike 
+}) => {
   const { theme } = useTheme();
   
-  // Find primary image or use first image
+  // Robust image selection strategy
   const primaryImage = property.property_images?.find(img => img.is_primary) || 
-                       (property.property_images && property.property_images.length > 0 ? property.property_images[0] : null);
+                       (property.property_images && property.property_images.length > 0 
+                         ? property.property_images[0] 
+                         : null);
   
-  const imageSrc = primaryImage?.url || '/noimage.png';
+  const imageSrc = primaryImage?.url || 
+                   property.image ||  // Fallback to legacy image field
+                   '/noimage.png';    // Final fallback
 
   return (
     <Card className="overflow-hidden group h-full flex flex-col transition-all duration-300 hover:shadow-xl hover:translate-y-[-4px] border-none">
       <div className="relative">
-        <Link to={`/seeker/property/${property.id}`} className="block relative h-60 overflow-hidden">
+        <Link 
+          to={`/seeker/property/${property.id}`} 
+          className="block relative h-60 overflow-hidden"
+        >
+          {/* Background gradient overlay */}
           <div className="absolute inset-0 bg-gradient-to-b from-black/0 via-black/0 to-black/30 z-10" />
+          
+          {/* Property Image */}
           <img 
             src={imageSrc} 
-            alt={property.title} 
+            alt={property.title || 'Property'} 
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
             onError={(e) => {
               const target = e.target as HTMLImageElement;
@@ -42,6 +62,8 @@ const PropertyCard: React.FC<PropertyCardProps> = ({ property, isLiked = false, 
               target.src = '/noimage.png';
             }}
           />
+          
+          {/* Property Type Badge */}
           <div className={cn(
             "absolute bottom-3 left-3 z-20 bg-white/90 backdrop-blur-sm rounded-full px-3 py-1 text-xs font-medium shadow-sm",
             theme === 'ocean' ? "text-primary" : "text-primary"
@@ -49,6 +71,8 @@ const PropertyCard: React.FC<PropertyCardProps> = ({ property, isLiked = false, 
             {property.property_details?.propertyType || 'Property'}
           </div>
         </Link>
+        
+        {/* Favorite Button */}
         <FavoriteButton 
           initialIsLiked={isLiked}
           onToggle={(newLikedState) => {
@@ -60,14 +84,17 @@ const PropertyCard: React.FC<PropertyCardProps> = ({ property, isLiked = false, 
         />
       </div>
 
+      {/* Property Details */}
       <div className="flex-grow p-5 flex flex-col">
         <div className="mb-auto">
+          {/* Property Title */}
           <Link to={`/seeker/property/${property.id}`} className="block">
             <h3 className="text-lg font-semibold line-clamp-2 group-hover:text-primary transition-colors">
               {property.title}
             </h3>
           </Link>
         
+          {/* Property Location */}
           <div className="flex items-center mt-2.5 text-muted-foreground">
             <MapPinIcon className="h-3.5 w-3.5 min-w-3.5 mr-1.5" />
             <p className="text-sm line-clamp-1">
@@ -78,6 +105,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({ property, isLiked = false, 
           </div>
         </div>
         
+        {/* Property Features */}
         <div className="mt-4 flex justify-between items-center">
           <div className="flex gap-2 flex-wrap">
             {property.bedrooms && (
@@ -103,6 +131,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({ property, isLiked = false, 
           </div>
         </div>
         
+        {/* Price and View Details */}
         <div className="mt-4 pt-4 border-t border-border/40 flex items-center justify-between">
           <p className={cn(
             "text-xl font-bold flex items-center",
