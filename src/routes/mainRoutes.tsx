@@ -1,7 +1,7 @@
 // src/routes/mainRoutes.tsx
-// Version: 11.0.0
-// Last Modified: 27-02-2025 16:15 IST
-// Purpose: Routes with added home page navigation hub
+// Version: 11.1.0
+// Last Modified: 01-04-2025 10:00 IST
+// Purpose: Routes with added home page navigation hub and moving HomePage to /home
 
 import React from 'react';
 import { Navigate } from 'react-router-dom';
@@ -42,6 +42,7 @@ export const mainRoutes = [
       { path: 'property/:id', element: <PropertyDetailPage /> }
     ]
   },
-  // Change the root path to use our new HomePage instead of redirecting
-  { path: '/', element: <HomePage /> }
-];
+  // Move HomePage to /home path
+  { path: '/home', element: <HomePage /> },
+  // Root path will be defined directly in App.tsx with a simple message
+]

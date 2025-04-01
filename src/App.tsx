@@ -1,7 +1,7 @@
 // src/App.tsx 
-// Version: 6.0.0
-// Last Modified: 27-02-2025 09:45 IST
-// Purpose: Improved role-based access control for routes
+// Version: 6.1.0
+// Last Modified: 01-04-2025 10:00 IST
+// Purpose: Moved root path to /home and added simple message at root path
 
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
@@ -21,6 +21,17 @@ import { moderatorRoutes } from './routes/moderatorRoutes';
 const LoadingSpinner = () => (
   <div className="min-h-screen flex items-center justify-center">
     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+  </div>
+);
+
+// Simple Root Page Component
+const RootPage = () => (
+  <div className="min-h-screen flex items-center justify-center flex-col p-4">
+    <h1 className="text-2xl font-bold mb-4">Welcome to Bhoomitalli</h1>
+    <p className="text-xl mb-6 text-center">This site has moved to a new location.</p>
+    <a href="/home" className="py-2 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
+      Go to Home Page
+    </a>
   </div>
 );
 
@@ -167,17 +178,11 @@ function App() {
       <BrowserRouter>
         <div className="min-h-screen bg-background">
           <Routes>
-            {/* Make root path public with HomePage */}
-            <Route element={<AppLayout />}>
-              <Route 
-                path="/" 
-                element={
-                  <PublicOrProtectedRoute>
-                    <HomePage />
-                  </PublicOrProtectedRoute>
-                } 
-              />
-            </Route>
+            {/* Root path now shows a simple message */}
+            <Route 
+              path="/" 
+              element={<RootPage />} 
+            />
             
             {/* Auth Routes - accessible to everyone */}
             {authRoutes.map((route, i) => (
@@ -227,63 +232,61 @@ function App() {
 
             {/* Main App Routes */}
             <Route element={<AppLayout />}>
-              {mainRoutes
-                .filter(route => route.path !== '/') // Filter out root route as we've defined it separately
-                .map((route, i) => {
-                  // Handle routes with children
-                  if (route.children) {
-                    return (
-                      <Route key={`main-${i}`} path={route.path}>
-                        {route.children.map((childRoute, j) => (
-                          <Route
-                            key={`main-${i}-child-${j}`}
-                            path={childRoute.path}
-                            element={
-                              // Special handling for seeker routes - public
-                              route.path === '/seeker' ? (
-                                <PublicOrProtectedRoute>
-                                  {childRoute.element}
-                                </PublicOrProtectedRoute>
-                              ) : (
-                                // All other routes require authentication
-                                <ProtectedRoute>
-                                  {childRoute.element}
-                                </ProtectedRoute>
-                              )
-                            }
-                            index={childRoute.index}
-                          />
-                        ))}
-                      </Route>
-                    );
-                  }
-                  
-                  // Handle regular routes
+              {mainRoutes.map((route, i) => {
+                // Handle routes with children
+                if (route.children) {
                   return (
-                    <Route
-                      key={`main-${i}`}
-                      path={route.path}
-                      element={
-                        // Special handling for seeker routes
-                        route.path === '/seeker' ? (
-                          <PublicOrProtectedRoute>
-                            {route.element}
-                          </PublicOrProtectedRoute>
-                        ) : (
-                          // All other routes require authentication
-                          <ProtectedRoute>
-                            {route.element}
-                          </ProtectedRoute>
-                        )
-                      }
-                      index={route.index}
-                    />
+                    <Route key={`main-${i}`} path={route.path}>
+                      {route.children.map((childRoute, j) => (
+                        <Route
+                          key={`main-${i}-child-${j}`}
+                          path={childRoute.path}
+                          element={
+                            // Special handling for seeker routes - public
+                            route.path === '/seeker' ? (
+                              <PublicOrProtectedRoute>
+                                {childRoute.element}
+                              </PublicOrProtectedRoute>
+                            ) : (
+                              // All other routes require authentication
+                              <ProtectedRoute>
+                                {childRoute.element}
+                              </ProtectedRoute>
+                            )
+                          }
+                          index={childRoute.index}
+                        />
+                      ))}
+                    </Route>
                   );
-                })}
+                }
+                
+                // Handle regular routes
+                return (
+                  <Route
+                    key={`main-${i}`}
+                    path={route.path}
+                    element={
+                      // Special handling for seeker routes and home route
+                      route.path === '/seeker' || route.path === '/home' ? (
+                        <PublicOrProtectedRoute>
+                          {route.element}
+                        </PublicOrProtectedRoute>
+                      ) : (
+                        // All other routes require authentication
+                        <ProtectedRoute>
+                          {route.element}
+                        </ProtectedRoute>
+                      )
+                    }
+                    index={route.index}
+                  />
+                );
+              })}
             </Route>
 
             {/* Catch-all route - redirect to home */}
-            <Route path="*" element={<Navigate to="/" replace />} />
+            <Route path="*" element={<Navigate to="/home" replace />} />
           </Routes>
         </div>
       </BrowserRouter>
