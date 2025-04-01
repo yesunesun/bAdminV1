@@ -1,7 +1,7 @@
 // src/lib/supabase.ts
-// Version: 2.3.0
-// Last Modified: 01-03-2025 19:30 IST
-// Purpose: Updated Supabase client configuration to fix file upload issues
+// Version: 2.5.0
+// Last Modified: 03-04-2025 10:30 IST
+// Purpose: Advanced Supabase client configuration with robust error handling and network resilience
 
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './database.types';
@@ -19,34 +19,69 @@ if (!supabaseAnonKey) {
   throw new Error('VITE_SUPABASE_ANON_KEY is not defined in environment variables');
 }
 
-// Custom error filter to reduce noise in console
-const originalConsoleError = console.error;
-console.error = (...args) => {
-  // Skip known Supabase-related non-critical errors
-  const skipErrors = [
-    'supabase',
-    '404',
-    'session',
-    'https://lkzbwrrauvdinwypmhyb.supabase.co',
-    'Request failed with status code 404',
-    'The content has been deleted',
-  ];
+// Advanced fetch interceptor with comprehensive error handling
+const customFetch = (url: RequestInfo | URL, options: RequestInit = {}) => {
+  // Create a new Headers object to avoid mutation
+  const headers = new Headers(options.headers);
 
-  // Check if error should be skipped
-  const shouldSkip = skipErrors.some(errorText => 
-    args[0]?.includes?.(errorText) || 
-    (typeof args[0] === 'string' && args[0].includes(errorText))
-  );
-
-  if (shouldSkip) {
-    return;
+  // Comprehensive header management
+  headers.set('Accept', 'application/json');
+  headers.set('Accept-Charset', 'utf-8');
+  
+  // Specific content type handling
+  if (!(options.body instanceof FormData)) {
+    headers.set('Content-Type', 'application/json');
   }
 
-  // Log all other errors normally
-  originalConsoleError.apply(console, args);
+  // Add custom client identifier
+  headers.set('x-client-info', 'bhoomitalli-web-client');
+
+  // Advanced error logging and retry mechanism
+  const fetchWithRetry = async (retriesLeft = 2): Promise<Response> => {
+    try {
+      const response = await fetch(url, { ...options, headers });
+
+      // Log detailed request information for debugging
+      console.log('API Request Details:', {
+        url: String(url),
+        method: options.method || 'GET',
+        status: response.status,
+        headers: Object.fromEntries(headers.entries())
+      });
+
+      // Handle specific error scenarios
+      if (!response.ok) {
+        if (response.status === 406 && retriesLeft > 0) {
+          console.warn(`Not Acceptable Error (406). Retrying... (${retriesLeft} attempts left)`);
+          return fetchWithRetry(retriesLeft - 1);
+        }
+
+        // Throw error for non-successful responses
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return response;
+    } catch (error) {
+      console.error('Fetch Request Failed:', {
+        url: String(url),
+        method: options.method || 'GET',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+
+      // Retry mechanism for network errors
+      if (retriesLeft > 0) {
+        console.warn(`Network error. Retrying... (${retriesLeft} attempts left)`);
+        return fetchWithRetry(retriesLeft - 1);
+      }
+
+      throw error;
+    }
+  };
+
+  return fetchWithRetry();
 };
 
-// Supabase client options
+// Supabase client options with enhanced configuration
 const supabaseOptions = {
   auth: {
     autoRefreshToken: true,
@@ -59,24 +94,10 @@ const supabaseOptions = {
   global: {
     headers: {
       'x-client-info': 'bhoomitalli-web-client',
-      'Accept': '*/*',
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
     },
-    // Custom fetch handler to properly handle FormData uploads
-    fetch: (url: RequestInfo | URL, options: RequestInit = {}) => {
-      // For FormData, let the browser set the Content-Type with boundary
-      if (options.body instanceof FormData) {
-        const headers = new Headers(options.headers);
-        headers.delete('Content-Type');
-        
-        return fetch(url, {
-          ...options,
-          headers
-        });
-      }
-      
-      // Default behavior for non-FormData requests
-      return fetch(url, options);
-    }
+    fetch: customFetch
   },
   db: {
     schema: 'public',
@@ -84,9 +105,7 @@ const supabaseOptions = {
   realtime: {
     reconnectAfterMs: (tries: number) => Math.min(1000 + tries * 1000, 10000),
   },
-  // Storage-specific options
   storage: {
-    // Prevent auto-setting of Content-Type
     multipart: true
   }
 };
@@ -98,8 +117,7 @@ export const supabase = createClient<Database>(
   supabaseOptions
 );
 
-// Create an admin client that uses the same anon key but includes admin headers
-// This will work with RLS policies that check for admin role in JWT claims
+// Create an admin client with enhanced headers
 export const adminSupabase = createClient<Database>(
   supabaseUrl,
   supabaseAnonKey,
@@ -115,23 +133,26 @@ export const adminSupabase = createClient<Database>(
   }
 );
 
-// Initialize auth state - Wrapped in IIFE to avoid top-level await
+// Initialize auth state with more comprehensive error handling
 (function initializeAuth() {
-  supabase.auth.getSession().catch(error => {
-    console.warn('Session initialization warning:', error instanceof Error ? error.message : 'Unknown error');
-  });
+  const initSession = async () => {
+    try {
+      const { data, error } = await supabase.auth.getSession();
+      
+      if (error) {
+        console.warn('Session initialization warning:', error.message);
+      }
+
+      // Optional: Additional session validation logic can be added here
+    } catch (error) {
+      console.error('Unexpected error during session initialization:', error);
+    }
+  };
+
+  initSession();
 })();
 
-// Export types
-export type SupabaseClient = typeof supabase;
-export type DbResult<T> = T extends PromiseLike<infer U> ? U : never;
-export type DbResultOk<T> = T extends PromiseLike<{ data: infer U }> ? Exclude<U, null> : never;
-
-// Helper types for database operations
-export type Tables<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Row'];
-export type Enums<T extends keyof Database['public']['Enums']> = Database['public']['Enums'][T];
-
-// Helper functions for type checking
+// Comprehensive error handling utilities
 export const isErrorWithMessage = (error: unknown): error is { message: string } => {
   return (
     typeof error === 'object' &&
@@ -141,7 +162,6 @@ export const isErrorWithMessage = (error: unknown): error is { message: string }
   );
 };
 
-// Error handler for Supabase operations
 export const handleSupabaseError = (error: unknown): string => {
   if (isErrorWithMessage(error)) {
     return error.message;
@@ -149,28 +169,29 @@ export const handleSupabaseError = (error: unknown): string => {
   return 'An unexpected error occurred';
 };
 
-// Type guard for database responses
-export const isDataResponse = <T>(
-  response: { data: T | null; error: null } | { data: null; error: Error }
-): response is { data: T; error: null } => {
-  return response.data !== null && response.error === null;
+// Detailed error logging with enhanced context
+export const logSupabaseError = (context: string, error: any) => {
+  console.error(`[${context}] Supabase Error:`, {
+    message: error?.message,
+    code: error?.code,
+    details: error?.details,
+    hint: error?.hint,
+    status: error?.status
+  });
 };
 
-// Helper function to check if user has admin role
+// User admin status check with comprehensive validation
 export const isUserAdmin = async (): Promise<boolean> => {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return false;
 
-    // Check user metadata for admin role
     const isAdminByMetadata = 
       user.user_metadata?.is_admin === true || 
-      user.user_metadata?.role === 'admin' ||
-      user.user_metadata?.role === 'super_admin';
+      ['admin', 'super_admin'].includes(user.user_metadata?.role);
 
     if (isAdminByMetadata) return true;
 
-    // Check admin_users table as fallback
     const { data: adminData } = await supabase
       .from('admin_users')
       .select('role_id')
@@ -184,60 +205,12 @@ export const isUserAdmin = async (): Promise<boolean> => {
   }
 };
 
-// Helper function for direct file uploads to bypass Supabase client issues
-export const directFileUpload = async (
-  bucket: string,
-  path: string,
-  file: File,
-  options?: { cacheControl?: string }
-): Promise<{ publicUrl: string | null; error: Error | null }> => {
-  try {
-    // Get auth session
-    const { data: { session } } = await supabase.auth.getSession();
-    const authToken = session?.access_token || supabaseAnonKey;
-    
-    // Create FormData
-    const formData = new FormData();
-    formData.append('file', file);
-    
-    // Add cache control if specified
-    if (options?.cacheControl) {
-      formData.append('cacheControl', options.cacheControl);
-    }
-    
-    // Direct API call
-    const response = await fetch(
-      `${supabaseUrl}/storage/v1/object/${bucket}/${path}`, 
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${authToken}`
-        },
-        body: formData
-      }
-    );
-    
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(`Upload failed: ${response.status} - ${errorData.error}`);
-    }
-    
-    // Get public URL
-    const publicUrl = `${supabaseUrl}/storage/v1/object/public/${bucket}/${path}`;
-    return { publicUrl, error: null };
-  } catch (error) {
-    console.error('Direct file upload failed:', error);
-    return { publicUrl: null, error: error instanceof Error ? error : new Error('Unknown error') };
-  }
-};
-
-// Export commonly used types
+// Export commonly used types and utilities
 export type { Database } from './database.types';
 export type Json = Database['public']['Json'];
 export type Tables = Database['public']['Tables'];
 export type Enums = Database['public']['Enums'];
 
-// Export error types for better error handling
 export type SupabaseError = {
   message: string;
   details: string;
