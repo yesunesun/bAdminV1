@@ -1,10 +1,10 @@
 // src/App.tsx 
-// Version: 6.5.0
-// Last Modified: 03-04-2025 15:20 IST
-// Purpose: Created separate layouts for seeker and regular pages
+// Version: 8.1.0
+// Last Modified: 03-04-2025 21:30 IST
+// Purpose: Fixed width for root path to match /seeker
 
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Header } from '@/components/Header';
 import PropertyHeader from '@/modules/seeker/components/PropertyHeader';
@@ -164,8 +164,8 @@ function AppLayout() {
   );
 }
 
-function SeekerLayout() {
-  // Empty function for now, will be implemented with favorites drawer functionality
+function SeekerLayout({ children }: { children?: React.ReactNode }) {
+  // Function to handle favorites click
   const handleFavoritesClick = () => {
     console.log('Favorites clicked');
   };
@@ -173,12 +173,28 @@ function SeekerLayout() {
   return (
     <>
       <PropertyHeader onFavoritesClick={handleFavoritesClick} />
-      <main>
-        <Outlet />
+      <main className="container mx-auto">
+        {children || <Outlet />}
       </main>
     </>
   );
 }
+
+// Wrapper for PropertyMapHome that adds consistent width
+const PropertyMapWrapper = () => {
+  const handleFavoritesClick = () => {
+    console.log('Favorites clicked');
+  };
+
+  return (
+    <>
+      <PropertyHeader onFavoritesClick={handleFavoritesClick} />
+      <div className="container mx-auto">
+        <PropertyMapHome />
+      </div>
+    </>
+  );
+};
 
 function App() {
   return (
@@ -186,12 +202,12 @@ function App() {
       <BrowserRouter>
         <div className="min-h-screen bg-background">
           <Routes>
-            {/* Root path with PropertyMapHome component - full width (no header or container) */}
+            {/* Root path - render PropertyMapHome with wrapper for width */}
             <Route 
               path="/" 
               element={
                 <PublicOrProtectedRoute>
-                  <PropertyMapHome />
+                  <PropertyMapWrapper />
                 </PublicOrProtectedRoute>
               } 
             />
@@ -254,7 +270,7 @@ function App() {
               );
             })}
 
-            {/* Seeker module routes with PropertyHeader */}
+            {/* Seeker module routes with SeekerLayout */}
             <Route element={<SeekerLayout />}>
               {mainRoutes.map((route, i) => {
                 // Handle specific seeker routes with seeker layout
@@ -277,6 +293,20 @@ function App() {
                       </Route>
                     );
                   }
+                  
+                  // Add index route for /seeker with the same wrapper
+                  return (
+                    <Route 
+                      key={`seeker-index-${i}`} 
+                      index 
+                      path={route.path} 
+                      element={
+                        <PublicOrProtectedRoute>
+                          <PropertyMapHome />
+                        </PublicOrProtectedRoute>
+                      } 
+                    />
+                  );
                 }
                 return null;
               })}

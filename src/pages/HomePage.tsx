@@ -1,7 +1,7 @@
 // src/pages/HomePage.tsx
-// Version: 1.3.0
-// Last Modified: 27-02-2025 18:35 IST
-// Purpose: Hub page with conditional navigation based on auth status
+// Version: 1.4.0
+// Last Modified: 03-04-2025 16:15 IST
+// Purpose: Updated to use consistent layout width from seeker module
 
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -17,7 +17,7 @@ const HomePage = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="container mx-auto py-12 px-4">
+    <div className="py-12 px-4">
       <div className="text-center mb-12">
         <h1 className="text-4xl font-bold mb-4">Welcome to Bhoomitalli</h1>
         <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
