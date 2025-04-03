@@ -1,12 +1,13 @@
 // src/App.tsx 
-// Version: 6.4.0
-// Last Modified: 03-04-2025 12:45 IST
-// Purpose: Updated PropertyMapHome import path to new module location
+// Version: 6.5.0
+// Last Modified: 03-04-2025 15:20 IST
+// Purpose: Created separate layouts for seeker and regular pages
 
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Header } from '@/components/Header';
+import PropertyHeader from '@/modules/seeker/components/PropertyHeader';
 import { useAdminAccess } from './modules/admin/hooks/useAdminAccess';
 
 // Import HomePage and PropertyMapHome (updated path)
@@ -64,6 +65,7 @@ const AdminRoute = ({ children }: { children: React.ReactNode }) => {
 const ModeratorRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
   const { isPropertyModerator, isAdmin, loading: roleLoading } = useAdminAccess();
+  const navigate = useNavigate();
   
   if (loading || roleLoading) {
     return <LoadingSpinner />;
@@ -162,6 +164,22 @@ function AppLayout() {
   );
 }
 
+function SeekerLayout() {
+  // Empty function for now, will be implemented with favorites drawer functionality
+  const handleFavoritesClick = () => {
+    console.log('Favorites clicked');
+  };
+  
+  return (
+    <>
+      <PropertyHeader onFavoritesClick={handleFavoritesClick} />
+      <main>
+        <Outlet />
+      </main>
+    </>
+  );
+}
+
 function App() {
   return (
     <AuthProvider>
@@ -177,6 +195,18 @@ function App() {
                 </PublicOrProtectedRoute>
               } 
             />
+            
+            {/* Home page with seeker layout */}
+            <Route element={<SeekerLayout />}>
+              <Route 
+                path="/home" 
+                element={
+                  <PublicOrProtectedRoute>
+                    <HomePage />
+                  </PublicOrProtectedRoute>
+                } 
+              />
+            </Route>
             
             {/* Auth Routes - accessible to everyone */}
             {authRoutes.map((route, i) => (
@@ -224,9 +254,42 @@ function App() {
               );
             })}
 
-            {/* Main App Routes */}
+            {/* Seeker module routes with PropertyHeader */}
+            <Route element={<SeekerLayout />}>
+              {mainRoutes.map((route, i) => {
+                // Handle specific seeker routes with seeker layout
+                if (route.path === '/seeker') {
+                  if (route.children) {
+                    return (
+                      <Route key={`seeker-${i}`} path={route.path}>
+                        {route.children.map((childRoute, j) => (
+                          <Route
+                            key={`seeker-${i}-child-${j}`}
+                            path={childRoute.path}
+                            element={
+                              <PublicOrProtectedRoute>
+                                {childRoute.element}
+                              </PublicOrProtectedRoute>
+                            }
+                            index={childRoute.index}
+                          />
+                        ))}
+                      </Route>
+                    );
+                  }
+                }
+                return null;
+              })}
+            </Route>
+
+            {/* Main App Routes with standard header */}
             <Route element={<AppLayout />}>
               {mainRoutes.map((route, i) => {
+                // Skip seeker routes as they are handled separately
+                if (route.path === '/seeker' || route.path === '/home') {
+                  return null;
+                }
+                
                 // Handle routes with children
                 if (route.children) {
                   return (
@@ -236,17 +299,9 @@ function App() {
                           key={`main-${i}-child-${j}`}
                           path={childRoute.path}
                           element={
-                            // Special handling for seeker routes - public
-                            route.path === '/seeker' ? (
-                              <PublicOrProtectedRoute>
-                                {childRoute.element}
-                              </PublicOrProtectedRoute>
-                            ) : (
-                              // All other routes require authentication
-                              <ProtectedRoute>
-                                {childRoute.element}
-                              </ProtectedRoute>
-                            )
+                            <ProtectedRoute>
+                              {childRoute.element}
+                            </ProtectedRoute>
                           }
                           index={childRoute.index}
                         />
@@ -261,17 +316,9 @@ function App() {
                     key={`main-${i}`}
                     path={route.path}
                     element={
-                      // Special handling for seeker routes and home route
-                      route.path === '/seeker' || route.path === '/home' ? (
-                        <PublicOrProtectedRoute>
-                          {route.element}
-                        </PublicOrProtectedRoute>
-                      ) : (
-                        // All other routes require authentication
-                        <ProtectedRoute>
-                          {route.element}
-                        </ProtectedRoute>
-                      )
+                      <ProtectedRoute>
+                        {route.element}
+                      </ProtectedRoute>
                     }
                     index={route.index}
                   />
