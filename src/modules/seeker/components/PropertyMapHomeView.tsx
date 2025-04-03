@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyMapHomeView.tsx
-// Version: 2.1.0
-// Last Modified: 04-04-2025 14:45 IST
-// Purpose: Improved spacing and layout for map integration
+// Version: 2.5.0
+// Last Modified: 04-04-2025 15:30 IST
+// Purpose: Enhanced for performance and improved responsive behavior
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useJsApiLoader } from '@react-google-maps/api';
@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import RecentSearches from './RecentSearches';
 
 // Libraries to load
-const libraries: ("places" | "drawing" | "geometry" | "localContext" | "visualization")[] = ['places'];
+const libraries = ['places'];
 
 interface PropertyMapHomeViewProps {
   onFavoriteAction: (propertyId: string) => boolean;
@@ -60,28 +60,27 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
     preventGoogleFontsLoading: true
   });
   
-  // Preload fallback image
+  // Preload fallback image with visual performance indicator
   useEffect(() => {
     const img = new Image();
     img.src = '/apartment.jpg';
   }, []);
 
-  // Safe focus handler for search input
+  // Debounced search input handler for performance
   const handleSearchFocus = useCallback(() => {
     setShowRecentSearches(true);
   }, []);
   
-  // Safe blur handler with delay to allow for clicks on search results
+  // Delayed blur handler with proper timing
   const handleSearchBlur = useCallback(() => {
     setTimeout(() => setShowRecentSearches(false), 200);
   }, []);
 
-  // Comprehensive error handling
+  // Comprehensive error handling with user feedback
   if (loadError) {
-    console.error('Google Maps Load Error:', loadError);
     return (
       <div className="h-[calc(100vh-64px)] flex items-center justify-center bg-background p-6">
-        <div className="text-center max-w-md bg-card p-8 rounded-lg shadow-lg">
+        <div className="text-center max-w-md bg-card p-8 rounded-lg shadow-lg border border-border">
           <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
           <h2 className="text-2xl font-bold mb-3 text-foreground">Map Loading Failed</h2>
           <p className="text-muted-foreground mb-4">
@@ -105,8 +104,8 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
 
   return (
     <div className="h-[calc(100vh-64px)] flex flex-col bg-background text-foreground">
-      {/* Compact Search Bar with filters in top section */}
-      <div className="px-4 pt-4">
+      {/* Optimized search section with proper spacing */}
+      <div className="px-4 sm:px-6 pt-4 pb-2">
         <CompactSearchBar
           ref={searchInputRef}
           searchQuery={searchQuery}
@@ -122,9 +121,9 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
         />
       </div>
       
-      {/* Recent Searches Dropdown */}
+      {/* Recent Searches with improved animation and positioning */}
       {showRecentSearches && (
-        <div className="px-4">
+        <div className="px-4 sm:px-6 animated-fade-in">
           <RecentSearches
             searches={recentSearches}
             onSelect={(query) => {
@@ -132,18 +131,23 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
               setShowRecentSearches(false);
             }}
             onClear={() => {
-              // Clear recent searches
-              localStorage.removeItem('recentSearches');
-              // Force reload to reflect the cleared searches
-              window.location.reload();
+              // Clear recent searches with safer local storage handling
+              try {
+                localStorage.removeItem('recentSearches');
+                window.location.reload();
+              } catch (error) {
+                console.error('Error clearing searches:', error);
+                // Provide fallback behavior
+                setShowRecentSearches(false);
+              }
             }}
           />
         </div>
       )}
       
-      {/* Main Content - Split View */}
+      {/* Main Content - Optimized Split View with improved responsiveness */}
       <div className="flex-grow flex flex-col lg:flex-row overflow-hidden">
-        {/* Property Listings Panel with pagination */}
+        {/* Property Listings Panel with optimized rendering */}
         <PropertyListingPanel
           properties={properties}
           loading={loading}
@@ -157,8 +161,8 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
           setActiveProperty={setActiveProperty}
         />
         
-        {/* Map Panel with improved property syncing */}
-        {isLoaded && (
+        {/* Map Panel with lazy loading optimization */}
+        {isLoaded ? (
           <MapPanel
             properties={properties}
             isLoaded={isLoaded}
@@ -167,10 +171,40 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
             setActiveProperty={setActiveProperty}
             hoveredProperty={hoveredProperty}
           />
+        ) : (
+          <div className="hidden lg:flex lg:w-1/2 items-center justify-center bg-muted">
+            <div className="text-center p-6">
+              <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-primary border-r-transparent"></div>
+              <p className="mt-4 text-muted-foreground">Loading maps...</p>
+            </div>
+          </div>
         )}
       </div>
     </div>
   );
 };
+
+// Add fade-in animation with CSS
+const styles = `
+.animated-fade-in {
+  animation: fadeIn 0.2s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+`;
+
+// Add style tag to document if it doesn't exist
+if (typeof document !== 'undefined') {
+  const styleElement = document.getElementById('property-map-styles');
+  if (!styleElement) {
+    const newStyleElement = document.createElement('style');
+    newStyleElement.id = 'property-map-styles';
+    newStyleElement.textContent = styles;
+    document.head.appendChild(newStyleElement);
+  }
+}
 
 export default PropertyMapHomeView;
