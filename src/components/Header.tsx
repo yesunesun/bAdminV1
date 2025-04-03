@@ -1,11 +1,23 @@
 // src/components/Header.tsx
-// Version: 2.1.0
-// Last Modified: 03-04-2025 21:45 IST
-// Purpose: Corrected routes in header for seeker module
+// Version: 3.0.0
+// Last Modified: 03-04-2025 18:30 IST
+// Purpose: Modernized header with simplified design, larger logo, and menu items under profile dropdown
 
 import React, { useEffect, useState, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LogOut, LayoutDashboard, List, User, Settings, ChevronDown, Sunset, Waves, Menu, Search, Heart, Home, Moon, Sun, PaintBucket } from 'lucide-react';
+import { 
+  LogOut, 
+  User, 
+  Settings, 
+  ChevronDown, 
+  Heart, 
+  Home, 
+  Search, 
+  LayoutDashboard, 
+  List, 
+  Waves, 
+  Sunset 
+} from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { supabase } from '@/lib/supabase';
@@ -20,13 +32,13 @@ export function Header({ onFavoritesClick }: HeaderProps) {
   const { theme, setTheme } = useTheme();
   const location = useLocation();
   const [userRole, setUserRole] = useState<string | null>(null);
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const [isThemeDropdownOpen, setIsThemeDropdownOpen] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const profileDropdownRef = useRef<HTMLDivElement>(null);
   const themeDropdownRef = useRef<HTMLDivElement>(null);
-  const mobileMenuRef = useRef<HTMLDivElement>(null);
+  const [favoriteCount, setFavoriteCount] = useState(0);
 
+  // Fetch user role
   useEffect(() => {
     const fetchUserRole = async () => {
       if (!user) return;
@@ -42,31 +54,63 @@ export function Header({ onFavoritesClick }: HeaderProps) {
     fetchUserRole();
   }, [user]);
 
+  // Fetch favorites count
+  useEffect(() => {
+    const fetchFavoritesCount = async () => {
+      if (!user) return;
+      const { count, error } = await supabase
+        .from('property_likes')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id);
+      
+      if (!error && count !== null) setFavoriteCount(count);
+    };
+
+    if (user) {
+      fetchFavoritesCount();
+      
+      // Subscribe to changes in property_likes
+      const subscription = supabase
+        .channel('property_likes_changes')
+        .on('postgres_changes', { 
+          event: '*', 
+          schema: 'public', 
+          table: 'property_likes',
+          filter: `user_id=eq.${user.id}`
+        }, () => {
+          fetchFavoritesCount();
+        })
+        .subscribe();
+        
+      return () => {
+        supabase.removeChannel(subscription);
+      };
+    }
+  }, [user]);
+
+  // Click outside handler
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsDropdownOpen(false);
+      if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target as Node)) {
+        setIsProfileDropdownOpen(false);
       }
       if (themeDropdownRef.current && !themeDropdownRef.current.contains(event.target as Node)) {
         setIsThemeDropdownOpen(false);
       }
-      if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target as Node)) {
-        setIsMobileMenuOpen(false);
-      }
     };
 
-    if (isDropdownOpen || isMobileMenuOpen || isThemeDropdownOpen) {
+    if (isProfileDropdownOpen || isThemeDropdownOpen) {
       document.addEventListener('mousedown', handleClickOutside);
     }
 
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isDropdownOpen, isMobileMenuOpen, isThemeDropdownOpen]);
+  }, [isProfileDropdownOpen, isThemeDropdownOpen]);
 
   const handleSignOut = async (e: React.MouseEvent) => {
     e.preventDefault();
-    e.stopPropagation();
     try {
       await signOut();
+      setIsProfileDropdownOpen(false);
     } catch (error) {
       console.error('Error signing out:', error);
     }
@@ -78,416 +122,478 @@ export function Header({ onFavoritesClick }: HeaderProps) {
                           location.pathname.startsWith('/seeker/');
   const isSeeker = userRole === 'seeker' || !userRole;
   const isOwner = userRole === 'owner' || userRole === 'landlord';
-  const isInOwnerSection = location.pathname.startsWith('/properties') || location.pathname.startsWith('/dashboard');
 
-  const NavLink = ({ to, icon: Icon, children, onClick }: { 
-    to: string; 
-    icon: React.ElementType; 
-    children: React.ReactNode;
-    onClick?: () => void;
-  }) => (
-    <Link 
-      to={to} 
-      onClick={onClick}
-      className={cn(
-        "inline-flex items-center px-4 py-2 text-sm font-medium rounded-md transition-colors",
-        location.pathname === to || (to !== '/' && location.pathname.startsWith(to)) 
-          ? "text-primary bg-primary/10" 
-          : "text-foreground hover:text-primary hover:bg-accent"
-      )}
-    >
-      <Icon className="h-4 w-4 mr-2" />
-      {children}
-    </Link>
-  );
+  // For PropertyHeader, we need to use the simpler version for Seeker module
+  if (isInSeekerModule && location.pathname !== '/') {
+    return (
+      <header className="w-full bg-card border-b border-border sticky top-0 z-50 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          <div className="flex h-16 items-center justify-between">
+            {/* Logo - Slightly larger */}
+            <Link to="/" className="flex-shrink-0">
+              <img src="/bhumitallilogo.png" alt="Bhumitalli" className="h-10 w-auto" />
+            </Link>
 
-  const ThemeOption = ({ value, label, icon: Icon, onClick }: {
-    value: 'ocean' | 'sunset';
-    label: string;
-    icon: React.ElementType;
-    onClick: () => void;
-  }) => (
-    <button
-      onClick={onClick}
-      className={cn(
-        "flex w-full items-center px-4 py-2 text-sm transition-colors",
-        theme === value 
-          ? "bg-primary/10 text-primary font-medium" 
-          : "text-foreground hover:bg-accent"
-      )}
-    >
-      <Icon className="h-4 w-4 mr-2" />
-      {label}
-    </button>
-  );
-
-  const UserMenu = ({ className }: { className?: string }) => (
-    <div className={cn("py-1", className)}>
-      <button className="flex w-full items-center px-4 py-2 text-sm text-foreground hover:bg-accent">
-        <User className="h-4 w-4 mr-2" />
-        Profile
-      </button>
-      <button className="flex w-full items-center px-4 py-2 text-sm text-foreground hover:bg-accent">
-        <Settings className="h-4 w-4 mr-2" />
-        Settings
-      </button>
-      
-      {/* Mode Switcher */}
-      {isSeeker && (
-        <Link 
-          to="/properties/list" 
-          className="flex w-full items-center px-4 py-2 text-sm text-foreground hover:bg-accent"
-        >
-          <Home className="h-4 w-4 mr-2" />
-          Switch to Owner Mode
-        </Link>
-      )}
-      {isOwner && (
-        <Link 
-          to="/" 
-          className="flex w-full items-center px-4 py-2 text-sm text-foreground hover:bg-accent"
-        >
-          <Search className="h-4 w-4 mr-2" />
-          Switch to Seeker Mode
-        </Link>
-      )}
-      
-      <div className="h-px bg-border" />
-      <button 
-        onClick={handleSignOut}
-        className="flex w-full items-center px-4 py-2 text-sm text-destructive hover:bg-destructive/10"
-      >
-        <LogOut className="h-4 w-4 mr-2" />
-        Sign Out
-      </button>
-    </div>
-  );
-
-  return (
-    <header className="w-full bg-card border-b border-border">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex h-20 items-center justify-between">
-          <Link to="/" className="flex-shrink-0">
-            <img src="/bhumitallilogo.png" alt="Bhumitalli" className="h-16 w-auto" />
-          </Link>
-
-          {user ? (
-            <>
-              {/* Desktop Navigation */}
-              <div className="hidden md:flex flex-1 ml-12 space-x-8">
-                {isInSeekerModule ? (
-                  <>
-                    <NavLink to="/" icon={Home}>Home</NavLink>
-                    <NavLink to="/seeker" icon={Search}>Browse Properties</NavLink>
-                    {user && <NavLink to="/seeker/favorites" icon={Heart}>Favorites</NavLink>}
-                    <NavLink to="/properties/list" icon={Home}>List Property</NavLink>
-                  </>
-                ) : (
-                  <>
-                    <NavLink to="/dashboard" icon={LayoutDashboard}>Dashboard</NavLink>
-                    <NavLink to="/properties" icon={List}>Properties</NavLink>
-                    <NavLink to="/" icon={Search}>Browse Properties</NavLink>
-                  </>
-                )}
-              </div>
-
-              {/* Mobile Menu Button */}
-              <button
-                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="md:hidden p-2 rounded-md hover:bg-accent"
-              >
-                <Menu className="h-6 w-6" />
-              </button>
-
-              {/* Theme Dropdown */}
-              <div className="hidden md:block relative mr-4" ref={themeDropdownRef}>
+            <div className="flex items-center space-x-4">
+              {/* Theme Switcher */}
+              <div className="relative" ref={themeDropdownRef}>
                 <button
                   onClick={() => setIsThemeDropdownOpen(!isThemeDropdownOpen)}
-                  className="flex items-center space-x-2 px-3 py-2 rounded-md hover:bg-accent transition-colors"
+                  className="flex items-center justify-center w-8 h-8 rounded-full bg-accent/50 backdrop-blur-sm transition-all hover:bg-accent"
                   aria-label="Change theme"
                 >
                   {theme === 'ocean' ? (
-                    <Waves className="h-5 w-5 text-primary" />
+                    <Waves className="h-4 w-4 text-primary" />
                   ) : (
-                    <Sunset className="h-5 w-5 text-primary" />
+                    <Sunset className="h-4 w-4 text-primary" />
                   )}
-                  <span className="hidden sm:inline text-sm font-medium">
-                    {theme === 'ocean' ? 'Ocean' : 'Sunset'}
-                  </span>
-                  <ChevronDown className={cn(
-                    "h-4 w-4 text-muted-foreground transition-transform", 
-                    isThemeDropdownOpen && "transform rotate-180"
-                  )} />
                 </button>
 
                 {isThemeDropdownOpen && (
                   <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-card border border-border overflow-hidden z-50">
                     <div className="py-1">
-                      <div className="px-4 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      <div className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                         Select Theme
                       </div>
-                      <ThemeOption 
-                        value="ocean" 
-                        label="Ocean Theme" 
-                        icon={Waves} 
+                      <button
                         onClick={() => {
                           setTheme('ocean');
                           setIsThemeDropdownOpen(false);
                         }}
-                      />
-                      <ThemeOption 
-                        value="sunset" 
-                        label="Sunset Theme" 
-                        icon={Sunset} 
+                        className={cn(
+                          "flex w-full items-center px-3 py-2 text-sm transition-colors",
+                          theme === 'ocean' 
+                            ? "bg-primary/10 text-primary font-medium" 
+                            : "text-foreground hover:bg-accent"
+                        )}
+                      >
+                        <Waves className="h-4 w-4 mr-2" />
+                        Ocean Theme
+                      </button>
+                      <button
                         onClick={() => {
                           setTheme('sunset');
                           setIsThemeDropdownOpen(false);
                         }}
-                      />
+                        className={cn(
+                          "flex w-full items-center px-3 py-2 text-sm transition-colors",
+                          theme === 'sunset' 
+                            ? "bg-primary/10 text-primary font-medium" 
+                            : "text-foreground hover:bg-accent"
+                        )}
+                      >
+                        <Sunset className="h-4 w-4 mr-2" />
+                        Sunset Theme
+                      </button>
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* Favorites Button (only in seeker module) */}
-              {isInSeekerModule && onFavoritesClick && (
+              {/* Favorites Button (only if user is logged in) */}
+              {user && (
                 <button
                   onClick={onFavoritesClick}
-                  className="relative p-2 mr-2 rounded-md hover:bg-accent"
+                  className="relative flex items-center justify-center w-8 h-8 rounded-full bg-accent/50 backdrop-blur-sm transition-all hover:bg-accent"
                   aria-label="Favorites"
                 >
-                  <Heart className="h-5 w-5" />
-                  {user && (
+                  <Heart className="h-4 w-4 text-primary" />
+                  {favoriteCount > 0 && (
                     <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground">
-                      0
+                      {favoriteCount > 99 ? '99+' : favoriteCount}
                     </span>
                   )}
                 </button>
               )}
 
-              {/* Desktop User Menu */}
-              <div className="hidden md:block relative" ref={dropdownRef}>
-                <button
-                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                  className="flex items-center space-x-3 px-3 py-2 rounded-md hover:bg-accent transition-colors"
-                >
-                  <div className="h-8 w-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-medium">
-                    {user.email?.charAt(0).toUpperCase()}
-                  </div>
-                  <div className="flex items-center">
-                    <div className="flex flex-col items-start mr-2">
-                      <span className="text-sm font-medium text-foreground">{user.email}</span>
-                      {userRole && (
-                        <span className="text-xs text-muted-foreground">
-                          {userRole.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                        </span>
-                      )}
-                      {!userRole && (
-                        <span className="text-xs text-muted-foreground">
-                          {isInSeekerModule ? 'Seeker' : 'Owner'}
-                        </span>
-                      )}
+              {/* Profile or Auth Links */}
+              {user ? (
+                <div className="relative" ref={profileDropdownRef}>
+                  <button
+                    onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
+                    className="flex items-center space-x-1 p-1 rounded-full bg-accent/50 hover:bg-accent transition-all"
+                    aria-label="Profile Menu"
+                  >
+                    <div className="h-7 w-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-medium">
+                      {user.email?.charAt(0).toUpperCase()}
                     </div>
                     <ChevronDown className={cn(
-                      "h-4 w-4 text-muted-foreground transition-transform", 
-                      isDropdownOpen && "transform rotate-180"
+                      "h-3 w-3 text-muted-foreground transition-transform", 
+                      isProfileDropdownOpen && "transform rotate-180"
                     )} />
-                  </div>
-                </button>
+                  </button>
 
-                {isDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-card border border-border overflow-hidden z-50">
-                    <UserMenu />
-                  </div>
-                )}
-              </div>
+                  {isProfileDropdownOpen && (
+                    <div className="absolute right-0 mt-2 w-56 rounded-lg shadow-lg bg-card border border-border overflow-hidden z-50">
+                      <div className="p-3 border-b border-border">
+                        <div className="font-medium truncate text-sm">{user.email}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {userRole ? 
+                            userRole.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) : 
+                            'Seeker'}
+                        </div>
+                      </div>
+                      
+                      <div className="py-1">
+                        {/* Menu items moved here from navbar */}
+                        <Link 
+                          to="/" 
+                          className="flex w-full items-center px-3 py-2 text-sm text-foreground hover:bg-accent"
+                          onClick={() => setIsProfileDropdownOpen(false)}
+                        >
+                          <Home className="h-4 w-4 mr-2" />
+                          Home
+                        </Link>
+                        <Link 
+                          to="/seeker" 
+                          className="flex w-full items-center px-3 py-2 text-sm text-foreground hover:bg-accent"
+                          onClick={() => setIsProfileDropdownOpen(false)}
+                        >
+                          <Search className="h-4 w-4 mr-2" />
+                          Browse Properties
+                        </Link>
+                        <Link 
+                          to="/seeker/favorites" 
+                          className="flex w-full items-center px-3 py-2 text-sm text-foreground hover:bg-accent"
+                          onClick={() => setIsProfileDropdownOpen(false)}
+                        >
+                          <Heart className="h-4 w-4 mr-2" />
+                          Favorites
+                        </Link>
+                        <Link 
+                          to="/properties/list" 
+                          className="flex w-full items-center px-3 py-2 text-sm text-foreground hover:bg-accent"
+                          onClick={() => setIsProfileDropdownOpen(false)}
+                        >
+                          <Home className="h-4 w-4 mr-2" />
+                          List Property
+                        </Link>
+                        
+                        <div className="h-px bg-border mx-2 my-1" />
+                        
+                        <button 
+                          onClick={handleSignOut}
+                          className="flex w-full items-center px-3 py-2 text-sm text-destructive hover:bg-destructive/10"
+                        >
+                          <LogOut className="h-4 w-4 mr-2" />
+                          Sign Out
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-center space-x-2">
+                  <Link 
+                    to="/login" 
+                    className="px-3 py-1.5 text-xs font-medium rounded-md text-foreground hover:text-primary hover:bg-accent transition-colors"
+                  >
+                    Log in
+                  </Link>
+                  <Link 
+                    to="/register" 
+                    className="px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                  >
+                    Sign up
+                  </Link>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </header>
+    );
+  }
+
+  // Main Header (used on homepage and non-seeker pages)
+  return (
+    <header className="w-full bg-card border-b border-border sticky top-0 z-50 shadow-sm">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+        <div className="flex h-20 items-center justify-between">
+          {/* Logo - Slightly larger */}
+          <Link to="/" className="flex-shrink-0">
+            <img src="/bhumitallilogo.png" alt="Bhumitalli" className="h-12 w-auto transition-transform hover:scale-105" />
+          </Link>
+
+          {user ? (
+            <>
+              {/* Main Navigation - Only shown on homepage now */}
+              {location.pathname === '/' && (
+                <div className="hidden md:flex flex-1 ml-12 space-x-8">
+                  <Link
+                    to="/"
+                    className={cn(
+                      "inline-flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors",
+                      location.pathname === '/' 
+                        ? "text-primary bg-primary/10" 
+                        : "text-foreground hover:text-primary hover:bg-accent"
+                    )}
+                  >
+                    <Home className="h-4 w-4 mr-2" />
+                    Home
+                  </Link>
+                  <Link
+                    to="/seeker"
+                    className={cn(
+                      "inline-flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors",
+                      location.pathname.startsWith('/seeker') && location.pathname !== '/seeker/favorites'
+                        ? "text-primary bg-primary/10" 
+                        : "text-foreground hover:text-primary hover:bg-accent"
+                    )}
+                  >
+                    <Search className="h-4 w-4 mr-2" />
+                    Browse Properties
+                  </Link>
+                  <Link
+                    to="/seeker/favorites"
+                    className={cn(
+                      "inline-flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors",
+                      location.pathname === '/seeker/favorites'
+                        ? "text-primary bg-primary/10" 
+                        : "text-foreground hover:text-primary hover:bg-accent"
+                    )}
+                  >
+                    <Heart className="h-4 w-4 mr-2" />
+                    Favorites
+                  </Link>
+                  <Link
+                    to="/properties/list"
+                    className={cn(
+                      "inline-flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors",
+                      location.pathname === '/properties/list'
+                        ? "text-primary bg-primary/10" 
+                        : "text-foreground hover:text-primary hover:bg-accent"
+                    )}
+                  >
+                    <Home className="h-4 w-4 mr-2" />
+                    List Property
+                  </Link>
+                </div>
+              )}
             </>
           ) : (
-            <div className="flex items-center space-x-4">
-              {/* Theme Dropdown for Logged Out Users */}
-              <div className="relative" ref={themeDropdownRef}>
+            <>
+              {/* Show navigation for non-logged in users on homepage */}
+              {location.pathname === '/' && (
+                <div className="hidden md:flex flex-1 ml-12 space-x-8">
+                  <Link
+                    to="/seeker"
+                    className="inline-flex items-center px-3 py-2 text-sm font-medium rounded-md text-foreground hover:text-primary hover:bg-accent transition-colors"
+                  >
+                    <Search className="h-4 w-4 mr-2" />
+                    Browse Properties
+                  </Link>
+                </div>
+              )}
+            </>
+          )}
+
+          <div className="flex items-center space-x-4">
+            {/* Theme Switcher */}
+            <div className="relative" ref={themeDropdownRef}>
+              <button
+                onClick={() => setIsThemeDropdownOpen(!isThemeDropdownOpen)}
+                className="flex items-center justify-center w-10 h-10 rounded-full bg-accent/50 backdrop-blur-sm transition-all hover:bg-accent"
+                aria-label="Change theme"
+              >
+                {theme === 'ocean' ? (
+                  <Waves className="h-5 w-5 text-primary" />
+                ) : (
+                  <Sunset className="h-5 w-5 text-primary" />
+                )}
+              </button>
+
+              {isThemeDropdownOpen && (
+                <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-card border border-border overflow-hidden z-50">
+                  <div className="py-1">
+                    <div className="px-4 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      Select Theme
+                    </div>
+                    <button
+                      onClick={() => {
+                        setTheme('ocean');
+                        setIsThemeDropdownOpen(false);
+                      }}
+                      className={cn(
+                        "flex w-full items-center px-4 py-2 text-sm transition-colors",
+                        theme === 'ocean' 
+                          ? "bg-primary/10 text-primary font-medium" 
+                          : "text-foreground hover:bg-accent"
+                      )}
+                    >
+                      <Waves className="h-4 w-4 mr-2" />
+                      Ocean Theme
+                    </button>
+                    <button
+                      onClick={() => {
+                        setTheme('sunset');
+                        setIsThemeDropdownOpen(false);
+                      }}
+                      className={cn(
+                        "flex w-full items-center px-4 py-2 text-sm transition-colors",
+                        theme === 'sunset' 
+                          ? "bg-primary/10 text-primary font-medium" 
+                          : "text-foreground hover:bg-accent"
+                      )}
+                    >
+                      <Sunset className="h-4 w-4 mr-2" />
+                      Sunset Theme
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Favorites Button (only if user is logged in) */}
+            {user && (
+              <button
+                onClick={onFavoritesClick}
+                className="relative flex items-center justify-center w-10 h-10 rounded-full bg-accent/50 backdrop-blur-sm transition-all hover:bg-accent"
+                aria-label="Favorites"
+              >
+                <Heart className="h-5 w-5 text-primary" />
+                {favoriteCount > 0 && (
+                  <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground">
+                    {favoriteCount > 99 ? '99+' : favoriteCount}
+                  </span>
+                )}
+              </button>
+            )}
+
+            {/* Profile or Auth Links */}
+            {user ? (
+              <div className="relative" ref={profileDropdownRef}>
                 <button
-                  onClick={() => setIsThemeDropdownOpen(!isThemeDropdownOpen)}
-                  className="flex items-center space-x-2 px-3 py-2 rounded-md hover:bg-accent transition-colors"
-                  aria-label="Change theme"
+                  onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
+                  className="flex items-center space-x-2 p-2 rounded-full bg-accent/50 hover:bg-accent transition-all"
+                  aria-label="Profile Menu"
                 >
-                  {theme === 'ocean' ? (
-                    <Waves className="h-5 w-5 text-primary" />
-                  ) : (
-                    <Sunset className="h-5 w-5 text-primary" />
-                  )}
+                  <div className="h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-medium">
+                    {user.email?.charAt(0).toUpperCase()}
+                  </div>
+                  <ChevronDown className={cn(
+                    "h-4 w-4 text-muted-foreground transition-transform", 
+                    isProfileDropdownOpen && "transform rotate-180"
+                  )} />
                 </button>
 
-                {isThemeDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-card border border-border overflow-hidden z-50">
-                    <div className="py-1">
-                      <div className="px-4 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                        Select Theme
+                {isProfileDropdownOpen && (
+                  <div className="absolute right-0 mt-2 w-64 rounded-lg shadow-lg bg-card border border-border overflow-hidden z-50">
+                    <div className="p-4 border-b border-border">
+                      <div className="font-medium truncate">{user.email}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {userRole ? 
+                          userRole.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) : 
+                          (isInSeekerModule ? 'Seeker' : 'Owner')}
                       </div>
-                      <ThemeOption 
-                        value="ocean" 
-                        label="Ocean Theme" 
-                        icon={Waves} 
-                        onClick={() => {
-                          setTheme('ocean');
-                          setIsThemeDropdownOpen(false);
-                        }}
-                      />
-                      <ThemeOption 
-                        value="sunset" 
-                        label="Sunset Theme" 
-                        icon={Sunset} 
-                        onClick={() => {
-                          setTheme('sunset');
-                          setIsThemeDropdownOpen(false);
-                        }}
-                      />
+                    </div>
+                    
+                    <div className="py-2">
+                      {/* Menu items placed here */}
+                      {location.pathname !== '/' && (
+                        <>
+                          <Link 
+                            to="/" 
+                            className="flex w-full items-center px-4 py-2 text-sm text-foreground hover:bg-accent"
+                            onClick={() => setIsProfileDropdownOpen(false)}
+                          >
+                            <Home className="h-4 w-4 mr-2" />
+                            Home
+                          </Link>
+                          <Link 
+                            to="/seeker" 
+                            className="flex w-full items-center px-4 py-2 text-sm text-foreground hover:bg-accent"
+                            onClick={() => setIsProfileDropdownOpen(false)}
+                          >
+                            <Search className="h-4 w-4 mr-2" />
+                            Browse Properties
+                          </Link>
+                          <Link 
+                            to="/seeker/favorites" 
+                            className="flex w-full items-center px-4 py-2 text-sm text-foreground hover:bg-accent"
+                            onClick={() => setIsProfileDropdownOpen(false)}
+                          >
+                            <Heart className="h-4 w-4 mr-2" />
+                            Favorites
+                          </Link>
+                          <Link 
+                            to="/properties/list" 
+                            className="flex w-full items-center px-4 py-2 text-sm text-foreground hover:bg-accent"
+                            onClick={() => setIsProfileDropdownOpen(false)}
+                          >
+                            <Home className="h-4 w-4 mr-2" />
+                            List Property
+                          </Link>
+                        </>
+                      )}
+                      
+                      <div className="px-4 py-2 text-xs uppercase font-semibold text-muted-foreground mt-2">
+                        Account
+                      </div>
+                      
+                      <div className="py-1">
+                        <button className="flex w-full items-center px-4 py-2 text-sm text-foreground hover:bg-accent">
+                          <User className="h-4 w-4 mr-2" />
+                          Profile
+                        </button>
+                        <button className="flex w-full items-center px-4 py-2 text-sm text-foreground hover:bg-accent">
+                          <Settings className="h-4 w-4 mr-2" />
+                          Settings
+                        </button>
+                        
+                        {/* Mode Switcher */}
+                        {isSeeker && (
+                          <Link 
+                            to="/properties/list" 
+                            className="flex w-full items-center px-4 py-2 text-sm text-foreground hover:bg-accent"
+                            onClick={() => setIsProfileDropdownOpen(false)}
+                          >
+                            <Home className="h-4 w-4 mr-2" />
+                            Switch to Owner Mode
+                          </Link>
+                        )}
+                        {isOwner && (
+                          <Link 
+                            to="/" 
+                            className="flex w-full items-center px-4 py-2 text-sm text-foreground hover:bg-accent"
+                            onClick={() => setIsProfileDropdownOpen(false)}
+                          >
+                            <Search className="h-4 w-4 mr-2" />
+                            Switch to Seeker Mode
+                          </Link>
+                        )}
+                      </div>
+
+                      <div className="h-px bg-border mx-2 my-1" />
+                      <button 
+                        onClick={handleSignOut}
+                        className="flex w-full items-center px-4 py-2 text-sm text-destructive hover:bg-destructive/10"
+                      >
+                        <LogOut className="h-4 w-4 mr-2" />
+                        Sign Out
+                      </button>
                     </div>
                   </div>
                 )}
               </div>
-
-              <Link 
-                to="/login" 
-                className="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md text-foreground hover:text-primary hover:bg-accent transition-colors"
-              >
-                Log in
-              </Link>
-              <Link 
-                to="/register" 
-                className="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-              >
-                Sign up
-              </Link>
-            </div>
-          )}
-        </div>
-
-        {/* Mobile Menu */}
-        {user && isMobileMenuOpen && (
-          <div 
-            ref={mobileMenuRef}
-            className="md:hidden fixed inset-x-0 top-20 bg-card border-b border-border shadow-lg z-50"
-          >
-            <div className="p-4 space-y-4">
-              <div className="flex flex-col space-y-2">
-                {isInSeekerModule ? (
-                  <>
-                    <NavLink 
-                      to="/" 
-                      icon={Home} 
-                      onClick={() => setIsMobileMenuOpen(false)}
-                    >
-                      Home
-                    </NavLink>
-                    <NavLink 
-                      to="/seeker" 
-                      icon={Search} 
-                      onClick={() => setIsMobileMenuOpen(false)}
-                    >
-                      Browse Properties
-                    </NavLink>
-                    {user && (
-                      <NavLink 
-                        to="/seeker/favorites" 
-                        icon={Heart} 
-                        onClick={() => setIsMobileMenuOpen(false)}
-                      >
-                        Favorites
-                      </NavLink>
-                    )}
-                    <NavLink 
-                      to="/properties/list" 
-                      icon={Home} 
-                      onClick={() => setIsMobileMenuOpen(false)}
-                    >
-                      List Property
-                    </NavLink>
-                  </>
-                ) : (
-                  <>
-                    <NavLink 
-                      to="/dashboard" 
-                      icon={LayoutDashboard} 
-                      onClick={() => setIsMobileMenuOpen(false)}
-                    >
-                      Dashboard
-                    </NavLink>
-                    <NavLink 
-                      to="/properties" 
-                      icon={List} 
-                      onClick={() => setIsMobileMenuOpen(false)}
-                    >
-                      Properties
-                    </NavLink>
-                    <NavLink 
-                      to="/" 
-                      icon={Search} 
-                      onClick={() => setIsMobileMenuOpen(false)}
-                    >
-                      Browse Properties
-                    </NavLink>
-                  </>
-                )}
+            ) : (
+              <div className="flex items-center space-x-2">
+                <Link 
+                  to="/login" 
+                  className="px-4 py-2 text-sm font-medium rounded-md text-foreground hover:text-primary hover:bg-accent transition-colors"
+                >
+                  Log in
+                </Link>
+                <Link 
+                  to="/register" 
+                  className="px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                >
+                  Sign up
+                </Link>
               </div>
-              
-              {/* Mobile theme options */}
-              <div className="border-t border-border pt-4">
-                <div className="px-4 py-2 text-sm font-medium text-muted-foreground">
-                  Theme
-                </div>
-                <div className="flex space-x-2 px-4 py-2">
-                  <button 
-                    onClick={() => setTheme('ocean')}
-                    className={cn(
-                      "flex-1 flex items-center justify-center space-x-2 p-2 rounded-md border",
-                      theme === 'ocean' 
-                        ? "bg-primary/10 border-primary" 
-                        : "border-border hover:bg-accent"
-                    )}
-                  >
-                    <Waves className="h-4 w-4" />
-                    <span className="text-sm">Ocean</span>
-                  </button>
-                  <button 
-                    onClick={() => setTheme('sunset')}
-                    className={cn(
-                      "flex-1 flex items-center justify-center space-x-2 p-2 rounded-md border",
-                      theme === 'sunset' 
-                        ? "bg-primary/10 border-primary" 
-                        : "border-border hover:bg-accent"
-                    )}
-                  >
-                    <Sunset className="h-4 w-4" />
-                    <span className="text-sm">Sunset</span>
-                  </button>
-                </div>
-              </div>
-              
-              <div className="border-t border-border pt-4">
-                <div className="flex items-center space-x-3 px-4 py-2">
-                  <div className="h-8 w-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-medium">
-                    {user.email?.charAt(0).toUpperCase()}
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-sm font-medium text-foreground">{user.email}</span>
-                    {userRole && (
-                      <span className="text-xs text-muted-foreground">
-                        {userRole.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                      </span>
-                    )}
-                    {!userRole && (
-                      <span className="text-xs text-muted-foreground">
-                        {isInSeekerModule ? 'Seeker' : 'Owner'}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <UserMenu className="mt-2" />
-              </div>
-            </div>
+            )}
           </div>
-        )}
+        </div>
       </div>
     </header>
   );

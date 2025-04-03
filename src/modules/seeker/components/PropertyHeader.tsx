@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyHeader.tsx
-// Version: 2.1.0
-// Last Modified: 03-04-2025 21:45 IST
-// Purpose: Corrected navigation links in seeker header to match main header
+// Version: 3.0.0
+// Last Modified: 03-04-2025 18:30 IST
+// Purpose: Modernized header with simplified design for Seeker module
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
@@ -14,7 +14,6 @@ import {
   User, 
   LogIn, 
   LogOut, 
-  Menu, 
   ChevronDown,
   Search,
   Home,
@@ -22,8 +21,7 @@ import {
   List,
   Settings,
   Waves,
-  Sunset,
-  PaintBucket
+  Sunset
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -44,6 +42,32 @@ const PropertyHeader: React.FC<PropertyHeaderProps> = ({ onFavoritesClick }) => 
   const location = useLocation();
   const [isThemeDropdownOpen, setIsThemeDropdownOpen] = useState(false);
   const themeDropdownRef = useRef<HTMLDivElement>(null);
+  const [favoriteCount, setFavoriteCount] = useState(0);
+  
+  // Fetch favorites count when user is logged in
+  useEffect(() => {
+    const fetchFavoriteCount = async () => {
+      if (!user) return;
+      
+      try {
+        const { supabase } = await import('@/lib/supabase');
+        const { count, error } = await supabase
+          .from('property_likes')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id);
+        
+        if (!error && count !== null) {
+          setFavoriteCount(count);
+        }
+      } catch (error) {
+        console.error('Error fetching favorite count:', error);
+      }
+    };
+    
+    if (user) {
+      fetchFavoriteCount();
+    }
+  }, [user]);
   
   // Close theme dropdown when clicking outside
   useEffect(() => {
@@ -91,243 +115,168 @@ const PropertyHeader: React.FC<PropertyHeaderProps> = ({ onFavoritesClick }) => 
   );
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container mx-auto flex h-16 items-center justify-between px-4">
-        {/* Logo and Brand */}
-        <div className="flex items-center gap-2">
-          <Link to="/" className="flex items-center gap-2">
-            <img src="/bhumitallilogo.png" alt="BhoomiTalli" className="h-8 w-auto" />
-            <span className="font-bold text-xl text-primary hidden sm:inline-block">BhoomiTalli</span>
+    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-sm">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+        <div className="flex h-20 items-center justify-between">
+          {/* Logo - Significantly larger */}
+          <Link to="/" className="flex-shrink-0">
+            <img src="/bhumitallilogo.png" alt="BhoomiTalli" className="h-14 w-auto transition-transform hover:scale-105" />
           </Link>
-        </div>
-        
-        {/* Navigation */}
-        <nav className="hidden md:flex items-center gap-6 text-sm">
-          <Link to="/" className={cn(
-            "text-sm font-medium transition-colors hover:text-primary",
-            location.pathname === '/' ? "text-primary" : "text-muted-foreground"
-          )}>
-            Home
-          </Link>
-          <Link to="/seeker" className={cn(
-            "text-sm font-medium transition-colors hover:text-primary",
-            location.pathname === '/seeker' ? "text-primary" : "text-muted-foreground"
-          )}>
-            Browse Properties
-          </Link>
-          {user && (
-            <Link to="/seeker/favorites" className={cn(
-              "text-sm font-medium transition-colors hover:text-primary",
-              location.pathname === '/seeker/favorites' ? "text-primary" : "text-muted-foreground"
-            )}>
-              Favorites
-            </Link>
-          )}
-          <Link to="/properties/list" className={cn(
-            "text-sm font-medium transition-colors hover:text-primary",
-            location.pathname === '/properties/list' ? "text-primary" : "text-muted-foreground"
-          )}>
-            List Property
-          </Link>
-        </nav>
-        
-        {/* Actions */}
-        <div className="flex items-center gap-2">
-          {/* Theme Dropdown */}
-          <div className="relative" ref={themeDropdownRef}>
-            <button
-              onClick={() => setIsThemeDropdownOpen(!isThemeDropdownOpen)}
-              className="flex items-center px-3 py-2 rounded-md hover:bg-accent transition-colors"
-              aria-label="Change theme"
-            >
-              {theme === 'ocean' ? (
-                <Waves className="h-5 w-5 text-primary" />
-              ) : (
-                <Sunset className="h-5 w-5 text-primary" />
-              )}
-            </button>
 
-            {isThemeDropdownOpen && (
-              <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-card border border-border overflow-hidden z-50">
-                <div className="py-1">
-                  <div className="px-4 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                    Select Theme
+          <div className="flex items-center space-x-3">
+            {/* Theme Switcher */}
+            <div className="relative" ref={themeDropdownRef}>
+              <button
+                onClick={() => setIsThemeDropdownOpen(!isThemeDropdownOpen)}
+                className="flex items-center justify-center w-9 h-9 rounded-full bg-accent/50 backdrop-blur-sm transition-all hover:bg-accent"
+                aria-label="Change theme"
+              >
+                {theme === 'ocean' ? (
+                  <Waves className="h-5 w-5 text-primary" />
+                ) : (
+                  <Sunset className="h-5 w-5 text-primary" />
+                )}
+              </button>
+
+              {isThemeDropdownOpen && (
+                <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-card border border-border overflow-hidden z-50">
+                  <div className="py-1">
+                    <div className="px-4 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      Select Theme
+                    </div>
+                    <ThemeOption 
+                      value="ocean" 
+                      label="Ocean Theme" 
+                      icon={Waves} 
+                      onClick={() => {
+                        setTheme('ocean');
+                        setIsThemeDropdownOpen(false);
+                      }}
+                    />
+                    <ThemeOption 
+                      value="sunset" 
+                      label="Sunset Theme" 
+                      icon={Sunset} 
+                      onClick={() => {
+                        setTheme('sunset');
+                        setIsThemeDropdownOpen(false);
+                      }}
+                    />
                   </div>
-                  <ThemeOption 
-                    value="ocean" 
-                    label="Ocean Theme" 
-                    icon={Waves} 
-                    onClick={() => {
-                      setTheme('ocean');
-                      setIsThemeDropdownOpen(false);
-                    }}
-                  />
-                  <ThemeOption 
-                    value="sunset" 
-                    label="Sunset Theme" 
-                    icon={Sunset} 
-                    onClick={() => {
-                      setTheme('sunset');
-                      setIsThemeDropdownOpen(false);
-                    }}
-                  />
                 </div>
-              </div>
-            )}
-          </div>
-
-          {/* Favorites button - only if handler is provided */}
-          {onFavoritesClick && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onFavoritesClick}
-              className="relative"
-              aria-label="Favorites"
-            >
-              <Heart className="h-5 w-5" />
-              {user && (
-                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground">
-                  0
-                </span>
               )}
-            </Button>
-          )}
-          
-          {/* Authentication */}
-          {user ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="gap-1">
-                  <User className="h-4 w-4" />
-                  <span className="hidden sm:inline-block max-w-[100px] truncate">
-                    {user.email?.split('@')[0]}
-                  </span>
-                  <ChevronDown className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link to="/dashboard">
-                    <LayoutDashboard className="h-4 w-4 mr-2" />
-                    Dashboard
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link to="/properties">
-                    <List className="h-4 w-4 mr-2" />
-                    My Properties
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link to="/seeker/favorites">
-                    <Heart className="h-4 w-4 mr-2" />
-                    Saved Properties
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link to="/profile">
-                    <Settings className="h-4 w-4 mr-2" />
-                    Profile Settings
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                {/* Mode Switcher */}
-                <DropdownMenuItem asChild>
-                  <Link to="/properties/list">
-                    <Home className="h-4 w-4 mr-2" />
-                    Switch to Owner Mode
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleSignOut} className="text-destructive">
-                  <LogOut className="h-4 w-4 mr-2" />
-                  <span>Log Out</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : (
-            <div className="flex items-center gap-2">
-              <Link to="/login">
-                <Button variant="ghost" size="sm" className="hidden sm:flex items-center gap-1">
-                  <LogIn className="h-4 w-4" />
-                  <span>Log In</span>
-                </Button>
-              </Link>
-              <Link to="/register">
-                <Button size="sm">Register</Button>
-              </Link>
             </div>
-          )}
-          
-          {/* Mobile menu */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild className="md:hidden">
-              <Button variant="ghost" size="icon">
-                <Menu className="h-5 w-5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 md:hidden">
-              <DropdownMenuItem asChild>
-                <Link to="/">
-                  <Home className="h-4 w-4 mr-2" />
-                  Home
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link to="/seeker">
-                  <Search className="h-4 w-4 mr-2" />
-                  Browse Properties
-                </Link>
-              </DropdownMenuItem>
-              {user && (
-                <DropdownMenuItem asChild>
-                  <Link to="/seeker/favorites">
-                    <Heart className="h-4 w-4 mr-2" />
-                    Favorites
-                  </Link>
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuItem asChild>
-                <Link to="/properties/list">
-                  <Home className="h-4 w-4 mr-2" />
-                  List Property
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              {user ? (
-                <>
+
+            {/* Favorites Button */}
+            {user && onFavoritesClick && (
+              <button
+                onClick={onFavoritesClick}
+                className="relative flex items-center justify-center w-9 h-9 rounded-full bg-accent/50 backdrop-blur-sm transition-all hover:bg-accent"
+                aria-label="Favorites"
+              >
+                <Heart className="h-5 w-5 text-primary" />
+                {favoriteCount > 0 && (
+                  <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground">
+                    {favoriteCount > 99 ? '99+' : favoriteCount}
+                  </span>
+                )}
+              </button>
+            )}
+
+            {/* User Profile */}
+            {user ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="flex items-center p-1.5 rounded-full bg-accent/50 hover:bg-accent transition-all gap-1.5 min-w-[42px]">
+                    <div className="h-7 w-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-medium">
+                      {user.email?.charAt(0).toUpperCase()}
+                    </div>
+                    <ChevronDown className="h-4 w-4 mr-0.5 transition-transform duration-200 data-[state=open]:-rotate-180" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56 mt-1" sideOffset={4}>
+                  <DropdownMenuLabel className="font-normal">
+                    <div className="font-medium truncate">{user.email}</div>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Seeker Account
+                    </p>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  
+                  {/* Main Navigation */}
                   <DropdownMenuItem asChild>
-                    <Link to="/dashboard">
+                    <Link to="/" className="flex items-center">
+                      <Home className="h-4 w-4 mr-2" />
+                      Home
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/seeker" className="flex items-center">
+                      <Search className="h-4 w-4 mr-2" />
+                      Browse Properties
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/seeker/favorites" className="flex items-center">
+                      <Heart className="h-4 w-4 mr-2" />
+                      Favorites
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/properties/list" className="flex items-center">
+                      <Home className="h-4 w-4 mr-2" />
+                      List Property
+                    </Link>
+                  </DropdownMenuItem>
+                  
+                  <DropdownMenuSeparator />
+                  
+                  {/* User Account */}
+                  <DropdownMenuItem asChild>
+                    <Link to="/dashboard" className="flex items-center">
                       <LayoutDashboard className="h-4 w-4 mr-2" />
                       Dashboard
                     </Link>
                   </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/properties" className="flex items-center">
+                      <List className="h-4 w-4 mr-2" />
+                      My Properties
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/profile" className="flex items-center">
+                      <Settings className="h-4 w-4 mr-2" />
+                      Profile Settings
+                    </Link>
+                  </DropdownMenuItem>
+                  
+                  <DropdownMenuSeparator />
+                  
+                  {/* Sign Out */}
                   <DropdownMenuItem onClick={handleSignOut} className="text-destructive">
                     <LogOut className="h-4 w-4 mr-2" />
                     <span>Log Out</span>
                   </DropdownMenuItem>
-                </>
-              ) : (
-                <>
-                  <DropdownMenuItem asChild>
-                    <Link to="/login">
-                      <LogIn className="h-4 w-4 mr-2" />
-                      Log In
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link to="/register">
-                      <User className="h-4 w-4 mr-2" />
-                      Register
-                    </Link>
-                  </DropdownMenuItem>
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <div className="flex items-center space-x-2">
+                <Link 
+                  to="/login" 
+                  className="px-3 py-1.5 text-sm font-medium rounded-md text-foreground hover:text-primary hover:bg-accent transition-colors"
+                >
+                  Log in
+                </Link>
+                <Link 
+                  to="/register" 
+                  className="px-3 py-1.5 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                >
+                  Sign up
+                </Link>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </header>

@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyMapHomeView.tsx
-// Version: 2.0.0
-// Last Modified: 04-04-2025 10:45 IST
-// Purpose: Fixed hooks order issue and state update errors
+// Version: 2.1.0
+// Last Modified: 04-04-2025 14:45 IST
+// Purpose: Improved spacing and layout for map integration
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useJsApiLoader } from '@react-google-maps/api';
@@ -106,35 +106,39 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
   return (
     <div className="h-[calc(100vh-64px)] flex flex-col bg-background text-foreground">
       {/* Compact Search Bar with filters in top section */}
-      <CompactSearchBar
-        ref={searchInputRef}
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
-        searchLocations={searchLocations}
-        selectedPropertyType={selectedPropertyType}
-        handlePropertyTypeChange={handlePropertyTypeChange}
-        filters={filters}
-        setFilters={setFilters}
-        handleResetFilters={handleResetFilters}
-        onFocus={handleSearchFocus}
-        onBlur={handleSearchBlur}
-      />
+      <div className="px-4 pt-4">
+        <CompactSearchBar
+          ref={searchInputRef}
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          searchLocations={searchLocations}
+          selectedPropertyType={selectedPropertyType}
+          handlePropertyTypeChange={handlePropertyTypeChange}
+          filters={filters}
+          setFilters={setFilters}
+          handleResetFilters={handleResetFilters}
+          onFocus={handleSearchFocus}
+          onBlur={handleSearchBlur}
+        />
+      </div>
       
       {/* Recent Searches Dropdown */}
       {showRecentSearches && (
-        <RecentSearches
-          searches={recentSearches}
-          onSelect={(query) => {
-            setSearchQuery(query);
-            setShowRecentSearches(false);
-          }}
-          onClear={() => {
-            // Clear recent searches
-            localStorage.removeItem('recentSearches');
-            // Force reload to reflect the cleared searches
-            window.location.reload();
-          }}
-        />
+        <div className="px-4">
+          <RecentSearches
+            searches={recentSearches}
+            onSelect={(query) => {
+              setSearchQuery(query);
+              setShowRecentSearches(false);
+            }}
+            onClear={() => {
+              // Clear recent searches
+              localStorage.removeItem('recentSearches');
+              // Force reload to reflect the cleared searches
+              window.location.reload();
+            }}
+          />
+        </div>
       )}
       
       {/* Main Content - Split View */}

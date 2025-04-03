@@ -1,7 +1,7 @@
 // src/modules/seeker/components/MapPanel.tsx
-// Version: 1.0.0
-// Last Modified: 03-04-2025 12:30 IST
-// Purpose: Migrated from properties module to seeker module
+// Version: 1.1.0
+// Last Modified: 03-04-2025 14:45 IST
+// Purpose: Added margins to Google Map component while preserving hover functionality
 
 import React, { useCallback, useState, useRef, useEffect } from 'react';
 import { GoogleMap, Marker, InfoWindow } from '@react-google-maps/api';
@@ -20,6 +20,7 @@ interface MapPanelProps {
   hoveredProperty: string | null;
 }
 
+// Updated map container style with height adjustment to accommodate margins
 const mapContainerStyle = {
   width: '100%',
   height: '100%'
@@ -160,100 +161,102 @@ const MapPanel: React.FC<MapPanelProps> = ({
   }
   
   return (
-    <div className="relative flex-1 hidden lg:block">
-      {isLoaded ? (
-        <GoogleMap
-          id="property-map"
-          mapContainerStyle={mapContainerStyle}
-          options={defaultOptions}
-          onLoad={onMapLoad}
-        >
-          {/* Property markers */}
-          {properties.map(property => {
-            const lat = parseFloat(property.property_details?.latitude || '0');
-            const lng = parseFloat(property.property_details?.longitude || '0');
+    <div className="relative flex-1 hidden lg:flex p-4">
+      <div className="w-full h-full rounded-xl overflow-hidden shadow-md border border-border">
+        {isLoaded ? (
+          <GoogleMap
+            id="property-map"
+            mapContainerStyle={mapContainerStyle}
+            options={defaultOptions}
+            onLoad={onMapLoad}
+          >
+            {/* Property markers */}
+            {properties.map(property => {
+              const lat = parseFloat(property.property_details?.latitude || '0');
+              const lng = parseFloat(property.property_details?.longitude || '0');
+              
+              // Skip invalid coordinates
+              if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) {
+                return null;
+              }
+              
+              const isActive = activeProperty?.id === property.id;
+              const isHovered = hoveredProperty === property.id;
+              
+              return (
+                <Marker
+                  key={property.id}
+                  position={{ lat, lng }}
+                  icon={{
+                    url: getMarkerPin(property),
+                    scaledSize: new google.maps.Size(isActive || isHovered ? 40 : 30, isActive || isHovered ? 40 : 30),
+                    origin: new google.maps.Point(0, 0),
+                    anchor: new google.maps.Point(15, 30),
+                  }}
+                  animation={isHovered && !isActive ? google.maps.Animation.BOUNCE : undefined}
+                  onClick={() => handleMarkerClick(property)}
+                  zIndex={isActive || isHovered ? 1000 : 1}
+                />
+              );
+            })}
             
-            // Skip invalid coordinates
-            if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) {
-              return null;
-            }
-            
-            const isActive = activeProperty?.id === property.id;
-            const isHovered = hoveredProperty === property.id;
-            
-            return (
-              <Marker
-                key={property.id}
-                position={{ lat, lng }}
-                icon={{
-                  url: getMarkerPin(property),
-                  scaledSize: new google.maps.Size(isActive || isHovered ? 40 : 30, isActive || isHovered ? 40 : 30),
-                  origin: new google.maps.Point(0, 0),
-                  anchor: new google.maps.Point(15, 30),
-                }}
-                animation={isHovered && !isActive ? google.maps.Animation.BOUNCE : undefined}
-                onClick={() => handleMarkerClick(property)}
-                zIndex={isActive || isHovered ? 1000 : 1}
-              />
-            );
-          })}
-          
-          {/* Info window for active property */}
-          {activeProperty && (() => {
-            const lat = parseFloat(activeProperty.property_details?.latitude || '0');
-            const lng = parseFloat(activeProperty.property_details?.longitude || '0');
-            
-            if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) {
-              return null;
-            }
-            
-            return (
-              <InfoWindow
-                position={{ lat, lng }}
-                onCloseClick={() => setActiveProperty(null)}
-              >
-                <div className="max-w-xs">
-                  <Link 
-                    to={`/seeker/property/${activeProperty.id}`}
-                    className="block hover:opacity-90"
-                  >
-                    <div className="w-full h-24 bg-muted rounded-md overflow-hidden mb-2">
-                      <img
-                        src={activeProperty.property_images?.[0]?.url || '/apartment.jpg'}
-                        alt={activeProperty.title}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    
-                    <h3 className="font-medium text-sm mb-1 line-clamp-1">{activeProperty.title}</h3>
-                    
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="text-sm font-bold">{formatPrice(activeProperty.price)}</span>
-                      
-                      <div className="flex text-xs text-muted-foreground">
-                        {activeProperty.bedrooms && <span className="mr-2">{activeProperty.bedrooms} bed</span>}
-                        {activeProperty.bathrooms && <span>{activeProperty.bathrooms} bath</span>}
+            {/* Info window for active property */}
+            {activeProperty && (() => {
+              const lat = parseFloat(activeProperty.property_details?.latitude || '0');
+              const lng = parseFloat(activeProperty.property_details?.longitude || '0');
+              
+              if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) {
+                return null;
+              }
+              
+              return (
+                <InfoWindow
+                  position={{ lat, lng }}
+                  onCloseClick={() => setActiveProperty(null)}
+                >
+                  <div className="max-w-xs">
+                    <Link 
+                      to={`/seeker/property/${activeProperty.id}`}
+                      className="block hover:opacity-90"
+                    >
+                      <div className="w-full h-24 bg-muted rounded-md overflow-hidden mb-2">
+                        <img
+                          src={activeProperty.property_images?.[0]?.url || '/apartment.jpg'}
+                          alt={activeProperty.title}
+                          className="w-full h-full object-cover"
+                        />
                       </div>
-                    </div>
-                    
-                    <p className="text-xs text-muted-foreground truncate">
-                      {activeProperty.address || activeProperty.city || 'Location unavailable'}
-                    </p>
-                  </Link>
-                </div>
-              </InfoWindow>
-            );
-          })()}
-        </GoogleMap>
-      ) : (
-        <div className="w-full h-full flex items-center justify-center bg-muted/10">
-          <div className="animate-pulse flex flex-col items-center">
-            <div className="h-12 w-12 bg-muted rounded-full mb-3"></div>
-            <div className="h-4 w-32 bg-muted rounded mb-3"></div>
-            <div className="h-3 w-48 bg-muted rounded"></div>
+                      
+                      <h3 className="font-medium text-sm mb-1 line-clamp-1">{activeProperty.title}</h3>
+                      
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-sm font-bold">{formatPrice(activeProperty.price)}</span>
+                        
+                        <div className="flex text-xs text-muted-foreground">
+                          {activeProperty.bedrooms && <span className="mr-2">{activeProperty.bedrooms} bed</span>}
+                          {activeProperty.bathrooms && <span>{activeProperty.bathrooms} bath</span>}
+                        </div>
+                      </div>
+                      
+                      <p className="text-xs text-muted-foreground truncate">
+                        {activeProperty.address || activeProperty.city || 'Location unavailable'}
+                      </p>
+                    </Link>
+                  </div>
+                </InfoWindow>
+              );
+            })()}
+          </GoogleMap>
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-muted/10">
+            <div className="animate-pulse flex flex-col items-center">
+              <div className="h-12 w-12 bg-muted rounded-full mb-3"></div>
+              <div className="h-4 w-32 bg-muted rounded mb-3"></div>
+              <div className="h-3 w-48 bg-muted rounded"></div>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };
