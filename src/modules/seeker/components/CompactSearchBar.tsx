@@ -1,18 +1,19 @@
 // src/modules/seeker/components/CompactSearchBar.tsx
-// Version: 1.0.0
-// Last Modified: 03-04-2025 12:20 IST
-// Purpose: Migrated from properties module to seeker module
+// Version: 1.1.0
+// Last Modified: 04-04-2025 15:30 IST
+// Purpose: Added property types to the filters panel and fixed filter display
 
-import React, { forwardRef, useState } from 'react';
+import React, { forwardRef, useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, X, Sliders, MapPin } from 'lucide-react';
+import { Search, X, Sliders, MapPin, Check } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Slider } from '@/components/ui/slider';
 import { propertyTypeOptions } from '../services/seekerService';
 import { PropertyFilters } from '../services/seekerService';
+import { cn } from '@/lib/utils';
 
 interface CompactSearchBarProps {
   searchQuery: string;
@@ -43,16 +44,35 @@ const CompactSearchBar = forwardRef<HTMLInputElement, CompactSearchBarProps>(({
   const [maxPrice, setMaxPrice] = useState<number>(filters.maxPrice || 10000000);
   const [bedrooms, setBedrooms] = useState<number | undefined>(filters.bedrooms);
   const [bathrooms, setBathrooms] = useState<number | undefined>(filters.bathrooms);
+  const [localPropertyType, setLocalPropertyType] = useState<string>(selectedPropertyType);
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
+  
+  // Sync local state with filters when they change externally
+  useEffect(() => {
+    setMinPrice(filters.minPrice || 0);
+    setMaxPrice(filters.maxPrice || 10000000);
+    setBedrooms(filters.bedrooms);
+    setBathrooms(filters.bathrooms);
+    setLocalPropertyType(selectedPropertyType);
+  }, [filters, selectedPropertyType]);
   
   // Handle filter changes 
   const applyFilters = () => {
+    // Apply property type from local state
+    if (localPropertyType !== selectedPropertyType) {
+      handlePropertyTypeChange(localPropertyType);
+    }
+    
     setFilters({
       ...filters,
       minPrice,
       maxPrice,
       bedrooms,
-      bathrooms
+      bathrooms,
+      propertyType: localPropertyType === 'all' ? undefined : localPropertyType
     });
+    
+    setIsSheetOpen(false);
   };
   
   // Count active filters
@@ -63,6 +83,17 @@ const CompactSearchBar = forwardRef<HTMLInputElement, CompactSearchBarProps>(({
     !!bathrooms,
     selectedPropertyType !== 'all'
   ].filter(Boolean).length;
+  
+  // Format price to Indian format
+  const formatPrice = (price: number) => {
+    if (price >= 10000000) {
+      return `₹${(price / 10000000).toFixed(1)}Cr`;
+    } else if (price >= 100000) {
+      return `₹${(price / 100000).toFixed(1)}L`;
+    } else {
+      return `₹${price}`;
+    }
+  };
   
   return (
     <div className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 py-3">
@@ -111,7 +142,7 @@ const CompactSearchBar = forwardRef<HTMLInputElement, CompactSearchBarProps>(({
           </Select>
           
           {/* Advanced Filters Button */}
-          <Sheet>
+          <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
             <SheetTrigger asChild>
               <Button variant="outline" className="h-11 relative">
                 <Sliders className="h-4 w-4 mr-2" />
@@ -132,15 +163,40 @@ const CompactSearchBar = forwardRef<HTMLInputElement, CompactSearchBarProps>(({
               </SheetHeader>
               
               <div className="mt-6 space-y-6">
+                {/* Property Types */}
+                <div className="space-y-3">
+                  <h3 className="font-medium">Property Type</h3>
+                  <div className="grid grid-cols-2 gap-2">
+                    {propertyTypeOptions.map((option) => (
+                      <div
+                        key={option.id}
+                        onClick={() => setLocalPropertyType(option.id)}
+                        className={cn(
+                          "px-3 py-2 rounded-md border cursor-pointer flex items-center justify-between",
+                          localPropertyType === option.id
+                            ? "bg-primary/10 border-primary"
+                            : "bg-background hover:bg-muted/50 border-input"
+                        )}
+                      >
+                        <span>{option.label}</span>
+                        {localPropertyType === option.id && (
+                          <Check className="h-4 w-4 text-primary" />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                
                 {/* Price Range */}
                 <div className="space-y-3">
                   <h3 className="font-medium">Price Range</h3>
                   <div className="flex items-center justify-between">
-                    <span>₹{(minPrice / 100000).toFixed(1)}L</span>
-                    <span>₹{maxPrice >= 10000000 ? (maxPrice / 10000000).toFixed(1) + 'Cr' : (maxPrice / 100000).toFixed(1) + 'L'}</span>
+                    <span>{formatPrice(minPrice)}</span>
+                    <span>{formatPrice(maxPrice)}</span>
                   </div>
                   <Slider
                     defaultValue={[minPrice, maxPrice]}
+                    value={[minPrice, maxPrice]}
                     min={0}
                     max={10000000}
                     step={100000}
@@ -154,11 +210,12 @@ const CompactSearchBar = forwardRef<HTMLInputElement, CompactSearchBarProps>(({
                 {/* Bedrooms */}
                 <div className="space-y-3">
                   <h3 className="font-medium">Bedrooms</h3>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="grid grid-cols-6 gap-2">
                     <Button 
                       variant={bedrooms === undefined ? "default" : "outline"}
                       size="sm"
                       onClick={() => setBedrooms(undefined)}
+                      className="text-center"
                     >
                       Any
                     </Button>
@@ -168,6 +225,7 @@ const CompactSearchBar = forwardRef<HTMLInputElement, CompactSearchBarProps>(({
                         variant={bedrooms === num ? "default" : "outline"}
                         size="sm"
                         onClick={() => setBedrooms(num)}
+                        className="text-center"
                       >
                         {num}+
                       </Button>
@@ -178,11 +236,12 @@ const CompactSearchBar = forwardRef<HTMLInputElement, CompactSearchBarProps>(({
                 {/* Bathrooms */}
                 <div className="space-y-3">
                   <h3 className="font-medium">Bathrooms</h3>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="grid grid-cols-6 gap-2">
                     <Button 
                       variant={bathrooms === undefined ? "default" : "outline"}
                       size="sm"
                       onClick={() => setBathrooms(undefined)}
+                      className="text-center"
                     >
                       Any
                     </Button>
@@ -192,6 +251,7 @@ const CompactSearchBar = forwardRef<HTMLInputElement, CompactSearchBarProps>(({
                         variant={bathrooms === num ? "default" : "outline"}
                         size="sm"
                         onClick={() => setBathrooms(num)}
+                        className="text-center"
                       >
                         {num}+
                       </Button>
@@ -201,7 +261,17 @@ const CompactSearchBar = forwardRef<HTMLInputElement, CompactSearchBarProps>(({
                 
                 {/* Action buttons */}
                 <div className="flex justify-between pt-6">
-                  <Button variant="outline" onClick={handleResetFilters}>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => {
+                      handleResetFilters();
+                      setLocalPropertyType('all');
+                      setBedrooms(undefined);
+                      setBathrooms(undefined);
+                      setMinPrice(0);
+                      setMaxPrice(10000000);
+                    }}
+                  >
                     Reset Filters
                   </Button>
                   <Button onClick={applyFilters}>
@@ -234,7 +304,7 @@ const CompactSearchBar = forwardRef<HTMLInputElement, CompactSearchBarProps>(({
             
             {minPrice > 0 && (
               <Badge variant="secondary" className="flex items-center gap-1">
-                Min: ₹{(minPrice / 100000).toFixed(1)}L
+                Min: {formatPrice(minPrice)}
                 <Button
                   variant="ghost"
                   size="icon"
@@ -251,7 +321,7 @@ const CompactSearchBar = forwardRef<HTMLInputElement, CompactSearchBarProps>(({
             
             {maxPrice < 10000000 && (
               <Badge variant="secondary" className="flex items-center gap-1">
-                Max: ₹{maxPrice >= 10000000 ? (maxPrice / 10000000).toFixed(1) + 'Cr' : (maxPrice / 100000).toFixed(1) + 'L'}
+                Max: {formatPrice(maxPrice)}
                 <Button
                   variant="ghost"
                   size="icon"

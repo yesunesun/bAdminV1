@@ -1,9 +1,9 @@
 // src/modules/seeker/components/Search/FilterPanel.tsx
-// Version: 2.3.0
-// Last Modified: 01-03-2025 19:15 IST
-// Purpose: Fixed Apply Filters button to properly apply theme colors
+// Version: 2.7.0
+// Last Modified: 04-04-2025 13:30 IST
+// Purpose: Fixed filter layout to match UI design and added property types
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -30,13 +30,31 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
     filters.maxPrice || 10000000
   ]);
   const [isExpanded, setIsExpanded] = useState(false);
+  
+  // Selected filters state
+  const [selectedBedrooms, setSelectedBedrooms] = useState<string>('');
+  const [selectedBathrooms, setSelectedBathrooms] = useState<string>('');
+  const [selectedPropertyType, setSelectedPropertyType] = useState<string>(filters.propertyType || '');
+
+  // Update local state when filters change
+  useEffect(() => {
+    setLocalFilters(filters);
+    setPriceRange([
+      filters.minPrice || 0,
+      filters.maxPrice || 10000000
+    ]);
+    
+    // Set selected values based on incoming filters
+    setSelectedBedrooms(filters.bedrooms ? String(filters.bedrooms) : '');
+    setSelectedBathrooms(filters.bathrooms ? String(filters.bathrooms) : '');
+    setSelectedPropertyType(filters.propertyType || '');
+  }, [filters]);
 
   // Property type options
   const propertyTypes = [
-    { value: 'All Types', label: 'All Types' },
+    { value: '', label: 'Any' },
     { value: 'apartment', label: 'Apartment' },
     { value: 'house', label: 'House' },
-    { value: 'villa', label: 'Villa' },
     { value: 'commercial', label: 'Commercial' },
     { value: 'land', label: 'Land' }
   ];
@@ -51,8 +69,33 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
     { value: '5', label: '5+' }
   ];
 
+  // Bathroom options
+  const bathroomOptions = [
+    { value: '', label: 'Any' },
+    { value: '1', label: '1+' },
+    { value: '2', label: '2+' },
+    { value: '3', label: '3+' },
+    { value: '4', label: '4+' },
+    { value: '5', label: '5+' }
+  ];
+
   const handleFilterChange = (name: keyof PropertyFilters, value: any) => {
     setLocalFilters(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handlePropertyTypeSelect = (value: string) => {
+    setSelectedPropertyType(value);
+    handleFilterChange('propertyType', value);
+  };
+
+  const handleBedroomSelect = (value: string) => {
+    setSelectedBedrooms(value);
+    handleFilterChange('bedrooms', value === '' ? '' : parseInt(value));
+  };
+
+  const handleBathroomSelect = (value: string) => {
+    setSelectedBathrooms(value);
+    handleFilterChange('bathrooms', value === '' ? '' : parseInt(value));
   };
 
   const handleApplyFilters = () => {
@@ -61,6 +104,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
       minPrice: priceRange[0],
       maxPrice: priceRange[1]
     };
+    
     onApplyFilters(updatedFilters);
     if (window.innerWidth < 768) {
       setIsExpanded(false);
@@ -70,6 +114,9 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
   const handleResetFilters = () => {
     setLocalFilters({});
     setPriceRange([0, 10000000]);
+    setSelectedBedrooms('');
+    setSelectedBathrooms('');
+    setSelectedPropertyType('');
     onResetFilters();
   };
 
@@ -78,15 +125,19 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
   };
 
   const formatPrice = (value: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      maximumFractionDigits: 0
-    }).format(value);
+    if (value >= 10000000) {
+      return `₹${(value / 10000000).toFixed(1)}Cr`;
+    } else if (value >= 100000) {
+      return `₹${(value / 100000).toFixed(1)}L`;
+    } else {
+      return `₹${value}`;
+    }
   };
 
   return (
     <Card className="h-fit sticky top-4 border border-border bg-card shadow-sm">
       <CardContent className="p-5">
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-semibold text-foreground">Filters</h3>
           <div className="flex space-x-2">
             <Button 
@@ -98,42 +149,23 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
               <FilterIcon className="h-4 w-4 mr-2" />
               {isExpanded ? 'Hide Filters' : 'Show Filters'}
             </Button>
-            
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={handleResetFilters}
-              className="text-destructive hover:text-destructive h-8"
-            >
-              <XIcon className="h-4 w-4 mr-1" />
-              Reset
-            </Button>
           </div>
         </div>
+        
+        <p className="text-sm text-muted-foreground mb-6">Refine your search with specific criteria</p>
 
         <div className={`space-y-6 ${isExpanded ? 'block' : 'hidden md:block'}`}>
-          {/* Location Filter */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium block mb-1.5 text-foreground">Location</label>
-            <Input 
-              placeholder="City, state, or address" 
-              value={localFilters.location || ''} 
-              onChange={(e) => handleFilterChange('location', e.target.value)}
-              className="w-full"
-            />
-          </div>
-
           {/* Property Type Filter */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium block mb-1.5 text-foreground">Property Type</label>
+          <div className="mb-6">
+            <h4 className="text-base font-medium mb-3">Property Type</h4>
             <div className="grid grid-cols-2 gap-2">
               {propertyTypes.map((type) => (
                 <div 
                   key={type.value}
-                  onClick={() => handleFilterChange('propertyType', type.value)}
+                  onClick={() => handlePropertyTypeSelect(type.value)}
                   className={cn(
-                    "px-4 py-2 rounded-md border cursor-pointer transition-colors text-center text-sm",
-                    localFilters.propertyType === type.value 
+                    "px-3 py-2 rounded-md border cursor-pointer text-center text-sm",
+                    selectedPropertyType === type.value
                       ? "bg-primary text-primary-foreground border-primary font-medium" 
                       : "bg-background hover:bg-muted/50 border-input text-foreground"
                   )}
@@ -144,17 +176,72 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
             </div>
           </div>
 
+          {/* Price Range Filter */}
+          <div className="mb-6">
+            <h4 className="text-base font-medium mb-3">Price Range</h4>
+            <div className="flex justify-between text-sm mb-2">
+              <span>{formatPrice(priceRange[0])}</span>
+              <span>{formatPrice(priceRange[1])}</span>
+            </div>
+            
+            <div className="relative h-6 mb-4">
+              <div className="absolute h-1 bg-muted rounded-full w-full top-1/2 transform -translate-y-1/2"></div>
+              <div 
+                className="absolute h-1 bg-primary rounded-full top-1/2 transform -translate-y-1/2"
+                style={{ 
+                  left: `${(priceRange[0] / 10000000) * 100}%`, 
+                  right: `${100 - (priceRange[1] / 10000000) * 100}%` 
+                }}
+              ></div>
+              
+              {/* Left handle */}
+              <div 
+                className="absolute h-6 w-6 rounded-full bg-background border-2 border-primary top-1/2 transform -translate-y-1/2 -translate-x-1/2 cursor-pointer flex items-center justify-center"
+                style={{ left: `${(priceRange[0] / 10000000) * 100}%` }}
+              >
+                <div className="h-2 w-2 bg-primary rounded-full"></div>
+              </div>
+              
+              {/* Right handle */}
+              <div 
+                className="absolute h-6 w-6 rounded-full bg-background border-2 border-primary top-1/2 transform -translate-y-1/2 -translate-x-1/2 cursor-pointer flex items-center justify-center"
+                style={{ left: `${(priceRange[1] / 10000000) * 100}%` }}
+              >
+                <div className="h-2 w-2 bg-primary rounded-full"></div>
+              </div>
+              
+              <input
+                type="range"
+                min="0"
+                max="10000000"
+                step="10000"
+                value={priceRange[0]}
+                onChange={(e) => setPriceRange([Math.min(parseInt(e.target.value), priceRange[1] - 100000), priceRange[1]])}
+                className="absolute w-full h-6 opacity-0 cursor-pointer"
+              />
+              <input
+                type="range"
+                min="0"
+                max="10000000"
+                step="10000"
+                value={priceRange[1]}
+                onChange={(e) => setPriceRange([priceRange[0], Math.max(parseInt(e.target.value), priceRange[0] + 100000)])}
+                className="absolute w-full h-6 opacity-0 cursor-pointer"
+              />
+            </div>
+          </div>
+          
           {/* Bedrooms Filter */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium block mb-1.5 text-foreground">Bedrooms</label>
-            <div className="grid grid-cols-3 gap-2">
+          <div className="mb-6">
+            <h4 className="text-base font-medium mb-3">Bedrooms</h4>
+            <div className="grid grid-cols-6 gap-2">
               {bedroomOptions.map((option) => (
                 <div 
                   key={option.value}
-                  onClick={() => handleFilterChange('bedrooms', option.value)}
+                  onClick={() => handleBedroomSelect(option.value)}
                   className={cn(
-                    "px-3 py-2 rounded-md border cursor-pointer transition-colors text-center text-sm",
-                    String(localFilters.bedrooms) === option.value 
+                    "px-1 py-2 rounded-md border cursor-pointer text-center text-sm",
+                    selectedBedrooms === option.value
                       ? "bg-primary text-primary-foreground border-primary font-medium" 
                       : "bg-background hover:bg-muted/50 border-input text-foreground"
                   )}
@@ -165,61 +252,43 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
             </div>
           </div>
 
-          {/* Price Range Filter */}
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <label className="text-sm font-medium text-foreground">Price Range (₹)</label>
-              <span className="text-sm text-muted-foreground">
-                {formatPrice(priceRange[0])} - {formatPrice(priceRange[1])}
-              </span>
-            </div>
-            
-            <div className="px-2">
-              <div className="h-4 relative">
-                <div className="absolute inset-0 h-1 top-1/2 -translate-y-1/2 bg-muted rounded-full"></div>
-              </div>
-              {/* This is a placeholder for a real slider component */}
-              {/* You would need to implement or install a proper range slider */}
-            </div>
-            
-            <div className="flex space-x-4">
-              <div className="w-1/2">
-                <Input
-                  type="number"
-                  placeholder="Min"
-                  value={priceRange[0] || ''}
-                  onChange={(e) => setPriceRange([
-                    e.target.value ? parseInt(e.target.value) : 0, 
-                    priceRange[1]
-                  ])}
-                  className="w-full"
-                />
-              </div>
-              <div className="w-1/2">
-                <Input
-                  type="number"
-                  placeholder="Max"
-                  value={priceRange[1] || ''}
-                  onChange={(e) => setPriceRange([
-                    priceRange[0], 
-                    e.target.value ? parseInt(e.target.value) : 10000000
-                  ])}
-                  className="w-full"
-                />
-              </div>
+          {/* Bathrooms Filter */}
+          <div className="mb-6">
+            <h4 className="text-base font-medium mb-3">Bathrooms</h4>
+            <div className="grid grid-cols-6 gap-2">
+              {bathroomOptions.map((option) => (
+                <div 
+                  key={option.value}
+                  onClick={() => handleBathroomSelect(option.value)}
+                  className={cn(
+                    "px-1 py-2 rounded-md border cursor-pointer text-center text-sm",
+                    selectedBathrooms === option.value
+                      ? "bg-primary text-primary-foreground border-primary font-medium" 
+                      : "bg-background hover:bg-muted/50 border-input text-foreground"
+                  )}
+                >
+                  {option.label}
+                </div>
+              ))}
             </div>
           </div>
 
-          <Button 
-            onClick={handleApplyFilters}
-            className={cn(
-              "w-full mt-6",
-              "bg-primary text-primary-foreground hover:bg-primary/90",
-              "dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
-            )}
-          >
-            Apply Filters
-          </Button>
+          {/* Action buttons */}
+          <div className="flex justify-between pt-2">
+            <Button
+              variant="outline"
+              onClick={handleResetFilters}
+              className="w-[48%]"
+            >
+              Reset Filters
+            </Button>
+            <Button
+              onClick={handleApplyFilters}
+              className="w-[48%] bg-primary text-primary-foreground hover:bg-primary/90"
+            >
+              Apply Filters
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>

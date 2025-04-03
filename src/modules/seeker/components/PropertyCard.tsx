@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyCard.tsx
-// Version: 2.6.0
-// Last Modified: 04-04-2025 17:10 IST
-// Purpose: Added login prompt for non-authenticated users when favoriting
+// Version: 3.0.0
+// Last Modified: 03-04-2025 15:30 IST
+// Purpose: Enhanced property card with improved styling, animations, and consistent visual elements
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -10,7 +10,9 @@ import {
   BedIcon, 
   BathIcon, 
   SquareIcon,
-  ShieldCheck
+  ShieldCheck,
+  Heart,
+  HeartOff
 } from 'lucide-react';
 
 import { PropertyType } from '@/modules/owner/components/property/types';
@@ -19,7 +21,6 @@ import { Card } from '@/components/ui/card';
 import { useTheme } from '@/contexts/ThemeContext';
 import { checkPropertyLike, togglePropertyLike } from '../services/seekerService';
 import { useAuth } from '@/contexts/AuthContext';
-import FavoriteButton from './FavoriteButton';
 import { useToast } from '@/components/ui/use-toast';
 import {
   Dialog,
@@ -42,6 +43,44 @@ const usePropertyImage = (property: PropertyType) => {
            property.image || 
            '/noimage.png';
   }, [property]);
+};
+
+// Favorite Button Component
+const FavoriteButton: React.FC<{
+  initialIsLiked: boolean;
+  onToggle: (newState: boolean) => void;
+  className?: string;
+}> = ({ initialIsLiked, onToggle, className = "" }) => {
+  const [isLiked, setIsLiked] = useState(initialIsLiked);
+  
+  // Handle click with animation
+  const handleClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsLiked(!isLiked);
+    onToggle(!isLiked);
+  };
+  
+  return (
+    <button
+      aria-label={isLiked ? "Remove from favorites" : "Add to favorites"}
+      onClick={handleClick}
+      className={cn(
+        "rounded-full w-10 h-10 flex items-center justify-center backdrop-blur-sm",
+        "transition-all duration-300 transform hover:scale-110 active:scale-95 shadow-sm",
+        isLiked 
+          ? "bg-primary/20 text-primary hover:bg-primary/30" 
+          : "bg-white/80 text-foreground/70 hover:text-primary",
+        className
+      )}
+    >
+      {isLiked ? (
+        <Heart className="h-5 w-5 fill-primary" />
+      ) : (
+        <Heart className="h-5 w-5" />
+      )}
+    </button>
+  );
 };
 
 interface PropertyCardProps {
@@ -166,8 +205,8 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
     <>
       <Card 
         className={cn(
-          "overflow-hidden group h-full flex flex-col transition-all duration-300",
-          "hover:shadow-xl border border-border/40",
+          "overflow-hidden group hover-lift transition-all duration-300",
+          "rounded-xl border border-border/40 h-full flex flex-col",
           isHovered ? "ring-2 ring-primary ring-offset-2" : "",
           theme === 'ocean' ? "bg-card" : "bg-card",
           className
@@ -180,8 +219,8 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
             to={`/seeker/property/${property.id}`} 
             className="block relative h-60 overflow-hidden"
           >
-            {/* Background gradient overlay */}
-            <div className="absolute inset-0 bg-gradient-to-b from-black/0 via-black/0 to-black/30 z-10" />
+            {/* Enhanced background gradient overlay */}
+            <div className="absolute inset-0 bg-gradient-to-b from-black/5 via-black/0 to-black/40 z-10" />
             
             {/* Property Image with Error Handling */}
             <img 
@@ -196,10 +235,10 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
               }}
             />
             
-            {/* Property Type Badge */}
+            {/* Property Type Badge - Enhanced styling */}
             <div className={cn(
               "absolute bottom-3 left-3 z-20 bg-white/90 backdrop-blur-sm",
-              "rounded-full px-3 py-1 text-xs font-medium shadow-sm",
+              "rounded-full px-3 py-1.5 text-xs font-medium shadow-sm",
               theme === 'ocean' ? "text-primary" : "text-primary"
             )}>
               {property.property_details?.propertyType || 'Property'}
@@ -217,79 +256,90 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
 
           {/* Verified Badge - show for selected properties */}
           {property.property_details?.isVerified && (
-            <div className="absolute top-3 left-3 z-20 bg-primary/10 backdrop-blur-sm text-primary rounded-full px-2 py-1 text-xs font-medium flex items-center shadow-sm">
-              <ShieldCheck className="h-3 w-3 mr-1" />
+            <div className="absolute top-3 left-3 z-20 bg-white/80 backdrop-blur-sm text-primary rounded-full px-3 py-1.5 text-xs font-medium flex items-center shadow-sm">
+              <ShieldCheck className="h-3.5 w-3.5 mr-1.5" />
               Verified
             </div>
           )}
         </div>
 
-        {/* Property Details */}
-        <div className="flex-grow p-5 flex flex-col">
+        {/* Property Details - Enhanced with better spacing and typography */}
+        <div className="flex-grow p-6 flex flex-col">
           <div className="mb-auto">
-            {/* Property Title */}
+            {/* Property Title - Enhanced styling */}
             <Link to={`/seeker/property/${property.id}`} className="block">
               <h3 className={cn(
-                "text-lg font-semibold line-clamp-2",
+                "text-lg font-semibold line-clamp-2 mb-2",
                 "group-hover:text-primary transition-colors"
               )}>
                 {property.title}
               </h3>
             </Link>
           
-            {/* Property Location */}
-            <div className="flex items-center mt-2.5 text-muted-foreground">
-              <MapPinIcon className="h-3.5 w-3.5 min-w-3.5 mr-1.5" />
+            {/* Property Location - Enhanced icon alignment */}
+            <div className="flex items-center mt-1 text-muted-foreground">
+              <div className="w-5 h-5 flex items-center justify-center mr-1.5">
+                <MapPinIcon className="h-4 w-4 text-primary" />
+              </div>
               <p className="text-sm line-clamp-1">
                 {formattedLocation || 'Location Not Specified'}
               </p>
             </div>
           </div>
           
-          {/* Property Features */}
-          <div className="mt-4 flex justify-between items-center">
-            <div className="flex gap-2 flex-wrap">
+          {/* Property Features - Enhanced with consistent spacing and icon styling */}
+          <div className="mt-5 flex justify-between items-center">
+            <div className="grid grid-cols-3 gap-2 w-full">
               {property.bedrooms && (
-                <div className="flex items-center gap-1.5 text-sm">
-                  <BedIcon className="h-3.5 w-3.5 text-primary" />
-                  <span className="font-medium">{property.bedrooms} Bed</span>
+                <div className="flex items-center">
+                  <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center mr-2">
+                    <BedIcon className="h-3.5 w-3.5 text-primary" />
+                  </div>
+                  <span className="text-sm font-medium">{property.bedrooms} {property.bedrooms === 1 ? 'Bed' : 'Beds'}</span>
                 </div>
               )}
               
               {property.bathrooms && (
-                <div className="flex items-center gap-1.5 text-sm ml-2">
-                  <BathIcon className="h-3.5 w-3.5 text-primary" />
-                  <span className="font-medium">{property.bathrooms} Bath</span>
+                <div className="flex items-center">
+                  <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center mr-2">
+                    <BathIcon className="h-3.5 w-3.5 text-primary" />
+                  </div>
+                  <span className="text-sm font-medium">{property.bathrooms} {property.bathrooms === 1 ? 'Bath' : 'Baths'}</span>
                 </div>
               )}
               
               {property.square_feet && (
-                <div className="flex items-center gap-1.5 text-sm ml-2">
-                  <SquareIcon className="h-3.5 w-3.5 text-primary" />
-                  <span className="font-medium">{property.square_feet} sqft</span>
+                <div className="flex items-center">
+                  <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center mr-2">
+                    <SquareIcon className="h-3.5 w-3.5 text-primary" />
+                  </div>
+                  <span className="text-sm font-medium">{property.square_feet} sqft</span>
                 </div>
               )}
             </div>
           </div>
           
-          {/* Price and View Details */}
-          <div className="mt-4 pt-4 border-t border-border/40 flex items-center justify-between">
-            <p className={cn(
-              "text-xl font-bold flex items-center",
-              theme === 'ocean' ? "text-primary" : "text-primary"
-            )}>
-              ₹{formatCurrency(property.price)}
+          {/* Price and View Details - Enhanced styling */}
+          <div className="mt-5 pt-4 border-t border-border/30 flex items-center justify-between">
+            <div>
+              <p className={cn(
+                "text-xl font-bold flex items-center",
+                theme === 'ocean' ? "text-primary" : "text-primary"
+              )}>
+                ₹{formatCurrency(property.price)}
+              </p>
               {property.property_details?.rentalFrequency && (
-                <span className="text-xs font-normal text-muted-foreground ml-1">
-                  /{property.property_details.rentalFrequency}
+                <span className="text-xs text-muted-foreground">
+                  per {property.property_details.rentalFrequency}
                 </span>
               )}
-            </p>
+            </div>
             
             <Link 
               to={`/seeker/property/${property.id}`} 
               className={cn(
-                "text-xs font-medium px-3 py-1.5 rounded-full transition-colors",
+                "text-sm font-medium px-4 py-2 rounded-full transition-all duration-300",
+                "hover:shadow-md hover:-translate-y-0.5",
                 theme === 'ocean' 
                   ? "bg-primary/10 text-primary hover:bg-primary/20" 
                   : "bg-primary/10 text-primary hover:bg-primary/20"
@@ -301,33 +351,33 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
         </div>
       </Card>
 
-      {/* Login Dialog */}
+      {/* Login Dialog - Enhanced styling */}
       <Dialog open={showLoginDialog} onOpenChange={setShowLoginDialog}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md rounded-xl">
           <DialogHeader>
-            <DialogTitle>Sign in to add favorites</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-xl">Sign in to add favorites</DialogTitle>
+            <DialogDescription className="mt-2">
               Create an account or sign in to save properties to your favorites list.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            <p className="text-center text-sm text-muted-foreground mb-4">
+            <p className="text-center text-sm text-muted-foreground">
               Sign in to keep track of your favorite properties and get updates on price changes.
             </p>
           </div>
-          <DialogFooter className="flex flex-col sm:flex-row gap-2">
+          <DialogFooter className="flex flex-col sm:flex-row gap-3 mt-2">
             <Button
               type="button"
               variant="outline"
               onClick={handleCancelLogin}
-              className="sm:w-auto w-full"
+              className="sm:w-auto w-full rounded-full"
             >
               Not now
             </Button>
             <Button 
               type="button" 
               onClick={handleLoginClick}
-              className="sm:w-auto w-full"
+              className="sm:w-auto w-full rounded-full"
             >
               Sign in
             </Button>

@@ -4,25 +4,25 @@
 
 @layer base {
   :root[data-theme="ocean"] {
-    /* Ocean Breeze Theme - Cool, calming blues */
+    /* Ocean Breeze Theme - Cool, calming blues - Enhanced for consistency */
     --background: 210 50% 98%;
     --foreground: 220 60% 20%;
     
-    /* Deep ocean blue primary */
+    /* Deep ocean blue primary - Adjusted for better contrast */
     --primary: 200 85% 45%;
     --primary-foreground: 0 0% 100%;
     
-    /* Lighter azure secondary */
+    /* Lighter azure secondary - Refined for better pairing */
     --secondary: 195 90% 90%;
     --secondary-foreground: 200 85% 25%;
     
-    /* Supporting colors */
+    /* Supporting colors - Enhanced for better visual harmony */
     --muted: 210 40% 96%;
     --muted-foreground: 215 35% 45%;
     --accent: 190 95% 85%;
     --accent-foreground: 200 85% 25%;
     
-    /* UI Elements */
+    /* UI Elements - Improved for consistency */
     --card: 0 0% 100%;
     --card-foreground: 220 60% 20%;
     --popover: 0 0% 100%;
@@ -34,28 +34,32 @@
     /* Semantic Colors */
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
+    
+    /* Added success color for positive indicators */
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 100%;
   }
 
   :root[data-theme="sunset"] {
-    /* Sunset Glow Theme - Warm oranges and purples */
+    /* Sunset Glow Theme - Warm oranges and purples - Enhanced for consistency */
     --background: 35 100% 98%;
     --foreground: 280 50% 20%;
     
-    /* Vibrant sunset orange primary */
+    /* Vibrant sunset orange primary - Adjusted for better contrast */
     --primary: 25 95% 55%;
     --primary-foreground: 0 0% 100%;
     
-    /* Soft purple secondary */
+    /* Soft purple secondary - Refined for better pairing */
     --secondary: 280 50% 90%;
     --secondary-foreground: 280 50% 30%;
     
-    /* Supporting colors */
+    /* Supporting colors - Enhanced for better visual harmony */
     --muted: 35 30% 96%;
     --muted-foreground: 280 20% 45%;
     --accent: 300 70% 90%;
     --accent-foreground: 280 50% 30%;
     
-    /* UI Elements */
+    /* UI Elements - Improved for consistency */
     --card: 0 0% 100%;
     --card-foreground: 280 50% 20%;
     --popover: 0 0% 100%;
@@ -67,10 +71,14 @@
     /* Semantic Colors */
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
+    
+    /* Added success color for positive indicators */
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 100%;
   }
   
   :root {
-    --radius: 0.5rem;
+    --radius: 0.75rem;
     --space-1: 0.25rem;
     --space-2: 0.5rem;
     --space-3: 0.75rem;
@@ -98,6 +106,26 @@
   body {
     @apply bg-background text-foreground antialiased;
     font-feature-settings: "ss01" on, "ss02" on, "cv01" on, "cv03" on;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold tracking-tight;
+  }
+
+  h1 {
+    @apply text-3xl md:text-4xl;
+  }
+
+  h2 {
+    @apply text-2xl md:text-3xl;
+  }
+
+  h3 {
+    @apply text-xl md:text-2xl;
+  }
+
+  h4 {
+    @apply text-lg md:text-xl;
   }
 
   :focus-visible {
@@ -133,9 +161,79 @@
   .content-spacing {
     @apply space-y-4 md:space-y-6;
   }
+
+  /* Property card styles */
+  .property-card {
+    @apply overflow-hidden rounded-xl transition-all duration-300 hover:shadow-xl border border-border/40 h-full flex flex-col bg-card;
+  }
+
+  .property-card-image-container {
+    @apply relative block h-60 overflow-hidden;
+  }
+  
+  .property-card-image {
+    @apply w-full h-full object-cover transition-transform duration-500;
+  }
+
+  .property-card-badge {
+    @apply absolute bottom-3 left-3 z-20 bg-white/90 backdrop-blur-sm rounded-full px-3 py-1 text-xs font-medium shadow-sm text-primary;
+  }
+
+  .property-card-content {
+    @apply flex-grow p-5 flex flex-col;
+  }
+
+  .property-card-title {
+    @apply text-lg font-semibold line-clamp-2 transition-colors;
+  }
+
+  .property-card-feature {
+    @apply flex items-center gap-1.5 text-sm;
+  }
+
+  .property-card-price {
+    @apply text-xl font-bold flex items-center;
+  }
+
+  /* Icon with background utility */
+  .icon-with-bg {
+    @apply rounded-full bg-primary/10 flex items-center justify-center transition-colors;
+  }
+
+  /* Feature icon */
+  .feature-icon {
+    @apply text-primary;
+  }
+
+  /* Animations */
+  .hover-scale {
+    @apply transition-transform hover:scale-105;
+  }
+
+  .hover-lift {
+    @apply transition-all hover:-translate-y-1 hover:shadow-md;
+  }
+
+  .fade-in {
+    @apply opacity-0 animate-[fadeIn_0.3s_ease-in-out_forwards];
+  }
+
+  /* Add animation keyframes */
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes slideUp {
+    from { transform: translateY(10px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+  }
 }
-
-
 
 @layer base {
   * {
