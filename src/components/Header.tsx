@@ -1,7 +1,7 @@
-//src/components/Header.tsx
-// Version: 2.0.0
-// Last Modified: 03-04-2025 14:35 IST
-// Purpose: Enhanced and standardized header for all modules including seeker
+// src/components/Header.tsx
+// Version: 2.1.0
+// Last Modified: 03-04-2025 21:45 IST
+// Purpose: Corrected routes in header for seeker module
 
 import React, { useEffect, useState, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
@@ -144,7 +144,7 @@ export function Header({ onFavoritesClick }: HeaderProps) {
       )}
       {isOwner && (
         <Link 
-          to="/seeker/browse" 
+          to="/" 
           className="flex w-full items-center px-4 py-2 text-sm text-foreground hover:bg-accent"
         >
           <Search className="h-4 w-4 mr-2" />
@@ -177,15 +177,16 @@ export function Header({ onFavoritesClick }: HeaderProps) {
               <div className="hidden md:flex flex-1 ml-12 space-x-8">
                 {isInSeekerModule ? (
                   <>
-                    <NavLink to="/seeker/browse" icon={Search}>Browse Properties</NavLink>
-                    <NavLink to="/seeker/favorites" icon={Heart}>Favorites</NavLink>
+                    <NavLink to="/" icon={Home}>Home</NavLink>
+                    <NavLink to="/seeker" icon={Search}>Browse Properties</NavLink>
+                    {user && <NavLink to="/seeker/favorites" icon={Heart}>Favorites</NavLink>}
                     <NavLink to="/properties/list" icon={Home}>List Property</NavLink>
                   </>
                 ) : (
                   <>
                     <NavLink to="/dashboard" icon={LayoutDashboard}>Dashboard</NavLink>
                     <NavLink to="/properties" icon={List}>Properties</NavLink>
-                    <NavLink to="/seeker/browse" icon={Search}>Browse Properties</NavLink>
+                    <NavLink to="/" icon={Search}>Browse Properties</NavLink>
                   </>
                 )}
               </div>
@@ -373,19 +374,28 @@ export function Header({ onFavoritesClick }: HeaderProps) {
                 {isInSeekerModule ? (
                   <>
                     <NavLink 
-                      to="/seeker/browse" 
+                      to="/" 
+                      icon={Home} 
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                      Home
+                    </NavLink>
+                    <NavLink 
+                      to="/seeker" 
                       icon={Search} 
                       onClick={() => setIsMobileMenuOpen(false)}
                     >
                       Browse Properties
                     </NavLink>
-                    <NavLink 
-                      to="/seeker/favorites" 
-                      icon={Heart} 
-                      onClick={() => setIsMobileMenuOpen(false)}
-                    >
-                      Favorites
-                    </NavLink>
+                    {user && (
+                      <NavLink 
+                        to="/seeker/favorites" 
+                        icon={Heart} 
+                        onClick={() => setIsMobileMenuOpen(false)}
+                      >
+                        Favorites
+                      </NavLink>
+                    )}
                     <NavLink 
                       to="/properties/list" 
                       icon={Home} 
@@ -411,7 +421,7 @@ export function Header({ onFavoritesClick }: HeaderProps) {
                       Properties
                     </NavLink>
                     <NavLink 
-                      to="/seeker/browse" 
+                      to="/" 
                       icon={Search} 
                       onClick={() => setIsMobileMenuOpen(false)}
                     >

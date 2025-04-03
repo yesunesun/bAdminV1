@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyHeader.tsx
-// Version: 2.0.0
-// Last Modified: 03-04-2025 13:30 IST
-// Purpose: Enhanced and standardized header for seeker module with theme support
+// Version: 2.1.0
+// Last Modified: 03-04-2025 21:45 IST
+// Purpose: Corrected navigation links in seeker header to match main header
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
@@ -103,9 +103,15 @@ const PropertyHeader: React.FC<PropertyHeaderProps> = ({ onFavoritesClick }) => 
         
         {/* Navigation */}
         <nav className="hidden md:flex items-center gap-6 text-sm">
-          <Link to="/seeker/browse" className={cn(
+          <Link to="/" className={cn(
             "text-sm font-medium transition-colors hover:text-primary",
-            location.pathname === '/seeker/browse' ? "text-primary" : "text-muted-foreground"
+            location.pathname === '/' ? "text-primary" : "text-muted-foreground"
+          )}>
+            Home
+          </Link>
+          <Link to="/seeker" className={cn(
+            "text-sm font-medium transition-colors hover:text-primary",
+            location.pathname === '/seeker' ? "text-primary" : "text-muted-foreground"
           )}>
             Browse Properties
           </Link>
@@ -265,7 +271,13 @@ const PropertyHeader: React.FC<PropertyHeaderProps> = ({ onFavoritesClick }) => 
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56 md:hidden">
               <DropdownMenuItem asChild>
-                <Link to="/seeker/browse">
+                <Link to="/">
+                  <Home className="h-4 w-4 mr-2" />
+                  Home
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link to="/seeker">
                   <Search className="h-4 w-4 mr-2" />
                   Browse Properties
                 </Link>
