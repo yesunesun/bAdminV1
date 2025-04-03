@@ -1,7 +1,7 @@
-// src/modules/properties/components/LoginPrompt.tsx
+// src/modules/seeker/components/LoginPrompt.tsx
 // Version: 1.0.0
-// Last Modified: 02-04-2025 16:40 IST
-// Purpose: Modal that prompts user to login or register when trying to favorite properties
+// Last Modified: 03-04-2025 12:00 IST
+// Purpose: Migrated from properties module to seeker module
 
 import React from 'react';
 import { Link } from 'react-router-dom';

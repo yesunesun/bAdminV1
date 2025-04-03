@@ -1,6 +1,6 @@
 // src/App.tsx 
-// Version: 6.3.0
-// Last Modified: 02-04-2025 14:35 IST
+// Version: 6.4.0
+// Last Modified: 03-04-2025 12:45 IST
 // Purpose: Updated PropertyMapHome import path to new module location
 
 import React from 'react';
@@ -11,7 +11,7 @@ import { useAdminAccess } from './modules/admin/hooks/useAdminAccess';
 
 // Import HomePage and PropertyMapHome (updated path)
 import HomePage from './pages/HomePage';
-import PropertyMapHome from './modules/properties';
+import PropertyMapHome from './modules/seeker'; // Updated import path
 
 // Route Configurations
 import { mainRoutes } from './routes/mainRoutes';

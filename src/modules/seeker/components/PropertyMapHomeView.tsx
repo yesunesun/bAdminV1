@@ -1,7 +1,7 @@
-// src/modules/properties/components/PropertyMapHomeView.tsx
-// Version: 3.1.0
-// Last Modified: 03-04-2025 17:15 IST
-// Purpose: Connected pagination functionality to load all properties
+// src/modules/seeker/components/PropertyMapHomeView.tsx
+// Version: 1.0.0
+// Last Modified: 03-04-2025 11:45 IST
+// Purpose: Migrated from properties module to seeker module
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useJsApiLoader } from '@react-google-maps/api';

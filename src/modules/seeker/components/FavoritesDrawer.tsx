@@ -1,7 +1,7 @@
-// src/modules/properties/components/FavoritesDrawer.tsx
+// src/modules/seeker/components/FavoritesDrawer.tsx
 // Version: 1.0.0
-// Last Modified: 02-04-2025 16:45 IST
-// Purpose: Sliding drawer that shows user's favorite properties
+// Last Modified: 03-04-2025 11:55 IST
+// Purpose: Migrated from properties module to seeker module
 
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
@@ -16,8 +16,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Heart, Loader2, Trash2 } from 'lucide-react';
 import { PropertyType } from '@/modules/owner/components/property/types';
-import { getUserFavorites, removeFavorite } from '@/modules/seeker/services/seekerService';
-import { formatPrice } from '../services/propertyMapService';
+import { getUserFavorites, removeFavorite, formatPrice } from '../services/seekerService';
 
 interface FavoritesDrawerProps {
   open: boolean;

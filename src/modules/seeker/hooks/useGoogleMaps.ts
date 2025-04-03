@@ -1,7 +1,7 @@
-// src/modules/properties/hooks/useGoogleMaps.ts
-// Version: 2.1.0
-// Last Modified: 02-04-2025 14:43 IST
-// Purpose: Moved to properties module
+// src/modules/seeker/hooks/useGoogleMaps.ts
+// Version: 1.0.0
+// Last Modified: 03-04-2025 12:10 IST
+// Purpose: Migrated from properties module to seeker module
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 

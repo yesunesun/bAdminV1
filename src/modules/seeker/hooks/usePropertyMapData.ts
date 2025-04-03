@@ -1,11 +1,11 @@
-// src/modules/properties/hooks/usePropertyMapData.ts
-// Version: 2.2.0
-// Last Modified: 03-04-2025 16:45 IST
-// Purpose: Added pagination support and property loading state for map view
+// src/modules/seeker/hooks/usePropertyMapData.ts
+// Version: 1.1.0
+// Last Modified: 03-04-2025 18:30 IST
+// Purpose: Fixed property loading issue after migration from properties module
 
 import { useState, useEffect, useCallback } from 'react';
 import { PropertyType } from '@/modules/owner/components/property/types';
-import { fetchProperties, PropertyFilters } from '@/modules/seeker/services/seekerService';
+import { fetchPropertiesForMap, PropertyFilters } from '../services/seekerService';
 
 // Popular locations for search suggestions
 const POPULAR_LOCATIONS = [
@@ -104,24 +104,25 @@ export const usePropertyMapData = () => {
           pageSize: 50
         };
         
-        const result = await fetchProperties(appliedFilters);
+        const result = await fetchPropertiesForMap(appliedFilters);
         
         // Filter properties with valid coordinates for map display
-        const validProperties = result.properties.filter(hasValidCoordinates);
+        const validProperties = result.filter(hasValidCoordinates);
         
-        console.log(`Fetched ${result.properties.length} properties, ${validProperties.length} have valid coordinates. Total: ${result.totalCount}`);
+        console.log(`Fetched ${result.length} properties, ${validProperties.length} have valid coordinates.`);
         
         setProperties(validProperties);
-        setTotalCount(result.totalCount);
-        setTotalPages(result.totalPages);
-        setHasMore(result.currentPage < result.totalPages);
+        setTotalCount(result.length);
+        // Calculate total pages based on results
+        setTotalPages(Math.ceil(result.length / 50));
+        setHasMore(currentPage < Math.ceil(result.length / 50));
         
         // Update location suggestions based on fetched properties
-        if (result.properties.length > 0) {
+        if (result.length > 0) {
           const locations = new Set<string>();
           
           // Extract locations from properties
-          result.properties.forEach(property => {
+          result.forEach(property => {
             if (property.city) locations.add(property.city);
             if (property.address) {
               // Extract locality or area from address
@@ -166,17 +167,18 @@ export const usePropertyMapData = () => {
         pageSize: 50
       };
       
-      const result = await fetchProperties(appliedFilters);
+      // FIX: Changed from fetchProperties to fetchPropertiesForMap
+      const result = await fetchPropertiesForMap(appliedFilters);
       
       // Filter properties with valid coordinates
-      const validNewProperties = result.properties.filter(hasValidCoordinates);
+      const validNewProperties = result.filter(hasValidCoordinates);
       
-      console.log(`Loaded more: ${result.properties.length} properties on page ${nextPage}, ${validNewProperties.length} have valid coordinates`);
+      console.log(`Loaded more: ${result.length} properties on page ${nextPage}, ${validNewProperties.length} have valid coordinates`);
       
       // Add new properties to existing ones
       setProperties(prevProperties => [...prevProperties, ...validNewProperties]);
       setCurrentPage(nextPage);
-      setHasMore(nextPage < result.totalPages);
+      setHasMore(nextPage < Math.ceil(result.length / 50));
     } catch (error) {
       console.error('Error loading more properties:', error);
     } finally {

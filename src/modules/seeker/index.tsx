@@ -1,9 +1,9 @@
-// src/modules/properties/index.tsx
-// Version: 2.0.0
-// Last Modified: 02-04-2025 16:30 IST
-// Purpose: Modernized property homepage with improved UX and new features
+// src/modules/seeker/index.tsx
+// Version: 1.0.0
+// Last Modified: 03-04-2025 12:40 IST
+// Purpose: New entry point for property homepage in seeker module
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import PropertyMapHomeView from './components/PropertyMapHomeView';
 import PropertyHeader from './components/PropertyHeader';

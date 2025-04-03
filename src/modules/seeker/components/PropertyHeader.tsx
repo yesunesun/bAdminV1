@@ -1,7 +1,7 @@
-// src/modules/properties/components/PropertyHeader.tsx
+// src/modules/seeker/components/PropertyHeader.tsx
 // Version: 1.0.0
-// Last Modified: 02-04-2025 16:35 IST
-// Purpose: Modern header with authentication options and favorites access
+// Last Modified: 03-04-2025 11:50 IST
+// Purpose: Migrated from properties module to seeker module
 
 import React from 'react';
 import { Link } from 'react-router-dom';
