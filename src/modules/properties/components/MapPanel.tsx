@@ -1,7 +1,7 @@
 // src/modules/properties/components/MapPanel.tsx
-// Version: 3.0.0
-// Last Modified: 02-04-2025 18:20 IST
-// Purpose: Fixed map to display property markers with proper synchronization
+// Version: 3.3.0
+// Last Modified: 03-04-2025 15:00 IST
+// Purpose: Fixed hover synchronization and improved marker rendering
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { GoogleMap, Marker, InfoWindow } from '@react-google-maps/api';
@@ -41,15 +41,60 @@ const MapPanel: React.FC<MapPanelProps> = ({
   hoveredProperty
 }) => {
   const mapRef = useRef<google.maps.Map | null>(null);
+  const markersRef = useRef<Map<string, google.maps.Marker>>(new Map());
   const [mapClickListener, setMapClickListener] = useState<google.maps.MapsEventListener | null>(null);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+  const [selectedProperty, setSelectedProperty] = useState<PropertyType | null>(null);
+  
+  // Helper function to get marker pin based on property type
+  const getMarkerPin = (property: PropertyType) => {
+    const propertyType = property.property_details?.propertyType?.toLowerCase() || '';
+    
+    if (propertyType.includes('apartment')) return markerPins.apartment;
+    if (propertyType.includes('residential') || propertyType.includes('house')) return markerPins.residential;
+    if (propertyType.includes('office')) return markerPins.office;
+    if (propertyType.includes('shop') || propertyType.includes('retail')) return markerPins.shop;
+    if (propertyType.includes('commercial')) return markerPins.commercial;
+    if (propertyType.includes('land') || propertyType.includes('plot')) return markerPins.land;
+    
+    return markerPins.default;
+  };
+
+  // Validate and parse coordinates with detailed logging
+  const getValidCoordinates = (property: PropertyType) => {
+    try {
+      if (!property.property_details) return null;
+      
+      const lat = parseFloat(property.property_details.latitude || '0');
+      const lng = parseFloat(property.property_details.longitude || '0');
+      
+      // Detailed coordinate validation
+      if (
+        !isNaN(lat) && 
+        !isNaN(lng) && 
+        lat !== 0 && 
+        lng !== 0 && 
+        lat >= -90 && 
+        lat <= 90 && 
+        lng >= -180 && 
+        lng <= 180
+      ) {
+        return { lat, lng };
+      }
+      
+      return null;
+    } catch (error) {
+      console.error(`Coordinate parsing error for property ${property.id}:`, error);
+      return null;
+    }
+  };
   
   // Map options
   const mapOptions: google.maps.MapOptions = {
     disableDefaultUI: false,
     clickableIcons: false,
     scrollwheel: true,
-    zoomControl: false, // We'll add our own zoom controls
+    zoomControl: false,
     mapTypeControl: false,
     fullscreenControl: false,
     streetViewControl: false,
@@ -59,270 +104,273 @@ const MapPanel: React.FC<MapPanelProps> = ({
     styles: [
       {
         featureType: "poi",
-        stylers: [
-          { visibility: "off" }
-        ]
+        stylers: [{ visibility: "off" }]
       }
     ]
   };
   
-  // Helper function to get marker pin based on property type
-  const getMarkerPin = (property: PropertyType) => {
-    const propertyType = property.property_details?.propertyType?.toLowerCase() || '';
+  // Update marker animations when hoveredProperty changes
+  useEffect(() => {
+    console.log(`Hover state changed to: ${hoveredProperty}`);
     
-    if (propertyType.includes('apartment')) {
-      return markerPins.apartment;
-    } else if (propertyType.includes('residential') || propertyType.includes('house')) {
-      return markerPins.residential;
-    } else if (propertyType.includes('office')) {
-      return markerPins.office;
-    } else if (propertyType.includes('shop') || propertyType.includes('retail')) {
-      return markerPins.shop;
-    } else if (propertyType.includes('commercial')) {
-      return markerPins.commercial;
-    } else if (propertyType.includes('land') || propertyType.includes('plot')) {
-      return markerPins.land;
+    // Stop all animations first
+    markersRef.current.forEach((marker, id) => {
+      marker.setAnimation(null);
+      
+      // Reset size for non-hovered markers
+      if (id !== hoveredProperty && id !== (activeProperty?.id || '')) {
+        marker.setIcon({
+          url: marker.getIcon()?.toString() || '',
+          scaledSize: new google.maps.Size(36, 36),
+          origin: new google.maps.Point(0, 0),
+          anchor: new google.maps.Point(16, 32),
+        });
+        marker.setZIndex(undefined);
+        marker.setOpacity(0.7);
+      }
+    });
+    
+    // Apply animation and enhanced style to hovered marker
+    if (hoveredProperty && markersRef.current.has(hoveredProperty)) {
+      const marker = markersRef.current.get(hoveredProperty);
+      if (marker) {
+        marker.setAnimation(google.maps.Animation.BOUNCE);
+        marker.setIcon({
+          url: marker.getIcon()?.toString() || '',
+          scaledSize: new google.maps.Size(48, 48),
+          origin: new google.maps.Point(0, 0),
+          anchor: new google.maps.Point(16, 32),
+        });
+        marker.setZIndex(1000);
+        marker.setOpacity(1);
+        
+        // Center map on hovered marker
+        if (mapRef.current) {
+          mapRef.current.panTo(marker.getPosition() as google.maps.LatLng);
+        }
+      }
     }
-    
-    return markerPins.default;
-  };
+  }, [hoveredProperty, activeProperty]);
   
   // Handle map load
   const onMapLoad = useCallback((map: google.maps.Map) => {
+    console.log('Map loaded');
     mapRef.current = map;
+   
+    // Add click listener to close info window
+    const listener = map.addListener('click', () => {
+      setSelectedProperty(null);
+      setActiveProperty(null);
+    });
+    setMapClickListener(listener);
+   
+    // Fit map to bounds of valid properties
+    if (properties.length > 0) {
+      const bounds = new google.maps.LatLngBounds();
+      let validPropertiesCount = 0;
+      
+      properties.forEach(property => {
+        const coords = getValidCoordinates(property);
+        if (coords) {
+          bounds.extend(coords);
+          validPropertiesCount++;
+        }
+      });
+      
+      console.log('Map Bounds Calculation:', {
+        totalProperties: properties.length,
+        validProperties: validPropertiesCount,
+        boundsEmpty: bounds.isEmpty()
+      });
+      
+      if (!bounds.isEmpty()) {
+        map.fitBounds(bounds);
+        // Prevent excessive zooming
+        const zoomListener = google.maps.event.addListener(map, 'idle', () => {
+          if (map.getZoom() > 16) map.setZoom(16);
+          google.maps.event.removeListener(zoomListener);
+        });
+      } else {
+        // Fallback to default center if no valid coordinates
+        map.setCenter(DEFAULT_MAP_CENTER);
+        map.setZoom(12);
+      }
+    }
+  }, [properties, setActiveProperty]);
+  
+  // Store markers in ref after creation
+  const onMarkerLoad = useCallback((marker: google.maps.Marker, propertyId: string) => {
+    markersRef.current.set(propertyId, marker);
+    console.log(`Marker stored for property ${propertyId}`);
+  }, []);
+  
+  // Toggle fullscreen mode
+  const toggleFullscreen = () => {
+    setIsFullscreen(!isFullscreen);
+  };
+  
+  // Zoom controls
+  const handleZoomIn = () => {
+    if (mapRef.current) {
+      const currentZoom = mapRef.current.getZoom() || 10;
+      mapRef.current.setZoom(currentZoom + 1);
+    }
+  };
+  
+  const handleZoomOut = () => {
+    if (mapRef.current) {
+      const currentZoom = mapRef.current.getZoom() || 10;
+      mapRef.current.setZoom(currentZoom - 1);
+    }
+  };
+  
+  // Clean up event listeners
+  useEffect(() => {
+    return () => {
+      if (mapClickListener) {
+        google.maps.event.removeListener(mapClickListener);
+      }
+      markersRef.current.clear();
+    };
+  }, [mapClickListener]);
 
-// src/modules/properties/components/MapPanel.tsx (continued)
-   
-   // Add click listener to close info window when clicking elsewhere on map
-   const listener = map.addListener('click', () => {
-     setActiveProperty(null);
-   });
-   setMapClickListener(listener);
-   
-   // Fit map to bounds of all properties
-   if (properties.length > 0) {
-     const bounds = new google.maps.LatLngBounds();
-     
-     properties.forEach(property => {
-       const lat = parseFloat(property.property_details?.latitude || '0');
-       const lng = parseFloat(property.property_details?.longitude || '0');
-       
-       if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
-         bounds.extend({ lat, lng });
-       }
-     });
-     
-     if (!bounds.isEmpty()) {
-       map.fitBounds(bounds);
-       // Don't zoom in too far on small data sets
-       const listener = google.maps.event.addListener(map, 'idle', () => {
-         if (map.getZoom() > 16) map.setZoom(16);
-         google.maps.event.removeListener(listener);
-       });
-     }
-   }
- }, [properties, setActiveProperty]);
- 
- // When hoveredProperty changes, adjust the map center if needed
- useEffect(() => {
-   if (hoveredProperty && mapRef.current) {
-     const hoveredProp = properties.find(p => p.id === hoveredProperty);
-     if (hoveredProp) {
-       const lat = parseFloat(hoveredProp.property_details?.latitude || '0');
-       const lng = parseFloat(hoveredProp.property_details?.longitude || '0');
-       
-       if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
-         // Only adjust center if the property is outside the visible area
-         const bounds = mapRef.current.getBounds();
-         const latLng = new google.maps.LatLng(lat, lng);
-         
-         if (bounds && !bounds.contains(latLng)) {
-           mapRef.current.panTo(latLng);
-         }
-       }
-     }
-   }
- }, [hoveredProperty, properties]);
- 
- // Zoom in
- const handleZoomIn = () => {
-   if (mapRef.current) {
-     mapRef.current.setZoom((mapRef.current.getZoom() || 12) + 1);
-   }
- };
- 
- // Zoom out
- const handleZoomOut = () => {
-   if (mapRef.current) {
-     mapRef.current.setZoom((mapRef.current.getZoom() || 12) - 1);
-   }
- };
- 
- // Toggle fullscreen
- const toggleFullscreen = () => {
-   setIsFullscreen(!isFullscreen);
- };
- 
- // Cleanup map listener on unmount
- React.useEffect(() => {
-   return () => {
-     if (mapClickListener) {
-       google.maps.event.removeListener(mapClickListener);
-     }
-   };
- }, [mapClickListener]);
- 
- return (
-   <div className={`h-full relative transition-all duration-300 ${
-     isFullscreen ? 'w-full' : 'w-full lg:w-2/3'
-   }`}>
-     {isLoaded ? (
-       <>
-         <GoogleMap
-           mapContainerClassName="w-full h-full p-2"
-           mapContainerStyle={{ 
-             width: '100%',
-             height: '100%',
-             borderRadius: '8px',
-             margin: '8px'
-           }}
-           center={DEFAULT_MAP_CENTER}
-           zoom={12}
-           options={mapOptions}
-           onLoad={onMapLoad}
-         >
-           {/* Property Markers */}
-           {properties.map((property) => {
-             const lat = parseFloat(property.property_details?.latitude || '0');
-             const lng = parseFloat(property.property_details?.longitude || '0');
-             
-             if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) {
-               return null;
-             }
-             
-             const isHovered = hoveredProperty === property.id;
-             const isActive = activeProperty?.id === property.id;
-             
-             return (
-               <Marker
-                 key={property.id}
-                 position={{ lat, lng }}
-                 icon={{
-                   url: getMarkerPin(property),
-                   scaledSize: new google.maps.Size(
-                     isHovered || isActive ? 40 : 32, 
-                     isHovered || isActive ? 40 : 32
-                   ),
-                   origin: new google.maps.Point(0, 0),
-                   anchor: new google.maps.Point(16, 32),
-                 }}
-                 animation={isHovered ? google.maps.Animation.BOUNCE : undefined}
-                 onClick={() => setActiveProperty(property)}
-                 zIndex={isHovered || isActive ? 1000 : undefined}
-               />
-             );
-           })}
-           
-           {/* Info Window for active property */}
-           {activeProperty && (
-             <InfoWindow
-               position={{
-                 lat: parseFloat(activeProperty.property_details?.latitude || '0'),
-                 lng: parseFloat(activeProperty.property_details?.longitude || '0')
-               }}
-               onCloseClick={() => setActiveProperty(null)}
-               options={{
-                 pixelOffset: new google.maps.Size(0, -32),
-                 maxWidth: 300
-               }}
-             >
-               <div className="max-w-xs">
-                 <div className="flex items-center gap-2 border-b pb-2 mb-2">
-                   <MapPin className="h-4 w-4 text-primary" />
-                   <h3 className="font-medium text-sm truncate">
-                     {activeProperty.title}
-                   </h3>
-                 </div>
-                 
-                 <div className="mb-2">
-                   <p className="text-sm text-muted-foreground mb-1">
-                     {activeProperty.address || 'Location not specified'}
-                   </p>
-                   <p className="text-base font-bold">
-                     {formatPrice(activeProperty.price || 0)}
-                   </p>
-                 </div>
-                 
-                 <div className="text-xs text-muted-foreground mb-3">
-                   <div className="flex gap-2">
-                     {activeProperty.bedrooms && (
-                       <span>{activeProperty.bedrooms} Beds</span>
-                     )}
-                     {activeProperty.bathrooms && (
-                       <span>• {activeProperty.bathrooms} Baths</span>
-                     )}
-                     {activeProperty.square_feet && (
-                       <span>• {activeProperty.square_feet} sq.ft</span>
-                     )}
-                   </div>
-                 </div>
-                 
-                 <Link 
-                   to={`/seeker/property/${activeProperty.id}`}
-                   className="flex items-center justify-center gap-1 text-xs bg-primary text-primary-foreground p-2 rounded-md w-full hover:bg-primary/90 transition-colors"
-                 >
-                   <span>View Details</span>
-                   <ArrowUpRight className="h-3.5 w-3.5" />
-                 </Link>
-               </div>
-             </InfoWindow>
-           )}
-         </GoogleMap>
-         
-         {/* Map Controls */}
-         <div className="absolute top-6 right-6 flex flex-col gap-2">
-           <Button 
-             variant="secondary" 
-             size="icon" 
-             className="h-8 w-8 rounded-full shadow-md"
-             onClick={handleZoomIn}
-           >
-             <ZoomIn className="h-4 w-4" />
-           </Button>
-           <Button 
-             variant="secondary" 
-             size="icon" 
-             className="h-8 w-8 rounded-full shadow-md"
-             onClick={handleZoomOut}
-           >
-             <ZoomOut className="h-4 w-4" />
-           </Button>
-           <Button 
-             variant="secondary" 
-             size="icon" 
-             className="h-8 w-8 rounded-full shadow-md"
-             onClick={toggleFullscreen}
-           >
-             {isFullscreen ? 
-               <Minimize className="h-4 w-4" /> : 
-               <Maximize className="h-4 w-4" />
-             }
-           </Button>
-         </div>
-       </>
-     ) : (
-       <div className="w-full h-full flex items-center justify-center bg-muted m-2 rounded-lg">
-         <div className="text-center p-4">
-           <MapPin className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-           <h3 className="text-lg font-medium mb-2">Map Loading</h3>
-           <p className="text-muted-foreground">
-             Please wait while we load the map...
-           </p>
-         </div>
-       </div>
-     )}
-   </div>
- );
+  return (
+    <div className={`h-full relative transition-all duration-300 ${
+      isFullscreen ? 'w-full' : 'w-full lg:w-2/3'
+    }`}>
+      {isLoaded ? (
+        <GoogleMap
+          mapContainerClassName="w-full h-full p-2"
+          mapContainerStyle={{ 
+            width: '100%',
+            height: '100%',
+            borderRadius: '8px',
+            margin: '8px'
+          }}
+          center={DEFAULT_MAP_CENTER}
+          zoom={12}
+          options={mapOptions}
+          onLoad={onMapLoad}
+        >
+          {/* Property Markers with Comprehensive Validation */}
+          {properties.map((property) => {
+            const coords = getValidCoordinates(property);
+            
+            // Skip properties with invalid coordinates
+            if (!coords) return null;
+            
+            const isHovered = hoveredProperty === property.id;
+            const isActive = activeProperty?.id === property.id;
+            
+            return (
+              <Marker
+                key={property.id}
+                position={coords}
+                icon={{
+                  url: getMarkerPin(property),
+                  scaledSize: new google.maps.Size(
+                    isHovered || isActive ? 48 : 36, 
+                    isHovered || isActive ? 48 : 36
+                  ),
+                  origin: new google.maps.Point(0, 0),
+                  anchor: new google.maps.Point(16, 32),
+                }}
+                opacity={isHovered || isActive ? 1 : 0.7}
+                animation={
+                  isHovered ? google.maps.Animation.BOUNCE : 
+                  isActive ? google.maps.Animation.DROP : 
+                  undefined
+                }
+                zIndex={isHovered || isActive ? 1000 : undefined}
+                onClick={() => {
+                  setSelectedProperty(property);
+                  setActiveProperty(property);
+                }}
+                onLoad={(marker) => onMarkerLoad(marker, property.id)}
+              />
+            );
+          })}
+          
+          {/* Info Window for selected property */}
+          {selectedProperty && (
+            <InfoWindow
+              position={getValidCoordinates(selectedProperty) as google.maps.LatLng}
+              onCloseClick={() => setSelectedProperty(null)}
+            >
+              <div className="w-64 p-1">
+                <h3 className="font-semibold text-sm truncate">{selectedProperty.title}</h3>
+                <p className="text-xs font-bold">{formatPrice(selectedProperty.price || 0)}</p>
+                <div className="text-xs text-gray-500 truncate mt-1">
+                  {selectedProperty.address || selectedProperty.city || 'Location not specified'}
+                </div>
+                
+                <div className="flex text-xs mt-2 gap-2">
+                  {selectedProperty.bedrooms && (
+                    <span>{selectedProperty.bedrooms} Beds</span>
+                  )}
+                  {selectedProperty.bathrooms && (
+                    <span>{selectedProperty.bathrooms} Baths</span>
+                  )}
+                  {selectedProperty.square_feet && (
+                    <span>{selectedProperty.square_feet} sq.ft</span>
+                  )}
+                </div>
+                
+                <Link
+                  to={`/seeker/property/${selectedProperty.id}`}
+                  className="flex items-center justify-center w-full text-xs text-blue-600 font-medium mt-2 hover:underline"
+                >
+                  View Details
+                  <ArrowUpRight className="w-3 h-3 ml-1" />
+                </Link>
+              </div>
+            </InfoWindow>
+          )}
+          
+          {/* Map Controls */}
+          <div className="absolute bottom-4 right-4 flex flex-col gap-2">
+            <Button 
+              variant="secondary" 
+              size="icon"
+              className="rounded-full bg-white shadow-md"
+              onClick={handleZoomIn}
+            >
+              <ZoomIn className="h-4 w-4" />
+            </Button>
+            <Button 
+              variant="secondary" 
+              size="icon"
+              className="rounded-full bg-white shadow-md"
+              onClick={handleZoomOut}
+            >
+              <ZoomOut className="h-4 w-4" />
+            </Button>
+            <Button 
+              variant="secondary" 
+              size="icon"
+              className="rounded-full bg-white shadow-md"
+              onClick={toggleFullscreen}
+            >
+              {isFullscreen ? 
+                <Minimize className="h-4 w-4" /> : 
+                <Maximize className="h-4 w-4" />
+              }
+            </Button>
+          </div>
+        </GoogleMap>
+      ) : (
+        <div className="w-full h-full flex items-center justify-center bg-muted m-2 rounded-lg">
+          <div className="text-center p-4">
+            <MapPin className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-medium mb-2">Map Loading</h3>
+            <p className="text-muted-foreground">
+              Please wait while we load the map...
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 };
 
 export default MapPanel;

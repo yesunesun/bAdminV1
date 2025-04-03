@@ -1,9 +1,9 @@
 // src/modules/properties/hooks/usePropertyMapData.ts
-// Version: 2.0.0
-// Last Modified: 02-04-2025 17:20 IST
-// Purpose: Enhanced hook with recent searches and location suggestions
+// Version: 2.1.0
+// Last Modified: 03-04-2025 14:45 IST
+// Purpose: Fixed coordinate validation and hover state debugging
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { PropertyType } from '@/modules/owner/components/property/types';
 import { fetchProperties, PropertyFilters } from '@/modules/seeker/services/seekerService';
 
@@ -15,6 +15,28 @@ const POPULAR_LOCATIONS = [
 
 // Maximum number of recent searches to keep
 const MAX_RECENT_SEARCHES = 10;
+
+// Coordinate validation helper
+const hasValidCoordinates = (property: PropertyType): boolean => {
+  try {
+    const lat = parseFloat(property.property_details?.latitude || '0');
+    const lng = parseFloat(property.property_details?.longitude || '0');
+    
+    return (
+      !isNaN(lat) && 
+      !isNaN(lng) && 
+      lat !== 0 && 
+      lng !== 0 && 
+      lat >= -90 && 
+      lat <= 90 && 
+      lng >= -180 && 
+      lng <= 180
+    );
+  } catch (error) {
+    console.error(`Coordinate validation error for property ${property.id}:`, error);
+    return false;
+  }
+};
 
 export const usePropertyMapData = () => {
   const [properties, setProperties] = useState<PropertyType[]>([]);
@@ -65,76 +87,99 @@ export const usePropertyMapData = () => {
         const appliedFilters: PropertyFilters = {
           ...filters,
           searchQuery: searchQuery || undefined,
-         propertyType: selectedPropertyType !== 'all' ? selectedPropertyType : undefined
-       };
-       
-       const { properties: fetchedProperties } = await fetchProperties(appliedFilters);
-       setProperties(fetchedProperties as unknown as PropertyType[]);
-       
-       // Update location suggestions based on fetched properties
-       if (fetchedProperties.length > 0) {
-         const locations = new Set<string>();
-         
-         // Extract locations from properties
-         fetchedProperties.forEach(property => {
-           if (property.city) locations.add(property.city);
-           if (property.address) {
-             // Extract locality or area from address
-             const parts = property.address.split(',');
-             if (parts.length > 1) {
-               locations.add(parts[0].trim());
-             }
-           }
-         });
-         
-         // Combine with popular locations
-         const combinedLocations = [...Array.from(locations), ...POPULAR_LOCATIONS];
-         
-         // Remove duplicates and limit to top 10
-         setSearchLocations([...new Set(combinedLocations)].slice(0, 10));
-       }
-     } catch (error) {
-       console.error('Error loading properties:', error);
-     } finally {
-       setLoading(false);
-     }
-   };
-   
-   loadProperties();
- }, [filters, searchQuery, selectedPropertyType]);
- 
- // Reset all filters
- const handleResetFilters = () => {
-   setFilters({});
-   setSearchQuery('');
-   setSelectedPropertyType('all');
- };
- 
- // Update property type filter
- const handlePropertyTypeChange = (type: string) => {
-   setSelectedPropertyType(type);
- };
- 
- // Handle property hover states
- const handlePropertyHover = (propertyId: string, isHovering: boolean) => {
-   setHoveredProperty(isHovering ? propertyId : null);
- };
- 
- return {
-   properties,
-   loading,
-   filters,
-   setFilters,
-   searchQuery,
-   setSearchQuery,
-   selectedPropertyType,
-   hoveredProperty,
-   activeProperty,
-   setActiveProperty,
-   handleResetFilters,
-   handlePropertyTypeChange,
-   handlePropertyHover,
-   recentSearches,
-   searchLocations
- };
+          propertyType: selectedPropertyType !== 'all' ? selectedPropertyType : undefined
+        };
+        
+        const { properties: fetchedProperties } = await fetchProperties(appliedFilters);
+        
+        // Filter properties with valid coordinates for map display
+        const validProperties = fetchedProperties.filter((property) => {
+          const isValid = hasValidCoordinates(property);
+          
+          if (!isValid) {
+            console.warn(`Property ${property.id} excluded from map due to invalid coordinates:`, {
+              latitude: property.property_details?.latitude,
+              longitude: property.property_details?.longitude
+            });
+          }
+          
+          return isValid;
+        });
+        
+        console.log(`Fetched ${fetchedProperties.length} properties, ${validProperties.length} have valid coordinates`);
+        
+        setProperties(validProperties as unknown as PropertyType[]);
+        
+        // Update location suggestions based on fetched properties
+        if (fetchedProperties.length > 0) {
+          const locations = new Set<string>();
+          
+          // Extract locations from properties
+          fetchedProperties.forEach(property => {
+            if (property.city) locations.add(property.city);
+            if (property.address) {
+              // Extract locality or area from address
+              const parts = property.address.split(',');
+              if (parts.length > 1) {
+                locations.add(parts[0].trim());
+              }
+            }
+          });
+          
+          // Combine with popular locations
+          const combinedLocations = [...Array.from(locations), ...POPULAR_LOCATIONS];
+          
+          // Remove duplicates and limit to top 10
+          setSearchLocations([...new Set(combinedLocations)].slice(0, 10));
+        }
+      } catch (error) {
+        console.error('Error loading properties:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadProperties();
+  }, [filters, searchQuery, selectedPropertyType]);
+  
+  // Reset all filters
+  const handleResetFilters = () => {
+    setFilters({});
+    setSearchQuery('');
+    setSelectedPropertyType('all');
+  };
+  
+  // Update property type filter
+  const handlePropertyTypeChange = (type: string) => {
+    setSelectedPropertyType(type);
+  };
+  
+  // Handle property hover states with improved debugging
+  const handlePropertyHover = useCallback((propertyId: string, isHovering: boolean) => {
+    console.log(`Property hover: ${propertyId}, isHovering: ${isHovering}`);
+    setHoveredProperty(isHovering ? propertyId : null);
+  }, []);
+  
+  // Log hover state changes for debugging
+  useEffect(() => {
+    console.log('Current hoveredProperty state:', hoveredProperty);
+  }, [hoveredProperty]);
+  
+  return {
+    properties,
+    loading,
+    filters,
+    setFilters,
+    searchQuery,
+    setSearchQuery,
+    selectedPropertyType,
+    hoveredProperty,
+    activeProperty,
+    setActiveProperty,
+    handleResetFilters,
+    handlePropertyTypeChange,
+    handlePropertyHover,
+    recentSearches,
+    searchLocations
+  };
 };

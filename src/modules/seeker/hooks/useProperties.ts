@@ -1,74 +1,121 @@
 // src/modules/seeker/hooks/useProperties.ts
-// Version: 1.0.0
-// Last Modified: 26-02-2025 15:00 IST
-// Purpose: Hook for fetching and managing property listings
+// Version: 1.2.0
+// Last Modified: 03-04-2025 10:30 IST
+// Purpose: Advanced hook for fetching and managing property listings with robust error handling
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { fetchProperties, PropertyFilters } from '../services/seekerService';
 import { PropertyType } from '@/modules/owner/components/property/types';
 
+// Comprehensive error handling interface
+interface ErrorState {
+  message: string;
+  code?: string;
+  details?: string;
+}
+
 export const useProperties = (initialFilters: PropertyFilters = {}) => {
+  // State management with enhanced type safety
   const [properties, setProperties] = useState<PropertyType[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<Error | null>(null);
+  const [error, setError] = useState<ErrorState | null>(null);
   const [filters, setFilters] = useState<PropertyFilters>(initialFilters);
   const [page, setPage] = useState<number>(1);
   const [totalProperties, setTotalProperties] = useState<number>(0);
   const [pageSize] = useState<number>(12);
 
-  useEffect(() => {
-    const loadProperties = async () => {
-      setLoading(true);
-      try {
-        const { properties: fetchedProperties, total } = await fetchProperties(filters, page, pageSize);
-        setProperties(fetchedProperties as unknown as PropertyType[]);
-        setTotalProperties(total);
-        setError(null);
-      } catch (err) {
-        setError(err as Error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  // Comprehensive property loading method
+  const loadProperties = useCallback(async () => {
+    setLoading(true);
+    setError(null);
 
-    loadProperties();
+    try {
+      const result = await fetchProperties(filters, page, pageSize);
+      
+      // Robust data processing with fallback mechanisms
+      const fetchedProperties = result.properties || [];
+      
+      setProperties(fetchedProperties);
+      setTotalProperties(result.totalCount || fetchedProperties.length);
+    } catch (err) {
+      // Detailed error handling
+      const errorState: ErrorState = {
+        message: err instanceof Error 
+          ? err.message 
+          : 'An unexpected error occurred while fetching properties',
+        code: err instanceof Error && 'code' in err 
+          ? (err as any).code 
+          : undefined,
+        details: err instanceof Error && 'details' in err 
+          ? (err as any).details 
+          : undefined
+      };
+
+      console.warn('Properties Fetch Warning:', errorState);
+      setError(errorState);
+      setProperties([]);
+    } finally {
+      setLoading(false);
+    }
   }, [filters, page, pageSize]);
 
-  const updateFilters = (newFilters: Partial<PropertyFilters>) => {
-    setFilters({ ...filters, ...newFilters });
-    setPage(1); // Reset to first page when filters change
-  };
+  // Initial and filter-change property load
+  useEffect(() => {
+    loadProperties();
+  }, [loadProperties]);
 
-  const resetFilters = () => {
+  // Filter management methods with reset capabilities
+  const updateFilters = useCallback((newFilters: Partial<PropertyFilters>) => {
+    setFilters(prevFilters => ({
+      ...prevFilters,
+      ...newFilters
+    }));
+    setPage(1); // Reset to first page when filters change
+  }, []);
+
+  const resetFilters = useCallback(() => {
     setFilters({});
     setPage(1);
-  };
+  }, []);
 
-  const nextPage = () => {
-    if (page * pageSize < totalProperties) {
-      setPage(page + 1);
-    }
-  };
+  // Pagination methods with boundary checks
+  const nextPage = useCallback(() => {
+    const maxPages = Math.ceil(totalProperties / pageSize);
+    setPage(currentPage => 
+      currentPage < maxPages ? currentPage + 1 : currentPage
+    );
+  }, [totalProperties, pageSize]);
 
-  const prevPage = () => {
-    if (page > 1) {
-      setPage(page - 1);
-    }
-  };
+  const prevPage = useCallback(() => {
+    setPage(currentPage => 
+      currentPage > 1 ? currentPage - 1 : currentPage
+    );
+  }, []);
 
-  const goToPage = (pageNum: number) => {
-    if (pageNum >= 1 && pageNum <= Math.ceil(totalProperties / pageSize)) {
-      setPage(pageNum);
-    }
-  };
+  const goToPage = useCallback((pageNum: number) => {
+    const maxPages = Math.ceil(totalProperties / pageSize);
+    setPage(currentPage => 
+      pageNum >= 1 && pageNum <= maxPages ? pageNum : currentPage
+    );
+  }, [totalProperties, pageSize]);
+
+  // Refresh method to reload current properties
+  const refresh = useCallback(() => {
+    loadProperties();
+  }, [loadProperties]);
 
   return {
+    // Property data
     properties,
     loading,
     error,
+
+    // Filter management
     filters,
     updateFilters,
     resetFilters,
+
+    // Pagination details
     pagination: {
       page,
       pageSize,
@@ -77,6 +124,9 @@ export const useProperties = (initialFilters: PropertyFilters = {}) => {
       nextPage,
       prevPage,
       goToPage
-    }
+    },
+
+    // Additional utility methods
+    refresh
   };
 };
