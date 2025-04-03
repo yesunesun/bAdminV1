@@ -1,7 +1,7 @@
 // src/modules/seeker/pages/BrowseProperties.tsx
-// Version: 1.5.0
-// Last Modified: 01-03-2025 15:00 IST
-// Purpose: Improved layout with better spacing, alignment, mobile responsiveness and theme integration
+// Version: 3.0.0
+// Last Modified: 03-04-2025 14:45 IST
+// Purpose: Removed duplicate header
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';

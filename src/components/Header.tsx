@@ -1,7 +1,7 @@
 //src/components/Header.tsx
-// Version: 1.4.0
-// Last Modified: 01-03-2025 16:30 IST
-// Purpose: Enhanced Header with seeker module support and theme dropdown
+// Version: 2.0.0
+// Last Modified: 03-04-2025 14:35 IST
+// Purpose: Enhanced and standardized header for all modules including seeker
 
 import React, { useEffect, useState, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
@@ -11,7 +11,11 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 
-export function Header() {
+interface HeaderProps {
+  onFavoritesClick?: () => void;
+}
+
+export function Header({ onFavoritesClick }: HeaderProps) {
   const { user, signOut } = useAuth();
   const { theme, setTheme } = useTheme();
   const location = useLocation();
@@ -68,9 +72,12 @@ export function Header() {
     }
   };
 
+  // Check if current path is in seeker module
+  const isInSeekerModule = location.pathname === '/' || 
+                          location.pathname === '/seeker' || 
+                          location.pathname.startsWith('/seeker/');
   const isSeeker = userRole === 'seeker' || !userRole;
   const isOwner = userRole === 'owner' || userRole === 'landlord';
-  const isInSeekerSection = location.pathname.startsWith('/seeker');
   const isInOwnerSection = location.pathname.startsWith('/properties') || location.pathname.startsWith('/dashboard');
 
   const NavLink = ({ to, icon: Icon, children, onClick }: { 
@@ -168,15 +175,17 @@ export function Header() {
             <>
               {/* Desktop Navigation */}
               <div className="hidden md:flex flex-1 ml-12 space-x-8">
-                {isInSeekerSection ? (
+                {isInSeekerModule ? (
                   <>
                     <NavLink to="/seeker/browse" icon={Search}>Browse Properties</NavLink>
                     <NavLink to="/seeker/favorites" icon={Heart}>Favorites</NavLink>
+                    <NavLink to="/properties/list" icon={Home}>List Property</NavLink>
                   </>
                 ) : (
                   <>
                     <NavLink to="/dashboard" icon={LayoutDashboard}>Dashboard</NavLink>
                     <NavLink to="/properties" icon={List}>Properties</NavLink>
+                    <NavLink to="/seeker/browse" icon={Search}>Browse Properties</NavLink>
                   </>
                 )}
               </div>
@@ -239,6 +248,22 @@ export function Header() {
                 )}
               </div>
 
+              {/* Favorites Button (only in seeker module) */}
+              {isInSeekerModule && onFavoritesClick && (
+                <button
+                  onClick={onFavoritesClick}
+                  className="relative p-2 mr-2 rounded-md hover:bg-accent"
+                  aria-label="Favorites"
+                >
+                  <Heart className="h-5 w-5" />
+                  {user && (
+                    <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground">
+                      0
+                    </span>
+                  )}
+                </button>
+              )}
+
               {/* Desktop User Menu */}
               <div className="hidden md:block relative" ref={dropdownRef}>
                 <button
@@ -258,7 +283,7 @@ export function Header() {
                       )}
                       {!userRole && (
                         <span className="text-xs text-muted-foreground">
-                          {isInSeekerSection ? 'Seeker' : 'Owner'}
+                          {isInSeekerModule ? 'Seeker' : 'Owner'}
                         </span>
                       )}
                     </div>
@@ -345,7 +370,7 @@ export function Header() {
           >
             <div className="p-4 space-y-4">
               <div className="flex flex-col space-y-2">
-                {isInSeekerSection ? (
+                {isInSeekerModule ? (
                   <>
                     <NavLink 
                       to="/seeker/browse" 
@@ -360,6 +385,13 @@ export function Header() {
                       onClick={() => setIsMobileMenuOpen(false)}
                     >
                       Favorites
+                    </NavLink>
+                    <NavLink 
+                      to="/properties/list" 
+                      icon={Home} 
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                      List Property
                     </NavLink>
                   </>
                 ) : (
@@ -377,6 +409,13 @@ export function Header() {
                       onClick={() => setIsMobileMenuOpen(false)}
                     >
                       Properties
+                    </NavLink>
+                    <NavLink 
+                      to="/seeker/browse" 
+                      icon={Search} 
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                      Browse Properties
                     </NavLink>
                   </>
                 )}
@@ -429,7 +468,7 @@ export function Header() {
                     )}
                     {!userRole && (
                       <span className="text-xs text-muted-foreground">
-                        {isInSeekerSection ? 'Seeker' : 'Owner'}
+                        {isInSeekerModule ? 'Seeker' : 'Owner'}
                       </span>
                     )}
                   </div>
