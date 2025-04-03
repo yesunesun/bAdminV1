@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyListingPanel.tsx
-// Version: 1.2.0
-// Last Modified: 04-04-2025 15:10 IST
-// Purpose: Enhanced styling for better visual separation and consistency with map component
+// Version: 1.3.0
+// Last Modified: 04-04-2025 18:15 IST
+// Purpose: Added favorite button to mobile property list items
 
 import React from 'react';
 import { Link } from 'react-router-dom';
@@ -9,6 +9,8 @@ import { PropertyType } from '@/modules/owner/components/property/types';
 import { Button } from '@/components/ui/button';
 import { formatPrice } from '../services/seekerService';
 import { Loader2, ChevronRight, MapPin, Bed, Bath, Square, Info } from 'lucide-react';
+import FavoriteButton from './FavoriteButton';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface PropertyListingPanelProps {
   properties: PropertyType[];
@@ -35,6 +37,14 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
   hoveredProperty,
   setActiveProperty
 }) => {
+  const { user } = useAuth();
+
+  // Handle favorite toggle
+  const handleFavoriteToggle = (propertyId: string, isLiked: boolean) => {
+    onFavoriteAction(propertyId);
+    return true;
+  };
+
   return (
     <div className="w-full lg:w-1/3 flex-shrink-0 p-4 pb-0">
       <div className="h-full overflow-hidden rounded-xl border border-border bg-card shadow-sm flex flex-col">
@@ -97,11 +107,20 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
                 return (
                   <div 
                     key={`property-${property.id}`}
-                    className={`p-4 transition hover:bg-muted/40 ${isHovered ? 'bg-muted/40' : ''}`}
+                    className={`relative p-4 transition hover:bg-muted/40 ${isHovered ? 'bg-muted/40' : ''}`}
                     onMouseEnter={() => handlePropertyHover(property.id, true)}
                     onMouseLeave={() => handlePropertyHover(property.id, false)}
                     onClick={() => setActiveProperty(property)}
                   >
+                    {/* Favorite Button - absolute positioned for both mobile and desktop */}
+                    <div className="absolute top-3 right-3 z-10">
+                      <FavoriteButton
+                        initialIsLiked={false} // Default to not liked - this would need to be dynamic in a real implementation
+                        onToggle={(isLiked) => handleFavoriteToggle(property.id, isLiked)}
+                        className="scale-90 lg:scale-75" // Slightly smaller on mobile
+                      />
+                    </div>
+                    
                     <Link 
                       to={`/seeker/property/${property.id}`} 
                       className="flex gap-4 group"
@@ -112,11 +131,16 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
                           src={primaryImage}
                           alt={property.title}
                           className="h-full w-full object-cover transition group-hover:scale-105"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.onerror = null; // Prevent infinite loop
+                            target.src = '/noimage.png';
+                          }}
                         />
                       </div>
                       
                       {/* Property details */}
-                      <div className="flex-1 min-w-0">
+                      <div className="flex-1 min-w-0 pr-8"> {/* Added right padding for favorite button */}
                         <h3 className="font-medium text-sm line-clamp-2 group-hover:text-primary">
                           {property.title}
                         </h3>
