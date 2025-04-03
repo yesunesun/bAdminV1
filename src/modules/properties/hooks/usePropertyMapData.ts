@@ -1,7 +1,7 @@
 // src/modules/properties/hooks/usePropertyMapData.ts
-// Version: 2.1.0
-// Last Modified: 03-04-2025 14:45 IST
-// Purpose: Fixed coordinate validation and hover state debugging
+// Version: 2.2.0
+// Last Modified: 03-04-2025 16:45 IST
+// Purpose: Added pagination support and property loading state for map view
 
 import { useState, useEffect, useCallback } from 'react';
 import { PropertyType } from '@/modules/owner/components/property/types';
@@ -41,6 +41,7 @@ const hasValidCoordinates = (property: PropertyType): boolean => {
 export const usePropertyMapData = () => {
   const [properties, setProperties] = useState<PropertyType[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [loadingMore, setLoadingMore] = useState<boolean>(false);
   const [filters, setFilters] = useState<PropertyFilters>({});
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedPropertyType, setSelectedPropertyType] = useState<string>('all');
@@ -48,6 +49,12 @@ export const usePropertyMapData = () => {
   const [activeProperty, setActiveProperty] = useState<PropertyType | null>(null);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [searchLocations, setSearchLocations] = useState<string[]>(POPULAR_LOCATIONS);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [totalPages, setTotalPages] = useState<number>(1);
+  const [totalCount, setTotalCount] = useState<number>(0);
+  const [hasMore, setHasMore] = useState<boolean>(true);
   
   // Load recent searches from localStorage
   useEffect(() => {
@@ -82,40 +89,39 @@ export const usePropertyMapData = () => {
   // Fetch properties based on filters and search query
   useEffect(() => {
     const loadProperties = async () => {
+      // Reset pagination when filters change
+      setCurrentPage(1);
+      setProperties([]);
       setLoading(true);
+      setHasMore(true);
+      
       try {
         const appliedFilters: PropertyFilters = {
           ...filters,
           searchQuery: searchQuery || undefined,
-          propertyType: selectedPropertyType !== 'all' ? selectedPropertyType : undefined
+          propertyType: selectedPropertyType !== 'all' ? selectedPropertyType : undefined,
+          page: 1,
+          pageSize: 50
         };
         
-        const { properties: fetchedProperties } = await fetchProperties(appliedFilters);
+        const result = await fetchProperties(appliedFilters);
         
         // Filter properties with valid coordinates for map display
-        const validProperties = fetchedProperties.filter((property) => {
-          const isValid = hasValidCoordinates(property);
-          
-          if (!isValid) {
-            console.warn(`Property ${property.id} excluded from map due to invalid coordinates:`, {
-              latitude: property.property_details?.latitude,
-              longitude: property.property_details?.longitude
-            });
-          }
-          
-          return isValid;
-        });
+        const validProperties = result.properties.filter(hasValidCoordinates);
         
-        console.log(`Fetched ${fetchedProperties.length} properties, ${validProperties.length} have valid coordinates`);
+        console.log(`Fetched ${result.properties.length} properties, ${validProperties.length} have valid coordinates. Total: ${result.totalCount}`);
         
-        setProperties(validProperties as unknown as PropertyType[]);
+        setProperties(validProperties);
+        setTotalCount(result.totalCount);
+        setTotalPages(result.totalPages);
+        setHasMore(result.currentPage < result.totalPages);
         
         // Update location suggestions based on fetched properties
-        if (fetchedProperties.length > 0) {
+        if (result.properties.length > 0) {
           const locations = new Set<string>();
           
           // Extract locations from properties
-          fetchedProperties.forEach(property => {
+          result.properties.forEach(property => {
             if (property.city) locations.add(property.city);
             if (property.address) {
               // Extract locality or area from address
@@ -142,6 +148,49 @@ export const usePropertyMapData = () => {
     loadProperties();
   }, [filters, searchQuery, selectedPropertyType]);
   
+  // Load more properties function
+  const loadMoreProperties = useCallback(async () => {
+    // Don't load more if we're already at the last page
+    if (!hasMore || loadingMore) return;
+    
+    setLoadingMore(true);
+    
+    try {
+      const nextPage = currentPage + 1;
+      
+      const appliedFilters: PropertyFilters = {
+        ...filters,
+        searchQuery: searchQuery || undefined,
+        propertyType: selectedPropertyType !== 'all' ? selectedPropertyType : undefined,
+        page: nextPage,
+        pageSize: 50
+      };
+      
+      const result = await fetchProperties(appliedFilters);
+      
+      // Filter properties with valid coordinates
+      const validNewProperties = result.properties.filter(hasValidCoordinates);
+      
+      console.log(`Loaded more: ${result.properties.length} properties on page ${nextPage}, ${validNewProperties.length} have valid coordinates`);
+      
+      // Add new properties to existing ones
+      setProperties(prevProperties => [...prevProperties, ...validNewProperties]);
+      setCurrentPage(nextPage);
+      setHasMore(nextPage < result.totalPages);
+    } catch (error) {
+      console.error('Error loading more properties:', error);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [
+    currentPage, 
+    filters, 
+    hasMore, 
+    loadingMore, 
+    searchQuery, 
+    selectedPropertyType
+  ]);
+  
   // Reset all filters
   const handleResetFilters = () => {
     setFilters({});
@@ -160,14 +209,10 @@ export const usePropertyMapData = () => {
     setHoveredProperty(isHovering ? propertyId : null);
   }, []);
   
-  // Log hover state changes for debugging
-  useEffect(() => {
-    console.log('Current hoveredProperty state:', hoveredProperty);
-  }, [hoveredProperty]);
-  
   return {
     properties,
     loading,
+    loadingMore,
     filters,
     setFilters,
     searchQuery,
@@ -180,6 +225,9 @@ export const usePropertyMapData = () => {
     handlePropertyTypeChange,
     handlePropertyHover,
     recentSearches,
-    searchLocations
+    searchLocations,
+    loadMoreProperties,
+    hasMore,
+    totalCount
   };
 };

@@ -1,7 +1,7 @@
 // src/modules/properties/components/PropertyMapHomeView.tsx
-// Version: 3.0.0
-// Last Modified: 02-04-2025 18:10 IST
-// Purpose: Updated component with filters in the top section and improved map synchronization
+// Version: 3.1.0
+// Last Modified: 03-04-2025 17:15 IST
+// Purpose: Connected pagination functionality to load all properties
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useJsApiLoader } from '@react-google-maps/api';
@@ -25,6 +25,10 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
   const {
     properties,
     loading,
+    loadingMore,
+    hasMore,
+    totalCount,
+    loadMoreProperties,
     filters,
     setFilters,
     searchQuery,
@@ -125,10 +129,14 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
       
       {/* Main Content - Split View */}
       <div className="flex-grow flex flex-col lg:flex-row overflow-hidden">
-        {/* Property Listings Panel - Simplified without the filters section */}
+        {/* Property Listings Panel with pagination */}
         <PropertyListingPanel
           properties={properties}
           loading={loading}
+          loadingMore={loadingMore}
+          hasMore={hasMore}
+          totalCount={totalCount}
+          onLoadMore={loadMoreProperties}
           onFavoriteAction={onFavoriteAction}
           handlePropertyHover={handlePropertyHover}
           hoveredProperty={hoveredProperty}

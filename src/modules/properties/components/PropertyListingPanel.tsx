@@ -1,7 +1,7 @@
 // src/modules/properties/components/PropertyListingPanel.tsx
-// Version: 3.0.0
-// Last Modified: 02-04-2025 18:15 IST
-// Purpose: Simplified panel focused on property listings without filters
+// Version: 3.1.0
+// Last Modified: 03-04-2025 17:00 IST
+// Purpose: Added load more functionality to show all properties
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,10 @@ import PropertyCard from './PropertyCard';
 interface PropertyListingPanelProps {
   properties: PropertyType[];
   loading: boolean;
+  loadingMore?: boolean;
+  hasMore?: boolean;
+  totalCount?: number;
+  onLoadMore?: () => void;
   onFavoriteAction: (propertyId: string) => boolean;
   handlePropertyHover: (id: string, isHovered: boolean) => void;
   hoveredProperty: string | null;
@@ -22,6 +26,10 @@ interface PropertyListingPanelProps {
 const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
   properties,
   loading,
+  loadingMore = false,
+  hasMore = false,
+  totalCount = 0,
+  onLoadMore,
   onFavoriteAction,
   handlePropertyHover,
   hoveredProperty,
@@ -33,7 +41,7 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
       <div className="p-3 border-b bg-muted/30">
         <div className="flex justify-between items-center">
           <span className="text-sm font-medium">
-            {loading ? 'Searching...' : `${properties.length} Properties`}
+            {loading ? 'Searching...' : `${properties.length} of ${totalCount} Properties`}
           </span>
           
           <span className="text-xs text-muted-foreground">
@@ -44,7 +52,7 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
 
       {/* Property Listings */}
       <div className="flex-grow overflow-y-auto p-3">
-        {loading ? (
+        {loading && properties.length === 0 ? (
           <div className="h-full flex items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
@@ -81,6 +89,27 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
                 />
               </div>
             ))}
+            
+            {/* Load more button */}
+            {hasMore && onLoadMore && (
+              <div className="mt-4 mb-2 flex justify-center">
+                <Button 
+                  onClick={onLoadMore} 
+                  disabled={loadingMore}
+                  variant="outline"
+                  className="w-full"
+                >
+                  {loadingMore ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Loading more...
+                    </>
+                  ) : (
+                    `Load More Properties (${properties.length} of ${totalCount})`
+                  )}
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </div>
