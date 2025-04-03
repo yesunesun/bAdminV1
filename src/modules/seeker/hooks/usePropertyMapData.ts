@@ -1,7 +1,7 @@
 // src/modules/seeker/hooks/usePropertyMapData.ts
-// Version: 2.1.0
-// Last Modified: 04-04-2025 15:35 IST
-// Purpose: Fixed property loading and pagination issues
+// Version: 2.2.0
+// Last Modified: 04-04-2025 16:20 IST
+// Purpose: Fixed property page size and pagination functionality
 
 import { useState, useEffect, useCallback } from 'react';
 import { PropertyType } from '@/modules/owner/components/property/types';
@@ -16,8 +16,8 @@ const POPULAR_LOCATIONS = [
 // Maximum number of recent searches to keep
 const MAX_RECENT_SEARCHES = 10;
 
-// Page size for pagination
-const PAGE_SIZE = 10;
+// Page size for pagination (changed from 10 to 9 to match initial view)
+const PAGE_SIZE = 9;
 
 // Coordinate validation helper
 const hasValidCoordinates = (property: PropertyType): boolean => {
@@ -109,6 +109,7 @@ export const usePropertyMapData = () => {
           pageSize: PAGE_SIZE
         };
         
+        console.log('Initial load - applied filters:', appliedFilters);
         const result = await fetchPropertiesForMap(appliedFilters);
         
         // Ensure we're consistently handling the object return format
@@ -178,6 +179,7 @@ export const usePropertyMapData = () => {
         pageSize: PAGE_SIZE
       };
       
+      console.log('Load More - applied filters:', appliedFilters);
       const result = await fetchPropertiesForMap(appliedFilters);
       
       // Ensure we're consistently handling the object return format
@@ -205,7 +207,7 @@ export const usePropertyMapData = () => {
         
         // Check if there are more pages
         const hasMorePages = nextPage < Math.ceil(totalCountValue / PAGE_SIZE);
-        setHasMore(hasMorePages);
+setHasMore(hasMorePages);
         setCurrentPage(nextPage);
       }
     } catch (error) {
@@ -224,7 +226,8 @@ export const usePropertyMapData = () => {
     searchQuery,
     selectedPropertyType,
     totalCount,
-    totalPages]);
+    totalPages
+  ]);
   
   // Reset all filters
   const handleResetFilters = useCallback(() => {

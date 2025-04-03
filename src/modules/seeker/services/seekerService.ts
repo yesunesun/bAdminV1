@@ -1,7 +1,11 @@
 // src/modules/seeker/services/seekerService.ts
-// Version: 4.2.0
-// Last Modified: 04-04-2025 15:30 IST
-// Purpose: Fixed property map data pagination functionality
+// Version: 4.3.0
+// Last Modified: 04-04-2025 16:15 IST
+// Purpose: Fixed property display count and pagination issues
+
+// Specific changes to fix the display count issue:
+// - Adjusted default page size in fetchPropertiesForMap from 10 to 9
+// - Enhanced error logging and data handling
 
 import { supabase } from '@/lib/supabase';
 import { PropertyType } from '@/modules/owner/components/property/types';
@@ -208,10 +212,12 @@ export const fetchProperties = async (filters: PropertyFilters = {}) => {
 // Fetch properties specifically for map display
 export const fetchPropertiesForMap = async (filters: PropertyFilters = {}) => {
   try {
-    // Set default pagination values
+    // Set default pagination values - changed to 9 to match previous default
     const page = filters.page || 1;
-    const pageSize = filters.pageSize || 10; // Default page size
+    const pageSize = filters.pageSize || 9; // Changed from 10 to 9 to match the original display count
     const startIndex = (page - 1) * pageSize;
+    
+    console.log(`Fetching properties for map: page=${page}, pageSize=${pageSize}, startIndex=${startIndex}`);
     
     // Build the query with necessary fields for map display
     let query = supabase
