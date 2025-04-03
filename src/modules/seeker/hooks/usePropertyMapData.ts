@@ -1,7 +1,7 @@
 // src/modules/seeker/hooks/usePropertyMapData.ts
-// Version: 1.1.0
-// Last Modified: 03-04-2025 18:30 IST
-// Purpose: Fixed property loading issue after migration from properties module
+// Version: 2.1.0
+// Last Modified: 04-04-2025 15:35 IST
+// Purpose: Fixed property loading and pagination issues
 
 import { useState, useEffect, useCallback } from 'react';
 import { PropertyType } from '@/modules/owner/components/property/types';
@@ -15,6 +15,9 @@ const POPULAR_LOCATIONS = [
 
 // Maximum number of recent searches to keep
 const MAX_RECENT_SEARCHES = 10;
+
+// Page size for pagination
+const PAGE_SIZE = 10;
 
 // Coordinate validation helper
 const hasValidCoordinates = (property: PropertyType): boolean => {
@@ -52,9 +55,11 @@ export const usePropertyMapData = () => {
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const [totalPages, setTotalPages] = useState<number>(1);
   const [totalCount, setTotalCount] = useState<number>(0);
   const [hasMore, setHasMore] = useState<boolean>(true);
+  
+  // Calculate total pages
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
   
   // Load recent searches from localStorage
   useEffect(() => {
@@ -86,10 +91,10 @@ export const usePropertyMapData = () => {
     }
   }, [searchQuery]);
   
-  // Fetch properties based on filters and search query
+  // Initial load of properties
   useEffect(() => {
-    const loadProperties = async () => {
-      // Reset pagination when filters change
+    const loadInitialProperties = async () => {
+      // Reset pagination and properties when filters change
       setCurrentPage(1);
       setProperties([]);
       setLoading(true);
@@ -101,28 +106,30 @@ export const usePropertyMapData = () => {
           searchQuery: searchQuery || undefined,
           propertyType: selectedPropertyType !== 'all' ? selectedPropertyType : undefined,
           page: 1,
-          pageSize: 50
+          pageSize: PAGE_SIZE
         };
         
         const result = await fetchPropertiesForMap(appliedFilters);
         
-        // Filter properties with valid coordinates for map display
-        const validProperties = result.filter(hasValidCoordinates);
+        // Ensure we're consistently handling the object return format
+        const propertiesArray = result.properties || [];
+        const totalCountValue = result.totalCount || 0;
         
-        console.log(`Fetched ${result.length} properties, ${validProperties.length} have valid coordinates.`);
+        // Filter valid properties
+        const validProperties = propertiesArray.filter(hasValidCoordinates);
+        
+        console.log(`Initial load: Fetched ${propertiesArray.length} properties, ${validProperties.length} have valid coordinates. Total available: ${totalCountValue}`);
         
         setProperties(validProperties);
-        setTotalCount(result.length);
-        // Calculate total pages based on results
-        setTotalPages(Math.ceil(result.length / 50));
-        setHasMore(currentPage < Math.ceil(result.length / 50));
+        setTotalCount(totalCountValue);
+        setHasMore(validProperties.length > 0 && validProperties.length < totalCountValue);
         
         // Update location suggestions based on fetched properties
-        if (result.length > 0) {
+        if (propertiesArray.length > 0) {
           const locations = new Set<string>();
           
           // Extract locations from properties
-          result.forEach(property => {
+          propertiesArray.forEach(property => {
             if (property.city) locations.add(property.city);
             if (property.address) {
               // Extract locality or area from address
@@ -140,21 +147,25 @@ export const usePropertyMapData = () => {
           setSearchLocations([...new Set(combinedLocations)].slice(0, 10));
         }
       } catch (error) {
-        console.error('Error loading properties:', error);
+        console.error('Error loading initial properties:', error);
       } finally {
         setLoading(false);
       }
     };
     
-    loadProperties();
+    loadInitialProperties();
   }, [filters, searchQuery, selectedPropertyType]);
   
   // Load more properties function
   const loadMoreProperties = useCallback(async () => {
-    // Don't load more if we're already at the last page
-    if (!hasMore || loadingMore) return;
+    // Don't load more if already loading or all loaded
+    if (loadingMore || loading || !hasMore || currentPage >= totalPages) {
+      console.log(`Skipping loadMore: loadingMore=${loadingMore}, loading=${loading}, hasMore=${hasMore}, currentPage=${currentPage}, totalPages=${totalPages}`);
+      return;
+    }
     
     setLoadingMore(true);
+    console.log(`Loading more properties: page ${currentPage + 1} of ${totalPages}, loaded=${properties.length}, total=${totalCount}`);
     
     try {
       const nextPage = currentPage + 1;
@@ -164,50 +175,71 @@ export const usePropertyMapData = () => {
         searchQuery: searchQuery || undefined,
         propertyType: selectedPropertyType !== 'all' ? selectedPropertyType : undefined,
         page: nextPage,
-        pageSize: 50
+        pageSize: PAGE_SIZE
       };
       
-      // FIX: Changed from fetchProperties to fetchPropertiesForMap
       const result = await fetchPropertiesForMap(appliedFilters);
       
-      // Filter properties with valid coordinates
-      const validNewProperties = result.filter(hasValidCoordinates);
+      // Ensure we're consistently handling the object return format
+      const propertiesArray = result.properties || [];
+      const totalCountValue = result.totalCount || 0;
       
-      console.log(`Loaded more: ${result.length} properties on page ${nextPage}, ${validNewProperties.length} have valid coordinates`);
+      // Filter valid properties
+      const validNewProperties = propertiesArray.filter(hasValidCoordinates);
       
-      // Add new properties to existing ones
-      setProperties(prevProperties => [...prevProperties, ...validNewProperties]);
-      setCurrentPage(nextPage);
-      setHasMore(nextPage < Math.ceil(result.length / 50));
+      console.log(`Page ${nextPage}: Fetched ${propertiesArray.length} properties, ${validNewProperties.length} have valid coordinates`);
+      
+      if (validNewProperties.length === 0) {
+        console.log("No new valid properties found");
+        setHasMore(false);
+      } else {
+        // Add new properties to existing list, ensuring no duplicates
+        setProperties(prevProperties => {
+          const existingIds = new Set(prevProperties.map(p => p.id));
+          const uniqueNewProperties = validNewProperties.filter(p => !existingIds.has(p.id));
+          
+          console.log(`Adding ${uniqueNewProperties.length} unique new properties to existing ${prevProperties.length}`);
+          
+          return [...prevProperties, ...uniqueNewProperties];
+        });
+        
+        // Check if there are more pages
+        const hasMorePages = nextPage < Math.ceil(totalCountValue / PAGE_SIZE);
+        setHasMore(hasMorePages);
+        setCurrentPage(nextPage);
+      }
     } catch (error) {
       console.error('Error loading more properties:', error);
+      setHasMore(false);
     } finally {
       setLoadingMore(false);
     }
   }, [
-    currentPage, 
-    filters, 
-    hasMore, 
-    loadingMore, 
-    searchQuery, 
-    selectedPropertyType
-  ]);
+    currentPage,
+    filters,
+    hasMore,
+    loading,
+    loadingMore,
+    properties.length,
+    searchQuery,
+    selectedPropertyType,
+    totalCount,
+    totalPages]);
   
   // Reset all filters
-  const handleResetFilters = () => {
+  const handleResetFilters = useCallback(() => {
     setFilters({});
     setSearchQuery('');
     setSelectedPropertyType('all');
-  };
+  }, []);
   
   // Update property type filter
-  const handlePropertyTypeChange = (type: string) => {
+  const handlePropertyTypeChange = useCallback((type: string) => {
     setSelectedPropertyType(type);
-  };
+  }, []);
   
-  // Handle property hover states with improved debugging
+  // Handle property hover states
   const handlePropertyHover = useCallback((propertyId: string, isHovering: boolean) => {
-    console.log(`Property hover: ${propertyId}, isHovering: ${isHovering}`);
     setHoveredProperty(isHovering ? propertyId : null);
   }, []);
   
@@ -230,6 +262,14 @@ export const usePropertyMapData = () => {
     searchLocations,
     loadMoreProperties,
     hasMore,
-    totalCount
+    totalCount,
+    pagination: {
+      page: currentPage,
+      totalPages,
+      totalProperties: totalCount,
+      nextPage: loadMoreProperties,
+      prevPage: () => {}, // Not implemented as UI doesn't use it
+      goToPage: () => {}, // Not implemented as UI doesn't use it
+    }
   };
 };

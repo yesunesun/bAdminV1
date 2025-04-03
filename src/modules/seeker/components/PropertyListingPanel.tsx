@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyListingPanel.tsx
-// Version: 1.0.1
-// Last Modified: 03-04-2025 12:50 IST
-// Purpose: Fixed syntax error in image URL handling
+// Version: 1.1.0
+// Last Modified: 03-04-2025 19:50 IST
+// Purpose: Fixed load more button visibility and duplication issues
 
 import React from 'react';
 import { Link } from 'react-router-dom';
@@ -63,7 +63,7 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
       {loading && properties.length === 0 ? (
         <div className="p-6 space-y-4">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="border rounded-lg p-4 animate-pulse">
+            <div key={`loading-skeleton-${i}`} className="border rounded-lg p-4 animate-pulse">
               <div className="h-32 bg-muted rounded-md mb-3"></div>
               <div className="h-4 bg-muted rounded w-3/4 mb-2"></div>
               <div className="h-3 bg-muted rounded w-1/2 mb-4"></div>
@@ -87,16 +87,15 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
         <>
           <div className="divide-y">
             {properties.map((property) => {
-              // Fixed the syntax error in this part
+              // Get primary image with fallback
               const primaryImage = property.property_images?.find(img => img.is_primary)?.url || 
-                                   property.property_images?.[0]?.url || 
-                                   '/apartment.jpg';
+                                   (property.property_images && property.property_images.length > 0 ? property.property_images[0].url : '/apartment.jpg');
               
               const isHovered = hoveredProperty === property.id;
               
               return (
                 <div 
-                  key={property.id}
+                  key={`property-${property.id}`}
                   className={`p-4 transition hover:bg-muted/40 ${isHovered ? 'bg-muted/40' : ''}`}
                   onMouseEnter={() => handlePropertyHover(property.id, true)}
                   onMouseLeave={() => handlePropertyHover(property.id, false)}
@@ -164,13 +163,13 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
           </div>
           
           {/* Load more button */}
-          {hasMore && (
+          {properties.length > 0 && (
             <div className="p-4 flex justify-center">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={onLoadMore}
-                disabled={loadingMore}
+                disabled={loadingMore || !hasMore}
                 className="w-full"
               >
                 {loadingMore ? (
@@ -178,8 +177,10 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                     Loading more...
                   </>
-                ) : (
+                ) : hasMore ? (
                   <>Load more properties</>
+                ) : (
+                  <>All properties loaded</>
                 )}
               </Button>
             </div>

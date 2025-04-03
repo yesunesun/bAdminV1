@@ -1,9 +1,9 @@
 // src/modules/seeker/components/PropertyMapHomeView.tsx
-// Version: 1.0.0
-// Last Modified: 03-04-2025 11:45 IST
-// Purpose: Migrated from properties module to seeker module
+// Version: 2.0.0
+// Last Modified: 04-04-2025 10:45 IST
+// Purpose: Fixed hooks order issue and state update errors
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useJsApiLoader } from '@react-google-maps/api';
 import { usePropertyMapData } from '../hooks/usePropertyMapData';
 import CompactSearchBar from './CompactSearchBar';
@@ -21,7 +21,16 @@ interface PropertyMapHomeViewProps {
 }
 
 const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAction }) => {
-  // Property data and state management
+  // Reference for search input
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  
+  // State for showing recent searches
+  const [showRecentSearches, setShowRecentSearches] = useState<boolean>(false);
+  
+  // Memoize API key to prevent unnecessary re-renders
+  const apiKey = useMemo(() => import.meta.env.VITE_GOOGLE_MAPS_KEY || '', []);
+  
+  // Property data and state management - keeping hook calls in consistent order
   const {
     properties,
     loading,
@@ -44,9 +53,6 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
     searchLocations
   } = usePropertyMapData();
   
-  // Memoize API key to prevent unnecessary re-renders
-  const apiKey = useMemo(() => import.meta.env.VITE_GOOGLE_MAPS_KEY, []);
-  
   // Google Maps script loader
   const { isLoaded, loadError } = useJsApiLoader({
     googleMapsApiKey: apiKey,
@@ -54,16 +60,20 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
     preventGoogleFontsLoading: true
   });
   
-  // State for showing recent searches
-  const [showRecentSearches, setShowRecentSearches] = useState<boolean>(false);
-  
-  // Focus search input on search click
-  const searchInputRef = useRef<HTMLInputElement>(null);
-  
   // Preload fallback image
   useEffect(() => {
     const img = new Image();
     img.src = '/apartment.jpg';
+  }, []);
+
+  // Safe focus handler for search input
+  const handleSearchFocus = useCallback(() => {
+    setShowRecentSearches(true);
+  }, []);
+  
+  // Safe blur handler with delay to allow for clicks on search results
+  const handleSearchBlur = useCallback(() => {
+    setTimeout(() => setShowRecentSearches(false), 200);
   }, []);
 
   // Comprehensive error handling
@@ -106,8 +116,8 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
         filters={filters}
         setFilters={setFilters}
         handleResetFilters={handleResetFilters}
-        onFocus={() => setShowRecentSearches(true)}
-        onBlur={() => setTimeout(() => setShowRecentSearches(false), 200)}
+        onFocus={handleSearchFocus}
+        onBlur={handleSearchBlur}
       />
       
       {/* Recent Searches Dropdown */}

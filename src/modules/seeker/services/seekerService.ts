@@ -1,7 +1,7 @@
 // src/modules/seeker/services/seekerService.ts
-// Version: 4.1.0
-// Last Modified: 03-04-2025 17:30 IST
-// Purpose: Comprehensive service for seeker module with all required functions
+// Version: 4.2.0
+// Last Modified: 04-04-2025 15:30 IST
+// Purpose: Fixed property map data pagination functionality
 
 import { supabase } from '@/lib/supabase';
 import { PropertyType } from '@/modules/owner/components/property/types';
@@ -208,6 +208,11 @@ export const fetchProperties = async (filters: PropertyFilters = {}) => {
 // Fetch properties specifically for map display
 export const fetchPropertiesForMap = async (filters: PropertyFilters = {}) => {
   try {
+    // Set default pagination values
+    const page = filters.page || 1;
+    const pageSize = filters.pageSize || 10; // Default page size
+    const startIndex = (page - 1) * pageSize;
+    
     // Build the query with necessary fields for map display
     let query = supabase
       .from('properties')
@@ -229,30 +234,41 @@ export const fetchPropertiesForMap = async (filters: PropertyFilters = {}) => {
         )
       `);
     
-    // Apply filters similar to fetchProperties
+    // Create a count query to get total results
+    let countQuery = supabase
+      .from('properties')
+      .select('id', { count: 'exact' });
+    
+    // Apply filters to both queries
     if (filters.searchQuery) {
       const searchFilter = `title.ilike.%${filters.searchQuery}%,address.ilike.%${filters.searchQuery}%,city.ilike.%${filters.searchQuery}%`;
       query = query.or(searchFilter);
+      countQuery = countQuery.or(searchFilter);
     }
     
     if (filters.propertyType) {
       query = query.filter('property_details->propertyType', 'ilike', `%${filters.propertyType}%`);
+      countQuery = countQuery.filter('property_details->propertyType', 'ilike', `%${filters.propertyType}%`);
     }
     
     if (filters.minPrice !== undefined) {
       query = query.gte('price', filters.minPrice);
+      countQuery = countQuery.gte('price', filters.minPrice);
     }
     
     if (filters.maxPrice !== undefined) {
       query = query.lte('price', filters.maxPrice);
+      countQuery = countQuery.lte('price', filters.maxPrice);
     }
     
     if (filters.bedrooms !== undefined) {
       query = query.gte('bedrooms', filters.bedrooms);
+      countQuery = countQuery.gte('bedrooms', filters.bedrooms);
     }
     
     if (filters.bathrooms !== undefined) {
       query = query.gte('bathrooms', filters.bathrooms);
+      countQuery = countQuery.gte('bathrooms', filters.bathrooms);
     }
     
     // Apply sorting
@@ -277,16 +293,32 @@ export const fetchPropertiesForMap = async (filters: PropertyFilters = {}) => {
       query = query.order('created_at', { ascending: false });
     }
     
-    // Execute the query
-    const { data, error } = await query;
+    // Apply pagination
+    query = query.range(startIndex, startIndex + pageSize - 1);
     
-    if (error) {
-      console.error('Error fetching properties for map:', error);
-      throw error;
+    // Execute both queries in parallel
+    const [dataResult, countResult] = await Promise.all([
+      query,
+      countQuery
+    ]);
+    
+    if (dataResult.error) {
+      console.error('Error fetching properties for map:', dataResult.error);
+      throw dataResult.error;
     }
     
+    if (countResult.error) {
+      console.error('Error counting properties for map:', countResult.error);
+      throw countResult.error;
+    }
+    
+    const totalCount = countResult.count || 0;
+    const totalPages = Math.ceil(totalCount / pageSize);
+    
+    console.log(`Fetched ${dataResult.data?.length || 0} properties for map (page ${page}/${totalPages}, total: ${totalCount})`);
+    
     // Process the data to include primary images
-    const processedProperties = (data || []).map(property => {
+    const processedProperties = (dataResult.data || []).map(property => {
       let primaryImage = '/noimage.png';
       
       if (property.property_images && property.property_images.length > 0) {
@@ -305,7 +337,12 @@ export const fetchPropertiesForMap = async (filters: PropertyFilters = {}) => {
       };
     });
     
-    return processedProperties;
+    return { 
+      properties: processedProperties,
+      totalCount,
+      currentPage: page,
+      totalPages
+    };
   } catch (error) {
     console.error('Error fetching properties for map:', error);
     throw error;
