@@ -1,13 +1,12 @@
 // src/modules/seeker/pages/PropertyDetailPage.tsx
-// Version: 3.0.0
-// Last Modified: 03-04-2025 13:45 IST
-// Purpose: Updated to use standardized header component
+// Version: 3.1.0
+// Last Modified: 05-04-2025 11:30 IST
+// Purpose: Removed duplicate header component
 
 import React, { useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { usePropertyDetails } from '../hooks/usePropertyDetails';
 import PropertyDetails from '../components/PropertyDetails';
-import PropertyHeader from '../components/PropertyHeader';
 import { Button } from '@/components/ui/button';
 import { 
   ChevronLeftIcon, 
@@ -55,8 +54,6 @@ const PropertyDetailPage: React.FC = () => {
   if (error) {
     return (
       <div className="min-h-screen flex flex-col bg-background">
-        <PropertyHeader onFavoritesClick={toggleFavorites} />
-        
         <div className="min-h-[80vh] container mx-auto py-16 px-4 flex items-center justify-center">
           <div className="max-w-lg mx-auto bg-background rounded-xl shadow-lg p-8 text-center border border-border/50">
             <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-destructive/10 flex items-center justify-center">
@@ -78,9 +75,6 @@ const PropertyDetailPage: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      {/* Standardized header component */}
-      <PropertyHeader onFavoritesClick={toggleFavorites} />
-      
       <div className="container mx-auto py-8 px-4">
         {/* Navigation bar with breadcrumbs and actions */}
         <div className="sticky top-16 z-10 bg-background/80 backdrop-blur-sm py-3 px-4 rounded-lg mb-6 flex flex-wrap justify-between items-center border border-border/30 shadow-sm">
