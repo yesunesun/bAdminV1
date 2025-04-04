@@ -1,11 +1,12 @@
 // src/modules/seeker/components/PropertyDetails/index.tsx
-// Version: 3.1.0
-// Last Modified: 05-04-2025 18:30 IST
-// Purpose: Fixed property data rendering and added detailed debugging
+// Version: 3.2.0
+// Last Modified: 05-04-2025 20:15 IST
+// Purpose: Added Google Maps integration for property location
 
 import React, { useState, useEffect } from 'react';
 import { PropertyDetails as PropertyDetailsType } from '../../hooks/usePropertyDetails';
 import PropertyGallery from './PropertyGallery';
+import PropertyLocationMap from './PropertyLocationMap';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
@@ -118,6 +119,30 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
     return [safeProperty.address, safeProperty.city, safeProperty.state, safeProperty.zip_code]
       .filter(Boolean)
       .join(", ") || "Location not specified";
+  };
+  
+  // Get coordinates from property details
+  const getPropertyCoordinates = () => {
+    const lat = parseFloat(safeProperty.property_details?.latitude || safeProperty.property_details?.lat || '0');
+    const lng = parseFloat(safeProperty.property_details?.longitude || safeProperty.property_details?.lng || '0');
+    
+    // Return coordinates only if both values are valid numbers and not zero
+    if (!isNaN(lat) && !isNaN(lng) && (lat !== 0 || lng !== 0)) {
+      return { lat, lng };
+    }
+    
+    // Check if coordinates are in a different format in property_details
+    if (safeProperty.property_details?.coordinates) {
+      const coords = safeProperty.property_details.coordinates;
+      if (typeof coords === 'object' && 'lat' in coords && 'lng' in coords) {
+        return { 
+          lat: parseFloat(coords.lat), 
+          lng: parseFloat(coords.lng) 
+        };
+      }
+    }
+    
+    return undefined;
   };
   
   return (
@@ -293,32 +318,13 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
           </Card>
           
           {/* Location Map */}
-          <Card className="border-border/40 shadow-md">
-            <CardContent className="p-6">
-              <h3 className="text-lg font-semibold mb-3 flex items-center">
-                <MapPin className="h-5 w-5 mr-2 text-primary" />
-                Property Location
-              </h3>
-              
-              {safeProperty.property_details?.coordinates ? (
-                <div className="w-full h-80 bg-muted rounded-lg overflow-hidden">
-                  {/* Map would go here */}
-                  <div className="h-full w-full flex items-center justify-center">
-                    <p className="text-muted-foreground">Map is loading...</p>
-                  </div>
-                </div>
-              ) : (
-                <div className="w-full py-10 bg-destructive/10 rounded-lg flex items-center justify-center">
-                  <AlertCircle className="h-5 w-5 text-destructive mr-2" />
-                  <span className="text-destructive">Location coordinates not available</span>
-                </div>
-              )}
-              
-              <div className="mt-3 text-muted-foreground">
-                {getLocationString()}
-              </div>
-            </CardContent>
-          </Card>
+          <PropertyLocationMap
+            address={safeProperty.address || ''}
+            city={safeProperty.city || ''}
+            state={safeProperty.state || ''}
+            zipCode={safeProperty.zip_code || ''}
+            coordinates={getPropertyCoordinates()}
+          />
         </div>
         
         {/* Sidebar Column */}
