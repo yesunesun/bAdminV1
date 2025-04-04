@@ -1,7 +1,7 @@
 // src/contexts/FavoritesContext.tsx
-// Version: 1.3.0
-// Last Modified: 05-04-2025 15:30 IST
-// Purpose: Fixed data loading issues and improved error handling
+// Version: 1.4.0
+// Last Modified: 05-04-2025 16:45 IST
+// Purpose: Cleaned up code and removed console logs
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -29,13 +29,11 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   // Fetch user's favorite properties
   const fetchFavorites = async () => {
     if (!user) {
-      console.log('No user, clearing favorites');
       setFavorites([]);
       setFavoriteCount(0);
       return;
     }
 
-    console.log('Fetching favorites for user:', user.id);
     setIsLoading(true);
     
     try {
@@ -68,10 +66,8 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         console.error('Error fetching favorites:', error);
         throw error;
       }
-
-      console.log('Raw data from Supabase:', data);
       
-      // Filter out any null properties (e.g., if a property was deleted)
+      // Filter out any null properties and process the data
       const validProperties = data
         .filter(item => item.properties !== null)
         .map(item => {
@@ -94,7 +90,6 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           };
         });
 
-      console.log('Processed favorites:', validProperties);
       setFavorites(validProperties);
       setFavoriteCount(validProperties.length);
     } catch (error) {
@@ -108,12 +103,10 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   // Initialize favorites when user changes
   useEffect(() => {
     if (user) {
-      console.log('User authenticated, loading initial favorites');
       fetchFavorites().catch(err => {
         console.error('Initial favorites load failed:', err);
       });
     } else {
-      console.log('No user, clearing favorites');
       setFavorites([]);
       setFavoriteCount(0);
     }
@@ -129,8 +122,6 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (!user) return false;
 
     try {
-      console.log('Adding property to favorites:', propertyId);
-      
       // First check if already favorited
       const { data: existingLike, error: checkError } = await supabase
         .from('property_likes')
@@ -145,7 +136,6 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       
       // If already exists, no need to add
       if (existingLike && existingLike.length > 0) {
-        console.log('Property already in favorites');
         return true;
       }
       
@@ -176,7 +166,6 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (!user) return false;
 
     try {
-      console.log('Removing property from favorites:', propertyId);
       const { error } = await supabase
         .from('property_likes')
         .delete()
@@ -200,10 +189,8 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   // Refresh favorites
   const refreshFavorites = async () => {
-    console.log('Refreshing favorites...');
     try {
       await fetchFavorites();
-      console.log('Favorites refreshed successfully');
     } catch (error) {
       console.error('Error refreshing favorites:', error);
       throw error;
