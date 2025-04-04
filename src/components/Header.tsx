@@ -1,7 +1,7 @@
 // src/components/Header.tsx
-// Version: 3.1.0
-// Last Modified: 04-04-2025 18:00 IST
-// Purpose: Fixed real-time subscription for favorites count updates
+// Version: 3.2.0
+// Last Modified: 04-04-2025 19:30 IST
+// Purpose: Updated to use FavoritesContext for real-time favorite count
 
 import React, { useEffect, useState, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useFavorites } from '@/contexts/FavoritesContext';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 
@@ -30,13 +31,13 @@ interface HeaderProps {
 export function Header({ onFavoritesClick }: HeaderProps) {
   const { user, signOut } = useAuth();
   const { theme, setTheme } = useTheme();
+  const { favoriteCount } = useFavorites();
   const location = useLocation();
   const [userRole, setUserRole] = useState<string | null>(null);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const [isThemeDropdownOpen, setIsThemeDropdownOpen] = useState(false);
   const profileDropdownRef = useRef<HTMLDivElement>(null);
   const themeDropdownRef = useRef<HTMLDivElement>(null);
-  const [favoriteCount, setFavoriteCount] = useState(0);
 
   // Fetch user role
   useEffect(() => {
@@ -52,84 +53,6 @@ export function Header({ onFavoritesClick }: HeaderProps) {
     };
 
     fetchUserRole();
-  }, [user]);
-
-  // Fetch favorites count and subscribe to changes
-  useEffect(() => {
-    const fetchFavoriteCount = async () => {
-      if (!user) {
-        setFavoriteCount(0);
-        return;
-      }
-      
-      try {
-        console.log("Fetching favorite count for user:", user.id);
-        const { count, error } = await supabase
-          .from('property_likes')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', user.id);
-        
-        if (error) {
-          console.error('Error fetching favorite count:', error);
-          return;
-        }
-        
-        console.log("Current favorite count:", count);
-        if (count !== null) {
-          setFavoriteCount(count);
-        }
-      } catch (error) {
-        console.error('Error fetching favorite count:', error);
-      }
-    };
-    
-    fetchFavoriteCount();
-    
-    // Set up real-time subscription only if user is logged in
-    if (user) {
-      console.log("Setting up property_likes subscription for user:", user.id);
-      
-      // Subscribe to changes in property_likes
-      const channel = supabase.channel('property_likes_changes_main_header')
-        .on('postgres_changes', 
-          {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'property_likes',
-            filter: `user_id=eq.${user.id}`
-          }, 
-          (payload) => {
-            console.log('INSERT detected in property_likes:', payload);
-            setFavoriteCount(prevCount => prevCount + 1);
-          }
-        )
-        .on('postgres_changes', 
-          {
-            event: 'DELETE',
-            schema: 'public',
-            table: 'property_likes',
-            filter: `user_id=eq.${user.id}`
-          }, 
-          (payload) => {
-            console.log('DELETE detected in property_likes:', payload);
-            setFavoriteCount(prevCount => Math.max(0, prevCount - 1));
-          }
-        );
-      
-      // Subscribe to the channel
-      channel.subscribe((status) => {
-        console.log(`Subscription status for property_likes_changes_main_header: ${status}`);
-        if (status === 'SUBSCRIBED') {
-          console.log('Successfully subscribed to property_likes changes');
-        }
-      });
-      
-      // Clean up subscription when component unmounts
-      return () => {
-        console.log('Cleaning up property_likes subscription');
-        supabase.removeChannel(channel);
-      };
-    }
   }, [user]);
 
   // Click outside handler
