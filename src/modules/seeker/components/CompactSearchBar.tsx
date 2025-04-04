@@ -1,7 +1,7 @@
 // src/modules/seeker/components/CompactSearchBar.tsx
-// Version: 1.1.0
-// Last Modified: 04-04-2025 15:30 IST
-// Purpose: Added property types to the filters panel and fixed filter display
+// Version: 1.2.0
+// Last Modified: 04-04-2025 21:30 IST
+// Purpose: Enhanced filters panel to match design shown in screenshot
 
 import React, { forwardRef, useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Search, X, Sliders, MapPin, Check } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger, SheetClose } from '@/components/ui/sheet';
 import { Slider } from '@/components/ui/slider';
 import { propertyTypeOptions } from '../services/seekerService';
 import { PropertyFilters } from '../services/seekerService';
@@ -94,6 +94,15 @@ const CompactSearchBar = forwardRef<HTMLInputElement, CompactSearchBarProps>(({
       return `₹${price}`;
     }
   };
+
+  // Property type options for the filters panel
+  const propertyTypeFilters = [
+    { id: 'all', label: 'All Types' },
+    { id: 'apartment', label: 'Apartment' },
+    { id: 'house', label: 'House' },
+    { id: 'commercial', label: 'Commercial' },
+    { id: 'land', label: 'Land' }
+  ];
   
   return (
     <div className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 py-3">
@@ -154,25 +163,25 @@ const CompactSearchBar = forwardRef<HTMLInputElement, CompactSearchBarProps>(({
                 )}
               </Button>
             </SheetTrigger>
-            <SheetContent side="right" className="w-full max-w-md sm:max-w-lg">
-              <SheetHeader>
-                <SheetTitle>Filters</SheetTitle>
+            <SheetContent side="right" className="w-full max-w-md sm:max-w-lg overflow-y-auto">
+              <SheetHeader className="mb-4">
+                <SheetTitle className="text-xl">Filters</SheetTitle>
                 <SheetDescription>
                   Refine your search with specific criteria
                 </SheetDescription>
               </SheetHeader>
               
-              <div className="mt-6 space-y-6">
+              <div className="mt-4 space-y-6">
                 {/* Property Types */}
                 <div className="space-y-3">
-                  <h3 className="font-medium">Property Type</h3>
-                  <div className="grid grid-cols-2 gap-2">
-                    {propertyTypeOptions.map((option) => (
+                  <h3 className="font-medium text-lg">Property Type</h3>
+                  <div className="grid grid-cols-2 gap-3">
+                    {propertyTypeFilters.map((option) => (
                       <div
                         key={option.id}
                         onClick={() => setLocalPropertyType(option.id)}
                         className={cn(
-                          "px-3 py-2 rounded-md border cursor-pointer flex items-center justify-between",
+                          "px-3 py-2.5 rounded-md border cursor-pointer flex items-center justify-between",
                           localPropertyType === option.id
                             ? "bg-primary/10 border-primary"
                             : "bg-background hover:bg-muted/50 border-input"
@@ -189,10 +198,10 @@ const CompactSearchBar = forwardRef<HTMLInputElement, CompactSearchBarProps>(({
                 
                 {/* Price Range */}
                 <div className="space-y-3">
-                  <h3 className="font-medium">Price Range</h3>
-                  <div className="flex items-center justify-between">
-                    <span>{formatPrice(minPrice)}</span>
-                    <span>{formatPrice(maxPrice)}</span>
+                  <h3 className="font-medium text-lg">Price Range</h3>
+                  <div className="flex items-center justify-between text-sm text-muted-foreground">
+                    <span>₹0</span>
+                    <span>₹1.0Cr</span>
                   </div>
                   <Slider
                     defaultValue={[minPrice, maxPrice]}
@@ -204,30 +213,28 @@ const CompactSearchBar = forwardRef<HTMLInputElement, CompactSearchBarProps>(({
                       setMinPrice(values[0]);
                       setMaxPrice(values[1]);
                     }}
+                    className="mt-2"
                   />
                 </div>
                 
                 {/* Bedrooms */}
                 <div className="space-y-3">
-                  <h3 className="font-medium">Bedrooms</h3>
+                  <h3 className="font-medium text-lg">Bedrooms</h3>
                   <div className="grid grid-cols-6 gap-2">
-                    <Button 
-                      variant={bedrooms === undefined ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setBedrooms(undefined)}
-                      className="text-center"
-                    >
-                      Any
-                    </Button>
-                    {[1, 2, 3, 4, 5].map(num => (
+                    {["Any", "1+", "2+", "3+", "4+", "5+"].map((num, index) => (
                       <Button
                         key={num}
-                        variant={bedrooms === num ? "default" : "outline"}
+                        variant={
+                          (index === 0 && bedrooms === undefined) || 
+                          (index > 0 && bedrooms === index) 
+                            ? "default" 
+                            : "outline"
+                        }
                         size="sm"
-                        onClick={() => setBedrooms(num)}
+                        onClick={() => setBedrooms(index === 0 ? undefined : index)}
                         className="text-center"
                       >
-                        {num}+
+                        {num}
                       </Button>
                     ))}
                   </div>
@@ -235,32 +242,29 @@ const CompactSearchBar = forwardRef<HTMLInputElement, CompactSearchBarProps>(({
                 
                 {/* Bathrooms */}
                 <div className="space-y-3">
-                  <h3 className="font-medium">Bathrooms</h3>
+                  <h3 className="font-medium text-lg">Bathrooms</h3>
                   <div className="grid grid-cols-6 gap-2">
-                    <Button 
-                      variant={bathrooms === undefined ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setBathrooms(undefined)}
-                      className="text-center"
-                    >
-                      Any
-                    </Button>
-                    {[1, 2, 3, 4, 5].map(num => (
+                    {["Any", "1+", "2+", "3+", "4+", "5+"].map((num, index) => (
                       <Button
                         key={num}
-                        variant={bathrooms === num ? "default" : "outline"}
+                        variant={
+                          (index === 0 && bathrooms === undefined) || 
+                          (index > 0 && bathrooms === index) 
+                            ? "default" 
+                            : "outline"
+                        }
                         size="sm"
-                        onClick={() => setBathrooms(num)}
+                        onClick={() => setBathrooms(index === 0 ? undefined : index)}
                         className="text-center"
                       >
-                        {num}+
+                        {num}
                       </Button>
                     ))}
                   </div>
                 </div>
                 
                 {/* Action buttons */}
-                <div className="flex justify-between pt-6">
+                <div className="flex justify-between pt-6 sticky bottom-0 bg-background pb-4">
                   <Button 
                     variant="outline" 
                     onClick={() => {
@@ -274,7 +278,10 @@ const CompactSearchBar = forwardRef<HTMLInputElement, CompactSearchBarProps>(({
                   >
                     Reset Filters
                   </Button>
-                  <Button onClick={applyFilters}>
+                  <Button 
+                    onClick={applyFilters}
+                    className="bg-primary text-primary-foreground hover:bg-primary/90"
+                  >
                     Apply Filters
                   </Button>
                 </div>
