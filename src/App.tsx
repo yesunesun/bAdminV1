@@ -1,7 +1,7 @@
 // src/App.tsx 
-// Version: 8.5.0
-// Last Modified: 04-04-2025 20:45 IST
-// Purpose: Consolidated FavoritesProvider to wrap the entire app to fix context issues
+// Version: 8.6.0
+// Last Modified: 04-04-2025 14:45 IST
+// Purpose: Added Footer component to seeker layouts
 
 import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
@@ -11,6 +11,7 @@ import { Header } from '@/components/Header';
 import PropertyHeader from '@/modules/seeker/components/PropertyHeader';
 import { useAdminAccess } from './modules/admin/hooks/useAdminAccess';
 import FavoritesDrawer from '@/modules/seeker/components/FavoritesDrawer';
+import Footer from '@/components/Footer';
 
 // Import HomePage and PropertyMapHome (updated path)
 import HomePage from './pages/HomePage';
@@ -168,13 +169,14 @@ function AppLayout() {
   };
   
   return (
-    <>
+    <div className="flex flex-col min-h-screen">
       <Header onFavoritesClick={handleFavoritesClick} />
       <FavoritesDrawer open={isFavoritesOpen} onClose={handleFavoritesClose} />
-      <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+      <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex-grow">
         <Outlet />
       </main>
-    </>
+      <Footer />
+    </div>
   );
 }
 
@@ -191,13 +193,14 @@ function SeekerLayout({ children }: { children?: React.ReactNode }) {
   };
   
   return (
-    <>
+    <div className="flex flex-col min-h-screen">
       <PropertyHeader onFavoritesClick={handleFavoritesClick} />
       <FavoritesDrawer open={isFavoritesOpen} onClose={handleFavoritesClose} />
-      <main className="container mx-auto">
+      <main className="container mx-auto flex-grow">
         {children || <Outlet />}
       </main>
-    </>
+      <Footer />
+    </div>
   );
 }
 
@@ -214,13 +217,14 @@ const PropertyMapWrapper = () => {
   };
 
   return (
-    <>
+    <div className="flex flex-col min-h-screen">
       <Header onFavoritesClick={handleFavoritesClick} />
       <FavoritesDrawer open={isFavoritesOpen} onClose={handleFavoritesClose} />
-      <div className="container mx-auto">
+      <div className="container mx-auto flex-grow">
         <PropertyMapHome />
       </div>
-    </>
+      <Footer />
+    </div>
   );
 };
 

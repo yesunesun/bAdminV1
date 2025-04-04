@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyMapHomeView.tsx
-// Version: 2.8.0
-// Last Modified: 05-04-2025 12:30 IST
-// Purpose: Fixed favorites loading and toggling
+// Version: 2.9.0
+// Last Modified: 04-04-2025 12:30 IST
+// Purpose: Removed recent searches functionality
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useJsApiLoader } from '@react-google-maps/api';
@@ -11,7 +11,6 @@ import PropertyListingPanel from './PropertyListingPanel';
 import MapPanel from './MapPanel';
 import { AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import RecentSearches from './RecentSearches';
 import { getUserFavorites, togglePropertyLike } from '../services/seekerService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
@@ -26,9 +25,6 @@ interface PropertyMapHomeViewProps {
 const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAction }) => {
   // Reference for search input
   const searchInputRef = useRef<HTMLInputElement>(null);
-  
-  // State for showing recent searches
-  const [showRecentSearches, setShowRecentSearches] = useState<boolean>(false);
   
   // Favorites state management
   const [favoriteProperties, setFavoriteProperties] = useState<Set<string>>(new Set());
@@ -170,16 +166,6 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
     img.src = '/apartment.jpg';
   }, []);
 
-  // Debounced search input handler for performance
-  const handleSearchFocus = useCallback(() => {
-    setShowRecentSearches(true);
-  }, []);
-  
-  // Delayed blur handler with proper timing
-  const handleSearchBlur = useCallback(() => {
-    setTimeout(() => setShowRecentSearches(false), 200);
-  }, []);
-
   // Comprehensive error handling with user feedback
   if (loadError) {
     return (
@@ -220,34 +206,8 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
           filters={filters}
           setFilters={setFilters}
           handleResetFilters={handleResetFilters}
-          onFocus={handleSearchFocus}
-          onBlur={handleSearchBlur}
         />
       </div>
-      
-      {/* Recent Searches with improved animation and positioning */}
-      {showRecentSearches && (
-        <div className="px-4 sm:px-6 animated-fade-in">
-          <RecentSearches
-            searches={recentSearches}
-            onSelect={(query) => {
-              setSearchQuery(query);
-              setShowRecentSearches(false);
-            }}
-            onClear={() => {
-              // Clear recent searches with safer local storage handling
-              try {
-                localStorage.removeItem('recentSearches');
-                window.location.reload();
-              } catch (error) {
-                console.error('Error clearing searches:', error);
-                // Provide fallback behavior
-                setShowRecentSearches(false);
-              }
-            }}
-          />
-        </div>
-      )}
       
       {/* Main Content - Optimized Split View with improved responsiveness */}
       <div className="flex-grow flex flex-col lg:flex-row overflow-hidden">
@@ -289,28 +249,5 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
     </div>
   );
 };
-
-// Add fade-in animation with CSS
-const styles = `
-.animated-fade-in {
-  animation: fadeIn 0.2s ease-in-out;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-`;
-
-// Add style tag to document if it doesn't exist
-if (typeof document !== 'undefined') {
-  const styleElement = document.getElementById('property-map-styles');
-  if (!styleElement) {
-    const newStyleElement = document.createElement('style');
-    newStyleElement.id = 'property-map-styles';
-    newStyleElement.textContent = styles;
-    document.head.appendChild(newStyleElement);
-  }
-}
 
 export default PropertyMapHomeView;
