@@ -1,7 +1,7 @@
 // src/routes/mainRoutes.tsx
-// Version: 11.2.0
-// Last Modified: 01-04-2025 10:45 IST
-// Purpose: Keep HomePage at /home, add route mapping
+// Version: 11.3.0
+// Last Modified: 05-04-2025 14:50 IST
+// Purpose: Add /allproperties route to main routes
 
 import React from 'react';
 import { Navigate } from 'react-router-dom';
@@ -15,6 +15,7 @@ import ListYourProperty from '../modules/owner/pages/ListYourProperty';
 // Import from the seeker module
 import BrowseProperties from '../modules/seeker/pages/BrowseProperties';
 import PropertyDetailPage from '../modules/seeker/pages/PropertyDetailPage';
+import AllProperties from '../modules/seeker/pages/AllProperties/index';
 // Import our HomePage component
 import HomePage from '../pages/HomePage';
 
@@ -39,9 +40,12 @@ export const mainRoutes = [
     path: '/seeker',
     children: [
       { index: true, element: <BrowseProperties /> },
-      { path: 'property/:id', element: <PropertyDetailPage /> }
+      { path: 'property/:id', element: <PropertyDetailPage /> },
+      { path: 'allproperties', element: <AllProperties /> }
     ]
   },
+  // Add direct route to AllProperties
+  { path: '/allproperties', element: <AllProperties /> },
   // Keep existing HomePage at /home path unchanged
   { path: '/home', element: <HomePage /> }
   // Root path will be handled directly in App.tsx with PropertyMapHome component
