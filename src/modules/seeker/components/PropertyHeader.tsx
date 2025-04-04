@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyHeader.tsx
-// Version: 3.2.0
-// Last Modified: 04-04-2025 19:30 IST
-// Purpose: Updated to use FavoritesContext for real-time favorite count
+// Version: 3.3.1
+// Last Modified: 04-04-2025 21:00 IST
+// Purpose: Adjusted logo size to maintain consistency across routes
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
@@ -94,9 +94,9 @@ const PropertyHeader: React.FC<PropertyHeaderProps> = ({ onFavoritesClick }) => 
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="flex h-20 items-center justify-between">
-          {/* Logo - Significantly larger */}
+          {/* Logo - Adjusted to be proportional to main header */}
           <Link to="/" className="flex-shrink-0">
-            <img src="/bhumitallilogo.png" alt="BhoomiTalli" className="h-14 w-auto transition-transform hover:scale-105" />
+            <img src="/bhumitallilogo.png" alt="BhoomiTalli" className="h-16 w-auto transition-transform hover:scale-105" />
           </Link>
 
           <div className="flex items-center space-x-3">

@@ -1,7 +1,7 @@
 // src/components/Header.tsx
-// Version: 3.2.0
-// Last Modified: 04-04-2025 19:30 IST
-// Purpose: Updated to use FavoritesContext for real-time favorite count
+// Version: 3.3.0
+// Last Modified: 04-04-2025 20:45 IST
+// Purpose: Moved navigation links to profile menu and increased logo size by 30%
 
 import React, { useEffect, useState, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
@@ -96,9 +96,9 @@ export function Header({ onFavoritesClick }: HeaderProps) {
       <header className="w-full bg-card border-b border-border sticky top-0 z-50 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="flex h-16 items-center justify-between">
-            {/* Logo - Slightly larger */}
+            {/* Logo - Increased by 30% */}
             <Link to="/" className="flex-shrink-0">
-              <img src="/bhumitallilogo.png" alt="Bhumitalli" className="h-10 w-auto" />
+              <img src="/bhumitallilogo.png" alt="Bhumitalli" className="h-13 w-auto" />
             </Link>
 
             <div className="flex items-center space-x-4">
@@ -277,83 +277,10 @@ export function Header({ onFavoritesClick }: HeaderProps) {
     <header className="w-full bg-card border-b border-border sticky top-0 z-50 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="flex h-20 items-center justify-between">
-          {/* Logo - Slightly larger */}
+          {/* Logo - Increased by 30% */}
           <Link to="/" className="flex-shrink-0">
-            <img src="/bhumitallilogo.png" alt="Bhumitalli" className="h-12 w-auto transition-transform hover:scale-105" />
+            <img src="/bhumitallilogo.png" alt="Bhumitalli" className="h-16 w-auto transition-transform hover:scale-105" />
           </Link>
-
-          {user ? (
-            <>
-              {/* Main Navigation - Only shown on homepage now */}
-              {location.pathname === '/' && (
-                <div className="hidden md:flex flex-1 ml-12 space-x-8">
-                  <Link
-                    to="/"
-                    className={cn(
-                      "inline-flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors",
-                      location.pathname === '/' 
-                        ? "text-primary bg-primary/10" 
-                        : "text-foreground hover:text-primary hover:bg-accent"
-                    )}
-                  >
-                    <Home className="h-4 w-4 mr-2" />
-                    Home
-                  </Link>
-                  <Link
-                    to="/seeker"
-                    className={cn(
-                      "inline-flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors",
-                      location.pathname.startsWith('/seeker') && location.pathname !== '/seeker/favorites'
-                        ? "text-primary bg-primary/10" 
-                        : "text-foreground hover:text-primary hover:bg-accent"
-                    )}
-                  >
-                    <Search className="h-4 w-4 mr-2" />
-                    Browse Properties
-                  </Link>
-                  <Link
-                    to="/seeker/favorites"
-                    className={cn(
-                      "inline-flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors",
-                      location.pathname === '/seeker/favorites'
-                        ? "text-primary bg-primary/10" 
-                        : "text-foreground hover:text-primary hover:bg-accent"
-                    )}
-                  >
-                    <Heart className="h-4 w-4 mr-2" />
-                    Favorites
-                  </Link>
-                  <Link
-                    to="/properties/list"
-                    className={cn(
-                      "inline-flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors",
-                      location.pathname === '/properties/list'
-                        ? "text-primary bg-primary/10" 
-                        : "text-foreground hover:text-primary hover:bg-accent"
-                    )}
-                  >
-                    <Home className="h-4 w-4 mr-2" />
-                    List Property
-                  </Link>
-                </div>
-              )}
-            </>
-          ) : (
-            <>
-              {/* Show navigation for non-logged in users on homepage */}
-              {location.pathname === '/' && (
-                <div className="hidden md:flex flex-1 ml-12 space-x-8">
-                  <Link
-                    to="/seeker"
-                    className="inline-flex items-center px-3 py-2 text-sm font-medium rounded-md text-foreground hover:text-primary hover:bg-accent transition-colors"
-                  >
-                    <Search className="h-4 w-4 mr-2" />
-                    Browse Properties
-                  </Link>
-                </div>
-              )}
-            </>
-          )}
 
           <div className="flex items-center space-x-4">
             {/* Theme Switcher */}
@@ -456,43 +383,39 @@ export function Header({ onFavoritesClick }: HeaderProps) {
                     </div>
                     
                     <div className="py-2">
-                      {/* Menu items placed here */}
-                      {location.pathname !== '/' && (
-                        <>
-                          <Link 
-                            to="/" 
-                            className="flex w-full items-center px-4 py-2 text-sm text-foreground hover:bg-accent"
-                            onClick={() => setIsProfileDropdownOpen(false)}
-                          >
-                            <Home className="h-4 w-4 mr-2" />
-                            Home
-                          </Link>
-                          <Link 
-                            to="/seeker" 
-                            className="flex w-full items-center px-4 py-2 text-sm text-foreground hover:bg-accent"
-                            onClick={() => setIsProfileDropdownOpen(false)}
-                          >
-                            <Search className="h-4 w-4 mr-2" />
-                            Browse Properties
-                          </Link>
-                          <Link 
-                            to="/seeker/favorites" 
-                            className="flex w-full items-center px-4 py-2 text-sm text-foreground hover:bg-accent"
-                            onClick={() => setIsProfileDropdownOpen(false)}
-                          >
-                            <Heart className="h-4 w-4 mr-2" />
-                            Favorites
-                          </Link>
-                          <Link 
-                            to="/properties/list" 
-                            className="flex w-full items-center px-4 py-2 text-sm text-foreground hover:bg-accent"
-                            onClick={() => setIsProfileDropdownOpen(false)}
-                          >
-                            <Home className="h-4 w-4 mr-2" />
-                            List Property
-                          </Link>
-                        </>
-                      )}
+                      {/* Navigation links always in dropdown now */}
+                      <Link 
+                        to="/" 
+                        className="flex w-full items-center px-4 py-2 text-sm text-foreground hover:bg-accent"
+                        onClick={() => setIsProfileDropdownOpen(false)}
+                      >
+                        <Home className="h-4 w-4 mr-2" />
+                        Home
+                      </Link>
+                      <Link 
+                        to="/seeker" 
+                        className="flex w-full items-center px-4 py-2 text-sm text-foreground hover:bg-accent"
+                        onClick={() => setIsProfileDropdownOpen(false)}
+                      >
+                        <Search className="h-4 w-4 mr-2" />
+                        Browse Properties
+                      </Link>
+                      <Link 
+                        to="/seeker/favorites" 
+                        className="flex w-full items-center px-4 py-2 text-sm text-foreground hover:bg-accent"
+                        onClick={() => setIsProfileDropdownOpen(false)}
+                      >
+                        <Heart className="h-4 w-4 mr-2" />
+                        Favorites
+                      </Link>
+                      <Link 
+                        to="/properties/list" 
+                        className="flex w-full items-center px-4 py-2 text-sm text-foreground hover:bg-accent"
+                        onClick={() => setIsProfileDropdownOpen(false)}
+                      >
+                        <Home className="h-4 w-4 mr-2" />
+                        List Property
+                      </Link>
                       
                       <div className="px-4 py-2 text-xs uppercase font-semibold text-muted-foreground mt-2">
                         Account
