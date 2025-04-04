@@ -1,19 +1,13 @@
 // src/modules/seeker/components/PropertyDetails/PropertyGallery.tsx
-// Version: 2.0.0
-// Last Modified: 01-03-2025 14:30 IST
-// Purpose: Enhanced image gallery with immersive viewing experience
+// Version: 3.0.0
+// Last Modified: 06-04-2025 12:15 IST
+// Purpose: Enhanced image gallery with better error handling and fallbacks
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ChevronLeftIcon, ChevronRightIcon, ImageIcon, ExpandIcon, XIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
-
-interface PropertyImage {
-  id: string;
-  url: string;
-  is_primary?: boolean;
-  display_order?: number;
-}
+import { PropertyImage } from '../../hooks/usePropertyDetails';
 
 interface PropertyGalleryProps {
   images: PropertyImage[];
@@ -23,9 +17,46 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({ images }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
   const [fullscreenIndex, setFullscreenIndex] = useState(0);
-
-  // If no images, show placeholder
-  if (!images || images.length === 0) {
+  const [displayImages, setDisplayImages] = useState<PropertyImage[]>([]);
+  
+  // Process images when they change
+  useEffect(() => {
+    // Log received images for debugging
+    console.log('[PropertyGallery] Received images:', images);
+    
+    if (!images || images.length === 0) {
+      // Use a placeholder if no images are available
+      setDisplayImages([{
+        id: 'placeholder',
+        url: '/noimage.png'
+      }]);
+      return;
+    }
+    
+    // Ensure all images have valid URLs
+    const validImages = images.filter(img => img && img.url);
+    
+    if (validImages.length === 0) {
+      setDisplayImages([{
+        id: 'placeholder',
+        url: '/noimage.png'
+      }]);
+      return;
+    }
+    
+    // Sort images: primary first, then by display order
+    const sortedImages = [...validImages].sort((a, b) => {
+      if (a.is_primary && !b.is_primary) return -1;
+      if (!a.is_primary && b.is_primary) return 1;
+      return (a.display_order || 999) - (b.display_order || 999);
+    });
+    
+    setDisplayImages(sortedImages);
+    setCurrentIndex(0); // Reset to first image when images change
+  }, [images]);
+  
+  // If still no valid images after processing, show placeholder
+  if (!displayImages || displayImages.length === 0) {
     return (
       <div className="w-full aspect-[16/9] bg-muted/60 flex flex-col items-center justify-center rounded-xl border border-border">
         <ImageIcon className="h-16 w-16 text-muted-foreground mb-3 opacity-50" />
@@ -33,23 +64,16 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({ images }) => {
       </div>
     );
   }
-
-  // Sort images by display_order or is_primary
-  const sortedImages = [...images].sort((a, b) => {
-    if (a.is_primary) return -1;
-    if (b.is_primary) return 1;
-    return (a.display_order || 999) - (b.display_order || 999);
-  });
-
+  
   const goToNextSlide = () => {
     setCurrentIndex((prevIndex) => 
-      prevIndex === sortedImages.length - 1 ? 0 : prevIndex + 1
+      prevIndex === displayImages.length - 1 ? 0 : prevIndex + 1
     );
   };
 
   const goToPrevSlide = () => {
     setCurrentIndex((prevIndex) => 
-      prevIndex === 0 ? sortedImages.length - 1 : prevIndex - 1
+      prevIndex === 0 ? displayImages.length - 1 : prevIndex - 1
     );
   };
 
@@ -64,101 +88,70 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({ images }) => {
 
   const goToNextFullscreen = () => {
     setFullscreenIndex((prevIndex) => 
-      prevIndex === sortedImages.length - 1 ? 0 : prevIndex + 1
+      prevIndex === displayImages.length - 1 ? 0 : prevIndex + 1
     );
   };
 
   const goToPrevFullscreen = () => {
     setFullscreenIndex((prevIndex) => 
-      prevIndex === 0 ? sortedImages.length - 1 : prevIndex - 1
+      prevIndex === 0 ? displayImages.length - 1 : prevIndex - 1
     );
   };
-
-  // For grid view with multiple images
-  const renderImageGrid = () => {
-    // Show grid only if we have more than 1 image
-    if (sortedImages.length <= 1) {
-      return null;
-    }
-    
-    // Main image is larger, with up to 4 thumbnails to the right
-    return (
-      <div className="grid grid-cols-4 gap-2 mt-2">
-        {sortedImages.slice(0, 5).map((image, index) => (
-          <button
-            key={image.id}
-            onClick={() => openFullscreen(index)}
-            className={`relative rounded-lg overflow-hidden ${
-              index === 0 ? "col-span-4 md:col-span-2 aspect-video" : "aspect-square"
-            } transition-opacity hover:opacity-95 group`}
-          >
-            <img
-              src={image.url}
-              alt={`Property view ${index + 1}`}
-              className="w-full h-full object-cover"
-            />
-            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-              <ExpandIcon className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-            </div>
-          </button>
-        ))}
-        
-        {/* Show "See All Photos" button if more than 5 images */}
-        {sortedImages.length > 5 && (
-          <button
-            onClick={() => openFullscreen(5)}
-            className="col-span-4 md:col-span-2 aspect-square relative rounded-lg overflow-hidden bg-black/50 flex items-center justify-center group hover:bg-black/60 transition-colors"
-          >
-            <span className="text-white font-medium">+{sortedImages.length - 5} More Photos</span>
-          </button>
-        )}
-      </div>
-    );
+  
+  // Handle image load errors
+  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    e.currentTarget.src = '/noimage.png';
   };
-
+  
   return (
     <div className="space-y-2">
       {/* Main featured image */}
       <div className="relative rounded-xl overflow-hidden bg-muted group">
         <div className="aspect-[16/9] md:aspect-[21/9] overflow-hidden">
           <img
-            src={sortedImages[currentIndex].url}
-            alt="Property Featured View"
+            src={displayImages[currentIndex].url}
+            alt={`Property view ${currentIndex + 1}`}
             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+            onError={handleImageError}
           />
         </div>
         
-        {/* Navigation arrows */}
-        <div className="absolute inset-0 flex items-center justify-between p-4 opacity-0 group-hover:opacity-100 transition-opacity">
-          <Button
-            variant="secondary"
-            size="icon"
-            className="rounded-full bg-black/40 text-white hover:bg-black/60 border-white/20"
-            onClick={(e) => {
-              e.stopPropagation();
-              goToPrevSlide();
-            }}
-          >
-            <ChevronLeftIcon className="h-6 w-6" />
-          </Button>
-          
-          <Button
-            variant="secondary"
-            size="icon"
-            className="rounded-full bg-black/40 text-white hover:bg-black/60 border-white/20"
-            onClick={(e) => {
-              e.stopPropagation();
-              goToNextSlide();
-            }}
-          >
-            <ChevronRightIcon className="h-6 w-6" />
-          </Button>
-        </div>
-        
-        {/* Image counter */}
-        <div className="absolute bottom-4 left-4 bg-black/50 text-white px-3 py-1.5 rounded-full text-sm backdrop-blur-sm">
-          {currentIndex + 1} / {sortedImages.length}
-        </div>
+        {/* Only show navigation if more than one image */}
+        {displayImages.length > 1 && (
+          <>
+            {/* Navigation arrows */}
+            <div className="absolute inset-0 flex items-center justify-between p-4 opacity-0 group-hover:opacity-100 transition-opacity">
+              <Button
+                variant="secondary"
+                size="icon"
+                className="rounded-full bg-black/40 text-white hover:bg-black/60 border-white/20"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  goToPrevSlide();
+                }}
+              >
+                <ChevronLeftIcon className="h-6 w-6" />
+              </Button>
+              
+              <Button
+                variant="secondary"
+                size="icon"
+                className="rounded-full bg-black/40 text-white hover:bg-black/60 border-white/20"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  goToNextSlide();
+                }}
+              >
+                <ChevronRightIcon className="h-6 w-6" />
+              </Button>
+            </div>
+            
+            {/* Image counter */}
+            <div className="absolute bottom-4 left-4 bg-black/50 text-white px-3 py-1.5 rounded-full text-sm backdrop-blur-sm">
+              {currentIndex + 1} / {displayImages.length}
+            </div>
+          </>
+        )}
         
         {/* Fullscreen button */}
         <Button
@@ -171,31 +164,29 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({ images }) => {
         </Button>
       </div>
       
-      {/* Thumbnail navigation for desktop */}
-      <div className="hidden md:flex space-x-2 overflow-x-auto pb-2 -mx-1 px-1">
-        {sortedImages.map((image, index) => (
-          <button
-            key={image.id}
-            onClick={() => goToSlide(index)}
-            className={`flex-shrink-0 rounded-md overflow-hidden transition-all ${
-              index === currentIndex 
-                ? 'ring-2 ring-primary w-20 h-20 opacity-100' 
-                : 'opacity-70 hover:opacity-100 w-16 h-16 hover:w-20 hover:h-20'
-            }`}
-          >
-            <img
-              src={image.url}
-              alt={`Thumbnail ${index + 1}`}
-              className="w-full h-full object-cover"
-            />
-          </button>
-        ))}
-      </div>
-      
-      {/* Mobile image grid view */}
-      <div className="md:hidden">
-        {renderImageGrid()}
-      </div>
+      {/* Thumbnail navigation for desktop - only show if multiple images */}
+      {displayImages.length > 1 && (
+        <div className="hidden md:flex space-x-2 overflow-x-auto pb-2 -mx-1 px-1">
+          {displayImages.map((image, index) => (
+            <button
+              key={image.id || index}
+              onClick={() => goToSlide(index)}
+              className={`flex-shrink-0 rounded-md overflow-hidden transition-all ${
+                index === currentIndex 
+                  ? 'ring-2 ring-primary w-20 h-20 opacity-100' 
+                  : 'opacity-70 hover:opacity-100 w-16 h-16 hover:w-20 hover:h-20'
+              }`}
+            >
+              <img
+                src={image.url}
+                alt={`Thumbnail ${index + 1}`}
+                className="w-full h-full object-cover"
+                onError={handleImageError}
+              />
+            </button>
+          ))}
+        </div>
+      )}
       
       {/* Fullscreen gallery dialog */}
       <Dialog open={fullscreenOpen} onOpenChange={setFullscreenOpen}>
@@ -214,60 +205,66 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({ images }) => {
             {/* Main image container */}
             <div className="flex-1 flex items-center justify-center p-4">
               <img
-                src={sortedImages[fullscreenIndex].url}
+                src={displayImages[fullscreenIndex].url}
                 alt={`Property view ${fullscreenIndex + 1}`}
                 className="max-h-full max-w-full object-contain"
+                onError={handleImageError}
               />
             </div>
             
-            {/* Navigation controls */}
-            <div className="absolute inset-0 flex items-center justify-between p-4">
-              <Button
-                variant="secondary"
-                size="icon"
-                className="rounded-full bg-black/40 text-white hover:bg-black/60 border-white/20"
-                onClick={goToPrevFullscreen}
-              >
-                <ChevronLeftIcon className="h-6 w-6" />
-              </Button>
-              
-              <Button
-                variant="secondary"
-                size="icon"
-                className="rounded-full bg-black/40 text-white hover:bg-black/60 border-white/20"
-                onClick={goToNextFullscreen}
-              >
-                <ChevronRightIcon className="h-6 w-6" />
-              </Button>
-            </div>
-            
-            {/* Image counter */}
-            <div className="absolute bottom-4 left-4 bg-white/10 text-white px-3 py-1.5 rounded-full text-sm backdrop-blur-sm">
-              {fullscreenIndex + 1} / {sortedImages.length}
-            </div>
-            
-            {/* Thumbnail strip */}
-            <div className="h-24 bg-black/60 p-3 flex items-center">
-              <div className="flex space-x-2 overflow-x-auto">
-                {sortedImages.map((image, index) => (
-                  <button
-                    key={image.id}
-                    onClick={() => setFullscreenIndex(index)}
-                    className={`flex-shrink-0 rounded-md overflow-hidden transition-all h-16 w-16 ${
-                      index === fullscreenIndex 
-                        ? 'ring-2 ring-white' 
-                        : 'opacity-50 hover:opacity-100'
-                    }`}
+            {/* Navigation controls - only if multiple images */}
+            {displayImages.length > 1 && (
+              <>
+                <div className="absolute inset-0 flex items-center justify-between p-4">
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    className="rounded-full bg-black/40 text-white hover:bg-black/60 border-white/20"
+                    onClick={goToPrevFullscreen}
                   >
-                    <img
-                      src={image.url}
-                      alt={`Thumbnail ${index + 1}`}
-                      className="w-full h-full object-cover"
-                    />
-                  </button>
-                ))}
-              </div>
-            </div>
+                    <ChevronLeftIcon className="h-6 w-6" />
+                  </Button>
+                  
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    className="rounded-full bg-black/40 text-white hover:bg-black/60 border-white/20"
+                    onClick={goToNextFullscreen}
+                  >
+                    <ChevronRightIcon className="h-6 w-6" />
+                  </Button>
+                </div>
+                
+                {/* Image counter */}
+                <div className="absolute bottom-24 left-4 bg-white/10 text-white px-3 py-1.5 rounded-full text-sm backdrop-blur-sm">
+                  {fullscreenIndex + 1} / {displayImages.length}
+                </div>
+                
+                {/* Thumbnail strip */}
+                <div className="h-24 bg-black/60 p-3 flex items-center">
+                  <div className="flex space-x-2 overflow-x-auto">
+                    {displayImages.map((image, index) => (
+                      <button
+                        key={image.id || index}
+                        onClick={() => setFullscreenIndex(index)}
+                        className={`flex-shrink-0 rounded-md overflow-hidden transition-all h-16 w-16 ${
+                          index === fullscreenIndex 
+                            ? 'ring-2 ring-white' 
+                            : 'opacity-50 hover:opacity-100'
+                        }`}
+                      >
+                        <img
+                          src={image.url}
+                          alt={`Thumbnail ${index + 1}`}
+                          className="w-full h-full object-cover"
+                          onError={handleImageError}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </DialogContent>
       </Dialog>
