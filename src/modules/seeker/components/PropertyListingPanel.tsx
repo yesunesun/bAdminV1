@@ -1,9 +1,9 @@
 // src/modules/seeker/components/PropertyListingPanel.tsx
-// Version: 1.4.0
-// Last Modified: 04-04-2025 22:45 IST
-// Purpose: Added property type and share button matching screenshot layout
+// Version: 1.7.0
+// Last Modified: 05-04-2025 12:00 IST
+// Purpose: Fixed favorites toggling and loading issues
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { PropertyType } from '@/modules/owner/components/property/types';
 import { Button } from '@/components/ui/button';
@@ -20,10 +20,12 @@ interface PropertyListingPanelProps {
   hasMore: boolean;
   totalCount: number;
   onLoadMore: () => void;
-  onFavoriteAction: (propertyId: string) => boolean;
+  onFavoriteAction: (propertyId: string, isLiked: boolean) => Promise<boolean>;
   handlePropertyHover: (propertyId: string, isHovering: boolean) => void;
   hoveredProperty: string | null;
   setActiveProperty: (property: PropertyType | null) => void;
+  favoriteProperties?: Set<string>;
+  isLoadingFavorites?: boolean;
 }
 
 const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
@@ -36,15 +38,72 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
   onFavoriteAction,
   handlePropertyHover,
   hoveredProperty,
-  setActiveProperty
+  setActiveProperty,
+  favoriteProperties = new Set(),
+  isLoadingFavorites = false
 }) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [propertyLikeState, setPropertyLikeState] = useState<Record<string, boolean>>({});
 
-  // Handle favorite toggle
-  const handleFavoriteToggle = (propertyId: string, isLiked: boolean) => {
-    onFavoriteAction(propertyId);
-    return true;
+  // Setup initial like states when favorites or properties change
+  useEffect(() => {
+    const newLikeState: Record<string, boolean> = {};
+    
+    properties.forEach(property => {
+      // Check if the property is in the favorites set
+      newLikeState[property.id] = favoriteProperties.has(property.id);
+    });
+    
+    setPropertyLikeState(newLikeState);
+    
+    console.log('Updated property like states:', { 
+      propertiesCount: properties.length,
+      favoritesCount: favoriteProperties.size,
+      newStates: newLikeState
+    });
+  }, [properties, favoriteProperties]);
+
+  // Handle favorite toggle with persistence
+  const handleFavoriteToggle = async (propertyId: string, newLikedState: boolean) => {
+    if (!user) {
+      toast({
+        title: "Login required",
+        description: "Please log in to save favorites",
+        duration: 3000,
+      });
+      return false;
+    }
+    
+    // Optimistically update UI
+    setPropertyLikeState(prev => ({
+      ...prev,
+      [propertyId]: newLikedState
+    }));
+    
+    console.log(`Toggling property ${propertyId} to ${newLikedState ? 'liked' : 'not liked'}`);
+    
+    // Perform the actual toggle operation
+    const success = await onFavoriteAction(propertyId, newLikedState);
+    
+    console.log(`Toggle operation ${success ? 'succeeded' : 'failed'}`);
+    
+    // If failed, revert UI change
+    if (!success) {
+      setPropertyLikeState(prev => ({
+        ...prev,
+        [propertyId]: !newLikedState
+      }));
+      
+      toast({
+        title: "Action failed",
+        description: "There was a problem updating your favorites",
+        variant: "destructive",
+        duration: 3000,
+      });
+    }
+    
+    return success;
   };
 
   // Handle share action
@@ -99,10 +158,10 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
         {/* Header with count */}
         <div className="sticky top-0 z-10 bg-card p-4 border-b flex justify-between items-center">
           <div className="text-sm font-medium">
-            {loading ? (
+            {loading || isLoadingFavorites ? (
               <span className="flex items-center gap-2">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Loading properties...
+                {isLoadingFavorites ? 'Loading favorites...' : 'Loading properties...'}
               </span>
             ) : (
               <span>
@@ -163,6 +222,9 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
                 // Extract locality from property details or fallback to city
                 const locality = property.property_details?.locality || property.city || '';
                 
+                // Check if property is liked using our state object
+                const isLiked = propertyLikeState[property.id] || false;
+                
                 return (
                   <div 
                     key={`property-${property.id}`}
@@ -193,8 +255,8 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
                           </button>
                           
                           <FavoriteButton
-                            initialIsLiked={false}
-                            onToggle={(isLiked) => handleFavoriteToggle(property.id, isLiked)}
+                            initialIsLiked={isLiked}
+                            onToggle={(newLikedState) => handleFavoriteToggle(property.id, newLikedState)}
                             className="text-gray-400 hover:text-primary" 
                           />
                         </div>
@@ -218,7 +280,7 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
                           />
                         </div>
                         
-                        {/* Property details - layout matches screenshot */}
+                        {/* Property details */}
                         <div className="flex-1 min-w-0">
                           {/* Location with icon */}
                           <div className="flex items-center text-xs text-gray-500 mb-1">
@@ -233,7 +295,7 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
                             {formatPrice(property.price)}
                           </p>
                           
-                          {/* Property specs - horizontal layout as in screenshot */}
+                          {/* Property specs */}
                           <div className="flex items-center gap-3 text-xs text-gray-500">
                             {property.bedrooms && (
                               <span className="flex items-center">
@@ -256,7 +318,7 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
                             )}
                           </div>
                           
-                          {/* Property Type Badge - Added as requested */}
+                          {/* Property Type Badge */}
                           <div className="mt-2 inline-block bg-gray-100 text-xs text-gray-600 px-2 py-0.5 rounded">
                             {propertyType}
                           </div>

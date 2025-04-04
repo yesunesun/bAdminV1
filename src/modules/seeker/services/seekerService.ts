@@ -598,11 +598,11 @@ export const removeFavorite = async (propertyId: string) => {
 
 export const togglePropertyLike = async (propertyId: string, isLiked: boolean) => {
   try {
-    // If currently liked, remove the like; otherwise add a like
+    // If isLiked is true, we want to add a favorite; otherwise remove it
     if (isLiked) {
-      return await removeFavorite(propertyId);
-    } else {
       return await addFavorite(propertyId);
+    } else {
+      return await removeFavorite(propertyId);
     }
   } catch (error) {
     console.error('Error toggling property like:', error);

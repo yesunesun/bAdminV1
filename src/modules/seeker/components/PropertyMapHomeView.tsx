@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyMapHomeView.tsx
-// Version: 2.5.0
-// Last Modified: 04-04-2025 15:30 IST
-// Purpose: Enhanced for performance and improved responsive behavior
+// Version: 2.8.0
+// Last Modified: 05-04-2025 12:30 IST
+// Purpose: Fixed favorites loading and toggling
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useJsApiLoader } from '@react-google-maps/api';
@@ -12,12 +12,15 @@ import MapPanel from './MapPanel';
 import { AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import RecentSearches from './RecentSearches';
+import { getUserFavorites, togglePropertyLike } from '../services/seekerService';
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/components/ui/use-toast';
 
 // Libraries to load
 const libraries = ['places'];
 
 interface PropertyMapHomeViewProps {
-  onFavoriteAction: (propertyId: string) => boolean;
+  onFavoriteAction?: (propertyId: string) => boolean;
 }
 
 const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAction }) => {
@@ -26,6 +29,12 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
   
   // State for showing recent searches
   const [showRecentSearches, setShowRecentSearches] = useState<boolean>(false);
+  
+  // Favorites state management
+  const [favoriteProperties, setFavoriteProperties] = useState<Set<string>>(new Set());
+  const [isLoadingFavorites, setIsLoadingFavorites] = useState<boolean>(false);
+  const { user } = useAuth();
+  const { toast } = useToast();
   
   // Memoize API key to prevent unnecessary re-renders
   const apiKey = useMemo(() => import.meta.env.VITE_GOOGLE_MAPS_KEY || '', []);
@@ -59,6 +68,101 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
     libraries,
     preventGoogleFontsLoading: true
   });
+  
+  // Load user favorites when component mounts or user changes
+  useEffect(() => {
+    const fetchFavorites = async () => {
+      if (!user) {
+        setFavoriteProperties(new Set());
+        return;
+      }
+      
+      setIsLoadingFavorites(true);
+      try {
+        const favorites = await getUserFavorites();
+        console.log('Loaded favorites:', favorites);
+        
+        // Extract IDs into a Set for efficient lookup
+        const favoriteIds = new Set(favorites.map(property => property.id));
+        setFavoriteProperties(favoriteIds);
+        
+        console.log('Favorite IDs:', Array.from(favoriteIds));
+      } catch (error) {
+        console.error('Error fetching user favorites:', error);
+        toast({
+          title: "Couldn't load favorites",
+          description: "There was a problem loading your favorites",
+          variant: "destructive",
+          duration: 3000,
+        });
+      } finally {
+        setIsLoadingFavorites(false);
+      }
+    };
+    
+    fetchFavorites();
+  }, [user, toast]);
+  
+  // Handle favorite toggling with proper feedback
+  const handleFavoriteToggle = useCallback(async (propertyId: string, isLiked: boolean) => {
+    if (!user) {
+      toast({
+        title: "Login required",
+        description: "Please log in to save favorites",
+        duration: 3000,
+      });
+      return false;
+    }
+    
+    try {
+      console.log(`Toggling property ${propertyId} to ${isLiked ? 'liked' : 'not liked'}`);
+      
+      // Toggle the favorite in the database
+      const result = await togglePropertyLike(propertyId, isLiked);
+      
+      if (result.success) {
+        // Update local state on success
+        setFavoriteProperties(prev => {
+          const updated = new Set(prev);
+          if (isLiked) {
+            updated.add(propertyId);
+          } else {
+            updated.delete(propertyId);
+          }
+          return updated;
+        });
+        
+        // Show success toast
+        toast({
+          title: isLiked ? "Added to favorites" : "Removed from favorites",
+          description: isLiked 
+            ? "Property added to your favorites" 
+            : "Property removed from your favorites",
+          duration: 2000,
+        });
+        
+        return true;
+      } else {
+        // Show error toast
+        toast({
+          title: "Action failed",
+          description: "There was a problem updating your favorites",
+          variant: "destructive",
+          duration: 3000,
+        });
+        return false;
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+      toast({
+        title: "Error",
+        description: "Something went wrong. Please try again.",
+        variant: "destructive",
+        duration: 3000,
+      });
+      return false;
+    }
+  }, [user, toast]);
   
   // Preload fallback image with visual performance indicator
   useEffect(() => {
@@ -155,10 +259,12 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
           hasMore={hasMore}
           totalCount={totalCount}
           onLoadMore={loadMoreProperties}
-          onFavoriteAction={onFavoriteAction}
+          onFavoriteAction={handleFavoriteToggle}
           handlePropertyHover={handlePropertyHover}
           hoveredProperty={hoveredProperty}
           setActiveProperty={setActiveProperty}
+          favoriteProperties={favoriteProperties}
+          isLoadingFavorites={isLoadingFavorites}
         />
         
         {/* Map Panel with lazy loading optimization */}
