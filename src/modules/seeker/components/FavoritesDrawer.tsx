@@ -1,7 +1,7 @@
 // src/modules/seeker/components/FavoritesDrawer.tsx
-// Version: 1.0.0
-// Last Modified: 03-04-2025 11:55 IST
-// Purpose: Migrated from properties module to seeker module
+// Version: 1.2.0
+// Last Modified: 04-04-2025 18:00 IST
+// Purpose: Enhanced real-time updates for favorites and smoother user experience
 
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
@@ -17,6 +17,8 @@ import { Button } from '@/components/ui/button';
 import { Heart, Loader2, Trash2 } from 'lucide-react';
 import { PropertyType } from '@/modules/owner/components/property/types';
 import { getUserFavorites, removeFavorite, formatPrice } from '../services/seekerService';
+import { useToast } from '@/components/ui/use-toast';
+import { supabase } from '@/lib/supabase';
 
 interface FavoritesDrawerProps {
   open: boolean;
@@ -25,6 +27,7 @@ interface FavoritesDrawerProps {
 
 const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({ open, onClose }) => {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [favorites, setFavorites] = useState<PropertyType[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   
@@ -44,16 +47,75 @@ const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({ open, onClose }) => {
       };
       
       fetchFavorites();
+      
+      // Set up subscription to real-time updates for favorites
+      if (user) {
+        const channel = supabase.channel('favorites_drawer_changes')
+          .on('postgres_changes', 
+            {
+              event: 'DELETE',
+              schema: 'public',
+              table: 'property_likes',
+              filter: `user_id=eq.${user.id}`
+            }, 
+            (payload) => {
+              console.log('DELETE detected in favorites drawer:', payload);
+              // If the property was removed outside this component, update the UI
+              if (payload.old && payload.old.property_id) {
+                setFavorites(prev => prev.filter(prop => prop.id !== payload.old.property_id));
+              }
+            }
+          )
+          .on('postgres_changes', 
+            {
+              event: 'INSERT',
+              schema: 'public',
+              table: 'property_likes',
+              filter: `user_id=eq.${user.id}`
+            }, 
+            () => {
+              // If a new property was added, refresh the list
+              fetchFavorites();
+            }
+          );
+        
+        channel.subscribe();
+        
+        return () => {
+          supabase.removeChannel(channel);
+        };
+      }
     }
   }, [open, user]);
   
   // Handle remove favorite
   const handleRemoveFavorite = async (propertyId: string) => {
     try {
-      await removeFavorite(propertyId);
-      setFavorites(favorites.filter(prop => prop.id !== propertyId));
+      const result = await removeFavorite(propertyId);
+      
+      if (result.success) {
+        // We'll let the real-time subscription handle the UI update
+        // This ensures consistency with the badge count
+        
+        // Show success toast
+        toast({
+          title: "Property removed from favorites",
+          description: "Your favorites have been updated",
+          duration: 3000,
+        });
+      } else {
+        throw new Error("Failed to remove favorite");
+      }
     } catch (error) {
       console.error('Error removing favorite:', error);
+      
+      // Show error toast
+      toast({
+        title: "Could not remove property",
+        description: "There was a problem updating your favorites",
+        variant: "destructive",
+        duration: 3000,
+      });
     }
   };
   

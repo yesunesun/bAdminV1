@@ -1,14 +1,15 @@
 // src/App.tsx 
-// Version: 8.1.0
-// Last Modified: 03-04-2025 21:30 IST
-// Purpose: Fixed width for root path to match /seeker
+// Version: 8.2.0
+// Last Modified: 04-04-2025 14:30 IST
+// Purpose: Added FavoritesDrawer integration with Header
 
-import React from 'react';
+import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Header } from '@/components/Header';
 import PropertyHeader from '@/modules/seeker/components/PropertyHeader';
 import { useAdminAccess } from './modules/admin/hooks/useAdminAccess';
+import FavoritesDrawer from '@/modules/seeker/components/FavoritesDrawer';
 
 // Import HomePage and PropertyMapHome (updated path)
 import HomePage from './pages/HomePage';
@@ -154,9 +155,20 @@ const PublicOrProtectedRoute = ({ children }: { children: React.ReactNode }) => 
 };
 
 function AppLayout() {
+  const [isFavoritesOpen, setIsFavoritesOpen] = useState(false);
+  
+  const handleFavoritesClick = () => {
+    setIsFavoritesOpen(true);
+  };
+  
+  const handleFavoritesClose = () => {
+    setIsFavoritesOpen(false);
+  };
+  
   return (
     <>
-      <Header />
+      <Header onFavoritesClick={handleFavoritesClick} />
+      <FavoritesDrawer open={isFavoritesOpen} onClose={handleFavoritesClose} />
       <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
         <Outlet />
       </main>
@@ -165,14 +177,20 @@ function AppLayout() {
 }
 
 function SeekerLayout({ children }: { children?: React.ReactNode }) {
-  // Function to handle favorites click
+  const [isFavoritesOpen, setIsFavoritesOpen] = useState(false);
+  
   const handleFavoritesClick = () => {
-    console.log('Favorites clicked');
+    setIsFavoritesOpen(true);
+  };
+  
+  const handleFavoritesClose = () => {
+    setIsFavoritesOpen(false);
   };
   
   return (
     <>
       <PropertyHeader onFavoritesClick={handleFavoritesClick} />
+      <FavoritesDrawer open={isFavoritesOpen} onClose={handleFavoritesClose} />
       <main className="container mx-auto">
         {children || <Outlet />}
       </main>
@@ -182,13 +200,20 @@ function SeekerLayout({ children }: { children?: React.ReactNode }) {
 
 // Wrapper for PropertyMapHome that adds consistent width
 const PropertyMapWrapper = () => {
+  const [isFavoritesOpen, setIsFavoritesOpen] = useState(false);
+  
   const handleFavoritesClick = () => {
-    console.log('Favorites clicked');
+    setIsFavoritesOpen(true);
+  };
+  
+  const handleFavoritesClose = () => {
+    setIsFavoritesOpen(false);
   };
 
   return (
     <>
-      <PropertyHeader onFavoritesClick={handleFavoritesClick} />
+      <Header onFavoritesClick={handleFavoritesClick} />
+      <FavoritesDrawer open={isFavoritesOpen} onClose={handleFavoritesClose} />
       <div className="container mx-auto">
         <PropertyMapHome />
       </div>

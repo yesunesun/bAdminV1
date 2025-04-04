@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyHeader.tsx
-// Version: 3.0.0
-// Last Modified: 03-04-2025 18:30 IST
-// Purpose: Modernized header with simplified design for Seeker module
+// Version: 3.2.0
+// Last Modified: 04-04-2025 18:00 IST
+// Purpose: Fixed real-time subscription for favorites count updates
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
@@ -31,6 +31,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { supabase } from '@/lib/supabase';
 
 interface PropertyHeaderProps {
   onFavoritesClick?: () => void;
@@ -47,16 +48,25 @@ const PropertyHeader: React.FC<PropertyHeaderProps> = ({ onFavoritesClick }) => 
   // Fetch favorites count when user is logged in
   useEffect(() => {
     const fetchFavoriteCount = async () => {
-      if (!user) return;
+      if (!user) {
+        setFavoriteCount(0);
+        return;
+      }
       
       try {
-        const { supabase } = await import('@/lib/supabase');
+        console.log("Fetching favorite count for user:", user.id);
         const { count, error } = await supabase
           .from('property_likes')
           .select('id', { count: 'exact', head: true })
           .eq('user_id', user.id);
         
-        if (!error && count !== null) {
+        if (error) {
+          console.error('Error fetching favorite count:', error);
+          return;
+        }
+        
+        console.log("Current favorite count:", count);
+        if (count !== null) {
           setFavoriteCount(count);
         }
       } catch (error) {
@@ -64,8 +74,52 @@ const PropertyHeader: React.FC<PropertyHeaderProps> = ({ onFavoritesClick }) => 
       }
     };
     
+    fetchFavoriteCount();
+    
+    // Set up real-time subscription only if user is logged in
     if (user) {
-      fetchFavoriteCount();
+      console.log("Setting up property_likes subscription for user:", user.id);
+      
+      // Subscribe to changes in property_likes
+      const channel = supabase.channel('property_likes_changes_property_header')
+        .on('postgres_changes', 
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'property_likes',
+            filter: `user_id=eq.${user.id}`
+          }, 
+          (payload) => {
+            console.log('INSERT detected in property_likes:', payload);
+            setFavoriteCount(prevCount => prevCount + 1);
+          }
+        )
+        .on('postgres_changes', 
+          {
+            event: 'DELETE',
+            schema: 'public',
+            table: 'property_likes',
+            filter: `user_id=eq.${user.id}`
+          }, 
+          (payload) => {
+            console.log('DELETE detected in property_likes:', payload);
+            setFavoriteCount(prevCount => Math.max(0, prevCount - 1));
+          }
+        );
+      
+      // Subscribe to the channel
+      channel.subscribe((status) => {
+        console.log(`Subscription status for property_likes_changes_property_header: ${status}`);
+        if (status === 'SUBSCRIBED') {
+          console.log('Successfully subscribed to property_likes changes');
+        }
+      });
+      
+      // Clean up subscription when component unmounts
+      return () => {
+        console.log('Cleaning up property_likes subscription');
+        supabase.removeChannel(channel);
+      };
     }
   }, [user]);
   

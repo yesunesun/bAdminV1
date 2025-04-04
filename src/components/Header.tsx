@@ -1,7 +1,7 @@
 // src/components/Header.tsx
-// Version: 3.0.0
-// Last Modified: 03-04-2025 18:30 IST
-// Purpose: Modernized header with simplified design, larger logo, and menu items under profile dropdown
+// Version: 3.1.0
+// Last Modified: 04-04-2025 18:00 IST
+// Purpose: Fixed real-time subscription for favorites count updates
 
 import React, { useEffect, useState, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
@@ -54,36 +54,80 @@ export function Header({ onFavoritesClick }: HeaderProps) {
     fetchUserRole();
   }, [user]);
 
-  // Fetch favorites count
+  // Fetch favorites count and subscribe to changes
   useEffect(() => {
-    const fetchFavoritesCount = async () => {
-      if (!user) return;
-      const { count, error } = await supabase
-        .from('property_likes')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id);
+    const fetchFavoriteCount = async () => {
+      if (!user) {
+        setFavoriteCount(0);
+        return;
+      }
       
-      if (!error && count !== null) setFavoriteCount(count);
+      try {
+        console.log("Fetching favorite count for user:", user.id);
+        const { count, error } = await supabase
+          .from('property_likes')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id);
+        
+        if (error) {
+          console.error('Error fetching favorite count:', error);
+          return;
+        }
+        
+        console.log("Current favorite count:", count);
+        if (count !== null) {
+          setFavoriteCount(count);
+        }
+      } catch (error) {
+        console.error('Error fetching favorite count:', error);
+      }
     };
-
+    
+    fetchFavoriteCount();
+    
+    // Set up real-time subscription only if user is logged in
     if (user) {
-      fetchFavoritesCount();
+      console.log("Setting up property_likes subscription for user:", user.id);
       
       // Subscribe to changes in property_likes
-      const subscription = supabase
-        .channel('property_likes_changes')
-        .on('postgres_changes', { 
-          event: '*', 
-          schema: 'public', 
-          table: 'property_likes',
-          filter: `user_id=eq.${user.id}`
-        }, () => {
-          fetchFavoritesCount();
-        })
-        .subscribe();
-        
+      const channel = supabase.channel('property_likes_changes_main_header')
+        .on('postgres_changes', 
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'property_likes',
+            filter: `user_id=eq.${user.id}`
+          }, 
+          (payload) => {
+            console.log('INSERT detected in property_likes:', payload);
+            setFavoriteCount(prevCount => prevCount + 1);
+          }
+        )
+        .on('postgres_changes', 
+          {
+            event: 'DELETE',
+            schema: 'public',
+            table: 'property_likes',
+            filter: `user_id=eq.${user.id}`
+          }, 
+          (payload) => {
+            console.log('DELETE detected in property_likes:', payload);
+            setFavoriteCount(prevCount => Math.max(0, prevCount - 1));
+          }
+        );
+      
+      // Subscribe to the channel
+      channel.subscribe((status) => {
+        console.log(`Subscription status for property_likes_changes_main_header: ${status}`);
+        if (status === 'SUBSCRIBED') {
+          console.log('Successfully subscribed to property_likes changes');
+        }
+      });
+      
+      // Clean up subscription when component unmounts
       return () => {
-        supabase.removeChannel(subscription);
+        console.log('Cleaning up property_likes subscription');
+        supabase.removeChannel(channel);
       };
     }
   }, [user]);
@@ -191,7 +235,7 @@ export function Header({ onFavoritesClick }: HeaderProps) {
               </div>
 
               {/* Favorites Button (only if user is logged in) */}
-              {user && (
+              {user && onFavoritesClick && (
                 <button
                   onClick={onFavoritesClick}
                   className="relative flex items-center justify-center w-8 h-8 rounded-full bg-accent/50 backdrop-blur-sm transition-all hover:bg-accent"
@@ -445,7 +489,7 @@ export function Header({ onFavoritesClick }: HeaderProps) {
             </div>
 
             {/* Favorites Button (only if user is logged in) */}
-            {user && (
+            {user && onFavoritesClick && (
               <button
                 onClick={onFavoritesClick}
                 className="relative flex items-center justify-center w-10 h-10 rounded-full bg-accent/50 backdrop-blur-sm transition-all hover:bg-accent"
