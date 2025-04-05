@@ -1,14 +1,13 @@
 // src/App.tsx 
-// Version: 8.6.0
-// Last Modified: 04-04-2025 14:45 IST
-// Purpose: Added Footer component to seeker layouts
+// Version: 8.9.0
+// Last Modified: 05-04-2025 19:45 IST
+// Purpose: Standardized header layout across all routes
 
 import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { FavoritesProvider } from './contexts/FavoritesContext';
 import { Header } from '@/components/Header';
-import PropertyHeader from '@/modules/seeker/components/PropertyHeader';
 import { useAdminAccess } from './modules/admin/hooks/useAdminAccess';
 import FavoritesDrawer from '@/modules/seeker/components/FavoritesDrawer';
 import Footer from '@/components/Footer';
@@ -156,7 +155,7 @@ const PublicOrProtectedRoute = ({ children }: { children: React.ReactNode }) => 
   return <>{children}</>;
 };
 
-// Main app layout with Header
+// Main app layout with Header - now standardized
 function AppLayout() {
   const [isFavoritesOpen, setIsFavoritesOpen] = useState(false);
   
@@ -180,7 +179,7 @@ function AppLayout() {
   );
 }
 
-// Seeker layout with PropertyHeader
+// Seeker layout with standard Header - now using same structure
 function SeekerLayout({ children }: { children?: React.ReactNode }) {
   const [isFavoritesOpen, setIsFavoritesOpen] = useState(false);
   
@@ -194,9 +193,9 @@ function SeekerLayout({ children }: { children?: React.ReactNode }) {
   
   return (
     <div className="flex flex-col min-h-screen">
-      <PropertyHeader onFavoritesClick={handleFavoritesClick} />
+      <Header onFavoritesClick={handleFavoritesClick} />
       <FavoritesDrawer open={isFavoritesOpen} onClose={handleFavoritesClose} />
-      <main className="container mx-auto flex-grow">
+      <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex-grow">
         {children || <Outlet />}
       </main>
       <Footer />
@@ -204,7 +203,7 @@ function SeekerLayout({ children }: { children?: React.ReactNode }) {
   );
 }
 
-// PropertyMapWrapper
+// PropertyMapWrapper - now standardized to match other layouts
 const PropertyMapWrapper = () => {
   const [isFavoritesOpen, setIsFavoritesOpen] = useState(false);
   
@@ -220,7 +219,7 @@ const PropertyMapWrapper = () => {
     <div className="flex flex-col min-h-screen">
       <Header onFavoritesClick={handleFavoritesClick} />
       <FavoritesDrawer open={isFavoritesOpen} onClose={handleFavoritesClose} />
-      <div className="container mx-auto flex-grow">
+      <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex-grow">
         <PropertyMapHome />
       </div>
       <Footer />
