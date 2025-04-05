@@ -1,12 +1,13 @@
 // src/modules/seeker/components/PropertyDetails/index.tsx
-// Version: 3.2.0
-// Last Modified: 05-04-2025 20:15 IST
-// Purpose: Added Google Maps integration for property location
+// Version: 3.3.0
+// Last Modified: 05-04-2025 21:30 IST
+// Purpose: Added nearby amenities feature to property details page
 
 import React, { useState, useEffect } from 'react';
 import { PropertyDetails as PropertyDetailsType } from '../../hooks/usePropertyDetails';
 import PropertyGallery from './PropertyGallery';
 import PropertyLocationMap from './PropertyLocationMap';
+import NearbyAmenities from './NearbyAmenities';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
@@ -325,6 +326,12 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
             zipCode={safeProperty.zip_code || ''}
             coordinates={getPropertyCoordinates()}
           />
+          
+          {/* Nearby Amenities */}
+          <NearbyAmenities 
+            coordinates={getPropertyCoordinates()}
+            address={getLocationString()}
+          />
         </div>
         
         {/* Sidebar Column */}
@@ -415,9 +422,8 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
   );
 };
 
-// Loading state skeleton remains the same
+// Loading state skeleton
 const PropertyDetailsSkeleton: React.FC = () => {
-  // ...skeleton component code remains unchanged
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
       {/* Title skeleton */}
@@ -462,6 +468,23 @@ const PropertyDetailsSkeleton: React.FC = () => {
             <CardContent className="p-6">
               <Skeleton className="h-6 w-48 mb-3" />
               <Skeleton className="h-80 w-full rounded-lg" />
+            </CardContent>
+          </Card>
+          
+          {/* Amenities skeleton */}
+          <Card>
+            <CardContent className="p-6">
+              <Skeleton className="h-6 w-48 mb-3" />
+              <div className="flex flex-wrap gap-2 mb-4">
+                {[1, 2, 3, 4, 5, 6].map(i => (
+                  <Skeleton key={i} className="h-9 w-24" />
+                ))}
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {[1, 2, 3, 4].map(i => (
+                  <Skeleton key={i} className="h-24 w-full rounded-lg" />
+                ))}
+              </div>
             </CardContent>
           </Card>
         </div>
