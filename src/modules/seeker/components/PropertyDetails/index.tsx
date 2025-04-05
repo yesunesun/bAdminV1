@@ -1,12 +1,14 @@
 // src/modules/seeker/components/PropertyDetails/index.tsx
-// Version: 3.5.5
-// Last Modified: 06-04-2025 11:45 IST
-// Purpose: Updated to use the modernized SimilarProperties component
+// Version: 3.8.0
+// Last Modified: 05-04-2025 18:15 IST
+// Purpose: Fixed import and usage of NearbyAmenities component
 
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { PropertyDetails as PropertyDetailsType } from '../../hooks/usePropertyDetails';
 import PropertyGallery from './PropertyGallery';
+import PropertyLocationMap from './PropertyLocationMap';
+import NearbyAmenities from './NearbyAmenities';
 import SimilarProperties from './SimilarProperties';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -26,13 +28,7 @@ import {
   Bath, 
   Square, 
   Building, 
-  AlertCircle,
-  Navigation,
-  Coffee,
-  ShoppingBag,
-  Landmark,
-  Bus,
-  Train
+  AlertCircle
 } from 'lucide-react';
 import ContactOwnerForm from './ContactOwnerForm';
 
@@ -74,15 +70,6 @@ const similarPropertiesData = [
     square_feet: 1100,
     property_details: { propertyType: 'Apartment' }
   }
-];
-
-// Static nearby amenities
-const nearbyAmenitiesData = [
-  { name: 'Restaurants', icon: Coffee, distance: '0.5 km' },
-  { name: 'Shopping Centers', icon: ShoppingBag, distance: '1.2 km' },
-  { name: 'Schools', icon: Landmark, distance: '0.8 km' },
-  { name: 'Bus Stops', icon: Bus, distance: '0.3 km' },
-  { name: 'Metro Station', icon: Train, distance: '1.5 km' }
 ];
 
 interface PropertyDetailsProps {
@@ -177,71 +164,16 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
       .join(", ") || "Location not specified";
   };
   
-  // Static Location component (no Google Maps)
-  const StaticLocationComponent = () => (
-    <Card className="border-border/40 shadow-md">
-      <CardContent className="p-6">
-        <h3 className="text-lg font-semibold mb-3 flex items-center">
-          <MapPin className="h-5 w-5 mr-2 text-primary" />
-          Property Location
-        </h3>
-        <div className="bg-muted/30 rounded-lg p-6 text-center">
-          <div className="mb-4 relative">
-            <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
-              <Navigation className="h-10 w-10 text-primary" />
-            </div>
-            <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 bg-primary text-white text-xs px-2 py-0.5 rounded-full">
-              Property
-            </div>
-          </div>
-          <h4 className="font-medium text-lg mb-1">{getLocationString()}</h4>
-          {safeProperty.property_details?.locality && (
-            <p className="text-sm text-muted-foreground">
-              {safeProperty.property_details.locality}
-            </p>
-          )}
-          <div className="flex justify-center mt-4">
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => {
-                // Open location in Google Maps
-                window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(getLocationString())}`, '_blank');
-              }}
-            >
-              <MapPin className="h-4 w-4 mr-2" />
-              View on Google Maps
-            </Button>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-  
-  // Static Nearby Amenities component (no Google Maps)
-  const StaticNearbyAmenities = () => (
-    <Card className="border-border/40 shadow-md">
-      <CardContent className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Nearby Amenities</h3>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-          {nearbyAmenitiesData.map((amenity, index) => {
-            const Icon = amenity.icon;
-            return (
-              <div key={index} className="bg-background/60 p-4 rounded-lg flex items-center">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center mr-3">
-                  <Icon className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <p className="font-medium text-sm">{amenity.name}</p>
-                  <p className="text-xs text-muted-foreground">{amenity.distance}</p>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </CardContent>
-    </Card>
-  );
+  // Get property coordinates from property_details if available
+  const getPropertyCoordinates = () => {
+    const lat = parseFloat(safeProperty.property_details?.latitude || '0');
+    const lng = parseFloat(safeProperty.property_details?.longitude || '0');
+    
+    if (!isNaN(lat) && !isNaN(lng) && (lat !== 0 || lng !== 0)) {
+      return { lat, lng };
+    }
+    return undefined;
+  };
   
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -415,11 +347,23 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
             </CardContent>
           </Card>
           
-          {/* Static Location Component (no Google Maps) */}
-          <StaticLocationComponent />
+          {/* Property Location Map */}
+          <PropertyLocationMap
+            address={safeProperty.address || ''}
+            city={safeProperty.city || ''}
+            state={safeProperty.state || ''}
+            zipCode={safeProperty.zip_code || ''}
+            coordinates={getPropertyCoordinates()}
+          />
           
-          {/* Static Nearby Amenities (no Google Maps) */}
-          <StaticNearbyAmenities />
+          {/* Nearby Amenities - using the correct component */}
+          <NearbyAmenities
+            address={safeProperty.address || ''}
+            city={safeProperty.city || ''}
+            state={safeProperty.state || ''}
+            coordinates={getPropertyCoordinates()}
+            radius={1500} // 1.5km radius
+          />
         </div>
         
         {/* Sidebar Column */}
