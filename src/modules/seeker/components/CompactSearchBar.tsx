@@ -1,13 +1,12 @@
 // src/modules/seeker/components/CompactSearchBar.tsx
-// Version: 1.2.0
-// Last Modified: 04-04-2025 21:30 IST
-// Purpose: Enhanced filters panel to match design shown in screenshot
+// Version: 1.3.0
+// Last Modified: 05-04-2025 10:45 IST
+// Purpose: Removed Property Types dropdown as requested
 
 import React, { forwardRef, useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, X, Sliders, MapPin, Check } from 'lucide-react';
+import { Search, X, Sliders, Check } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger, SheetClose } from '@/components/ui/sheet';
 import { Slider } from '@/components/ui/slider';
@@ -132,23 +131,6 @@ const CompactSearchBar = forwardRef<HTMLInputElement, CompactSearchBarProps>(({
               </Button>
             )}
           </div>
-          
-          {/* Property Type Filter */}
-          <Select
-            value={selectedPropertyType}
-            onValueChange={handlePropertyTypeChange}
-          >
-            <SelectTrigger className="w-[140px] h-11">
-              <SelectValue placeholder="Property Type" />
-            </SelectTrigger>
-            <SelectContent>
-              {propertyTypeOptions.map((option) => (
-                <SelectItem key={option.id} value={option.id}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
           
           {/* Advanced Filters Button */}
           <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>

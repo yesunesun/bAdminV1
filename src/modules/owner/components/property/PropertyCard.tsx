@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/PropertyCard.tsx
-// Version: 3.3.0
-// Last Modified: 08-03-2025 12:45 IST
-// Purpose: Made edit and delete property options visible only in dev mode
+// Version: 3.4.1
+// Last Modified: 05-04-2025 00:15 IST
+// Purpose: Fixed publish button to be enabled in draft mode
 
 import React from 'react';
 import { Link } from 'react-router-dom';
@@ -120,38 +120,25 @@ export function PropertyCard({
           )}
         </div>
         
-        {/* Actions - Icon-only buttons */}
+        {/* Actions - Icon buttons in new order: View, Publish/Unpublish, Edit, Delete */}
         <div className="flex justify-between">
-          {/* View Button - Always visible */}
+          {/* View Button - Always visible, now points to seeker/property */}
           <Link 
-            to={`/properties/${property.id}`}
+            to={`/seeker/property/${property.id}`}
             className="flex items-center justify-center h-10 w-10 rounded-full bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
             title="View Property"
           >
             <Eye className="h-5 w-5" />
           </Link>
           
-          {/* Edit Button - Only visible in development mode */}
-          {isDevMode && (
-            <Link 
-              to={`/properties/${property.id}/edit`}
-              className="flex items-center justify-center h-10 w-10 rounded-full bg-card border border-border hover:bg-muted/50 text-card-foreground transition-colors"
-              title="Edit Property"
-            >
-              <Pencil className="h-4.5 w-4.5" />
-            </Link>
-          )}
-          
-          {/* Publish/Unpublish Button - Always visible */}
+          {/* Publish/Unpublish Button - Always visible and enabled */}
           <button
             onClick={() => onTogglePublish(property.id, property.status)}
-            disabled={isDraft && !isComplete || isUpdating}
+            disabled={isUpdating} 
             className={cn(
               "flex items-center justify-center h-10 w-10 rounded-full transition-colors",
               isDraft
-                ? isComplete 
-                  ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                  : "cursor-not-allowed bg-muted text-muted-foreground/50"
+                ? "bg-primary text-primary-foreground hover:bg-primary/90"
                 : "bg-accent text-accent-foreground hover:bg-accent/80",
               isUpdating && "cursor-wait opacity-75"
             )}
@@ -165,6 +152,17 @@ export function PropertyCard({
               <Archive className="h-5 w-5" />
             )}
           </button>
+          
+          {/* Edit Button - Only visible in development mode */}
+          {isDevMode && (
+            <Link 
+              to={`/properties/${property.id}/edit`}
+              className="flex items-center justify-center h-10 w-10 rounded-full bg-card border border-border hover:bg-muted/50 text-card-foreground transition-colors"
+              title="Edit Property"
+            >
+              <Pencil className="h-4.5 w-4.5" />
+            </Link>
+          )}
           
           {/* Delete Button - Only visible in development mode */}
           {isDevMode && (
