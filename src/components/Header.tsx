@@ -1,7 +1,7 @@
 // src/components/Header.tsx
-// Version: 3.9.0
-// Last Modified: 05-04-2025 14:50 IST
-// Purpose: Make theme switcher visible only in development mode
+// Version: 4.0.0
+// Last Modified: 05-04-2025 23:15 IST
+// Purpose: Fixed alignment issues between header and content
 
 import React, { useEffect, useState, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
@@ -123,184 +123,182 @@ export function Header({ onFavoritesClick }: HeaderProps) {
   const isSeeker = userRole === 'seeker' || !userRole;
   const isOwner = userRole === 'owner' || userRole === 'landlord';
 
-  // Main Header (used on all pages)
+  // Main Header (used on all pages) - removed border-b to be added by parent container
   return (
-    <header className="w-full bg-card border-b border-border sticky top-0 z-50 shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <div className="flex h-20 items-center justify-between">
-          {/* Logo - using the centralized BrandLogo component */}
-          <BrandLogo />
+    <header className="w-full bg-card sticky top-0 z-50 shadow-sm">
+      <div className="flex h-20 items-center justify-between">
+        {/* Logo - using the centralized BrandLogo component */}
+        <BrandLogo />
 
-          <div className="flex items-center space-x-4">
-            {/* Theme Switcher - Only visible in development mode */}
-            {isDevelopmentMode && (
-              <div className="relative" ref={themeDropdownRef}>
-                <button
-                  onClick={() => setIsThemeDropdownOpen(!isThemeDropdownOpen)}
-                  className="flex items-center justify-center w-10 h-10 rounded-full bg-accent/50 backdrop-blur-sm transition-all hover:bg-accent"
-                  aria-label="Change theme"
-                >
-                  {getThemeIcon()}
-                </button>
-
-                {isThemeDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-card border border-border overflow-hidden z-50">
-                    <div className="py-1">
-                      <div className="px-4 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                        Select Theme
-                      </div>
-                      <button
-                        onClick={() => {
-                          setTheme('ocean');
-                          setIsThemeDropdownOpen(false);
-                        }}
-                        className={cn(
-                          "flex w-full items-center px-4 py-2 text-sm transition-colors",
-                          theme === 'ocean' 
-                            ? "bg-primary/10 text-primary font-medium" 
-                            : "text-foreground hover:bg-accent"
-                        )}
-                      >
-                        <Waves className="h-4 w-4 mr-2" />
-                        Ocean Theme
-                      </button>
-                      <button
-                        onClick={() => {
-                          setTheme('sunset');
-                          setIsThemeDropdownOpen(false);
-                        }}
-                        className={cn(
-                          "flex w-full items-center px-4 py-2 text-sm transition-colors",
-                          theme === 'sunset' 
-                            ? "bg-primary/10 text-primary font-medium" 
-                            : "text-foreground hover:bg-accent"
-                        )}
-                      >
-                        <Sunset className="h-4 w-4 mr-2" />
-                        Sunset Theme
-                      </button>
-                      <button
-                        onClick={() => {
-                          setTheme('vibrant');
-                          setIsThemeDropdownOpen(false);
-                        }}
-                        className={cn(
-                          "flex w-full items-center px-4 py-2 text-sm transition-colors",
-                          theme === 'vibrant' 
-                            ? "bg-primary/10 text-primary font-medium" 
-                            : "text-foreground hover:bg-accent"
-                        )}
-                      >
-                        <Sparkles className="h-4 w-4 mr-2" />
-                        Vibrant Theme
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Favorites Button (only if user is logged in) */}
-            {user && onFavoritesClick && (
+        <div className="flex items-center space-x-4">
+          {/* Theme Switcher - Only visible in development mode */}
+          {isDevelopmentMode && (
+            <div className="relative" ref={themeDropdownRef}>
               <button
-                onClick={onFavoritesClick}
-                className="relative flex items-center justify-center w-10 h-10 rounded-full bg-accent/50 backdrop-blur-sm transition-all hover:bg-accent"
-                aria-label="Favorites"
+                onClick={() => setIsThemeDropdownOpen(!isThemeDropdownOpen)}
+                className="flex items-center justify-center w-10 h-10 rounded-full bg-accent/50 backdrop-blur-sm transition-all hover:bg-accent"
+                aria-label="Change theme"
               >
-                <Heart className="h-5 w-5 text-primary" />
-                {favoriteCount > 0 && (
-                  <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground">
-                    {favoriteCount > 99 ? '99+' : favoriteCount}
-                  </span>
-                )}
+                {getThemeIcon()}
               </button>
-            )}
 
-            {/* Profile or Auth Links */}
-            {user ? (
-              <div className="relative" ref={profileDropdownRef}>
-                <button
-                  onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
-                  className="flex items-center space-x-2 p-2 rounded-full bg-accent/50 hover:bg-accent transition-all"
-                  aria-label="Profile Menu"
-                >
-                  <div className="h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-medium">
-                    {user.email?.charAt(0).toUpperCase()}
-                  </div>
-                  <ChevronDown className={cn(
-                    "h-4 w-4 text-muted-foreground transition-transform", 
-                    isProfileDropdownOpen && "transform rotate-180"
-                  )} />
-                </button>
-
-                {isProfileDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-64 rounded-lg shadow-lg bg-card border border-border overflow-hidden z-50">
-                    <div className="p-4 border-b border-border">
-                      <div className="font-medium truncate">{user.email}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {userRole ? 
-                          userRole.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) : 
-                          (isInSeekerModule ? 'Seeker' : 'Owner')}
-                      </div>
+              {isThemeDropdownOpen && (
+                <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-card border border-border overflow-hidden z-50">
+                  <div className="py-1">
+                    <div className="px-4 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      Select Theme
                     </div>
+                    <button
+                      onClick={() => {
+                        setTheme('ocean');
+                        setIsThemeDropdownOpen(false);
+                      }}
+                      className={cn(
+                        "flex w-full items-center px-4 py-2 text-sm transition-colors",
+                        theme === 'ocean' 
+                          ? "bg-primary/10 text-primary font-medium" 
+                          : "text-foreground hover:bg-accent"
+                      )}
+                    >
+                      <Waves className="h-4 w-4 mr-2" />
+                      Ocean Theme
+                    </button>
+                    <button
+                      onClick={() => {
+                        setTheme('sunset');
+                        setIsThemeDropdownOpen(false);
+                      }}
+                      className={cn(
+                        "flex w-full items-center px-4 py-2 text-sm transition-colors",
+                        theme === 'sunset' 
+                          ? "bg-primary/10 text-primary font-medium" 
+                          : "text-foreground hover:bg-accent"
+                      )}
+                    >
+                      <Sunset className="h-4 w-4 mr-2" />
+                      Sunset Theme
+                    </button>
+                    <button
+                      onClick={() => {
+                        setTheme('vibrant');
+                        setIsThemeDropdownOpen(false);
+                      }}
+                      className={cn(
+                        "flex w-full items-center px-4 py-2 text-sm transition-colors",
+                        theme === 'vibrant' 
+                          ? "bg-primary/10 text-primary font-medium" 
+                          : "text-foreground hover:bg-accent"
+                      )}
+                    >
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      Vibrant Theme
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Favorites Button (only if user is logged in) */}
+          {user && onFavoritesClick && (
+            <button
+              onClick={onFavoritesClick}
+              className="relative flex items-center justify-center w-10 h-10 rounded-full bg-accent/50 backdrop-blur-sm transition-all hover:bg-accent"
+              aria-label="Favorites"
+            >
+              <Heart className="h-5 w-5 text-primary" />
+              {favoriteCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground">
+                  {favoriteCount > 99 ? '99+' : favoriteCount}
+                </span>
+              )}
+            </button>
+          )}
+
+          {/* Profile or Auth Links */}
+          {user ? (
+            <div className="relative" ref={profileDropdownRef}>
+              <button
+                onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
+                className="flex items-center space-x-2 p-2 rounded-full bg-accent/50 hover:bg-accent transition-all"
+                aria-label="Profile Menu"
+              >
+                <div className="h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-medium">
+                  {user.email?.charAt(0).toUpperCase()}
+                </div>
+                <ChevronDown className={cn(
+                  "h-4 w-4 text-muted-foreground transition-transform", 
+                  isProfileDropdownOpen && "transform rotate-180"
+                )} />
+              </button>
+
+              {isProfileDropdownOpen && (
+                <div className="absolute right-0 mt-2 w-64 rounded-lg shadow-lg bg-card border border-border overflow-hidden z-50">
+                  <div className="p-4 border-b border-border">
+                    <div className="font-medium truncate">{user.email}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {userRole ? 
+                        userRole.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) : 
+                        (isInSeekerModule ? 'Seeker' : 'Owner')}
+                    </div>
+                  </div>
+                  
+                  <div className="py-2">
+                    {/* Limited menu items as per requirements */}
+                    <Link 
+                      to="/seeker" 
+                      className="flex w-full items-center px-4 py-2 text-sm text-foreground hover:bg-accent"
+                      onClick={() => setIsProfileDropdownOpen(false)}
+                    >
+                      <Search className="h-4 w-4 mr-2" />
+                      Browse Properties
+                    </Link>
+                    <Link 
+                      to="/properties/list" 
+                      className="flex w-full items-center px-4 py-2 text-sm text-foreground hover:bg-accent"
+                      onClick={() => setIsProfileDropdownOpen(false)}
+                    >
+                      <Home className="h-4 w-4 mr-2" />
+                      List My Property
+                    </Link>
+                    <Link 
+                      to="/properties" 
+                      className="flex w-full items-center px-4 py-2 text-sm text-foreground hover:bg-accent"
+                      onClick={() => setIsProfileDropdownOpen(false)}
+                    >
+                      <LayoutGrid className="h-4 w-4 mr-2" />
+                      My Properties
+                    </Link>
                     
-                    <div className="py-2">
-                      {/* Limited menu items as per requirements */}
-                      <Link 
-                        to="/seeker" 
-                        className="flex w-full items-center px-4 py-2 text-sm text-foreground hover:bg-accent"
-                        onClick={() => setIsProfileDropdownOpen(false)}
-                      >
-                        <Search className="h-4 w-4 mr-2" />
-                        Browse Properties
-                      </Link>
-                      <Link 
-                        to="/properties/list" 
-                        className="flex w-full items-center px-4 py-2 text-sm text-foreground hover:bg-accent"
-                        onClick={() => setIsProfileDropdownOpen(false)}
-                      >
-                        <Home className="h-4 w-4 mr-2" />
-                        List My Property
-                      </Link>
-                      <Link 
-                        to="/properties" 
-                        className="flex w-full items-center px-4 py-2 text-sm text-foreground hover:bg-accent"
-                        onClick={() => setIsProfileDropdownOpen(false)}
-                      >
-                        <LayoutGrid className="h-4 w-4 mr-2" />
-                        My Properties
-                      </Link>
-                      
-                      <div className="h-px bg-border mx-2 my-1" />
-                      
-                      <button 
-                        onClick={handleSignOut}
-                        className="flex w-full items-center px-4 py-2 text-sm text-destructive hover:bg-destructive/10"
-                      >
-                        <LogOut className="h-4 w-4 mr-2" />
-                        Sign Out
-                      </button>
-                    </div>
+                    <div className="h-px bg-border mx-2 my-1" />
+                    
+                    <button 
+                      onClick={handleSignOut}
+                      className="flex w-full items-center px-4 py-2 text-sm text-destructive hover:bg-destructive/10"
+                    >
+                      <LogOut className="h-4 w-4 mr-2" />
+                      Sign Out
+                    </button>
                   </div>
-                )}
-              </div>
-            ) : (
-              <div className="flex items-center space-x-2">
-                <Link 
-                  to="/login" 
-                  className="px-4 py-2 text-sm font-medium rounded-md text-foreground hover:text-primary hover:bg-accent transition-colors"
-                >
-                  Log in
-                </Link>
-                <Link 
-                  to="/register" 
-                  className="px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-                >
-                  Sign up
-                </Link>
-              </div>
-            )}
-          </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center space-x-2">
+              <Link 
+                to="/login" 
+                className="px-4 py-2 text-sm font-medium rounded-md text-foreground hover:text-primary hover:bg-accent transition-colors"
+              >
+                Log in
+              </Link>
+              <Link 
+                to="/register" 
+                className="px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+              >
+                Sign up
+              </Link>
+            </div>
+          )}
         </div>
       </div>
     </header>

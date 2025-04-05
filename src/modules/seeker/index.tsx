@@ -1,7 +1,7 @@
 // src/modules/seeker/index.tsx
-// Version: 3.1.0
-// Last Modified: 05-04-2025 18:15 IST
-// Purpose: Removed any potential duplicate header elements
+// Version: 3.2.0
+// Last Modified: 06-04-2025 02:00 IST
+// Purpose: Removed width constraints and allowed full-width content
 
 import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -37,9 +37,9 @@ const PropertyMapHome: React.FC = () => {
   };
   
   return (
-    <div className="flex flex-col bg-background">
-      {/* Main content - removed the min-h-screen to avoid layout issues */}
-      <div className="flex-grow flex flex-col">
+    <div className="flex flex-col bg-background w-full">
+      {/* Main content - allowed to take full width */}
+      <div className="flex-grow flex flex-col w-full">
         <PropertyMapHomeView 
           onFavoriteAction={handleFavoriteAction}
         />

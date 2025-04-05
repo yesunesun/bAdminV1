@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyMapHomeView.tsx
-// Version: 2.9.0
-// Last Modified: 04-04-2025 12:30 IST
-// Purpose: Removed recent searches functionality
+// Version: 3.8.0
+// Last Modified: 06-04-2025 03:00 IST
+// Purpose: Expanded content area to 100% of available space and centered layout
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useJsApiLoader } from '@react-google-maps/api';
@@ -193,58 +193,66 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
   }
 
   return (
-    <div className="h-[calc(100vh-64px)] flex flex-col bg-background text-foreground">
-      {/* Optimized search section with proper spacing */}
-      <div className="px-4 sm:px-6 pt-4 pb-2">
-        <CompactSearchBar
-          ref={searchInputRef}
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          searchLocations={searchLocations}
-          selectedPropertyType={selectedPropertyType}
-          handlePropertyTypeChange={handlePropertyTypeChange}
-          filters={filters}
-          setFilters={setFilters}
-          handleResetFilters={handleResetFilters}
-        />
-      </div>
-      
-      {/* Main Content - Optimized Split View with improved responsiveness */}
-      <div className="flex-grow flex flex-col lg:flex-row overflow-hidden">
-        {/* Property Listings Panel with optimized rendering */}
-        <PropertyListingPanel
-          properties={properties}
-          loading={loading}
-          loadingMore={loadingMore}
-          hasMore={hasMore}
-          totalCount={totalCount}
-          onLoadMore={loadMoreProperties}
-          onFavoriteAction={handleFavoriteToggle}
-          handlePropertyHover={handlePropertyHover}
-          hoveredProperty={hoveredProperty}
-          setActiveProperty={setActiveProperty}
-          favoriteProperties={favoriteProperties}
-          isLoadingFavorites={isLoadingFavorites}
-        />
-        
-        {/* Map Panel with lazy loading optimization */}
-        {isLoaded ? (
-          <MapPanel
-            properties={properties}
-            isLoaded={isLoaded}
-            loadError={loadError}
-            activeProperty={activeProperty}
-            setActiveProperty={setActiveProperty}
-            hoveredProperty={hoveredProperty}
-          />
-        ) : (
-          <div className="hidden lg:flex lg:w-1/2 items-center justify-center bg-muted">
-            <div className="text-center p-6">
-              <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-primary border-r-transparent"></div>
-              <p className="mt-4 text-muted-foreground">Loading maps...</p>
+    <div className="h-[calc(100vh-64px)] w-full flex flex-col bg-background text-foreground overflow-hidden">
+      {/* Full-width container with zero horizontal padding */}
+      <div className="w-full h-full">
+        {/* Container that takes 100% of available space */}
+        <div className="w-full h-full flex flex-col">
+          {/* Optimized search section with proper spacing */}
+          <div className="px-2 sm:px-3 pt-3 pb-2">
+            <CompactSearchBar
+              ref={searchInputRef}
+              searchQuery={searchQuery}
+              setSearchQuery={setSearchQuery}
+              searchLocations={searchLocations}
+              selectedPropertyType={selectedPropertyType}
+              handlePropertyTypeChange={handlePropertyTypeChange}
+              filters={filters}
+              setFilters={setFilters}
+              handleResetFilters={handleResetFilters}
+            />
+          </div>
+          
+          {/* Main Content - Fixed Width Split View (1/3 - 2/3) */}
+          <div className="flex-grow flex w-full">
+            {/* Property Listings Panel - Fixed at 1/3 width */}
+            <PropertyListingPanel
+              properties={properties}
+              loading={loading}
+              loadingMore={loadingMore}
+              hasMore={hasMore}
+              totalCount={totalCount}
+              onLoadMore={loadMoreProperties}
+              onFavoriteAction={handleFavoriteToggle}
+              handlePropertyHover={handlePropertyHover}
+              hoveredProperty={hoveredProperty}
+              setActiveProperty={setActiveProperty}
+              favoriteProperties={favoriteProperties}
+              isLoadingFavorites={isLoadingFavorites}
+            />
+            
+            {/* Map Panel - Fixed at 2/3 width */}
+            <div className="w-2/3 h-full">
+              {isLoaded ? (
+                <MapPanel
+                  properties={properties}
+                  isLoaded={isLoaded}
+                  loadError={loadError}
+                  activeProperty={activeProperty}
+                  setActiveProperty={setActiveProperty}
+                  hoveredProperty={hoveredProperty}
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-muted">
+                  <div className="text-center p-6">
+                    <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-primary border-r-transparent"></div>
+                    <p className="mt-4 text-muted-foreground">Loading maps...</p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );

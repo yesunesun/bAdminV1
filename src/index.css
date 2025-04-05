@@ -285,3 +285,30 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Add this to src/index.css */
+
+/* Seeker module standardized layout classes */
+.seeker-home-wrapper {
+  width: 100%;
+}
+
+/* Ensure that any map containers take full width */
+.google-map-container {
+  width: 100% !important;
+}
+
+/* Ensure property listing consistency */
+.property-listing-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+/* Property card grid consistency */
+.property-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.5rem;
+  width: 100%;
+}

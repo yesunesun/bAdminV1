@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyListingPanel.tsx
-// Version: 1.7.0
-// Last Modified: 05-04-2025 12:00 IST
-// Purpose: Fixed favorites toggling and loading issues
+// Version: 2.1.0
+// Last Modified: 06-04-2025 00:15 IST
+// Purpose: Fixed column widths to maintain the same dimensions during and after loading
 
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
@@ -152,11 +152,213 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
       });
   };
 
+  // Render content - either loading placeholders or actual property cards
+  const renderContent = () => {
+    if (loading && properties.length === 0) {
+      // Loading placeholders
+      return (
+        <div className="divide-y">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={`loading-skeleton-${i}`} className="p-3 border-b animate-pulse">
+              {/* Header placeholder with actions */}
+              <div className="flex items-center justify-between mb-2">
+                <div className="h-4 bg-muted rounded w-1/2"></div>
+                <div className="flex items-center space-x-2">
+                  <div className="h-4 w-4 bg-muted rounded-full"></div>
+                  <div className="h-4 w-4 bg-muted rounded-full"></div>
+                </div>
+              </div>
+              
+              {/* Main content with fixed layout matching real cards */}
+              <div className="flex gap-2">
+                {/* Image placeholder with fixed dimensions */}
+                <div className="h-20 w-24 flex-shrink-0 bg-muted rounded-lg"></div>
+                
+                {/* Content placeholders with matching layout */}
+                <div className="flex-1 min-w-0">
+                  {/* Location placeholder */}
+                  <div className="flex items-center mb-1">
+                    <div className="h-3 w-3 bg-muted rounded-full mr-1"></div>
+                    <div className="h-3 bg-muted rounded w-3/4"></div>
+                  </div>
+                  
+                  {/* Price placeholder */}
+                  <div className="h-4 bg-muted rounded w-1/3 mb-2"></div>
+                  
+                  {/* Property specs placeholder */}
+                  <div className="flex gap-2 mb-2">
+                    <div className="h-3 bg-muted rounded w-8"></div>
+                    <div className="h-3 bg-muted rounded w-8"></div>
+                    <div className="h-3 bg-muted rounded w-14"></div>
+                  </div>
+                  
+                  {/* Badge placeholder */}
+                  <div className="h-5 w-16 bg-muted rounded"></div>
+                </div>
+                
+                {/* Chevron placeholder */}
+                <div className="self-center flex-shrink-0">
+                  <div className="h-4 w-4 bg-muted rounded"></div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      );
+    } else if (properties.length === 0) {
+      // No properties found state
+      return (
+        <div className="flex flex-col items-center justify-center p-12 text-center">
+          <Info className="h-12 w-12 text-muted-foreground/40 mb-4" />
+          <h3 className="text-lg font-medium mb-1">No properties found</h3>
+          <p className="text-muted-foreground max-w-xs mb-4">
+            Try adjusting your filters or search for a different location
+          </p>
+        </div>
+      );
+    } else {
+      // Actual property cards
+      return (
+        <div className="divide-y">
+          {properties.map((property) => {
+            // Get primary image with fallback
+            const primaryImage = property.property_images?.find(img => img.is_primary)?.url || 
+                                (property.property_images && property.property_images.length > 0 ? property.property_images[0].url : '/apartment.jpg');
+            
+            const isHovered = hoveredProperty === property.id;
+            
+            // Extract proper property type
+            const propertyType = property.property_details?.propertyType || 'Apartment';
+            
+            // Extract property name/title to display
+            const propertyName = property.bedrooms 
+              ? `${property.bedrooms} BHK Apartment`
+              : property.title || 'Apartment';
+            
+            // Extract locality from property details or fallback to city
+            const locality = property.property_details?.locality || property.city || '';
+            
+            // Check if property is liked using our state object
+            const isLiked = propertyLikeState[property.id] || false;
+            
+            return (
+              <div 
+                key={`property-${property.id}`}
+                className={`relative transition hover:bg-muted/40 ${isHovered ? 'bg-muted/40' : ''}`}
+              >
+                <div className="p-3"
+                  onMouseEnter={() => handlePropertyHover(property.id, true)}
+                  onMouseLeave={() => handlePropertyHover(property.id, false)}
+                  onClick={() => setActiveProperty(property)}
+                >
+                  {/* Property Name at the top with blue text */}
+                  <div className="flex items-center justify-between mb-2">
+                    <Link
+                      to={`/seeker/property/${property.id}`}
+                      className="text-sm font-medium text-blue-500 hover:underline truncate max-w-[70%]"
+                    >
+                      {propertyName}
+                    </Link>
+                    
+                    {/* Share and Favorite buttons - horizontal layout */}
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={(e) => handleShare(e, property)}
+                        className="text-gray-400 hover:text-blue-500"
+                        aria-label="Share property"
+                      >
+                        <Share2 className="h-4 w-4" />
+                      </button>
+                      
+                      <FavoriteButton
+                        initialIsLiked={isLiked}
+                        onToggle={(newLikedState) => handleFavoriteToggle(property.id, newLikedState)}
+                        className="text-gray-400 hover:text-primary" 
+                      />
+                    </div>
+                  </div>
+                  
+                  <Link 
+                    to={`/seeker/property/${property.id}`} 
+                    className="flex gap-2"
+                  >
+                    {/* Property image */}
+                    <div className="relative h-20 w-24 flex-shrink-0 overflow-hidden rounded-lg">
+                      <img
+                        src={primaryImage}
+                        alt={property.title}
+                        className="h-full w-full object-cover"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.onerror = null; // Prevent infinite loop
+                          target.src = '/noimage.png';
+                        }}
+                      />
+                    </div>
+                    
+                    {/* Property details */}
+                    <div className="flex-1 min-w-0">
+                      {/* Location with icon */}
+                      <div className="flex items-center text-xs text-gray-500 mb-1">
+                        <MapPin className="h-3 w-3 mr-1 flex-shrink-0" />
+                        <span className="truncate">
+                          {locality || property.address || 'Location unavailable'}
+                        </span>
+                      </div>
+                      
+                      {/* Price */}
+                      <p className="text-sm font-semibold mb-2">
+                        {formatPrice(property.price)}
+                      </p>
+                      
+                      {/* Property specs */}
+                      <div className="flex items-center gap-2 text-xs text-gray-500">
+                        {property.bedrooms && (
+                          <span className="flex items-center">
+                            <span className="mr-1">{property.bedrooms}</span>
+                          </span>
+                        )}
+                        
+                        {property.bathrooms && (
+                          <span className="flex items-center">
+                            <Bath className="h-3 w-3 mr-1" />
+                            <span>{property.bathrooms}</span>
+                          </span>
+                        )}
+                        
+                        {property.square_feet && (
+                          <span className="flex items-center">
+                            <Square className="h-3 w-3 mr-1" />
+                            <span className="whitespace-nowrap">{property.square_feet} sq.ft</span>
+                          </span>
+                        )}
+                      </div>
+                      
+                      {/* Property Type Badge */}
+                      <div className="mt-2 inline-block bg-gray-100 text-xs text-gray-600 px-2 py-0.5 rounded">
+                        {propertyType}
+                      </div>
+                    </div>
+                    
+                    {/* Chevron icon */}
+                    <div className="self-center flex-shrink-0">
+                      <ChevronRight className="h-4 w-4 text-gray-400" />
+                    </div>
+                  </Link>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      );
+    }
+  };
+
   return (
-    <div className="w-full lg:w-1/3 flex-shrink-0 p-4 pb-0">
+    <div className="w-1/3 h-full flex-shrink-0 p-3">
       <div className="h-full overflow-hidden rounded-xl border border-border bg-card shadow-sm flex flex-col">
         {/* Header with count */}
-        <div className="sticky top-0 z-10 bg-card p-4 border-b flex justify-between items-center">
+        <div className="sticky top-0 z-10 bg-card p-3 border-b flex justify-between items-center">
           <div className="text-sm font-medium">
             {loading || isLoadingFavorites ? (
               <span className="flex items-center gap-2">
@@ -177,169 +379,14 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
           </div>
         </div>
         
-        {/* Property listing */}
+        {/* Property listing - using renderContent to ensure consistent layout */}
         <div className="flex-1 overflow-y-auto">
-          {loading && properties.length === 0 ? (
-            <div className="p-6 space-y-4">
-              {[1, 2, 3, 4].map((i) => (
-                <div key={`loading-skeleton-${i}`} className="border rounded-lg p-4 animate-pulse">
-                  <div className="h-32 bg-muted rounded-md mb-3"></div>
-                  <div className="h-4 bg-muted rounded w-3/4 mb-2"></div>
-                  <div className="h-3 bg-muted rounded w-1/2 mb-4"></div>
-                  <div className="flex gap-2">
-                    <div className="h-3 bg-muted rounded w-1/4"></div>
-                    <div className="h-3 bg-muted rounded w-1/4"></div>
-                    <div className="h-3 bg-muted rounded w-1/4"></div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : properties.length === 0 ? (
-            <div className="flex flex-col items-center justify-center p-12 text-center">
-              <Info className="h-12 w-12 text-muted-foreground/40 mb-4" />
-              <h3 className="text-lg font-medium mb-1">No properties found</h3>
-              <p className="text-muted-foreground max-w-xs mb-4">
-                Try adjusting your filters or search for a different location
-              </p>
-            </div>
-          ) : (
-            <div className="divide-y">
-              {properties.map((property) => {
-                // Get primary image with fallback
-                const primaryImage = property.property_images?.find(img => img.is_primary)?.url || 
-                                    (property.property_images && property.property_images.length > 0 ? property.property_images[0].url : '/apartment.jpg');
-                
-                const isHovered = hoveredProperty === property.id;
-                
-                // Extract proper property type
-                const propertyType = property.property_details?.propertyType || 'Apartment';
-                
-                // Extract property name/title to display
-                const propertyName = property.bedrooms 
-                  ? `${property.bedrooms} BHK Apartment`
-                  : property.title || 'Apartment';
-                
-                // Extract locality from property details or fallback to city
-                const locality = property.property_details?.locality || property.city || '';
-                
-                // Check if property is liked using our state object
-                const isLiked = propertyLikeState[property.id] || false;
-                
-                return (
-                  <div 
-                    key={`property-${property.id}`}
-                    className={`relative transition hover:bg-muted/40 ${isHovered ? 'bg-muted/40' : ''} border-b`}
-                  >
-                    <div className="p-4"
-                      onMouseEnter={() => handlePropertyHover(property.id, true)}
-                      onMouseLeave={() => handlePropertyHover(property.id, false)}
-                      onClick={() => setActiveProperty(property)}
-                    >
-                      {/* Property Name at the top with blue text */}
-                      <div className="flex items-center justify-between mb-2">
-                        <Link
-                          to={`/seeker/property/${property.id}`}
-                          className="text-sm font-medium text-blue-500 hover:underline"
-                        >
-                          {propertyName}
-                        </Link>
-                        
-                        {/* Share and Favorite buttons - horizontal layout */}
-                        <div className="flex items-center space-x-2">
-                          <button
-                            onClick={(e) => handleShare(e, property)}
-                            className="text-gray-400 hover:text-blue-500"
-                            aria-label="Share property"
-                          >
-                            <Share2 className="h-4 w-4" />
-                          </button>
-                          
-                          <FavoriteButton
-                            initialIsLiked={isLiked}
-                            onToggle={(newLikedState) => handleFavoriteToggle(property.id, newLikedState)}
-                            className="text-gray-400 hover:text-primary" 
-                          />
-                        </div>
-                      </div>
-                      
-                      <Link 
-                        to={`/seeker/property/${property.id}`} 
-                        className="flex gap-3"
-                      >
-                        {/* Property image */}
-                        <div className="relative h-24 w-28 flex-shrink-0 overflow-hidden rounded-lg">
-                          <img
-                            src={primaryImage}
-                            alt={property.title}
-                            className="h-full w-full object-cover"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              target.onerror = null; // Prevent infinite loop
-                              target.src = '/noimage.png';
-                            }}
-                          />
-                        </div>
-                        
-                        {/* Property details */}
-                        <div className="flex-1 min-w-0">
-                          {/* Location with icon */}
-                          <div className="flex items-center text-xs text-gray-500 mb-1">
-                            <MapPin className="h-3 w-3 mr-1 flex-shrink-0" />
-                            <span className="truncate">
-                              {locality || property.address || 'Location unavailable'}
-                            </span>
-                          </div>
-                          
-                          {/* Price */}
-                          <p className="text-sm font-semibold mb-2">
-                            {formatPrice(property.price)}
-                          </p>
-                          
-                          {/* Property specs */}
-                          <div className="flex items-center gap-3 text-xs text-gray-500">
-                            {property.bedrooms && (
-                              <span className="flex items-center">
-                                <span className="mr-1">{property.bedrooms}</span>
-                              </span>
-                            )}
-                            
-                            {property.bathrooms && (
-                              <span className="flex items-center">
-                                <Bath className="h-3 w-3 mr-1" />
-                                <span>{property.bathrooms}</span>
-                              </span>
-                            )}
-                            
-                            {property.square_feet && (
-                              <span className="flex items-center">
-                                <Square className="h-3 w-3 mr-1" />
-                                <span className="whitespace-nowrap">{property.square_feet} sq.ft</span>
-                              </span>
-                            )}
-                          </div>
-                          
-                          {/* Property Type Badge */}
-                          <div className="mt-2 inline-block bg-gray-100 text-xs text-gray-600 px-2 py-0.5 rounded">
-                            {propertyType}
-                          </div>
-                        </div>
-                        
-                        {/* Chevron icon */}
-                        <div className="self-center flex-shrink-0">
-                          <ChevronRight className="h-4 w-4 text-gray-400" />
-                        </div>
-                      </Link>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          {renderContent()}
         </div>
         
         {/* Load more button */}
         {properties.length > 0 && hasMore && (
-          <div className="p-4 border-t mt-auto bg-card">
+          <div className="p-3 border-t mt-auto bg-card">
             <Button
               variant="outline"
               size="sm"

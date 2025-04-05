@@ -1,7 +1,7 @@
 // src/modules/seeker/components/MapPanel.tsx
-// Version: 1.1.0
-// Last Modified: 03-04-2025 14:45 IST
-// Purpose: Added margins to Google Map component while preserving hover functionality
+// Version: 1.2.0
+// Last Modified: 05-04-2025 22:00 IST
+// Purpose: Fixed display for 2/3 width layout
 
 import React, { useCallback, useState, useRef, useEffect } from 'react';
 import { GoogleMap, Marker, InfoWindow } from '@react-google-maps/api';
@@ -139,7 +139,7 @@ const MapPanel: React.FC<MapPanelProps> = ({
   // Error handling
   if (loadError) {
     return (
-      <div className="flex-1 hidden lg:flex items-center justify-center p-8 bg-muted/10">
+      <div className="flex-1 flex items-center justify-center p-8 bg-muted/10">
         <div className="text-center p-6 max-w-md bg-card rounded-lg shadow-sm">
           <h3 className="text-lg font-medium mb-2">Map could not be loaded</h3>
           <p className="text-muted-foreground mb-4">
@@ -161,7 +161,7 @@ const MapPanel: React.FC<MapPanelProps> = ({
   }
   
   return (
-    <div className="relative flex-1 hidden lg:flex p-4">
+    <div className="flex-1 flex h-full p-4">
       <div className="w-full h-full rounded-xl overflow-hidden shadow-md border border-border">
         {isLoaded ? (
           <GoogleMap
