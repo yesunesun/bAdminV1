@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyDetails/index.tsx
-// Version: 3.8.0
-// Last Modified: 05-04-2025 18:15 IST
-// Purpose: Fixed import and usage of NearbyAmenities component
+// Version: 3.9.0
+// Last Modified: 06-04-2025 10:15 IST
+// Purpose: Moved NearbyAmenities component below SimilarProperties in sidebar
 
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
@@ -355,15 +355,6 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
             zipCode={safeProperty.zip_code || ''}
             coordinates={getPropertyCoordinates()}
           />
-          
-          {/* Nearby Amenities - using the correct component */}
-          <NearbyAmenities
-            address={safeProperty.address || ''}
-            city={safeProperty.city || ''}
-            state={safeProperty.state || ''}
-            coordinates={getPropertyCoordinates()}
-            radius={1500} // 1.5km radius
-          />
         </div>
         
         {/* Sidebar Column */}
@@ -451,6 +442,15 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
               square_feet: prop.square_feet
             }))} 
           />
+          
+          {/* Nearby Amenities - now in the sidebar below Similar Properties */}
+          <NearbyAmenities
+            address={safeProperty.address || ''}
+            city={safeProperty.city || ''}
+            state={safeProperty.state || ''}
+            coordinates={getPropertyCoordinates()}
+            radius={1500} // 1.5km radius
+          />
         </div>
       </div>
     </div>
@@ -505,23 +505,6 @@ const PropertyDetailsSkeleton: React.FC = () => {
               <Skeleton className="h-80 w-full rounded-lg" />
             </CardContent>
           </Card>
-          
-          {/* Amenities skeleton */}
-          <Card>
-            <CardContent className="p-6">
-              <Skeleton className="h-6 w-48 mb-3" />
-              <div className="flex flex-wrap gap-2 mb-4">
-                {[1, 2, 3, 4, 5, 6].map(i => (
-                  <Skeleton key={i} className="h-9 w-24" />
-                ))}
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {[1, 2, 3, 4].map(i => (
-                  <Skeleton key={i} className="h-24 w-full rounded-lg" />
-                ))}
-              </div>
-            </CardContent>
-          </Card>
         </div>
         
         <div className="space-y-6">
@@ -536,6 +519,18 @@ const PropertyDetailsSkeleton: React.FC = () => {
           </Card>
           
           {/* Similar properties skeleton */}
+          <Card>
+            <CardContent className="p-6">
+              <Skeleton className="h-6 w-40 mb-4" />
+              <div className="space-y-2">
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-16 w-full" />
+              </div>
+            </CardContent>
+          </Card>
+          
+          {/* Nearby amenities skeleton */}
           <Card>
             <CardContent className="p-6">
               <Skeleton className="h-6 w-40 mb-4" />
