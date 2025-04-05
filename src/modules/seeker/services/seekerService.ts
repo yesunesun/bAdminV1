@@ -1,11 +1,7 @@
 // src/modules/seeker/services/seekerService.ts
-// Version: 4.3.0
-// Last Modified: 04-04-2025 16:15 IST
-// Purpose: Fixed property display count and pagination issues
-
-// Specific changes to fix the display count issue:
-// - Adjusted default page size in fetchPropertiesForMap from 10 to 9
-// - Enhanced error logging and data handling
+// Version: 4.4.0
+// Last Modified: 05-04-2025 17:45 IST
+// Purpose: Added similar properties functionality
 
 import { supabase } from '@/lib/supabase';
 import { PropertyType } from '@/modules/owner/components/property/types';
@@ -672,5 +668,196 @@ export const reportProperty = async (
   } catch (error) {
     console.error('Error reporting property:', error);
     throw error;
+  }
+};
+
+interface SimilarPropertiesOptions {
+  currentPropertyId: string;
+  city?: string;
+  state?: string;
+  propertyType?: string;
+  bedrooms?: number;
+  price?: number;
+  limit?: number;
+}
+
+export const fetchSimilarProperties = async (options: SimilarPropertiesOptions) => {
+  try {
+    const {
+      currentPropertyId,
+      city,
+      state,
+      propertyType,
+      bedrooms,
+      price,
+      limit = 3
+    } = options;
+    
+    console.log(`[fetchSimilarProperties] Starting with options:`, options);
+    
+    if (!currentPropertyId) {
+      console.error('[fetchSimilarProperties] No property ID provided');
+      return [];
+    }
+    
+    // Base query to fetch properties
+    let query = supabase
+      .from('properties')
+      .select(`
+        id,
+        title,
+        price,
+        address,
+        city,
+        state,
+        bedrooms,
+        bathrooms,
+        square_feet,
+        property_details,
+        property_images (
+          id,
+          url,
+          is_primary
+        )
+      `)
+      .neq('id', currentPropertyId) // Exclude current property
+      .order('created_at', { ascending: false }) // Latest properties first
+      .limit(limit + 5); // Fetch a few extra to allow for filtering
+    
+    // Add location filters if available
+    if (city) {
+      query = query.eq('city', city);
+    }
+    
+    if (state) {
+      query = query.eq('state', state);
+    }
+    
+    // Add property type filter if available
+    if (propertyType) {
+      query = query.filter('property_details->propertyType', 'ilike', `%${propertyType}%`);
+    }
+    
+    // Add bedrooms filter if available (with some flexibility)
+    if (bedrooms !== undefined && bedrooms !== null) {
+      // Find properties with similar bedrooms count (±1)
+      query = query.gte('bedrooms', Math.max(1, bedrooms - 1))
+                  .lte('bedrooms', bedrooms + 1);
+    }
+    
+    // Add price range filter if available
+    if (price !== undefined && price !== null && price > 0) {
+      // Find properties within ±30% of the price (more flexibility)
+      const minPrice = price * 0.7;
+      const maxPrice = price * 1.3;
+      query = query.gte('price', minPrice).lte('price', maxPrice);
+    }
+    
+    console.log('[fetchSimilarProperties] Executing first query with filters');
+    
+    // Execute the query
+    const { data, error } = await query;
+    
+    if (error) {
+      console.error('[fetchSimilarProperties] Error fetching similar properties:', error);
+      throw error;
+    }
+    
+    const resultCount = data?.length || 0;
+    console.log(`[fetchSimilarProperties] First query returned ${resultCount} properties`);
+    
+    // If we got some results, return them
+    if (data && data.length >= 1) {
+      return processSimilarProperties(data);
+    }
+    
+    console.log('[fetchSimilarProperties] No similar properties found with strict criteria, trying with relaxed filters');
+    
+    // Try again with more relaxed filters
+    let fallbackQuery = supabase
+      .from('properties')
+      .select(`
+        id,
+        title,
+        price,
+        address,
+        city,
+        state,
+        bedrooms,
+        bathrooms,
+        square_feet,
+        property_details,
+        property_images (
+          id,
+          url,
+          is_primary
+        )
+      `)
+      .neq('id', currentPropertyId)
+      .limit(limit + 2);
+    
+    // Keep city/state filter if available
+    if (city) {
+      fallbackQuery = fallbackQuery.eq('city', city);
+    } else if (state) {
+      fallbackQuery = fallbackQuery.eq('state', state);
+    }
+    
+    // Remove other filters for a broader search
+    
+    const { data: fallbackData, error: fallbackError } = await fallbackQuery;
+    
+    if (fallbackError) {
+      console.error('[fetchSimilarProperties] Error fetching fallback properties:', fallbackError);
+      throw fallbackError;
+    }
+    
+    const fallbackCount = fallbackData?.length || 0;
+    console.log(`[fetchSimilarProperties] Fallback query returned ${fallbackCount} properties`);
+    
+    if (fallbackData && fallbackData.length >= 1) {
+      return processSimilarProperties(fallbackData);
+    }
+    
+    // If still no results, just get any recent properties
+    console.log('[fetchSimilarProperties] No properties found with location criteria, fetching most recent properties');
+    
+    const { data: lastResortData, error: lastResortError } = await supabase
+      .from('properties')
+      .select(`
+        id,
+        title,
+        price,
+        address,
+        city,
+        state,
+        bedrooms,
+        bathrooms,
+        square_feet,
+        property_details,
+        property_images (
+          id,
+          url,
+          is_primary
+        )
+      `)
+      .neq('id', currentPropertyId)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    
+    if (lastResortError) {
+      console.error('[fetchSimilarProperties] Error fetching last resort properties:', lastResortError);
+      throw lastResortError;
+    }
+    
+    const lastResortCount = lastResortData?.length || 0;
+    console.log(`[fetchSimilarProperties] Last resort query returned ${lastResortCount} properties`);
+    
+    // Return whatever we found, or empty array
+    return processSimilarProperties(lastResortData || []);
+  } catch (error) {
+    console.error('[fetchSimilarProperties] Error:', error);
+    // Return empty array instead of throwing to prevent component errors
+    return [];
   }
 };

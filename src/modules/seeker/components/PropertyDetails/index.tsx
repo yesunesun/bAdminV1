@@ -1,13 +1,13 @@
 // src/modules/seeker/components/PropertyDetails/index.tsx
-// Version: 3.3.0
-// Last Modified: 05-04-2025 21:30 IST
-// Purpose: Added nearby amenities feature to property details page
+// Version: 3.5.5
+// Last Modified: 06-04-2025 11:45 IST
+// Purpose: Updated to use the modernized SimilarProperties component
 
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { PropertyDetails as PropertyDetailsType } from '../../hooks/usePropertyDetails';
 import PropertyGallery from './PropertyGallery';
-import PropertyLocationMap from './PropertyLocationMap';
-import NearbyAmenities from './NearbyAmenities';
+import SimilarProperties from './SimilarProperties';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
@@ -26,9 +26,64 @@ import {
   Bath, 
   Square, 
   Building, 
-  AlertCircle 
+  AlertCircle,
+  Navigation,
+  Coffee,
+  ShoppingBag,
+  Landmark,
+  Bus,
+  Train
 } from 'lucide-react';
 import ContactOwnerForm from './ContactOwnerForm';
+
+// Static similar properties data
+const similarPropertiesData = [
+  {
+    id: 'similar-1',
+    title: 'Luxury Apartment in City Center',
+    address: '',
+    city: 'Madhapur',
+    state: 'Hyderabad',
+    price: 8500000,
+    bedrooms: 3,
+    bathrooms: 2,
+    square_feet: 1600,
+    property_details: { propertyType: 'Apartment' }
+  },
+  {
+    id: 'similar-2',
+    title: 'Modern Villa with Garden',
+    address: '',
+    city: 'Gachibowli',
+    state: 'Hyderabad',
+    price: 12000000,
+    bedrooms: 4,
+    bathrooms: 3,
+    square_feet: 2200,
+    property_details: { propertyType: 'Villa' }
+  },
+  {
+    id: 'similar-3',
+    title: 'Affordable 2BHK Near Metro',
+    address: '',
+    city: 'Miyapur',
+    state: 'Hyderabad',
+    price: 4500000,
+    bedrooms: 2,
+    bathrooms: 2,
+    square_feet: 1100,
+    property_details: { propertyType: 'Apartment' }
+  }
+];
+
+// Static nearby amenities
+const nearbyAmenitiesData = [
+  { name: 'Restaurants', icon: Coffee, distance: '0.5 km' },
+  { name: 'Shopping Centers', icon: ShoppingBag, distance: '1.2 km' },
+  { name: 'Schools', icon: Landmark, distance: '0.8 km' },
+  { name: 'Bus Stops', icon: Bus, distance: '0.3 km' },
+  { name: 'Metro Station', icon: Train, distance: '1.5 km' }
+];
 
 interface PropertyDetailsProps {
   property: PropertyDetailsType | null;
@@ -122,29 +177,71 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
       .join(", ") || "Location not specified";
   };
   
-  // Get coordinates from property details
-  const getPropertyCoordinates = () => {
-    const lat = parseFloat(safeProperty.property_details?.latitude || safeProperty.property_details?.lat || '0');
-    const lng = parseFloat(safeProperty.property_details?.longitude || safeProperty.property_details?.lng || '0');
-    
-    // Return coordinates only if both values are valid numbers and not zero
-    if (!isNaN(lat) && !isNaN(lng) && (lat !== 0 || lng !== 0)) {
-      return { lat, lng };
-    }
-    
-    // Check if coordinates are in a different format in property_details
-    if (safeProperty.property_details?.coordinates) {
-      const coords = safeProperty.property_details.coordinates;
-      if (typeof coords === 'object' && 'lat' in coords && 'lng' in coords) {
-        return { 
-          lat: parseFloat(coords.lat), 
-          lng: parseFloat(coords.lng) 
-        };
-      }
-    }
-    
-    return undefined;
-  };
+  // Static Location component (no Google Maps)
+  const StaticLocationComponent = () => (
+    <Card className="border-border/40 shadow-md">
+      <CardContent className="p-6">
+        <h3 className="text-lg font-semibold mb-3 flex items-center">
+          <MapPin className="h-5 w-5 mr-2 text-primary" />
+          Property Location
+        </h3>
+        <div className="bg-muted/30 rounded-lg p-6 text-center">
+          <div className="mb-4 relative">
+            <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+              <Navigation className="h-10 w-10 text-primary" />
+            </div>
+            <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 bg-primary text-white text-xs px-2 py-0.5 rounded-full">
+              Property
+            </div>
+          </div>
+          <h4 className="font-medium text-lg mb-1">{getLocationString()}</h4>
+          {safeProperty.property_details?.locality && (
+            <p className="text-sm text-muted-foreground">
+              {safeProperty.property_details.locality}
+            </p>
+          )}
+          <div className="flex justify-center mt-4">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => {
+                // Open location in Google Maps
+                window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(getLocationString())}`, '_blank');
+              }}
+            >
+              <MapPin className="h-4 w-4 mr-2" />
+              View on Google Maps
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+  
+  // Static Nearby Amenities component (no Google Maps)
+  const StaticNearbyAmenities = () => (
+    <Card className="border-border/40 shadow-md">
+      <CardContent className="p-6">
+        <h3 className="text-lg font-semibold mb-4">Nearby Amenities</h3>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          {nearbyAmenitiesData.map((amenity, index) => {
+            const Icon = amenity.icon;
+            return (
+              <div key={index} className="bg-background/60 p-4 rounded-lg flex items-center">
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center mr-3">
+                  <Icon className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="font-medium text-sm">{amenity.name}</p>
+                  <p className="text-xs text-muted-foreground">{amenity.distance}</p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  );
   
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -318,20 +415,11 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
             </CardContent>
           </Card>
           
-          {/* Location Map */}
-          <PropertyLocationMap
-            address={safeProperty.address || ''}
-            city={safeProperty.city || ''}
-            state={safeProperty.state || ''}
-            zipCode={safeProperty.zip_code || ''}
-            coordinates={getPropertyCoordinates()}
-          />
+          {/* Static Location Component (no Google Maps) */}
+          <StaticLocationComponent />
           
-          {/* Nearby Amenities */}
-          <NearbyAmenities 
-            coordinates={getPropertyCoordinates()}
-            address={getLocationString()}
-          />
+          {/* Static Nearby Amenities (no Google Maps) */}
+          <StaticNearbyAmenities />
         </div>
         
         {/* Sidebar Column */}
@@ -406,16 +494,19 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
             </Card>
           )}
           
-          {/* Similar Properties Card */}
-          <Card className="border-border/40 shadow-md">
-            <CardContent className="p-6">
-              <h3 className="text-lg font-semibold mb-4">Similar Properties</h3>
-              <div className="text-center py-8">
-                <Home className="h-12 w-12 mx-auto text-muted-foreground/40 mb-3" />
-                <p className="text-muted-foreground">Similar properties will appear here</p>
-              </div>
-            </CardContent>
-          </Card>
+          {/* Similar Properties */}
+          <SimilarProperties 
+            properties={similarPropertiesData.map(prop => ({
+              id: prop.id,
+              title: prop.title,
+              city: prop.city,
+              state: prop.state,
+              price: prop.price,
+              bedrooms: prop.bedrooms,
+              bathrooms: prop.bathrooms,
+              square_feet: prop.square_feet
+            }))} 
+          />
         </div>
       </div>
     </div>
@@ -500,15 +591,14 @@ const PropertyDetailsSkeleton: React.FC = () => {
             </CardContent>
           </Card>
           
-          {/* Highlights skeleton */}
+          {/* Similar properties skeleton */}
           <Card>
             <CardContent className="p-6">
               <Skeleton className="h-6 w-40 mb-4" />
               <div className="space-y-2">
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-2/3" />
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-16 w-full" />
               </div>
             </CardContent>
           </Card>
