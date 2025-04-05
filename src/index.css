@@ -1,3 +1,8 @@
+/* src/index.css
+// Version: 1.1.0
+// Last Modified: 05-04-2025 14:45 IST
+// Purpose: Add vibrant theme color scheme */
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -74,6 +79,43 @@
     
     /* Added success color for positive indicators */
     --success: 142 76% 36%;
+    --success-foreground: 0 0% 100%;
+  }
+
+  :root[data-theme="vibrant"] {
+    /* Vibrant Theme - Colorful, bright and energetic */
+    --background: 180 50% 98%;
+    --foreground: 260 50% 20%;
+    
+    /* Energetic magenta primary */
+    --primary: 320 90% 55%;
+    --primary-foreground: 0 0% 100%;
+    
+    /* Bright complementary secondary */
+    --secondary: 150 85% 60%;
+    --secondary-foreground: 155 90% 15%;
+    
+    /* Supporting colors - Rich and playful */
+    --muted: 180 30% 94%;
+    --muted-foreground: 260 30% 40%;
+    --accent: 260 85% 80%;
+    --accent-foreground: 260 90% 20%;
+    
+    /* UI Elements - Bright but not overwhelming */
+    --card: 0 0% 100%;
+    --card-foreground: 260 50% 20%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 260 50% 20%;
+    --border: 180 40% 85%;
+    --input: 180 40% 85%;
+    --ring: 320 90% 55%;
+    
+    /* Semantic Colors */
+    --destructive: 0 90% 60%;
+    --destructive-foreground: 0 0% 100%;
+    
+    /* Success color - Bright green */
+    --success: 142 80% 45%;
     --success-foreground: 0 0% 100%;
   }
   

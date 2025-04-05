@@ -1,7 +1,7 @@
 // src/components/Header.tsx
-// Version: 3.7.0
-// Last Modified: 05-04-2025 20:15 IST
-// Purpose: Centralized logo styling for consistent appearance across all routes
+// Version: 3.9.0
+// Last Modified: 05-04-2025 14:50 IST
+// Purpose: Make theme switcher visible only in development mode
 
 import React, { useEffect, useState, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
@@ -13,7 +13,8 @@ import {
   Search, 
   Waves, 
   Sunset,
-  LayoutGrid
+  LayoutGrid,
+  Sparkles
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -24,6 +25,10 @@ import { cn } from '@/lib/utils';
 interface HeaderProps {
   onFavoritesClick?: () => void;
 }
+
+// Check if app is running in development mode
+// In Vite, development mode can be detected using import.meta.env.DEV
+const isDevelopmentMode = import.meta.env.DEV;
 
 // Logo component with fixed styling - single source of truth for logo appearance
 const BrandLogo = () => (
@@ -97,6 +102,20 @@ export function Header({ onFavoritesClick }: HeaderProps) {
     }
   };
 
+  // Get theme icon based on current theme
+  const getThemeIcon = () => {
+    switch (theme) {
+      case 'ocean':
+        return <Waves className="h-5 w-5 text-primary" />;
+      case 'sunset':
+        return <Sunset className="h-5 w-5 text-primary" />;
+      case 'vibrant':
+        return <Sparkles className="h-5 w-5 text-primary" />;
+      default:
+        return <Waves className="h-5 w-5 text-primary" />;
+    }
+  };
+
   // Check if current path is in seeker module
   const isInSeekerModule = location.pathname === '/' || 
                           location.pathname === '/seeker' || 
@@ -113,60 +132,73 @@ export function Header({ onFavoritesClick }: HeaderProps) {
           <BrandLogo />
 
           <div className="flex items-center space-x-4">
-            {/* Theme Switcher */}
-            <div className="relative" ref={themeDropdownRef}>
-              <button
-                onClick={() => setIsThemeDropdownOpen(!isThemeDropdownOpen)}
-                className="flex items-center justify-center w-10 h-10 rounded-full bg-accent/50 backdrop-blur-sm transition-all hover:bg-accent"
-                aria-label="Change theme"
-              >
-                {theme === 'ocean' ? (
-                  <Waves className="h-5 w-5 text-primary" />
-                ) : (
-                  <Sunset className="h-5 w-5 text-primary" />
-                )}
-              </button>
+            {/* Theme Switcher - Only visible in development mode */}
+            {isDevelopmentMode && (
+              <div className="relative" ref={themeDropdownRef}>
+                <button
+                  onClick={() => setIsThemeDropdownOpen(!isThemeDropdownOpen)}
+                  className="flex items-center justify-center w-10 h-10 rounded-full bg-accent/50 backdrop-blur-sm transition-all hover:bg-accent"
+                  aria-label="Change theme"
+                >
+                  {getThemeIcon()}
+                </button>
 
-              {isThemeDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-card border border-border overflow-hidden z-50">
-                  <div className="py-1">
-                    <div className="px-4 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                      Select Theme
+                {isThemeDropdownOpen && (
+                  <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-card border border-border overflow-hidden z-50">
+                    <div className="py-1">
+                      <div className="px-4 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                        Select Theme
+                      </div>
+                      <button
+                        onClick={() => {
+                          setTheme('ocean');
+                          setIsThemeDropdownOpen(false);
+                        }}
+                        className={cn(
+                          "flex w-full items-center px-4 py-2 text-sm transition-colors",
+                          theme === 'ocean' 
+                            ? "bg-primary/10 text-primary font-medium" 
+                            : "text-foreground hover:bg-accent"
+                        )}
+                      >
+                        <Waves className="h-4 w-4 mr-2" />
+                        Ocean Theme
+                      </button>
+                      <button
+                        onClick={() => {
+                          setTheme('sunset');
+                          setIsThemeDropdownOpen(false);
+                        }}
+                        className={cn(
+                          "flex w-full items-center px-4 py-2 text-sm transition-colors",
+                          theme === 'sunset' 
+                            ? "bg-primary/10 text-primary font-medium" 
+                            : "text-foreground hover:bg-accent"
+                        )}
+                      >
+                        <Sunset className="h-4 w-4 mr-2" />
+                        Sunset Theme
+                      </button>
+                      <button
+                        onClick={() => {
+                          setTheme('vibrant');
+                          setIsThemeDropdownOpen(false);
+                        }}
+                        className={cn(
+                          "flex w-full items-center px-4 py-2 text-sm transition-colors",
+                          theme === 'vibrant' 
+                            ? "bg-primary/10 text-primary font-medium" 
+                            : "text-foreground hover:bg-accent"
+                        )}
+                      >
+                        <Sparkles className="h-4 w-4 mr-2" />
+                        Vibrant Theme
+                      </button>
                     </div>
-                    <button
-                      onClick={() => {
-                        setTheme('ocean');
-                        setIsThemeDropdownOpen(false);
-                      }}
-                      className={cn(
-                        "flex w-full items-center px-4 py-2 text-sm transition-colors",
-                        theme === 'ocean' 
-                          ? "bg-primary/10 text-primary font-medium" 
-                          : "text-foreground hover:bg-accent"
-                      )}
-                    >
-                      <Waves className="h-4 w-4 mr-2" />
-                      Ocean Theme
-                    </button>
-                    <button
-                      onClick={() => {
-                        setTheme('sunset');
-                        setIsThemeDropdownOpen(false);
-                      }}
-                      className={cn(
-                        "flex w-full items-center px-4 py-2 text-sm transition-colors",
-                        theme === 'sunset' 
-                          ? "bg-primary/10 text-primary font-medium" 
-                          : "text-foreground hover:bg-accent"
-                      )}
-                    >
-                      <Sunset className="h-4 w-4 mr-2" />
-                      Sunset Theme
-                    </button>
                   </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
 
             {/* Favorites Button (only if user is logged in) */}
             {user && onFavoritesClick && (
