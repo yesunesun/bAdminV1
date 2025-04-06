@@ -1,6 +1,6 @@
 // src/contexts/AuthContext.tsx
-// Version: 3.4.0
-// Last Modified: 01-04-2025 12:45 IST
+// Version: 3.5.0
+// Last Modified: 06-04-2025 16:30 IST
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
@@ -141,25 +141,48 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error('Verification code must contain only numbers');
       }
       
-      const { data, error } = await supabase.auth.verifyOtp({
-        email: email.trim(),
-        token: token.trim(),
-        type: 'signup', // Change from 'email' to 'signup' for new user registrations
-      });
-
-      if (error) {
-        console.error('OTP verification API error:', error);
-        throw error;
+      // Try all available verification types in case the token type has been misidentified
+      const typesToTry = ['signup', 'email', 'recovery', 'invite'];
+      let successfulVerification = false;
+      let lastError = null;
+      
+      // Try each verification type until one succeeds
+      for (const type of typesToTry) {
+        try {
+          console.log(`Attempting verification with type: ${type}`);
+          const { data, error } = await supabase.auth.verifyOtp({
+            email: email.trim(),
+            token: token.trim(),
+            type: type as any, // Type assertion needed for TypeScript
+          });
+          
+          if (!error) {
+            console.log(`OTP verification successful with type: ${type}. User data:`, data?.user ? 'User exists' : 'No user');
+            successfulVerification = true;
+            break;
+          } else {
+            lastError = error;
+            console.warn(`Verification failed with type ${type}:`, error.message);
+          }
+        } catch (e) {
+          console.warn(`Error trying verification type ${type}:`, e);
+          lastError = e;
+        }
       }
       
-      console.log('OTP verification successful. User data:', data?.user ? 'User exists' : 'No user');
-      return { error: undefined };
+      if (successfulVerification) {
+        return { error: undefined };
+      } else {
+        throw lastError || new Error('Verification failed with all token types');
+      }
     } catch (err) {
       console.error('OTP verification error:', err);
       if (err instanceof Error) {
         return {
           error: {
-            message: err.message,
+            message: err.message === 'Token has expired' 
+              ? 'Verification code has expired. Please request a new code or use the link in your email.' 
+              : err.message,
             name: 'AuthError'
           } as AuthError
         };

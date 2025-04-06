@@ -1,6 +1,6 @@
 // src/lib/supabase.ts
-// Version: 2.5.0
-// Last Modified: 03-04-2025 10:30 IST
+// Version: 2.6.0
+// Last Modified: 06-04-2025 15:30 IST
 // Purpose: Advanced Supabase client configuration with robust error handling and network resilience
 
 import { createClient } from '@supabase/supabase-js';
@@ -28,8 +28,12 @@ const customFetch = (url: RequestInfo | URL, options: RequestInit = {}) => {
   headers.set('Accept', 'application/json');
   headers.set('Accept-Charset', 'utf-8');
   
-  // Specific content type handling
-  if (!(options.body instanceof FormData)) {
+  // Do not override content-type for auth-related endpoints to avoid 403 errors
+  const urlString = String(url);
+  const isAuthEndpoint = urlString.includes('/auth/') || urlString.includes('/token');
+  
+  // Only set Content-Type if not an auth endpoint and not FormData
+  if (!isAuthEndpoint && !(options.body instanceof FormData)) {
     headers.set('Content-Type', 'application/json');
   }
 
@@ -40,35 +44,53 @@ const customFetch = (url: RequestInfo | URL, options: RequestInit = {}) => {
   const fetchWithRetry = async (retriesLeft = 2): Promise<Response> => {
     try {
       const response = await fetch(url, { ...options, headers });
+      
+      // Log detailed request information for debugging (only in development)
+      if (import.meta.env.DEV) {
+        console.log('API Request Details:', {
+          url: String(url),
+          method: options.method || 'GET',
+          status: response.status,
+          isAuthEndpoint
+        });
+      }
 
-      // Log detailed request information for debugging
-      console.log('API Request Details:', {
-        url: String(url),
-        method: options.method || 'GET',
-        status: response.status,
-        headers: Object.fromEntries(headers.entries())
-      });
-
-      // Handle specific error scenarios
+      // Special handling for auth endpoints - don't retry authentication endpoints
+      // as this can lead to account lockouts
       if (!response.ok) {
-        if (response.status === 406 && retriesLeft > 0) {
+        if (response.status === 406 && retriesLeft > 0 && !isAuthEndpoint) {
           console.warn(`Not Acceptable Error (406). Retrying... (${retriesLeft} attempts left)`);
           return fetchWithRetry(retriesLeft - 1);
         }
 
-        // Throw error for non-successful responses
+        // Log the error but don't throw for auth endpoints - let Supabase handle these errors
+        if (isAuthEndpoint) {
+          console.warn(`Auth endpoint returned status: ${response.status}`);
+          return response; // Return the response to let Supabase handle it
+        }
+
+        // Throw error for non-successful responses on non-auth endpoints
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       return response;
     } catch (error) {
+      // Avoid retrying auth endpoints
+      if (isAuthEndpoint) {
+        console.error('Auth endpoint error:', {
+          url: String(url),
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
+        throw error; // Don't retry auth errors
+      }
+
       console.error('Fetch Request Failed:', {
         url: String(url),
         method: options.method || 'GET',
         error: error instanceof Error ? error.message : 'Unknown error'
       });
 
-      // Retry mechanism for network errors
+      // Retry mechanism for network errors on non-auth endpoints
       if (retriesLeft > 0) {
         console.warn(`Network error. Retrying... (${retriesLeft} attempts left)`);
         return fetchWithRetry(retriesLeft - 1);
@@ -95,7 +117,6 @@ const supabaseOptions = {
     headers: {
       'x-client-info': 'bhoomitalli-web-client',
       'Accept': 'application/json',
-      'Content-Type': 'application/json',
     },
     fetch: customFetch
   },
