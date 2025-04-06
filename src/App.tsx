@@ -1,7 +1,7 @@
 // src/App.tsx 
-// Version: 8.12.0
-// Last Modified: 05-04-2025 22:30 IST
-// Purpose: Standardized layout across all seeker module pages
+// Version: 8.14.0
+// Last Modified: 06-04-2025 15:30 IST
+// Purpose: Make /properties and /properties/list use SeekerLayout when accessed from seeker module
 
 import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
@@ -155,7 +155,7 @@ const PublicOrProtectedRoute = ({ children }: { children: React.ReactNode }) => 
   return <>{children}</>;
 };
 
-// Main app layout with Header - standardized to match seeker layout
+// Main app layout with Header - used for non-seeker routes
 function AppLayout() {
   const [isFavoritesOpen, setIsFavoritesOpen] = useState(false);
   
@@ -169,14 +169,10 @@ function AppLayout() {
   
   return (
     <div className="flex flex-col min-h-screen">
-      <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8">
-        <Header onFavoritesClick={handleFavoritesClick} />
-      </div>
+      <Header onFavoritesClick={handleFavoritesClick} />
       <FavoritesDrawer open={isFavoritesOpen} onClose={handleFavoritesClose} />
-      <main className="flex-grow bg-background">
-        <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6">
-          <Outlet />
-        </div>
+      <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex-grow">
+        <Outlet />
       </main>
       <Footer />
     </div>
@@ -267,14 +263,41 @@ function App() {
                     ))}
                 </Route>
                 
+                {/* Add properties main route to use seeker layout when coming from seeker module */}
+                <Route 
+                  path="/properties" 
+                  element={
+                    <PublicOrProtectedRoute>
+                      {mainRoutes
+                        .find(route => route.path === '/properties')
+                        ?.children?.find(child => child.index)
+                        ?.element || <Navigate to="/" />}
+                    </PublicOrProtectedRoute>
+                  } 
+                />
+                
+                {/* Add properties/list path to use seeker layout when coming from seeker module */}
+                <Route 
+                  path="/properties/list" 
+                  element={
+                    <PublicOrProtectedRoute>
+                      {mainRoutes
+                        .find(route => route.path === '/properties')
+                        ?.children?.find(child => child.path === 'list')
+                        ?.element || <Navigate to="/" />}
+                    </PublicOrProtectedRoute>
+                  } 
+                />
+                
                 {/* Properties pages that should use the seeker layout */}
                 <Route 
                   path="/properties/:id" 
                   element={
                     <PublicOrProtectedRoute>
                       {mainRoutes
-                        .flatMap(route => route.children || [])
-                        .find(route => route.path === ':id')?.element || <Navigate to="/" />}
+                        .find(route => route.path === '/properties')
+                        ?.children?.find(child => child.path === ':id')
+                        ?.element || <Navigate to="/" />}
                     </PublicOrProtectedRoute>
                   } 
                 />
@@ -328,75 +351,36 @@ function App() {
                 );
               })}
 
-              {/* Owner module routes - Apply the same layout as seeker for consistency */}
-              <Route element={<SeekerLayout />}>
-                <Route path="/properties">
-                  <Route 
-                    index
-                    element={
-                      <ProtectedRoute>
-                        {mainRoutes
-                          .find(route => route.path === '/properties')?.element || <Navigate to="/" />}
-                      </ProtectedRoute>
-                    } 
-                  />
-                  <Route 
-                    path="list"
-                    element={
-                      <ProtectedRoute>
-                        {mainRoutes
-                          .flatMap(route => route.children || [])
-                          .find(route => route.path === 'list')?.element || <Navigate to="/" />}
-                      </ProtectedRoute>
-                    } 
-                  />
-                  {/* Other property routes */}
-                  {mainRoutes
-                    .filter(route => route.path === '/properties')
-                    .flatMap(route => route.children || [])
-                    .filter(child => child.path !== 'list' && !child.path?.includes(':id'))
-                    .map((childRoute, j) => (
-                      <Route
-                        key={`property-child-${j}`}
-                        path={childRoute.path}
-                        element={
-                          <ProtectedRoute>
-                            {childRoute.element}
-                          </ProtectedRoute>
-                        }
-                        index={childRoute.index}
-                      />
-                    ))}
-                </Route>
-              </Route>
-
-              {/* Remaining Main App Routes with standard header */}
+              {/* Main App Routes with standard header */}
               <Route element={<AppLayout />}>
                 {mainRoutes.map((route, i) => {
-                  // Skip routes that are handled by the seeker layout or property routes
+                  // Skip routes that are handled by the seeker layout
                   if (route.path === '/seeker' || route.path === '/home' || 
-                      route.path === '/properties' || route.path?.includes('/properties/')) {
+                      route.path === '/properties') {
                     return null;
                   }
                   
                   // Handle routes with children
                   if (route.children) {
+                    // Skip the /properties route which is handled in SeekerLayout
+                    if (route.path === '/properties') {
+                      return null;
+                    }
+                    
                     return (
                       <Route key={`main-${i}`} path={route.path}>
-                        {route.children
-                          .filter(child => !child.path?.includes(':id')) // Skip property detail routes
-                          .map((childRoute, j) => (
-                            <Route
-                              key={`main-${i}-child-${j}`}
-                              path={childRoute.path}
-                              element={
-                                <ProtectedRoute>
-                                  {childRoute.element}
-                                </ProtectedRoute>
-                              }
-                              index={childRoute.index}
-                            />
-                          ))}
+                        {route.children.map((childRoute, j) => (
+                          <Route
+                            key={`main-${i}-child-${j}`}
+                            path={childRoute.path}
+                            element={
+                              <ProtectedRoute>
+                                {childRoute.element}
+                              </ProtectedRoute>
+                            }
+                            index={childRoute.index}
+                          />
+                        ))}
                       </Route>
                     );
                   }
