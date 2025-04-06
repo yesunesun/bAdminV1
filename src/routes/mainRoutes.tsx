@@ -1,7 +1,7 @@
 // src/routes/mainRoutes.tsx
-// Version: 11.3.0
-// Last Modified: 05-04-2025 14:50 IST
-// Purpose: Add /allproperties route to main routes
+// Version: 11.4.0
+// Last Modified: 06-04-2025 17:30 IST
+// Purpose: Add /browse route for public access to property browsing
 
 import React from 'react';
 import { Navigate } from 'react-router-dom';
@@ -44,6 +44,8 @@ export const mainRoutes = [
       { path: 'allproperties', element: <AllProperties /> }
     ]
   },
+  // Add the new browse route
+  { path: '/browse', element: <BrowseProperties /> },
   // Add direct route to AllProperties
   { path: '/allproperties', element: <AllProperties /> },
   // Keep existing HomePage at /home path unchanged

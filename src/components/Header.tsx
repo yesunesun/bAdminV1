@@ -1,7 +1,7 @@
 // src/components/Header.tsx
-// Version: 4.0.0
-// Last Modified: 05-04-2025 23:15 IST
-// Purpose: Fixed alignment issues between header and content
+// Version: 4.1.0
+// Last Modified: 06-04-2025 17:30 IST
+// Purpose: Add /browse link in the header
 
 import React, { useEffect, useState, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
@@ -246,7 +246,7 @@ export function Header({ onFavoritesClick }: HeaderProps) {
                   <div className="py-2">
                     {/* Limited menu items as per requirements */}
                     <Link 
-                      to="/seeker" 
+                      to="/browse" 
                       className="flex w-full items-center px-4 py-2 text-sm text-foreground hover:bg-accent"
                       onClick={() => setIsProfileDropdownOpen(false)}
                     >

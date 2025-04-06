@@ -1,7 +1,7 @@
 // src/App.tsx 
-// Version: 8.14.0
-// Last Modified: 06-04-2025 15:30 IST
-// Purpose: Make /properties and /properties/list use SeekerLayout when accessed from seeker module
+// Version: 8.15.0
+// Last Modified: 06-04-2025 17:30 IST
+// Purpose: Add /browse route using SeekerLayout for public property browsing
 
 import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
@@ -235,6 +235,18 @@ function App() {
                   } 
                 />
                 
+                {/* Add the new browse route with SeekerLayout */}
+                <Route 
+                  path="/browse" 
+                  element={
+                    <PublicOrProtectedRoute>
+                      {mainRoutes
+                        .find(route => route.path === '/browse')
+                        ?.element || <Navigate to="/" />}
+                    </PublicOrProtectedRoute>
+                  } 
+                />
+                
                 {/* Seeker module routes */}
                 <Route path="/seeker">
                   <Route 
@@ -356,7 +368,7 @@ function App() {
                 {mainRoutes.map((route, i) => {
                   // Skip routes that are handled by the seeker layout
                   if (route.path === '/seeker' || route.path === '/home' || 
-                      route.path === '/properties') {
+                      route.path === '/properties' || route.path === '/browse') {
                     return null;
                   }
                   
