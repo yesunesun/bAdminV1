@@ -1,7 +1,7 @@
 // src/modules/seeker/services/seekerService.ts
-// Version: 4.4.0
-// Last Modified: 05-04-2025 17:45 IST
-// Purpose: Added similar properties functionality
+// Version: 4.5.0
+// Last Modified: 07-04-2025 16:30 IST
+// Purpose: Added property age and furnishing filters
 
 import { supabase } from '@/lib/supabase';
 import { PropertyType } from '@/modules/owner/components/property/types';
@@ -13,11 +13,12 @@ export interface PropertyFilters {
   maxPrice?: number;
   bedrooms?: number;
   bathrooms?: number;
+  furnishing?: string;
+  propertyAge?: string;
   sortBy?: string;
   page?: number;
   pageSize?: number;
 }
-
 // Colored marker URLs from Google Maps
 export const markerPins = {
   residential: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png',
@@ -52,7 +53,7 @@ export const formatPrice = (price: number): string => {
 // Get marker pin URL based on property type
 export const getMarkerPin = (property: PropertyType) => {
   const propertyType = property.property_details?.propertyType?.toLowerCase() || '';
-  
+
   if (propertyType.includes('apartment')) {
     return markerPins.apartment;
   } else if (propertyType.includes('residential') || propertyType.includes('house')) {
@@ -66,7 +67,7 @@ export const getMarkerPin = (property: PropertyType) => {
   } else if (propertyType.includes('land') || propertyType.includes('plot')) {
     return markerPins.land;
   }
-  
+
   return markerPins.default;
 };
 
@@ -77,7 +78,7 @@ export const fetchProperties = async (filters: PropertyFilters = {}) => {
     const page = filters.page || 1;
     const pageSize = filters.pageSize || 50; // Increased from default to show more properties
     const startIndex = (page - 1) * pageSize;
-    
+
     // Build the query
     let query = supabase
       .from('properties')
@@ -94,44 +95,55 @@ export const fetchProperties = async (filters: PropertyFilters = {}) => {
           email
         )
       `);
-    
+
     // Create a count query to get total results
     let countQuery = supabase
       .from('properties')
       .select('id', { count: 'exact' });
-    
+
     // Apply filters to both queries
+    // Inside fetchProperties function, add these filter conditions:
+    if (filters.furnishing) {
+      query = query.filter('property_details->furnishing', 'eq', filters.furnishing);
+      countQuery = countQuery.filter('property_details->furnishing', 'eq', filters.furnishing);
+    }
+
+    if (filters.propertyAge) {
+      query = query.filter('property_details->propertyAge', 'eq', filters.propertyAge);
+      countQuery = countQuery.filter('property_details->propertyAge', 'eq', filters.propertyAge);
+    }
+
     if (filters.searchQuery) {
       const searchFilter = `title.ilike.%${filters.searchQuery}%,address.ilike.%${filters.searchQuery}%,city.ilike.%${filters.searchQuery}%`;
       query = query.or(searchFilter);
       countQuery = countQuery.or(searchFilter);
     }
-    
+
     if (filters.propertyType) {
       query = query.filter('property_details->propertyType', 'ilike', `%${filters.propertyType}%`);
       countQuery = countQuery.filter('property_details->propertyType', 'ilike', `%${filters.propertyType}%`);
     }
-    
+
     if (filters.minPrice !== undefined) {
       query = query.gte('price', filters.minPrice);
       countQuery = countQuery.gte('price', filters.minPrice);
     }
-    
+
     if (filters.maxPrice !== undefined) {
       query = query.lte('price', filters.maxPrice);
       countQuery = countQuery.lte('price', filters.maxPrice);
     }
-    
+
     if (filters.bedrooms !== undefined) {
       query = query.gte('bedrooms', filters.bedrooms);
       countQuery = countQuery.gte('bedrooms', filters.bedrooms);
     }
-    
+
     if (filters.bathrooms !== undefined) {
       query = query.gte('bathrooms', filters.bathrooms);
       countQuery = countQuery.gte('bathrooms', filters.bathrooms);
     }
-    
+
     // Apply sorting
     if (filters.sortBy) {
       switch (filters.sortBy) {
@@ -153,47 +165,47 @@ export const fetchProperties = async (filters: PropertyFilters = {}) => {
       // Default sort by creation date (newest first)
       query = query.order('created_at', { ascending: false });
     }
-    
+
     // Apply pagination
     query = query.range(startIndex, startIndex + pageSize - 1);
-    
+
     // Execute both queries in parallel
     const [dataResult, countResult] = await Promise.all([
       query,
       countQuery
     ]);
-    
+
     if (dataResult.error) {
       console.error('Error fetching properties:', dataResult.error);
       throw dataResult.error;
     }
-    
+
     if (countResult.error) {
       console.error('Error counting properties:', countResult.error);
       throw countResult.error;
     }
-    
+
     const totalCount = countResult.count || 0;
     const totalPages = Math.ceil(totalCount / pageSize);
-    
+
     console.log(`Fetched ${dataResult.data?.length || 0} properties (page ${page}/${totalPages}, total: ${totalCount})`);
-    
+
     // Process images to ensure consistent sorting
     const processedProperties = (dataResult.data || []).map(property => ({
       ...property,
       property_images: property.property_images
         ? property.property_images.sort((a, b) => {
-            // Sort by is_primary first (primary images first)
-            if (a.is_primary && !b.is_primary) return -1;
-            if (!a.is_primary && b.is_primary) return 1;
-            
-            // Then sort by display_order if available
-            return (a.display_order || 0) - (b.display_order || 0);
-          })
+          // Sort by is_primary first (primary images first)
+          if (a.is_primary && !b.is_primary) return -1;
+          if (!a.is_primary && b.is_primary) return 1;
+
+          // Then sort by display_order if available
+          return (a.display_order || 0) - (b.display_order || 0);
+        })
         : []
     }));
-    
-    return { 
+
+    return {
       properties: processedProperties,
       totalCount,
       currentPage: page,
@@ -212,9 +224,9 @@ export const fetchPropertiesForMap = async (filters: PropertyFilters = {}) => {
     const page = filters.page || 1;
     const pageSize = filters.pageSize || 9; // Changed from 10 to 9 to match the original display count
     const startIndex = (page - 1) * pageSize;
-    
+
     console.log(`Fetching properties for map: page=${page}, pageSize=${pageSize}, startIndex=${startIndex}`);
-    
+
     // Build the query with necessary fields for map display
     let query = supabase
       .from('properties')
@@ -235,44 +247,44 @@ export const fetchPropertiesForMap = async (filters: PropertyFilters = {}) => {
           display_order
         )
       `);
-    
+
     // Create a count query to get total results
     let countQuery = supabase
       .from('properties')
       .select('id', { count: 'exact' });
-    
+
     // Apply filters to both queries
     if (filters.searchQuery) {
       const searchFilter = `title.ilike.%${filters.searchQuery}%,address.ilike.%${filters.searchQuery}%,city.ilike.%${filters.searchQuery}%`;
       query = query.or(searchFilter);
       countQuery = countQuery.or(searchFilter);
     }
-    
+
     if (filters.propertyType) {
       query = query.filter('property_details->propertyType', 'ilike', `%${filters.propertyType}%`);
       countQuery = countQuery.filter('property_details->propertyType', 'ilike', `%${filters.propertyType}%`);
     }
-    
+
     if (filters.minPrice !== undefined) {
       query = query.gte('price', filters.minPrice);
       countQuery = countQuery.gte('price', filters.minPrice);
     }
-    
+
     if (filters.maxPrice !== undefined) {
       query = query.lte('price', filters.maxPrice);
       countQuery = countQuery.lte('price', filters.maxPrice);
     }
-    
+
     if (filters.bedrooms !== undefined) {
       query = query.gte('bedrooms', filters.bedrooms);
       countQuery = countQuery.gte('bedrooms', filters.bedrooms);
     }
-    
+
     if (filters.bathrooms !== undefined) {
       query = query.gte('bathrooms', filters.bathrooms);
       countQuery = countQuery.gte('bathrooms', filters.bathrooms);
     }
-    
+
     // Apply sorting
     if (filters.sortBy) {
       switch (filters.sortBy) {
@@ -294,41 +306,41 @@ export const fetchPropertiesForMap = async (filters: PropertyFilters = {}) => {
       // Default sort by creation date (newest first)
       query = query.order('created_at', { ascending: false });
     }
-    
+
     // Apply pagination
     query = query.range(startIndex, startIndex + pageSize - 1);
-    
+
     // Execute both queries in parallel
     const [dataResult, countResult] = await Promise.all([
       query,
       countQuery
     ]);
-    
+
     if (dataResult.error) {
       console.error('Error fetching properties for map:', dataResult.error);
       throw dataResult.error;
     }
-    
+
     if (countResult.error) {
       console.error('Error counting properties for map:', countResult.error);
       throw countResult.error;
     }
-    
+
     const totalCount = countResult.count || 0;
     const totalPages = Math.ceil(totalCount / pageSize);
-    
+
     console.log(`Fetched ${dataResult.data?.length || 0} properties for map (page ${page}/${totalPages}, total: ${totalCount})`);
-    
+
     // Process the data to include primary images
     const processedProperties = (dataResult.data || []).map(property => {
       let primaryImage = '/noimage.png';
-      
+
       if (property.property_images && property.property_images.length > 0) {
         // Find primary image or use first image
         const primary = property.property_images.find(img => img.is_primary);
         primaryImage = (primary || property.property_images[0]).url;
       }
-      
+
       // Add primary image to property_details
       return {
         ...property,
@@ -338,8 +350,8 @@ export const fetchPropertiesForMap = async (filters: PropertyFilters = {}) => {
         }
       };
     });
-    
-    return { 
+
+    return {
       properties: processedProperties,
       totalCount,
       currentPage: page,
@@ -372,39 +384,39 @@ export const fetchPropertyById = async (propertyId: string) => {
       `)
       .eq('id', propertyId)
       .single();
-    
+
     if (error) {
       console.error('Error fetching property by ID:', error);
       throw error;
     }
-    
+
     if (!data) {
       throw new Error(`Property with ID ${propertyId} not found`);
     }
-    
+
     // Process images to ensure consistent sorting
     const processedImages = data.property_images
       ? data.property_images.sort((a, b) => {
-          // Sort by is_primary first (primary images first)
-          if (a.is_primary && !b.is_primary) return -1;
-          if (!a.is_primary && b.is_primary) return 1;
-          
-          // Then sort by display_order if available
-          return (a.display_order || 0) - (b.display_order || 0);
-        })
+        // Sort by is_primary first (primary images first)
+        if (a.is_primary && !b.is_primary) return -1;
+        if (!a.is_primary && b.is_primary) return 1;
+
+        // Then sort by display_order if available
+        return (a.display_order || 0) - (b.display_order || 0);
+      })
       : [];
-    
+
     // Create processed property with sorted images
     const processedProperty = {
       ...data,
       property_images: processedImages
     };
-    
+
     // Record view count increment in the background (don't await)
     incrementPropertyViewCount(propertyId).catch(err => {
       console.error('Error incrementing view count:', err);
     });
-    
+
     return processedProperty;
   } catch (error) {
     console.error(`Error fetching property with ID ${propertyId}:`, error);
@@ -417,12 +429,12 @@ const incrementPropertyViewCount = async (propertyId: string) => {
   try {
     const { data: user } = await supabase.auth.getUser();
     const userId = user?.user?.id;
-    
+
     // First check if this user already viewed this property today
     if (userId) {
       const today = new Date();
       today.setHours(0, 0, 0, 0); // Start of today
-      
+
       const { data: existingVisit } = await supabase
         .from('property_visits')
         .select('id, visit_count')
@@ -430,7 +442,7 @@ const incrementPropertyViewCount = async (propertyId: string) => {
         .eq('user_id', userId)
         .gte('visit_date', today.toISOString())
         .single();
-      
+
       if (existingVisit) {
         // Update existing visit count
         await supabase
@@ -457,7 +469,7 @@ const incrementPropertyViewCount = async (propertyId: string) => {
       // This could be implemented in the future if needed
       console.log('Anonymous user view - not tracked in database');
     }
-    
+
     return { success: true };
   } catch (error) {
     console.error('Error recording property visit:', error);
@@ -470,11 +482,11 @@ const incrementPropertyViewCount = async (propertyId: string) => {
 export const getUserFavorites = async () => {
   try {
     const { data: user } = await supabase.auth.getUser();
-    
+
     if (!user?.user) {
       throw new Error('User not authenticated');
     }
-    
+
     const { data, error } = await supabase
       .from('property_likes')
       .select(`
@@ -490,22 +502,22 @@ export const getUserFavorites = async () => {
         )
       `)
       .eq('user_id', user.user.id);
-    
+
     if (error) {
       throw error;
     }
-    
+
     // Format the properties data
     return data.map(like => {
       const property = like.properties;
-      
+
       // Find primary image or first image
       let primaryImage = '/noimage.png';
       if (property.property_images && property.property_images.length > 0) {
         const primary = property.property_images.find(img => img.is_primary);
         primaryImage = (primary || property.property_images[0]).url;
       }
-      
+
       // Add primary image to property_details
       return {
         ...property,
@@ -529,11 +541,11 @@ export const checkPropertyLike = async (propertyId: string, userId: string) => {
       .eq('property_id', propertyId)
       .eq('user_id', userId)
       .single();
-    
+
     if (error && error.code !== 'PGRST116') { // PGRST116 is "row not found"
       throw error;
     }
-    
+
     return { liked: !!data };
   } catch (error) {
     console.error('Error checking property like:', error);
@@ -544,22 +556,22 @@ export const checkPropertyLike = async (propertyId: string, userId: string) => {
 export const addFavorite = async (propertyId: string) => {
   try {
     const { data: user } = await supabase.auth.getUser();
-    
+
     if (!user?.user) {
       throw new Error('User not authenticated');
     }
-    
+
     const { error } = await supabase
       .from('property_likes')
       .insert({
         property_id: propertyId,
         user_id: user.user.id
       });
-    
+
     if (error) {
       throw error;
     }
-    
+
     return { success: true };
   } catch (error) {
     console.error('Error adding favorite:', error);
@@ -570,21 +582,21 @@ export const addFavorite = async (propertyId: string) => {
 export const removeFavorite = async (propertyId: string) => {
   try {
     const { data: user } = await supabase.auth.getUser();
-    
+
     if (!user?.user) {
       throw new Error('User not authenticated');
     }
-    
+
     const { error } = await supabase
       .from('property_likes')
       .delete()
       .eq('property_id', propertyId)
       .eq('user_id', user.user.id);
-    
+
     if (error) {
       throw error;
     }
-    
+
     return { success: true };
   } catch (error) {
     console.error('Error removing favorite:', error);
@@ -624,12 +636,12 @@ export const submitVisitRequest = async (
         status: 'pending',
         created_at: new Date().toISOString()
       });
-    
+
     if (error) {
       console.error('Error submitting visit request:', error);
       throw error;
     }
-    
+
     return { success: true, data };
   } catch (error) {
     console.error('Error submitting visit request:', error);
@@ -658,12 +670,12 @@ export const reportProperty = async (
         message: `Reason: ${reason}${description ? ` - Details: ${description}` : ''}`,
         created_at: new Date().toISOString()
       });
-    
+
     if (error) {
       console.error('Error reporting property:', error);
       throw error;
     }
-    
+
     return { success: true, data };
   } catch (error) {
     console.error('Error reporting property:', error);
@@ -692,14 +704,14 @@ export const fetchSimilarProperties = async (options: SimilarPropertiesOptions) 
       price,
       limit = 3
     } = options;
-    
+
     console.log(`[fetchSimilarProperties] Starting with options:`, options);
-    
+
     if (!currentPropertyId) {
       console.error('[fetchSimilarProperties] No property ID provided');
       return [];
     }
-    
+
     // Base query to fetch properties
     let query = supabase
       .from('properties')
@@ -723,28 +735,28 @@ export const fetchSimilarProperties = async (options: SimilarPropertiesOptions) 
       .neq('id', currentPropertyId) // Exclude current property
       .order('created_at', { ascending: false }) // Latest properties first
       .limit(limit + 5); // Fetch a few extra to allow for filtering
-    
+
     // Add location filters if available
     if (city) {
       query = query.eq('city', city);
     }
-    
+
     if (state) {
       query = query.eq('state', state);
     }
-    
+
     // Add property type filter if available
     if (propertyType) {
       query = query.filter('property_details->propertyType', 'ilike', `%${propertyType}%`);
     }
-    
+
     // Add bedrooms filter if available (with some flexibility)
     if (bedrooms !== undefined && bedrooms !== null) {
       // Find properties with similar bedrooms count (±1)
       query = query.gte('bedrooms', Math.max(1, bedrooms - 1))
-                  .lte('bedrooms', bedrooms + 1);
+        .lte('bedrooms', bedrooms + 1);
     }
-    
+
     // Add price range filter if available
     if (price !== undefined && price !== null && price > 0) {
       // Find properties within ±30% of the price (more flexibility)
@@ -752,27 +764,27 @@ export const fetchSimilarProperties = async (options: SimilarPropertiesOptions) 
       const maxPrice = price * 1.3;
       query = query.gte('price', minPrice).lte('price', maxPrice);
     }
-    
+
     console.log('[fetchSimilarProperties] Executing first query with filters');
-    
+
     // Execute the query
     const { data, error } = await query;
-    
+
     if (error) {
       console.error('[fetchSimilarProperties] Error fetching similar properties:', error);
       throw error;
     }
-    
+
     const resultCount = data?.length || 0;
     console.log(`[fetchSimilarProperties] First query returned ${resultCount} properties`);
-    
+
     // If we got some results, return them
     if (data && data.length >= 1) {
       return processSimilarProperties(data);
     }
-    
+
     console.log('[fetchSimilarProperties] No similar properties found with strict criteria, trying with relaxed filters');
-    
+
     // Try again with more relaxed filters
     let fallbackQuery = supabase
       .from('properties')
@@ -795,33 +807,33 @@ export const fetchSimilarProperties = async (options: SimilarPropertiesOptions) 
       `)
       .neq('id', currentPropertyId)
       .limit(limit + 2);
-    
+
     // Keep city/state filter if available
     if (city) {
       fallbackQuery = fallbackQuery.eq('city', city);
     } else if (state) {
       fallbackQuery = fallbackQuery.eq('state', state);
     }
-    
+
     // Remove other filters for a broader search
-    
+
     const { data: fallbackData, error: fallbackError } = await fallbackQuery;
-    
+
     if (fallbackError) {
       console.error('[fetchSimilarProperties] Error fetching fallback properties:', fallbackError);
       throw fallbackError;
     }
-    
+
     const fallbackCount = fallbackData?.length || 0;
     console.log(`[fetchSimilarProperties] Fallback query returned ${fallbackCount} properties`);
-    
+
     if (fallbackData && fallbackData.length >= 1) {
       return processSimilarProperties(fallbackData);
     }
-    
+
     // If still no results, just get any recent properties
     console.log('[fetchSimilarProperties] No properties found with location criteria, fetching most recent properties');
-    
+
     const { data: lastResortData, error: lastResortError } = await supabase
       .from('properties')
       .select(`
@@ -844,15 +856,15 @@ export const fetchSimilarProperties = async (options: SimilarPropertiesOptions) 
       .neq('id', currentPropertyId)
       .order('created_at', { ascending: false })
       .limit(limit);
-    
+
     if (lastResortError) {
       console.error('[fetchSimilarProperties] Error fetching last resort properties:', lastResortError);
       throw lastResortError;
     }
-    
+
     const lastResortCount = lastResortData?.length || 0;
     console.log(`[fetchSimilarProperties] Last resort query returned ${lastResortCount} properties`);
-    
+
     // Return whatever we found, or empty array
     return processSimilarProperties(lastResortData || []);
   } catch (error) {

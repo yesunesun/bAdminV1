@@ -1,7 +1,7 @@
 // src/modules/seeker/components/CompactSearchBar.tsx
-// Version: 1.3.0
-// Last Modified: 05-04-2025 10:45 IST
-// Purpose: Removed Property Types dropdown as requested
+// Version: 1.4.0
+// Last Modified: 07-04-2025 16:45 IST
+// Purpose: Added Property Age and Furnished/Unfurnished filters
 
 import React, { forwardRef, useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
@@ -44,6 +44,8 @@ const CompactSearchBar = forwardRef<HTMLInputElement, CompactSearchBarProps>(({
   const [bedrooms, setBedrooms] = useState<number | undefined>(filters.bedrooms);
   const [bathrooms, setBathrooms] = useState<number | undefined>(filters.bathrooms);
   const [localPropertyType, setLocalPropertyType] = useState<string>(selectedPropertyType);
+  const [furnishing, setFurnishing] = useState<string>(filters.furnishing || '');
+  const [propertyAge, setPropertyAge] = useState<string>(filters.propertyAge || '');
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   
   // Sync local state with filters when they change externally
@@ -53,6 +55,8 @@ const CompactSearchBar = forwardRef<HTMLInputElement, CompactSearchBarProps>(({
     setBedrooms(filters.bedrooms);
     setBathrooms(filters.bathrooms);
     setLocalPropertyType(selectedPropertyType);
+    setFurnishing(filters.furnishing || '');
+    setPropertyAge(filters.propertyAge || '');
   }, [filters, selectedPropertyType]);
   
   // Handle filter changes 
@@ -68,7 +72,9 @@ const CompactSearchBar = forwardRef<HTMLInputElement, CompactSearchBarProps>(({
       maxPrice,
       bedrooms,
       bathrooms,
-      propertyType: localPropertyType === 'all' ? undefined : localPropertyType
+      propertyType: localPropertyType === 'all' ? undefined : localPropertyType,
+      furnishing: furnishing || undefined,
+      propertyAge: propertyAge || undefined
     });
     
     setIsSheetOpen(false);
@@ -80,7 +86,9 @@ const CompactSearchBar = forwardRef<HTMLInputElement, CompactSearchBarProps>(({
     maxPrice < 10000000,
     !!bedrooms,
     !!bathrooms,
-    selectedPropertyType !== 'all'
+    selectedPropertyType !== 'all',
+    !!furnishing,
+    !!propertyAge
   ].filter(Boolean).length;
   
   // Format price to Indian format
@@ -101,6 +109,23 @@ const CompactSearchBar = forwardRef<HTMLInputElement, CompactSearchBarProps>(({
     { id: 'house', label: 'House' },
     { id: 'commercial', label: 'Commercial' },
     { id: 'land', label: 'Land' }
+  ];
+
+  // Furnishing options
+  const furnishingOptions = [
+    { id: '', label: 'Any' },
+    { id: 'furnished', label: 'Furnished' },
+    { id: 'semi-furnished', label: 'Semi-Furnished' },
+    { id: 'unfurnished', label: 'Unfurnished' }
+  ];
+
+  // Property Age options
+  const propertyAgeOptions = [
+    { id: '', label: 'Any' },
+    { id: 'new', label: 'New Construction' },
+    { id: 'less-than-5', label: 'Less than 5 years' },
+    { id: '5-10', label: '5-10 years' },
+    { id: 'more-than-10', label: 'More than 10 years' }
   ];
   
   return (
@@ -244,6 +269,54 @@ const CompactSearchBar = forwardRef<HTMLInputElement, CompactSearchBarProps>(({
                     ))}
                   </div>
                 </div>
+
+                {/* Furnished Status */}
+                <div className="space-y-3">
+                  <h3 className="font-medium text-lg">Furnishing</h3>
+                  <div className="grid grid-cols-2 gap-3">
+                    {furnishingOptions.map((option) => (
+                      <div
+                        key={option.id}
+                        onClick={() => setFurnishing(option.id)}
+                        className={cn(
+                          "px-3 py-2.5 rounded-md border cursor-pointer flex items-center justify-between",
+                          furnishing === option.id
+                            ? "bg-primary/10 border-primary"
+                            : "bg-background hover:bg-muted/50 border-input"
+                        )}
+                      >
+                        <span>{option.label}</span>
+                        {furnishing === option.id && (
+                          <Check className="h-4 w-4 text-primary" />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Property Age */}
+                <div className="space-y-3">
+                  <h3 className="font-medium text-lg">Property Age</h3>
+                  <div className="grid grid-cols-2 gap-3">
+                    {propertyAgeOptions.map((option) => (
+                      <div
+                        key={option.id}
+                        onClick={() => setPropertyAge(option.id)}
+                        className={cn(
+                          "px-3 py-2.5 rounded-md border cursor-pointer flex items-center justify-between",
+                          propertyAge === option.id
+                            ? "bg-primary/10 border-primary"
+                            : "bg-background hover:bg-muted/50 border-input"
+                        )}
+                      >
+                        <span>{option.label}</span>
+                        {propertyAge === option.id && (
+                          <Check className="h-4 w-4 text-primary" />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
                 
                 {/* Action buttons */}
                 <div className="flex justify-between pt-6 sticky bottom-0 bg-background pb-4">
@@ -256,6 +329,8 @@ const CompactSearchBar = forwardRef<HTMLInputElement, CompactSearchBarProps>(({
                       setBathrooms(undefined);
                       setMinPrice(0);
                       setMaxPrice(10000000);
+                      setFurnishing('');
+                      setPropertyAge('');
                     }}
                   >
                     Reset Filters
@@ -352,6 +427,40 @@ const CompactSearchBar = forwardRef<HTMLInputElement, CompactSearchBarProps>(({
                   onClick={() => {
                     setBathrooms(undefined);
                     setFilters({...filters, bathrooms: undefined});
+                  }}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </Badge>
+            )}
+
+            {furnishing && (
+              <Badge variant="secondary" className="flex items-center gap-1">
+                {furnishingOptions.find(o => o.id === furnishing)?.label || furnishing}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-4 w-4 p-0 ml-1"
+                  onClick={() => {
+                    setFurnishing('');
+                    setFilters({...filters, furnishing: undefined});
+                  }}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </Badge>
+            )}
+
+            {propertyAge && (
+              <Badge variant="secondary" className="flex items-center gap-1">
+                {propertyAgeOptions.find(o => o.id === propertyAge)?.label || propertyAge}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-4 w-4 p-0 ml-1"
+                  onClick={() => {
+                    setPropertyAge('');
+                    setFilters({...filters, propertyAge: undefined});
                   }}
                 >
                   <X className="h-3 w-3" />

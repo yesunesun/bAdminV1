@@ -1,7 +1,7 @@
 // src/modules/seeker/pages/AllProperties/components/PropertyCard.tsx
-// Version: 1.4.0
-// Last Modified: 08-04-2025 12:45 IST
-// Purpose: Enhanced direct update function and coordinate verification
+// Version: 2.1.0
+// Last Modified: 06-04-2025 15:00 IST
+// Purpose: Added property ID display and improved coordinate functionality
 
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
@@ -29,7 +29,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
   setGeocodingInProgress
 }) => {
   const { hasCoordinates, getCoordinatesDisplay } = useCoordinatesUtils();
-  const { geocodeAddress, verifyCoordinates } = usePropertyCoordinates();
+  const { geocodeAddress, verifyCoordinates, updatePropertyCoordinates } = usePropertyCoordinates();
   const [localCoordinates, setLocalCoordinates] = useState<string | null>(null);
   const [isUpdated, setIsUpdated] = useState(false);
   const [debugInfo, setDebugInfo] = useState<any>(null);
@@ -43,11 +43,17 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
       setHasVerifiedCoordinates(has);
     };
     checkCoords();
-  }, [property.id]);
+  }, [property.id, verifyCoordinates]);
   
   // Direct database update function for emergency testing
   const directUpdateCoordinates = async (e: React.MouseEvent) => {
     e.preventDefault();
+    
+    // Log property ID to console
+    console.log("===== DIRECT UPDATE =====");
+    console.log("Property ID:", property.id);
+    console.log("Property Title:", property.title);
+    console.log("=========================");
     
     try {
       setGeocodingInProgress(property.id);
@@ -57,59 +63,77 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
       
       console.log("[EMERGENCY] Starting direct update with:", coordinates);
       
-      // First, get the current property
-      const { data: propertyData, error: fetchError } = await supabase
-        .from('properties')
-        .select('property_details')
-        .eq('id', property.id)
-        .single();
+      // APPROACH 1: Direct SQL approach using RPC
+      // This is the most reliable method as it bypasses any ORM complexity
+      const { data: rpcResult, error: rpcError } = await supabase.rpc(
+        'update_property_coordinates',
+        {
+          p_property_id: property.id,
+          p_lat: coordinates.lat,
+          p_lng: coordinates.lng
+        }
+      );
+      
+      if (rpcError) {
+        // If RPC fails (function may not exist), fall back to direct update
+        console.warn("[EMERGENCY] RPC method failed, trying direct update:", rpcError);
         
-      if (fetchError) {
-        console.error("[EMERGENCY] Fetch error:", fetchError);
-        toast({
-          title: "Error fetching property",
-          description: fetchError.message,
-          variant: "destructive"
-        });
-        return;
+        // APPROACH 2: Direct update with fresh fetch first
+        const { data: propertyData, error: fetchError } = await supabase
+          .from('properties')
+          .select('property_details')
+          .eq('id', property.id)
+          .single();
+        
+        if (fetchError) {
+          console.error("[EMERGENCY] Fetch error:", fetchError);
+          throw new Error(`Failed to fetch property: ${fetchError.message}`);
+        }
+        
+        console.log("[EMERGENCY] Current property data:", propertyData);
+        
+        // Create a completely new property_details object to avoid reference issues
+        const updatedDetails = {
+          ...JSON.parse(JSON.stringify(propertyData.property_details || {})),
+          coordinates: {
+            lat: coordinates.lat,
+            lng: coordinates.lng
+          },
+          emergency_test: true,
+          lastUpdated: new Date().toISOString()
+        };
+        
+        console.log("[EMERGENCY] New property details:", updatedDetails);
+        
+        // Direct update approach
+        const { error: updateError } = await supabase
+          .from('properties')
+          .update({ 
+            property_details: updatedDetails 
+          })
+          .eq('id', property.id);
+        
+        if (updateError) {
+          console.error("[EMERGENCY] Update error:", updateError);
+          throw new Error(`Failed to update property: ${updateError.message}`);
+        }
+      } else {
+        console.log("[EMERGENCY] RPC update successful:", rpcResult);
       }
       
-      console.log("[EMERGENCY] Current property data:", propertyData);
+      console.log("[EMERGENCY] Update completed. Waiting before verification...");
       
-      // Prepare the update data - create a completely new object
-      const updatedDetails = {
-        ...(propertyData.property_details || {}),  // Handle undefined case
-        coordinates: coordinates,
-        emergency_test: true,
-        lastUpdated: new Date().toISOString()  // Add timestamp to ensure change is detected
-      };
-      
-      console.log("[EMERGENCY] New property details:", updatedDetails);
-      
-      // Update the database
-      const { data: updateResult, error: updateError } = await supabase
-        .from('properties')
-        .update({ property_details: updatedDetails })
-        .eq('id', property.id)
-        .select();
-      
-      if (updateError) {
-        console.error("[EMERGENCY] Update error:", updateError);
-        toast({
-          title: "Error updating property",
-          description: updateError.message,
-          variant: "destructive"
-        });
-        return;
-      }
-      
-      console.log("[EMERGENCY] Update result:", updateResult);
+      // Force a significant delay before verification to ensure the database has time to update
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Verify the update
+      console.log("[EMERGENCY] Running verification...");
       const verified = await verifyCoordinates(property.id);
+      console.log("[EMERGENCY] Verification result:", verified);
       setHasVerifiedCoordinates(verified);
       
       if (verified) {
+        // Fetch the updated property details to confirm
         const { data: verifyData, error: verifyError } = await supabase
           .from('properties')
           .select('property_details')
@@ -117,32 +141,55 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
           .single();
         
         if (verifyError) {
-          console.error("[EMERGENCY] Verify error:", verifyError);
+          console.error("[EMERGENCY] Verify fetch error:", verifyError);
         } else {
           console.log("[EMERGENCY] Verification data:", verifyData);
           setDebugInfo(verifyData.property_details);
           
           if (verifyData.property_details?.coordinates) {
             setLocalCoordinates(`${verifyData.property_details.coordinates.lat.toFixed(6)}, ${verifyData.property_details.coordinates.lng.toFixed(6)}`);
+            setIsUpdated(true);
+            
+            toast({
+              title: "Direct update successful",
+              description: `Coordinates updated and verified: ${verifyData.property_details.coordinates.lat.toFixed(6)}, ${verifyData.property_details.coordinates.lng.toFixed(6)}`,
+            });
+          } else {
+            throw new Error("Coordinates were not found in the updated property details");
           }
         }
+      } else {
+        throw new Error("Update was performed but coordinates could not be verified");
       }
-      
-      // Update local state
-      setLocalCoordinates(`${coordinates.lat.toFixed(6)}, ${coordinates.lng.toFixed(6)}`);
-      setIsUpdated(true);
-      
-      toast({
-        title: "Emergency update complete",
-        description: "Check console for details",
-      });
     } catch (error) {
       console.error("[EMERGENCY] Error:", error);
       toast({
-        title: "Emergency update failed",
-        description: "See console for details",
+        title: "Update failed",
+        description: error instanceof Error ? error.message : "Unknown error occurred",
         variant: "destructive"
       });
+      
+      // Try to determine what went wrong
+      console.log("[EMERGENCY] Running diagnostic checks...");
+      try {
+        const { data: diagnosticData, error: diagnosticError } = await supabase
+          .from('properties')
+          .select('property_details')
+          .eq('id', property.id)
+          .single();
+        
+        if (diagnosticError) {
+          console.error("[EMERGENCY] Diagnostic fetch error:", diagnosticError);
+        } else {
+          console.log("[EMERGENCY] Current property_details:", diagnosticData.property_details);
+          setDebugInfo({
+            ...diagnosticData.property_details,
+            _diagnostic: "Retrieved during error recovery"
+          });
+        }
+      } catch (diagError) {
+        console.error("[EMERGENCY] Diagnostic error:", diagError);
+      }
     } finally {
       setGeocodingInProgress(null);
     }
@@ -152,35 +199,75 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
   const checkCoordinates = async (e: React.MouseEvent) => {
     e.preventDefault();
     
-    console.log("[CHECK] Verifying coordinates for property:", property.id);
+    // Log property ID to console
+    console.log("===== VERIFY COORDINATES =====");
+    console.log("Property ID:", property.id);
+    console.log("Property Title:", property.title);
+    console.log("=============================");
     
-    const verified = await verifyCoordinates(property.id);
-    setHasVerifiedCoordinates(verified);
-    
-    if (verified) {
-      const { data, error } = await supabase
-        .from('properties')
-        .select('property_details')
-        .eq('id', property.id)
-        .single();
-        
-      if (!error && data.property_details) {
-        console.log("[CHECK] Verification data:", data.property_details);
-        setDebugInfo(data.property_details);
-        
-        // Update local coordinates display
-        if (data.property_details.coordinates) {
-          setLocalCoordinates(`${data.property_details.coordinates.lat.toFixed(6)}, ${data.property_details.coordinates.lng.toFixed(6)}`);
-          setIsUpdated(true);
+    try {
+      setGeocodingInProgress(property.id);
+      console.log("[CHECK] Verifying coordinates for property:", property.id);
+      
+      const verified = await verifyCoordinates(property.id);
+      setHasVerifiedCoordinates(verified);
+      
+      if (verified) {
+        const { data, error } = await supabase
+          .from('properties')
+          .select('property_details')
+          .eq('id', property.id)
+          .single();
+          
+        if (error) {
+          console.error("[CHECK] Error fetching property details:", error);
+          throw error;
         }
+        
+        if (data && data.property_details) {
+          console.log("[CHECK] Verification data:", data.property_details);
+          setDebugInfo(data.property_details);
+          
+          // Update local coordinates display
+          if (data.property_details.coordinates) {
+            setLocalCoordinates(`${data.property_details.coordinates.lat.toFixed(6)}, ${data.property_details.coordinates.lng.toFixed(6)}`);
+            setIsUpdated(true);
+            
+            toast({
+              title: "Coordinates verified",
+              description: `Found: ${data.property_details.coordinates.lat.toFixed(6)}, ${data.property_details.coordinates.lng.toFixed(6)}`,
+            });
+          } else {
+            toast({
+              title: "Verification issue",
+              description: "Property has property_details but no coordinates field",
+              variant: "destructive"
+            });
+          }
+        } else {
+          toast({
+            title: "Verification issue",
+            description: "Property found but no property_details available",
+            variant: "destructive"
+          });
+        }
+      } else {
+        toast({
+          title: "No coordinates found",
+          description: "This property does not have coordinates in the database",
+          variant: "destructive"
+        });
       }
+    } catch (error) {
+      console.error("[CHECK] Error during verification:", error);
+      toast({
+        title: "Verification error",
+        description: error instanceof Error ? error.message : "Unknown error occurred",
+        variant: "destructive"
+      });
+    } finally {
+      setGeocodingInProgress(null);
     }
-    
-    toast({
-      title: "Verification result",
-      description: verified ? "Coordinates found in database" : "No coordinates found",
-      variant: verified ? "default" : "destructive"
-    });
   };
   
   // Function to get coordinates from address using Google Maps Geocoding API
@@ -258,6 +345,10 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
                 <h2 className="text-xl font-semibold line-clamp-1">{property.title}</h2>
                 <p className="text-gray-500 dark:text-gray-400 text-sm line-clamp-1">
                   {property.address}, {property.city}, {property.state}
+                </p>
+                {/* Property ID Display - Added */}
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  ID: <span className="font-mono select-all">{property.id}</span>
                 </p>
                 {property.profiles && (
                   <p className="text-xs text-blue-600 dark:text-blue-400">
