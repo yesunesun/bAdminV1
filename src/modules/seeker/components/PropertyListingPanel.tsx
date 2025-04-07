@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyListingPanel.tsx
-// Version: 2.1.0
-// Last Modified: 06-04-2025 00:15 IST
-// Purpose: Fixed column widths to maintain the same dimensions during and after loading
+// Version: 2.2.0
+// Last Modified: 07-04-2025 15:00 IST
+// Purpose: Made property listing panel fully responsive for mobile view
 
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
@@ -355,7 +355,7 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
   };
 
   return (
-    <div className="w-1/3 h-full flex-shrink-0 p-3">
+    <div className="w-full h-full flex-shrink-0 p-3">
       <div className="h-full overflow-hidden rounded-xl border border-border bg-card shadow-sm flex flex-col">
         {/* Header with count */}
         <div className="sticky top-0 z-10 bg-card p-3 border-b flex justify-between items-center">

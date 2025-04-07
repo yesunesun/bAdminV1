@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyMapHomeView.tsx
-// Version: 3.8.0
-// Last Modified: 06-04-2025 03:00 IST
-// Purpose: Expanded content area to 100% of available space and centered layout
+// Version: 3.12.0
+// Last Modified: 07-04-2025 14:30 IST
+// Purpose: Made layout responsive - hide map on mobile devices
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useJsApiLoader } from '@react-google-maps/api';
@@ -58,7 +58,7 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
     searchLocations
   } = usePropertyMapData();
   
-  // Google Maps script loader
+  // Google Maps script loader - only load on non-mobile devices
   const { isLoaded, loadError } = useJsApiLoader({
     googleMapsApiKey: apiKey,
     libraries,
@@ -169,7 +169,7 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
   // Comprehensive error handling with user feedback
   if (loadError) {
     return (
-      <div className="h-[calc(100vh-64px)] flex items-center justify-center bg-background p-6">
+      <div className="flex items-center justify-center bg-background p-6" style={{ height: 'calc(100vh - 200px)' }}>
         <div className="text-center max-w-md bg-card p-8 rounded-lg shadow-lg border border-border">
           <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
           <h2 className="text-2xl font-bold mb-3 text-foreground">Map Loading Failed</h2>
@@ -193,65 +193,61 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
   }
 
   return (
-    <div className="h-[calc(100vh-64px)] w-full flex flex-col bg-background text-foreground overflow-hidden">
-      {/* Full-width container with zero horizontal padding */}
-      <div className="w-full h-full">
-        {/* Container that takes 100% of available space */}
-        <div className="w-full h-full flex flex-col">
-          {/* Optimized search section with proper spacing */}
-          <div className="px-2 sm:px-3 pt-3 pb-2">
-            <CompactSearchBar
-              ref={searchInputRef}
-              searchQuery={searchQuery}
-              setSearchQuery={setSearchQuery}
-              searchLocations={searchLocations}
-              selectedPropertyType={selectedPropertyType}
-              handlePropertyTypeChange={handlePropertyTypeChange}
-              filters={filters}
-              setFilters={setFilters}
-              handleResetFilters={handleResetFilters}
-            />
-          </div>
-          
-          {/* Main Content - Fixed Width Split View (1/3 - 2/3) */}
-          <div className="flex-grow flex w-full">
-            {/* Property Listings Panel - Fixed at 1/3 width */}
-            <PropertyListingPanel
+    <div className="flex flex-col bg-background text-foreground" style={{ height: 'calc(100vh - 200px)' }}>
+      {/* Optimized search section with proper spacing */}
+      <div className="px-2 sm:px-3 pt-3 pb-2">
+        <CompactSearchBar
+          ref={searchInputRef}
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          searchLocations={searchLocations}
+          selectedPropertyType={selectedPropertyType}
+          handlePropertyTypeChange={handlePropertyTypeChange}
+          filters={filters}
+          setFilters={setFilters}
+          handleResetFilters={handleResetFilters}
+        />
+      </div>
+      
+      {/* Main Content - Responsive layout (full width on mobile, split on desktop) */}
+      <div className="flex-grow flex w-full overflow-hidden">
+        {/* Property Listings Panel - Full width on mobile, 1/3 width on desktop */}
+        <div className="w-full md:w-1/3 h-full">
+          <PropertyListingPanel
+            properties={properties}
+            loading={loading}
+            loadingMore={loadingMore}
+            hasMore={hasMore}
+            totalCount={totalCount}
+            onLoadMore={loadMoreProperties}
+            onFavoriteAction={handleFavoriteToggle}
+            handlePropertyHover={handlePropertyHover}
+            hoveredProperty={hoveredProperty}
+            setActiveProperty={setActiveProperty}
+            favoriteProperties={favoriteProperties}
+            isLoadingFavorites={isLoadingFavorites}
+          />
+        </div>
+        
+        {/* Map Panel - Hidden on mobile, 2/3 width on desktop */}
+        <div className="hidden md:block md:w-2/3 h-full">
+          {isLoaded ? (
+            <MapPanel
               properties={properties}
-              loading={loading}
-              loadingMore={loadingMore}
-              hasMore={hasMore}
-              totalCount={totalCount}
-              onLoadMore={loadMoreProperties}
-              onFavoriteAction={handleFavoriteToggle}
-              handlePropertyHover={handlePropertyHover}
-              hoveredProperty={hoveredProperty}
+              isLoaded={isLoaded}
+              loadError={loadError}
+              activeProperty={activeProperty}
               setActiveProperty={setActiveProperty}
-              favoriteProperties={favoriteProperties}
-              isLoadingFavorites={isLoadingFavorites}
+              hoveredProperty={hoveredProperty}
             />
-            
-            {/* Map Panel - Fixed at 2/3 width */}
-            <div className="w-2/3 h-full">
-              {isLoaded ? (
-                <MapPanel
-                  properties={properties}
-                  isLoaded={isLoaded}
-                  loadError={loadError}
-                  activeProperty={activeProperty}
-                  setActiveProperty={setActiveProperty}
-                  hoveredProperty={hoveredProperty}
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-muted">
-                  <div className="text-center p-6">
-                    <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-primary border-r-transparent"></div>
-                    <p className="mt-4 text-muted-foreground">Loading maps...</p>
-                  </div>
-                </div>
-              )}
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-muted">
+              <div className="text-center p-6">
+                <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-primary border-r-transparent"></div>
+                <p className="mt-4 text-muted-foreground">Loading maps...</p>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>
