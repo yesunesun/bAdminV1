@@ -1,6 +1,7 @@
-// src/components/property/wizard/components/PropertyTypeSelection.tsx
-// Version: 1.5.0
-// Last Modified: 05-03-2025 14:35 IST
+// src/modules/owner/components/property/wizard/components/PropertyTypeSelection.tsx
+// Version: 1.6.0
+// Last Modified: 07-04-2025 17:30 IST
+// Purpose: Fix navigation issue with property listing wizard
 
 import React, { useState, useEffect } from 'react';
 import { 
@@ -9,7 +10,7 @@ import {
 } from '@/components/ui/card';
 import { Building2, Home, Trees, Shield, Clock, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { HowItWorks } from '../../HowItWorks';
+import { HowItWorks } from '../../../property/HowItWorks';
 
 const propertyCategories = [
   {
@@ -72,8 +73,16 @@ export default function PropertyTypeSelection({
     if (initialAdType) setSelectedListingType(initialAdType);
   }, [initialCategory, initialAdType]);
 
-  // Modified to ensure proper navigation to details step
-  const handleSubmit = () => {
+  // Fixed to properly handle navigation and prevent redirection to root
+  const handleSubmit = (e: React.MouseEvent) => {
+    e.preventDefault(); // Prevent default form submission
+    
+    console.log('PropertyTypeSelection - handleSubmit', {
+      selectedCategory,
+      selectedListingType,
+      selectedCity
+    });
+    
     if (selectedCategory && selectedListingType) {
       // Ensure consistent casing for category and listing type
       // This is critical for the URL structure and form handling
@@ -177,6 +186,7 @@ export default function PropertyTypeSelection({
 
                 <button
                   onClick={handleSubmit}
+                  type="button" // Explicitly set button type to prevent form submission
                   disabled={!selectedCategory || !selectedListingType}
                   className={cn(
                     "w-full py-3 px-4 rounded-lg text-white font-medium transition-all",
@@ -194,7 +204,11 @@ export default function PropertyTypeSelection({
 
         {/* How it works section */}
         <div className="py-12">
-          <HowItWorks onStartListing={scrollToTop} />
+          <HowItWorks 
+            onStartListing={scrollToTop} 
+            selectedCategory={selectedCategory} 
+            selectedType={selectedListingType}
+          />
         </div>
       </div>
     </div>

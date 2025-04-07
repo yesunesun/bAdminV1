@@ -1,7 +1,7 @@
-// src/pages/ListYourProperty.tsx
-// Version: 1.6.0
-// Last Modified: 07-03-2025 19:00 IST
-// Purpose: Updated import path for restructured PropertyForm component
+// src/modules/owner/pages/ListYourProperty.tsx
+// Version: 1.0.0
+// Last Modified: 07-04-2025 17:00 IST
+// Purpose: Fix routing issue with property listing wizard
 
 import React, { useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';

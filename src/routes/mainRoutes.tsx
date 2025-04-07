@@ -1,7 +1,7 @@
 // src/routes/mainRoutes.tsx
-// Version: 11.4.0
-// Last Modified: 06-04-2025 17:30 IST
-// Purpose: Add /browse route for public access to property browsing
+// Version: 11.6.0
+// Last Modified: 07-04-2025 16:15 IST
+// Purpose: Fix navigation issues with property listing
 
 import React from 'react';
 import { Navigate } from 'react-router-dom';
@@ -49,6 +49,7 @@ export const mainRoutes = [
   // Add direct route to AllProperties
   { path: '/allproperties', element: <AllProperties /> },
   // Keep existing HomePage at /home path unchanged
-  { path: '/home', element: <HomePage /> }
-  // Root path will be handled directly in App.tsx with PropertyMapHome component
+  { path: '/home', element: <HomePage /> },
+  // Add explicit handler for root path to avoid unexpected redirects
+  { path: '/', element: <Navigate to="/home" replace /> }
 ];
