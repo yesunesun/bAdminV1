@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyDetails/index.tsx
-// Version: 3.9.0
-// Last Modified: 06-04-2025 10:15 IST
-// Purpose: Moved NearbyAmenities component below SimilarProperties in sidebar
+// Version: 3.10.0
+// Last Modified: 08-04-2025 14:30 IST
+// Purpose: Fixed Schedule Visit button to open visit dialog instead of print
 
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
@@ -12,7 +12,7 @@ import NearbyAmenities from './NearbyAmenities';
 import SimilarProperties from './SimilarProperties';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -31,6 +31,10 @@ import {
   AlertCircle
 } from 'lucide-react';
 import ContactOwnerForm from './ContactOwnerForm';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/components/ui/use-toast';
+import { submitVisitRequest } from '../../services/seekerService';
 
 // Static similar properties data
 const similarPropertiesData = [
@@ -87,7 +91,15 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
 }) => {
   const { theme } = useTheme();
   const { user } = useAuth();
+  const { toast } = useToast();
   const [contactDialogOpen, setContactDialogOpen] = useState(false);
+  
+  // Visit scheduling dialog state
+  const [visitDialogOpen, setVisitDialogOpen] = useState(false);
+  const [visitDate, setVisitDate] = useState('');
+  const [visitTime, setVisitTime] = useState('');
+  const [visitMessage, setVisitMessage] = useState('');
+  const [isSubmittingVisit, setIsSubmittingVisit] = useState(false);
   
   // Add debugging for property data
   useEffect(() => {
@@ -109,6 +121,71 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
       console.log('- ownerInfo:', property.ownerInfo);
     }
   }, [property, isLoading]);
+  
+  // Handle visit request submission
+  const handleVisitRequest = async () => {
+    if (!user) {
+      toast({
+        title: "Authentication Required",
+        description: "Please sign in to schedule a visit",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!visitDate) {
+      toast({
+        title: "Date Required",
+        description: "Please select a preferred date for your visit",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!property) {
+      toast({
+        title: "Error",
+        description: "Property information is not available",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsSubmittingVisit(true);
+    
+    // Format datetime by combining date and time
+    const visitDateTime = visitTime 
+      ? new Date(`${visitDate}T${visitTime}`)
+      : new Date(visitDate);
+    
+    try {
+      await submitVisitRequest(
+        property.id, 
+        user.id, 
+        visitDateTime, 
+        visitMessage
+      );
+      
+      toast({
+        title: "Visit Request Submitted",
+        description: "Your visit request has been sent to the property owner",
+        variant: "default"
+      });
+      
+      setVisitDialogOpen(false);
+      setVisitDate('');
+      setVisitTime('');
+      setVisitMessage('');
+    } catch (error) {
+      toast({
+        title: "Submission Failed",
+        description: "Unable to submit your visit request. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmittingVisit(false);
+    }
+  };
   
   // Loading state
   if (isLoading) {
@@ -234,7 +311,7 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
               variant="outline" 
               size="sm"
               className="flex-1 sm:flex-none"
-              onClick={() => window.print()}
+              onClick={() => setVisitDialogOpen(true)}
             >
               <Calendar className="h-4 w-4 mr-2" />
               Schedule Visit
@@ -453,6 +530,84 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
           />
         </div>
       </div>
+      
+      {/* Visit Request Dialog */}
+      <Dialog open={visitDialogOpen} onOpenChange={setVisitDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Schedule a Visit</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label 
+                  htmlFor="visit-date" 
+                  className="text-sm font-medium flex items-center"
+                >
+                  Preferred Date <span className="text-destructive ml-1">*</span>
+                </label>
+                <Input
+                  id="visit-date"
+                  type="date"
+                  value={visitDate}
+                  onChange={(e) => setVisitDate(e.target.value)}
+                  min={new Date().toISOString().split('T')[0]}
+                  required
+                  className="w-full"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <label 
+                  htmlFor="visit-time" 
+                  className="text-sm font-medium"
+                >
+                  Preferred Time
+                </label>
+                <Input
+                  id="visit-time"
+                  type="time"
+                  value={visitTime}
+                  onChange={(e) => setVisitTime(e.target.value)}
+                  className="w-full"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label 
+                htmlFor="visit-message" 
+                className="text-sm font-medium"
+              >
+                Message to Owner (Optional)
+              </label>
+              <Textarea
+                id="visit-message"
+                placeholder="Any specific details or questions about your visit"
+                value={visitMessage}
+                onChange={(e) => setVisitMessage(e.target.value)}
+                rows={4}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setVisitDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleVisitRequest} 
+              disabled={isSubmittingVisit || !visitDate}
+            >
+              {isSubmittingVisit ? "Submitting..." : "Submit Request"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

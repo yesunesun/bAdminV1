@@ -23,7 +23,7 @@ const propertyCategories = [
     id: 'commercial',
     title: 'Commercial',
     icon: Building2,
-    listingTypes: ['Rent', 'Sale', 'Coworking']
+    listingTypes: ['Rent', 'Sale', 'Co-working']
   },
   {
     id: 'land',
