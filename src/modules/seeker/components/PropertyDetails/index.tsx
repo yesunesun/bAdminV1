@@ -1,40 +1,30 @@
 // src/modules/seeker/components/PropertyDetails/index.tsx
-// Version: 3.10.0
-// Last Modified: 08-04-2025 14:30 IST
-// Purpose: Fixed Schedule Visit button to open visit dialog instead of print
+// Version: 4.1.0
+// Last Modified: 08-04-2025 17:45 IST
+// Purpose: Update main component to use the redesigned section components
 
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
 import { PropertyDetails as PropertyDetailsType } from '../../hooks/usePropertyDetails';
-import PropertyGallery from './PropertyGallery';
-import PropertyLocationMap from './PropertyLocationMap';
-import NearbyAmenities from './NearbyAmenities';
-import SimilarProperties from './SimilarProperties';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useTheme } from '@/contexts/ThemeContext';
-import { useAuth } from '@/contexts/AuthContext';
-import { cn } from '@/lib/utils';
-import { 
-  MapPin, 
-  Home, 
-  Heart, 
-  Share2, 
-  Calendar, 
-  Info, 
-  BedDouble, 
-  Bath, 
-  Square, 
-  Building, 
-  AlertCircle
-} from 'lucide-react';
-import ContactOwnerForm from './ContactOwnerForm';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+import { AlertCircle } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
-import { submitVisitRequest } from '../../services/seekerService';
+
+// Import small components
+import PropertyHeader from './PropertyHeader';
+import PropertyGalleryCard from './PropertyGalleryCard';
+import PropertyActionButtons from './PropertyActionButtons';
+import PropertyOverviewCard from './PropertyOverviewCard';
+import PropertyDescriptionSection from './PropertyDescriptionSection';
+import PropertyFeaturesSection from './PropertyFeaturesSection';
+import PropertyAmenitiesSection from './PropertyAmenitiesSection';
+import PropertyLocationSection from './PropertyLocationSection';
+import ContactOwnerCard from './ContactOwnerCard';
+import PropertyHighlightsCard from './PropertyHighlightsCard';
+import SimilarProperties from './SimilarProperties';
+import NearbyAmenities from './NearbyAmenities';
+import VisitRequestDialog from './VisitRequestDialog';
 
 // Static similar properties data
 const similarPropertiesData = [
@@ -89,17 +79,8 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
   onToggleLike,
   isLoading
 }) => {
-  const { theme } = useTheme();
-  const { user } = useAuth();
   const { toast } = useToast();
-  const [contactDialogOpen, setContactDialogOpen] = useState(false);
-  
-  // Visit scheduling dialog state
   const [visitDialogOpen, setVisitDialogOpen] = useState(false);
-  const [visitDate, setVisitDate] = useState('');
-  const [visitTime, setVisitTime] = useState('');
-  const [visitMessage, setVisitMessage] = useState('');
-  const [isSubmittingVisit, setIsSubmittingVisit] = useState(false);
   
   // Add debugging for property data
   useEffect(() => {
@@ -121,71 +102,6 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
       console.log('- ownerInfo:', property.ownerInfo);
     }
   }, [property, isLoading]);
-  
-  // Handle visit request submission
-  const handleVisitRequest = async () => {
-    if (!user) {
-      toast({
-        title: "Authentication Required",
-        description: "Please sign in to schedule a visit",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (!visitDate) {
-      toast({
-        title: "Date Required",
-        description: "Please select a preferred date for your visit",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (!property) {
-      toast({
-        title: "Error",
-        description: "Property information is not available",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setIsSubmittingVisit(true);
-    
-    // Format datetime by combining date and time
-    const visitDateTime = visitTime 
-      ? new Date(`${visitDate}T${visitTime}`)
-      : new Date(visitDate);
-    
-    try {
-      await submitVisitRequest(
-        property.id, 
-        user.id, 
-        visitDateTime, 
-        visitMessage
-      );
-      
-      toast({
-        title: "Visit Request Submitted",
-        description: "Your visit request has been sent to the property owner",
-        variant: "default"
-      });
-      
-      setVisitDialogOpen(false);
-      setVisitDate('');
-      setVisitTime('');
-      setVisitMessage('');
-    } catch (error) {
-      toast({
-        title: "Submission Failed",
-        description: "Unable to submit your visit request. Please try again.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsSubmittingVisit(false);
-    }
-  };
   
   // Loading state
   if (isLoading) {
@@ -223,17 +139,6 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
     property_images: property.property_images || []
   };
   
-  // Format price with Indian notation (₹)
-  const formatPrice = (price: number) => {
-    if (price >= 10000000) {
-      return `₹${(price / 10000000).toFixed(2)} Cr`;
-    } else if (price >= 100000) {
-      return `₹${(price / 100000).toFixed(2)} L`;
-    } else {
-      return `₹${price.toLocaleString('en-IN')}`;
-    }
-  };
-  
   // Get formatted location string
   const getLocationString = () => {
     return [safeProperty.address, safeProperty.city, safeProperty.state, safeProperty.zip_code]
@@ -251,181 +156,70 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
     }
     return undefined;
   };
+
+  // Handle share functionality
+  const handleShare = () => {
+    if (navigator.share) {
+      navigator.share({
+        title: safeProperty.title,
+        url: window.location.href
+      }).catch(console.error);
+    } else {
+      navigator.clipboard.writeText(window.location.href);
+      toast({
+        title: "Link Copied",
+        description: "Property link copied to clipboard",
+        variant: "default"
+      });
+    }
+  };
   
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
       {/* Property Title Section */}
-      <div className="mb-6">
-        <h1 className="text-2xl md:text-3xl font-bold">{safeProperty.title}</h1>
-        <div className="flex items-center text-muted-foreground mt-2">
-          <MapPin className="h-4 w-4 mr-1 flex-shrink-0" />
-          <span className="truncate">{getLocationString()}</span>
-        </div>
-      </div>
+      <PropertyHeader 
+        title={safeProperty.title} 
+        location={getLocationString()} 
+      />
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Content Column */}
         <div className="lg:col-span-2 space-y-6">
           {/* Image Gallery */}
-          <Card className="overflow-hidden border-border/40 shadow-md">
-            <PropertyGallery 
-              images={safeProperty.property_images} 
-            />
-          </Card>
+          <PropertyGalleryCard images={safeProperty.property_images} />
           
           {/* Quick Actions */}
-          <div className="flex flex-wrap gap-3">
-            <Button 
-              variant={isLiked ? "default" : "outline"} 
-              size="sm" 
-              className="flex-1 sm:flex-none"
-              onClick={() => onToggleLike()}
-            >
-              <Heart className={cn(
-                "h-4 w-4 mr-2",
-                isLiked ? "fill-white" : "fill-none"
-              )} />
-              {isLiked ? "Saved" : "Save"}
-            </Button>
-            
-            <Button 
-              variant="outline" 
-              size="sm"
-              className="flex-1 sm:flex-none"
-              onClick={() => {
-                if (navigator.share) {
-                  navigator.share({
-                    title: safeProperty.title,
-                    url: window.location.href
-                  }).catch(console.error);
-                } else {
-                  navigator.clipboard.writeText(window.location.href);
-                }
-              }}
-            >
-              <Share2 className="h-4 w-4 mr-2" />
-              Share
-            </Button>
-            
-            <Button 
-              variant="outline" 
-              size="sm"
-              className="flex-1 sm:flex-none"
-              onClick={() => setVisitDialogOpen(true)}
-            >
-              <Calendar className="h-4 w-4 mr-2" />
-              Schedule Visit
-            </Button>
-          </div>
+          <PropertyActionButtons
+            isLiked={isLiked}
+            onToggleLike={onToggleLike}
+            onShare={handleShare}
+            onScheduleVisit={() => setVisitDialogOpen(true)}
+          />
           
-          {/* Property Overview */}
-          <Card className={cn(
-            "border-border/40 shadow-md",
-            theme === 'ocean' ? "bg-card" : "bg-card"
-          )}>
-            <CardContent className="p-6">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
-                <div className="mb-4 md:mb-0">
-                  <h2 className="text-3xl font-bold text-primary">
-                    {formatPrice(safeProperty.price)}
-                  </h2>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {safeProperty.property_details?.listingType === 'rent' ? 'For Rent' : 'For Sale'}
-                  </p>
-                </div>
-                
-                <div className="grid grid-cols-3 gap-4 text-center">
-                  <div className="flex flex-col items-center p-2 rounded-lg bg-background/60">
-                    <BedDouble className="h-5 w-5 text-primary mb-1" />
-                    <span className="font-medium">{safeProperty.bedrooms}</span>
-                    <span className="text-xs text-muted-foreground">Beds</span>
-                  </div>
-                  
-                  <div className="flex flex-col items-center p-2 rounded-lg bg-background/60">
-                    <Bath className="h-5 w-5 text-primary mb-1" />
-                    <span className="font-medium">{safeProperty.bathrooms}</span>
-                    <span className="text-xs text-muted-foreground">Baths</span>
-                  </div>
-                  
-                  <div className="flex flex-col items-center p-2 rounded-lg bg-background/60">
-                    <Square className="h-5 w-5 text-primary mb-1" />
-                    <span className="font-medium">{safeProperty.square_feet}</span>
-                    <span className="text-xs text-muted-foreground">Sq.ft</span>
-                  </div>
-                </div>
-              </div>
-              
-              {/* About this property */}
-              <div className="mb-6">
-                <h3 className="text-lg font-semibold mb-3 flex items-center">
-                  <Info className="h-5 w-5 mr-2 text-primary" />
-                  About this Property
-                </h3>
-                <p className="text-muted-foreground">
-                  {safeProperty.description}
-                </p>
-              </div>
-              
-              {/* Property Type and Features */}
-              {safeProperty.property_details && (
-                <div className="mb-6">
-                  <h3 className="text-lg font-semibold mb-3 flex items-center">
-                    <Building className="h-5 w-5 mr-2 text-primary" />
-                    Property Details
-                  </h3>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    <div className="bg-background/60 p-3 rounded-lg">
-                      <span className="text-sm text-muted-foreground">Type</span>
-                      <p className="font-medium">{safeProperty.property_details.propertyType || "Not specified"}</p>
-                    </div>
-                    
-                    <div className="bg-background/60 p-3 rounded-lg">
-                      <span className="text-sm text-muted-foreground">Year Built</span>
-                      <p className="font-medium">{safeProperty.property_details.yearBuilt || "Not specified"}</p>
-                    </div>
-                    
-                    <div className="bg-background/60 p-3 rounded-lg">
-                      <span className="text-sm text-muted-foreground">Furnishing</span>
-                      <p className="font-medium">{safeProperty.property_details.furnishing || "Not specified"}</p>
-                    </div>
-                    
-                    <div className="bg-background/60 p-3 rounded-lg">
-                      <span className="text-sm text-muted-foreground">Availability</span>
-                      <p className="font-medium">{safeProperty.property_details.availability || "Not specified"}</p>
-                    </div>
-                    
-                    <div className="bg-background/60 p-3 rounded-lg">
-                      <span className="text-sm text-muted-foreground">Floor</span>
-                      <p className="font-medium">{safeProperty.property_details.floor || "Not specified"}</p>
-                    </div>
-                    
-                    <div className="bg-background/60 p-3 rounded-lg">
-                      <span className="text-sm text-muted-foreground">Facing</span>
-                      <p className="font-medium">{safeProperty.property_details.facing || "Not specified"}</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-              
-              {/* Amenities */}
-              {safeProperty.property_details?.amenities && safeProperty.property_details.amenities.length > 0 && (
-                <div className="mb-6">
-                  <h3 className="text-lg font-semibold mb-3">Amenities</h3>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                    {safeProperty.property_details.amenities.map((amenity: string, index: number) => (
-                      <div key={index} className="flex items-center">
-                        <div className="w-2 h-2 rounded-full bg-primary mr-2"></div>
-                        <span>{amenity}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          {/* Property Overview Card */}
+          <PropertyOverviewCard
+            price={safeProperty.price}
+            listingType={safeProperty.property_details?.listingType}
+            bedrooms={safeProperty.bedrooms}
+            bathrooms={safeProperty.bathrooms}
+            squareFeet={safeProperty.square_feet}
+          />
+          
+          {/* About this property */}
+          <PropertyDescriptionSection description={safeProperty.description} />
+          
+          {/* Property Type and Features */}
+          {safeProperty.property_details && (
+            <PropertyFeaturesSection propertyDetails={safeProperty.property_details} />
+          )}
+          
+          {/* Amenities */}
+          {safeProperty.property_details?.amenities && (
+            <PropertyAmenitiesSection amenities={safeProperty.property_details.amenities} />
+          )}
           
           {/* Property Location Map */}
-          <PropertyLocationMap
+          <PropertyLocationSection
             address={safeProperty.address || ''}
             city={safeProperty.city || ''}
             state={safeProperty.state || ''}
@@ -436,77 +230,19 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
         
         {/* Sidebar Column */}
         <div className="space-y-6">
-          {/* Contact Owner Card */}
-          <Card className="border-border/40 shadow-md">
-            <CardContent className="p-6">
-              <h3 className="text-lg font-semibold mb-4">Contact Property Owner</h3>
-              
-              {user ? (
-                <>
-                  {safeProperty.ownerInfo ? (
-                    <div className="mb-4">
-                      <p className="text-sm text-muted-foreground mb-1">Listed by:</p>
-                      <p className="font-medium">{safeProperty.ownerInfo.email || "Owner"}</p>
-                      {safeProperty.ownerInfo.phone && (
-                        <p className="text-primary font-medium mt-1">{safeProperty.ownerInfo.phone}</p>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="flex items-center text-muted-foreground mb-4">
-                      <AlertCircle className="h-4 w-4 mr-2" />
-                      <span>Owner information not available</span>
-                    </div>
-                  )}
-                  
-                  <Dialog open={contactDialogOpen} onOpenChange={setContactDialogOpen}>
-                    <DialogTrigger asChild>
-                      <Button className="w-full">Contact Owner</Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-[425px]">
-                      <ContactOwnerForm 
-                        propertyTitle={safeProperty.title}
-                        propertyId={safeProperty.id}
-                        ownerId={safeProperty.owner_id}
-                        onSuccess={() => setContactDialogOpen(false)}
-                      />
-                    </DialogContent>
-                  </Dialog>
-                </>
-              ) : (
-                <div className="space-y-4">
-                  <div className="flex items-center text-muted-foreground">
-                    <AlertCircle className="h-4 w-4 mr-2" />
-                    <span>Please sign in to contact the owner</span>
-                  </div>
-                  <Button 
-                    className="w-full" 
-                    onClick={() => window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname)}
-                  >
-                    Sign In
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <ContactOwnerCard
+            propertyTitle={safeProperty.title}
+            propertyId={safeProperty.id}
+            ownerId={safeProperty.owner_id}
+            ownerInfo={safeProperty.ownerInfo}
+          />
           
-          {/* Property Highlights */}
-          {safeProperty.property_details?.highlights && safeProperty.property_details.highlights.length > 0 && (
-            <Card className="border-border/40 shadow-md">
-              <CardContent className="p-6">
-                <h3 className="text-lg font-semibold mb-4">Property Highlights</h3>
-                <ul className="space-y-2">
-                  {safeProperty.property_details.highlights.map((highlight: string, index: number) => (
-                    <li key={index} className="flex items-start">
-                      <div className="w-2 h-2 rounded-full bg-primary mt-2 mr-2"></div>
-                      <span>{highlight}</span>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
+          {safeProperty.property_details?.highlights && (
+            <PropertyHighlightsCard 
+              highlights={safeProperty.property_details.highlights} 
+            />
           )}
           
-          {/* Similar Properties */}
           <SimilarProperties 
             properties={similarPropertiesData.map(prop => ({
               id: prop.id,
@@ -520,94 +256,22 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
             }))} 
           />
           
-          {/* Nearby Amenities - now in the sidebar below Similar Properties */}
           <NearbyAmenities
             address={safeProperty.address || ''}
             city={safeProperty.city || ''}
             state={safeProperty.state || ''}
             coordinates={getPropertyCoordinates()}
-            radius={1500} // 1.5km radius
+            radius={1500}
           />
         </div>
       </div>
       
       {/* Visit Request Dialog */}
-      <Dialog open={visitDialogOpen} onOpenChange={setVisitDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Schedule a Visit</DialogTitle>
-          </DialogHeader>
-
-          <div className="space-y-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label 
-                  htmlFor="visit-date" 
-                  className="text-sm font-medium flex items-center"
-                >
-                  Preferred Date <span className="text-destructive ml-1">*</span>
-                </label>
-                <Input
-                  id="visit-date"
-                  type="date"
-                  value={visitDate}
-                  onChange={(e) => setVisitDate(e.target.value)}
-                  min={new Date().toISOString().split('T')[0]}
-                  required
-                  className="w-full"
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <label 
-                  htmlFor="visit-time" 
-                  className="text-sm font-medium"
-                >
-                  Preferred Time
-                </label>
-                <Input
-                  id="visit-time"
-                  type="time"
-                  value={visitTime}
-                  onChange={(e) => setVisitTime(e.target.value)}
-                  className="w-full"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label 
-                htmlFor="visit-message" 
-                className="text-sm font-medium"
-              >
-                Message to Owner (Optional)
-              </label>
-              <Textarea
-                id="visit-message"
-                placeholder="Any specific details or questions about your visit"
-                value={visitMessage}
-                onChange={(e) => setVisitMessage(e.target.value)}
-                rows={4}
-              />
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button 
-              variant="outline" 
-              onClick={() => setVisitDialogOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleVisitRequest} 
-              disabled={isSubmittingVisit || !visitDate}
-            >
-              {isSubmittingVisit ? "Submitting..." : "Submit Request"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <VisitRequestDialog
+        propertyId={safeProperty.id}
+        open={visitDialogOpen}
+        onOpenChange={setVisitDialogOpen}
+      />
     </div>
   );
 };
