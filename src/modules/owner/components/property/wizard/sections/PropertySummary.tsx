@@ -1,21 +1,21 @@
 // src/modules/owner/components/property/wizard/sections/PropertySummary.tsx
-// Version: 2.7.0
-// Last Modified: 09-03-2025 03:45 IST
-// Purpose: Fixed Previous button to navigate back to Features tab
+// Version: 3.3.0
+// Last Modified: 07-04-2025 19:45 IST
+// Purpose: Improved error handling and diagnostics
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FormSection } from '@/components/FormSection';
 import { cn } from '@/lib/utils';
 import { FormData } from '../types';
-import { Save, FileEdit, Send, Loader2, MapPin, Home, SquareStack, Sparkles, ImagePlus, IndianRupee } from 'lucide-react';
+import { Save, FileEdit, Send, Loader2, MapPin, Home, SquareStack, Sparkles, ImagePlus, IndianRupee, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface PropertySummaryProps {
   formData: FormData;
   onPrevious: () => void;
   onSaveAsDraft: () => Promise<void>;
-  onSaveAndPublish: () => Promise<void>;
+  onSaveAndPublish: () => Promise<string>;
   onUpdate: () => Promise<void>;
   saving: boolean;
   status?: 'draft' | 'published';
@@ -84,6 +84,8 @@ export function PropertySummary({
   const navigate = useNavigate();
   const isPublished = status === 'published';
   const isNewListing = !propertyId;
+  const [localError, setLocalError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
   
   // Improved logic to detect if this is a sale property
   const isSaleProperty = useMemo(() => {
@@ -119,15 +121,52 @@ export function PropertySummary({
 
   // Handler for Save and Photos navigation
   const handleSaveAndNavigateToPhotos = async () => {
+    // Local variable to track the property ID
+    let newPropertyId: string | null = null;
+    
     try {
-      // Save the property
-      await onSaveAndPublish();
+      // Clear any previous errors
+      setLocalError(null);
       
-      // After successful save, navigate to photos tab
-      const baseUrl = window.location.pathname.replace(/\/[^\/]*$/, '');
-      navigate(`${baseUrl}/photos`);
+      // Prevent multiple clicks
+      if (saving || isSaving) return;
+      
+      // Set local saving state
+      setIsSaving(true);
+      
+      console.log('Starting save and photo navigation process...');
+      
+      try {
+        // Directly save the property and get the ID
+        newPropertyId = await onSaveAndPublish();
+        console.log('Property saved with ID:', newPropertyId);
+        
+        if (!newPropertyId) {
+          throw new Error('No property ID returned from save operation');
+        }
+      } catch (saveError) {
+        console.error('Failed to save property:', saveError);
+        // Show more detailed error message
+        setLocalError(`Save failed: ${saveError.message || 'Unknown error during property save'}`);
+        setIsSaving(false);
+        return;
+      }
+      
+      // Now we have the property ID, navigate to photos tab
+      console.log('Navigating to photos with property ID:', newPropertyId);
+      
+      try {
+        const baseUrl = window.location.pathname.replace(/\/[^\/]*$/, '');
+        navigate(`${baseUrl}/photos`);
+      } catch (navError) {
+        console.error('Navigation error:', navError);
+        setLocalError('Error navigating to photo upload. Please try again.');
+        setIsSaving(false);
+      }
     } catch (error) {
-      console.error('Error saving property:', error);
+      console.error('Unhandled error in save and navigate process:', error);
+      setLocalError('An unexpected error occurred. Please try again.');
+      setIsSaving(false);
     }
   };
 
@@ -140,7 +179,7 @@ export function PropertySummary({
   const fullAddress = formData.address || '-';
 
   const renderButtons = () => {
-    if (saving) {
+    if (saving || isSaving) {
       return (
         <div className="flex items-center gap-2 px-4 py-2 bg-secondary rounded-lg">
           <Loader2 className="h-4 w-4 animate-spin" />
@@ -162,7 +201,7 @@ export function PropertySummary({
             "focus:outline-none focus:ring-2 focus:ring-ring",
             "disabled:opacity-50"
           )}
-          disabled={saving}
+          disabled={saving || isSaving}
         >
           <Save className="h-4 w-4 mr-2" />
           Save Changes
@@ -183,7 +222,7 @@ export function PropertySummary({
             "focus:outline-none focus:ring-2 focus:ring-ring",
             "disabled:opacity-50"
           )}
-          disabled={saving}
+          disabled={saving || isSaving}
         >
           <FileEdit className="h-4 w-4 mr-2" />
           Save to Draft
@@ -199,7 +238,7 @@ export function PropertySummary({
             "focus:outline-none focus:ring-2 focus:ring-ring",
             "disabled:opacity-50"
           )}
-          disabled={saving}
+          disabled={saving || isSaving}
         >
           {isNewListing ? (
             <>
@@ -228,6 +267,25 @@ export function PropertySummary({
           <h2 className="text-xl font-semibold text-foreground">{formData.title || "Unnamed Property"}</h2>
           <p className="text-muted-foreground text-sm mt-1">{fullAddress}</p>
         </div>
+        
+        {/* Local error message */}
+        {localError && (
+          <div className="bg-destructive/10 border border-destructive/30 p-4 rounded-lg flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-medium text-destructive">Error</p>
+              <p className="text-sm text-destructive/90 mt-1">{localError}</p>
+              <div className="mt-3">
+                <button
+                  onClick={() => setLocalError(null)}
+                  className="text-xs underline text-destructive/80 hover:text-destructive"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         
         <div className="grid gap-6 md:grid-cols-2">
           <SummarySection
@@ -323,7 +381,7 @@ export function PropertySummary({
               "focus:outline-none focus:ring-2 focus:ring-ring",
               "disabled:opacity-50"
             )}
-            disabled={saving}
+            disabled={saving || isSaving}
           >
             Previous
           </button>

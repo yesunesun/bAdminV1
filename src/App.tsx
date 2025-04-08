@@ -1,7 +1,7 @@
 // src/App.tsx 
-// Version: 8.15.0
-// Last Modified: 06-04-2025 17:30 IST
-// Purpose: Add /browse route using SeekerLayout for public property browsing
+// Version: 8.16.0
+// Last Modified: 08-04-2025 11:45 IST
+// Purpose: Fix property listing wizard navigation by adding nested routes to SeekerLayout
 
 import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
@@ -296,6 +296,31 @@ function App() {
                       {mainRoutes
                         .find(route => route.path === '/properties')
                         ?.children?.find(child => child.path === 'list')
+                        ?.element || <Navigate to="/" />}
+                    </PublicOrProtectedRoute>
+                  } 
+                />
+                
+                {/* Add missing nested routes for property listing wizard */}
+                <Route 
+                  path="/properties/list/:category/:type" 
+                  element={
+                    <PublicOrProtectedRoute>
+                      {mainRoutes
+                        .find(route => route.path === '/properties')
+                        ?.children?.find(child => child.path === 'list/:category/:type')
+                        ?.element || <Navigate to="/" />}
+                    </PublicOrProtectedRoute>
+                  } 
+                />
+                
+                <Route 
+                  path="/properties/list/:category/:type/:step" 
+                  element={
+                    <PublicOrProtectedRoute>
+                      {mainRoutes
+                        .find(route => route.path === '/properties')
+                        ?.children?.find(child => child.path === 'list/:category/:type/:step')
                         ?.element || <Navigate to="/" />}
                     </PublicOrProtectedRoute>
                   } 

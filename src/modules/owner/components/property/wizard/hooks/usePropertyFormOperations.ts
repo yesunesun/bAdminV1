@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/hooks/usePropertyFormOperations.ts
-// Version: 1.1.0
-// Last Modified: 09-03-2025 10:25 IST
-// Purpose: Added debug logs for save operations to track sale fields persistence
+// Version: 1.7.0
+// Last Modified: 07-04-2025 20:15 IST
+// Purpose: Robust property creation with timestamp marker
 
 import { useCallback } from 'react';
 import { UseFormReturn } from 'react-hook-form';
@@ -69,21 +69,11 @@ export function usePropertyFormOperations({
     }
   }, [form, setError]);
 
-  // Handle form submissions
-  const handleSaveAsDraft = async () => {
+  // Save property and return the saved property ID
+  const saveProperty = async (isPublished: boolean): Promise<string> => {
     try {
       console.log('=========== DEBUG: SAVE OPERATION START ===========');
-      console.log('Raw form data before save:', form.getValues());
-      console.log('Specific sale fields:', {
-        expectedPrice: form.getValues('expectedPrice'),
-        maintenanceCost: form.getValues('maintenanceCost'),
-        kitchenType: form.getValues('kitchenType'),
-        priceNegotiable: form.getValues('priceNegotiable')
-      });
       
-      setSaving(true);
-      setError('');
-
       if (!form || typeof form.getValues !== 'function') {
         throw new Error('Form is not properly initialized for saving');
       }
@@ -93,30 +83,19 @@ export function usePropertyFormOperations({
       }
 
       const formData = form.getValues();
-      console.log('Saving as draft with form data:', formData);
       
-      // Determine if this is a sale or rental property - more robust check
+      // Determine if this is a sale or rental property
       const isSaleType = 
         formData.listingType?.toLowerCase() === 'sale' || 
         formData.listingType?.toLowerCase() === 'sell' ||
         adType?.toLowerCase() === 'sale';
       
-      console.log('Is sale type?', isSaleType);
-      console.log('Sale-specific fields before save:', {
-        expectedPrice: formData.expectedPrice,
-        maintenanceCost: formData.maintenanceCost,
-        kitchenType: formData.kitchenType,
-        priceNegotiable: formData.priceNegotiable
-      });
-      
       // Make sure all required fields exist in the data
       const safeFormData = {
         ...formData,
         flatPlotNo: formData.flatPlotNo || '',
-        // Explicitly mark the property as sale or rental
         isSaleProperty: isSaleType,
         propertyPriceType: isSaleType ? 'sale' : 'rental',
-        // Ensure sale or rental specific fields exist as needed
         expectedPrice: isSaleType ? (formData.expectedPrice || '') : '',
         maintenanceCost: isSaleType ? (formData.maintenanceCost || '') : '',
         kitchenType: isSaleType ? (formData.kitchenType || '') : '',
@@ -131,16 +110,6 @@ export function usePropertyFormOperations({
         ? parseFloat(safeFormData.expectedPrice) || 0 
         : parseFloat(safeFormData.rentAmount) || 0;
       
-      console.log('Using price value:', price, 'from', isSaleType ? 'expectedPrice' : 'rentAmount');
-      console.log('Sale property data being saved:', {
-        expectedPrice: safeFormData.expectedPrice,
-        maintenanceCost: safeFormData.maintenanceCost,
-        kitchenType: safeFormData.kitchenType,
-        isSaleProperty: safeFormData.isSaleProperty,
-        propertyPriceType: safeFormData.propertyPriceType,
-        priceUsedInDB: price
-      });
-      
       const propertyData = {
         owner_id: user.id,
         title: safeFormData.title || `${safeFormData.bhkType} ${safeFormData.propertyType} in ${safeFormData.locality}`,
@@ -153,348 +122,186 @@ export function usePropertyFormOperations({
         city: safeFormData.locality,
         state: 'Telangana',
         zip_code: safeFormData.pinCode || '',
-        status: 'draft',
+        status: isPublished ? 'published' : 'draft',
         property_details: safeFormData
       };
 
       console.log('Saving property data:', propertyData);
-      console.log('Property details payload:', JSON.stringify(propertyData.property_details, null, 2));
 
-      let savedPropertyId = existingPropertyId;
+      // Use an explicit ID variable
+      let propertyId: string;
 
       if (mode === 'edit' && existingPropertyId) {
         console.log('Updating existing property:', existingPropertyId);
+        
         const { error: updateError } = await supabase
           .from('properties')
           .update(propertyData)
           .eq('id', existingPropertyId);
 
-        if (updateError) throw updateError;
+        if (updateError) {
+          console.error('Database update error:', updateError);
+          throw new Error(`Failed to update property: ${updateError.message}`);
+        }
+        
+        propertyId = existingPropertyId;
       } else {
-        console.log('Creating new property');
-        const { data: newProperty, error: createError } = await supabase
-          .from('properties')
-          .insert([propertyData])
-          .select()
-          .single();
-
-        if (createError) throw createError;
-        savedPropertyId = newProperty.id;
-        setSavedPropertyId(newProperty.id);
+        console.log('Creating new property with timestamp marker');
+        
+        try {
+          // Add a timestamp marker to help identify this specific property
+          const timestamp = new Date().toISOString();
+          const markerTitle = `${propertyData.title} (${timestamp})`;
+          
+          // Use the marker in the property data
+          const propertyDataWithMarker = {
+            ...propertyData,
+            title: markerTitle,
+            marker_timestamp: timestamp
+          };
+          
+          console.log('Creating property with marker title:', markerTitle);
+          
+          // First, insert the property
+          const { error: insertError } = await supabase
+            .from('properties')
+            .insert([propertyDataWithMarker]);
+          
+          if (insertError) {
+            console.error('Database insert error:', insertError);
+            throw new Error(`Failed to create property: ${insertError.message}`);
+          }
+          
+          // Sleep briefly to ensure database consistency
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          // Query for the property with the exact title (which now includes timestamp)
+          const { data: newProperty, error: queryError } = await supabase
+            .from('properties')
+            .select('id')
+            .eq('title', markerTitle)
+            .eq('owner_id', propertyData.owner_id)
+            .single();
+          
+          if (queryError) {
+            console.error('Error querying new property:', queryError);
+            throw new Error(`Failed to retrieve property ID: ${queryError.message}`);
+          }
+          
+          if (!newProperty || !newProperty.id) {
+            // Fallback query if exact title match fails
+            console.warn('Exact title match failed, trying broader query');
+            
+            const { data: fallbackProperties, error: fallbackError } = await supabase
+              .from('properties')
+              .select('id, title, created_at')
+              .eq('owner_id', propertyData.owner_id)
+              .order('created_at', { ascending: false })
+              .limit(5);
+            
+            if (fallbackError) {
+              console.error('Fallback query error:', fallbackError);
+              throw new Error('All attempts to retrieve property ID failed');
+            }
+            
+            if (!fallbackProperties || fallbackProperties.length === 0) {
+              console.error('No properties found for this user');
+              throw new Error('No properties found for this user');
+            }
+            
+            // Log all found properties for debugging
+            console.log('Found recent properties:', fallbackProperties);
+            
+            // Use the most recent property
+            propertyId = fallbackProperties[0].id;
+            console.log('Using most recent property ID as fallback:', propertyId);
+          } else {
+            propertyId = newProperty.id;
+            console.log('Successfully retrieved new property with ID:', propertyId);
+          }
+        } catch (insertError) {
+          console.error('Error during property creation process:', insertError);
+          throw new Error(`Failed to process property: ${insertError.message}`);
+        }
       }
 
-      // Verify the saved data
-      console.log('Success - retrieving saved property to verify data:');
-      const { data: savedProperty, error: fetchError } = await supabase
-        .from('properties')
-        .select('property_details, price')
-        .eq('id', savedPropertyId)
-        .single();
-
-      if (fetchError) {
-        console.error('Error fetching saved property:', fetchError);
-      } else {
-        console.log('Saved property details:', {
-          price: savedProperty.price,
-          expectedPrice: savedProperty.property_details.expectedPrice,
-          maintenanceCost: savedProperty.property_details.maintenanceCost,
-          kitchenType: savedProperty.property_details.kitchenType,
-          isSaleProperty: savedProperty.property_details.isSaleProperty,
-          propertyPriceType: savedProperty.property_details.propertyPriceType
-        });
-      }
-
-      setStatus('draft');
-      console.log('Save operation completed successfully');
+      // Set state immediately
+      setSavedPropertyId(propertyId);
+      setStatus(isPublished ? 'published' : 'draft');
+      
+      console.log('Save operation completed with ID:', propertyId);
       console.log('=========== DEBUG: SAVE OPERATION END ===========');
-      handleNextStep();
+      
+      // Explicitly return the ID
+      return propertyId;
     } catch (err) {
       console.error('Error saving property:', err);
-      setError('Failed to save property. Please try again.');
+      throw err;
+    }
+  };
+
+  // Handle form submissions
+  const handleSaveAsDraft = async () => {
+    let savedId: string | null = null;
+    
+    try {
+      setSaving(true);
+      setError('');
+      
+      console.log('Starting handleSaveAsDraft...');
+      savedId = await saveProperty(false);
+      
+      console.log('Property saved as draft with ID:', savedId);
+      handleNextStep();
+      return savedId;
+    } catch (err) {
+      console.error('Error in handleSaveAsDraft:', err);
+      setError('Failed to save property as draft. Please try again.');
+      throw err;
     } finally {
       setSaving(false);
     }
   };
 
   const handleSaveAndPublish = async () => {
+    let savedId: string | null = null;
+    
     try {
-      console.log('=========== DEBUG: PUBLISH OPERATION START ===========');
-      console.log('Raw form data before publishing:', form.getValues());
-      console.log('Specific sale fields:', {
-        expectedPrice: form.getValues('expectedPrice'),
-        maintenanceCost: form.getValues('maintenanceCost'),
-        kitchenType: form.getValues('kitchenType'),
-        priceNegotiable: form.getValues('priceNegotiable')
-      });
-      
       setSaving(true);
       setError('');
-
-      if (!form || typeof form.getValues !== 'function') {
-        throw new Error('Form is not properly initialized for publishing');
-      }
       
-      if (!user || !user.id) {
-        throw new Error('User is not authenticated');
-      }
-
-      const formData = form.getValues();
-      console.log('Publishing with form data:', formData);
+      console.log('Starting handleSaveAndPublish...');
+      savedId = await saveProperty(true);
       
-      // Determine if this is a sale or rental property - more robust check
-      const isSaleType = 
-        formData.listingType?.toLowerCase() === 'sale' || 
-        formData.listingType?.toLowerCase() === 'sell' ||
-        adType?.toLowerCase() === 'sale';
-      
-      console.log('Is sale type?', isSaleType);
-      console.log('Sale-specific fields before save:', {
-        expectedPrice: formData.expectedPrice,
-        maintenanceCost: formData.maintenanceCost,
-        kitchenType: formData.kitchenType,
-        priceNegotiable: formData.priceNegotiable
-      });
-      
-      // Make sure all required fields exist in the data
-      const safeFormData = {
-        ...formData,
-        flatPlotNo: formData.flatPlotNo || '',
-        // Explicitly mark the property as sale or rental
-        isSaleProperty: isSaleType,
-        propertyPriceType: isSaleType ? 'sale' : 'rental',
-        // Ensure sale or rental specific fields exist as needed
-        expectedPrice: isSaleType ? (formData.expectedPrice || '') : '',
-        maintenanceCost: isSaleType ? (formData.maintenanceCost || '') : '',
-        kitchenType: isSaleType ? (formData.kitchenType || '') : '',
-        priceNegotiable: isSaleType ? (formData.priceNegotiable || false) : false,
-        rentAmount: !isSaleType ? (formData.rentAmount || '') : '',
-        securityDeposit: !isSaleType ? (formData.securityDeposit || '') : '',
-        rentNegotiable: !isSaleType ? (formData.rentNegotiable || false) : false
-      };
-      
-      // Determine price based on property type
-      const price = isSaleType 
-        ? parseFloat(safeFormData.expectedPrice) || 0 
-        : parseFloat(safeFormData.rentAmount) || 0;
-      
-      console.log('Using price value:', price, 'from', isSaleType ? 'expectedPrice' : 'rentAmount');
-      console.log('Sale property data being saved:', {
-        expectedPrice: safeFormData.expectedPrice,
-        maintenanceCost: safeFormData.maintenanceCost,
-        kitchenType: safeFormData.kitchenType,
-        isSaleProperty: safeFormData.isSaleProperty,
-        propertyPriceType: safeFormData.propertyPriceType,
-        priceUsedInDB: price
-      });
-      
-      const propertyData = {
-        owner_id: user.id,
-        title: safeFormData.title || `${safeFormData.bhkType} ${safeFormData.propertyType} in ${safeFormData.locality}`,
-        description: safeFormData.description || '',
-        price: price,
-        bedrooms: safeFormData.bhkType ? parseInt(safeFormData.bhkType.split(' ')[0]) : 0,
-        bathrooms: safeFormData.bathrooms ? parseInt(safeFormData.bathrooms) : 0,
-        square_feet: safeFormData.builtUpArea ? parseFloat(safeFormData.builtUpArea) : null,
-        address: safeFormData.address || '',
-        city: safeFormData.locality,
-        state: 'Telangana',
-        zip_code: safeFormData.pinCode || '',
-        status: 'published',
-        property_details: safeFormData
-      };
-
-      console.log('Publishing property data:', propertyData);
-      console.log('Property details payload:', JSON.stringify(propertyData.property_details, null, 2));
-
-      let savedPropertyId = existingPropertyId;
-
-      if (mode === 'edit' && existingPropertyId) {
-        console.log('Updating and publishing existing property:', existingPropertyId);
-        const { error: updateError } = await supabase
-          .from('properties')
-          .update(propertyData)
-          .eq('id', existingPropertyId);
-
-        if (updateError) throw updateError;
-      } else {
-        console.log('Creating new published property');
-        const { data: newProperty, error: createError } = await supabase
-          .from('properties')
-          .insert([propertyData])
-          .select()
-          .single();
-
-        if (createError) throw createError;
-        savedPropertyId = newProperty.id;
-        setSavedPropertyId(newProperty.id);
-      }
-
-      // Verify the saved data
-      console.log('Success - retrieving saved property to verify data:');
-      const { data: savedProperty, error: fetchError } = await supabase
-        .from('properties')
-        .select('property_details, price')
-        .eq('id', savedPropertyId)
-        .single();
-
-      if (fetchError) {
-        console.error('Error fetching saved property:', fetchError);
-      } else {
-        console.log('Saved property details:', {
-          price: savedProperty.price,
-          expectedPrice: savedProperty.property_details.expectedPrice,
-          maintenanceCost: savedProperty.property_details.maintenanceCost,
-          kitchenType: savedProperty.property_details.kitchenType,
-          isSaleProperty: savedProperty.property_details.isSaleProperty,
-          propertyPriceType: savedProperty.property_details.propertyPriceType
-        });
-      }
-
-      setStatus('published');
-      console.log('Publish operation completed successfully');
-      console.log('=========== DEBUG: PUBLISH OPERATION END ===========');
-      handleNextStep();
+      // Do not call handleNextStep() here - let the caller control navigation
+      console.log('Property saved successfully with ID:', savedId);
+      return savedId;
     } catch (err) {
-      console.error('Error publishing property:', err);
+      console.error('Error in handleSaveAndPublish:', err);
       setError('Failed to publish property. Please try again.');
+      throw err;
     } finally {
       setSaving(false);
     }
   };
 
   const handleUpdate = async () => {
+    let savedId: string | null = null;
+    
     try {
-      console.log('=========== DEBUG: UPDATE OPERATION START ===========');
-      console.log('Raw form data before update:', form.getValues());
-      console.log('Specific sale fields:', {
-        expectedPrice: form.getValues('expectedPrice'),
-        maintenanceCost: form.getValues('maintenanceCost'),
-        kitchenType: form.getValues('kitchenType'),
-        priceNegotiable: form.getValues('priceNegotiable')
-      });
-      
       setSaving(true);
       setError('');
-
-      if (!form || typeof form.getValues !== 'function') {
-        throw new Error('Form is not properly initialized for updating');
-      }
       
-      if (!user || !user.id) {
-        throw new Error('User is not authenticated');
-      }
-
-      const formData = form.getValues();
-      console.log('Updating with form data:', formData);
+      console.log('Starting handleUpdate...');
+      savedId = await saveProperty(status === 'published');
       
-      // Determine if this is a sale or rental property - more robust check
-      const isSaleType = 
-        formData.listingType?.toLowerCase() === 'sale' || 
-        formData.listingType?.toLowerCase() === 'sell' ||
-        adType?.toLowerCase() === 'sale';
-      
-      console.log('Is sale type?', isSaleType);
-      console.log('Sale-specific fields before update:', {
-        expectedPrice: formData.expectedPrice,
-        maintenanceCost: formData.maintenanceCost,
-        kitchenType: formData.kitchenType,
-        priceNegotiable: formData.priceNegotiable
-      });
-      
-      // Make sure all required fields exist in the data
-      const safeFormData = {
-        ...formData,
-        flatPlotNo: formData.flatPlotNo || '',
-        // Explicitly mark the property as sale or rental
-        isSaleProperty: isSaleType,
-        propertyPriceType: isSaleType ? 'sale' : 'rental',
-        // Ensure sale or rental specific fields exist as needed
-        expectedPrice: isSaleType ? (formData.expectedPrice || '') : '',
-        maintenanceCost: isSaleType ? (formData.maintenanceCost || '') : '',
-        kitchenType: isSaleType ? (formData.kitchenType || '') : '',
-        priceNegotiable: isSaleType ? (formData.priceNegotiable || false) : false,
-        rentAmount: !isSaleType ? (formData.rentAmount || '') : '',
-        securityDeposit: !isSaleType ? (formData.securityDeposit || '') : '',
-        rentNegotiable: !isSaleType ? (formData.rentNegotiable || false) : false
-      };
-      
-      // Determine price based on property type
-      const price = isSaleType 
-        ? parseFloat(safeFormData.expectedPrice) || 0 
-        : parseFloat(safeFormData.rentAmount) || 0;
-      
-      console.log('Using price value:', price, 'from', isSaleType ? 'expectedPrice' : 'rentAmount');
-      console.log('Sale property data being saved:', {
-        expectedPrice: safeFormData.expectedPrice,
-        maintenanceCost: safeFormData.maintenanceCost,
-        kitchenType: safeFormData.kitchenType,
-        isSaleProperty: safeFormData.isSaleProperty,
-        propertyPriceType: safeFormData.propertyPriceType,
-        priceUsedInDB: price
-      });
-      
-      const updateData: any = {
-        title: safeFormData.title || `${safeFormData.bhkType} ${safeFormData.propertyType} in ${safeFormData.locality}`,
-        description: safeFormData.description || '',
-        price: price,
-        bedrooms: safeFormData.bhkType ? parseInt(safeFormData.bhkType.split(' ')[0]) : 0,
-        bathrooms: safeFormData.bathrooms ? parseInt(safeFormData.bathrooms) : 0,
-        square_feet: safeFormData.builtUpArea ? parseFloat(safeFormData.builtUpArea) : null,
-        address: safeFormData.address || '',
-        city: safeFormData.locality,
-        state: 'Telangana',
-        zip_code: safeFormData.pinCode || '',
-        property_details: safeFormData,
-      };
-
-      console.log('Update data:', updateData);
-      console.log('Property details payload:', JSON.stringify(updateData.property_details, null, 2));
-
-      // Only update status if provided
-      if (status) {
-        updateData.status = status;
-        updateData.tags = status === 'published' ? ['public'] : [];
-      }
-
-      if (!existingPropertyId) {
-        throw new Error('Property ID not found');
-      }
-
-      console.log('Updating property with ID:', existingPropertyId);
-      const { error: updateError } = await supabase
-        .from('properties')
-        .update(updateData)
-        .eq('id', existingPropertyId);
-
-      if (updateError) throw updateError;
-      
-      // Verify the saved data
-      console.log('Success - retrieving updated property to verify data:');
-      const { data: updatedProperty, error: fetchError } = await supabase
-        .from('properties')
-        .select('property_details, price')
-        .eq('id', existingPropertyId)
-        .single();
-
-      if (fetchError) {
-        console.error('Error fetching updated property:', fetchError);
-      } else {
-        console.log('Updated property details:', {
-          price: updatedProperty.price,
-          expectedPrice: updatedProperty.property_details.expectedPrice,
-          maintenanceCost: updatedProperty.property_details.maintenanceCost,
-          kitchenType: updatedProperty.property_details.kitchenType,
-          isSaleProperty: updatedProperty.property_details.isSaleProperty,
-          propertyPriceType: updatedProperty.property_details.propertyPriceType
-        });
-      }
-      
-      console.log('Update operation completed successfully');
-      console.log('=========== DEBUG: UPDATE OPERATION END ===========');
+      console.log('Property updated successfully with ID:', savedId);
       handleNextStep();
+      return savedId;
     } catch (err) {
-      console.error('Error updating property:', err);
+      console.error('Error in handleUpdate:', err);
       setError('Failed to update property. Please try again.');
+      throw err;
     } finally {
       setSaving(false);
     }

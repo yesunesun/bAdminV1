@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/PropertyForm/components/FormContent.tsx
-// Version: 2.0.0
-// Last Modified: 08-03-2025 23:00 IST
-// Purpose: Fixed component rendering and removed console logs
+// Version: 2.1.0
+// Last Modified: 07-04-2025 15:35 IST
+// Purpose: Improved handling of missing propertyId in photo upload section
 
 import React from 'react';
 import { UseFormReturn } from 'react-hook-form';
@@ -15,6 +15,7 @@ import { SaleDetails } from '../../sections/SaleDetails';
 import { AmenitiesSection } from '../../sections/AmenitiesSection';
 import { PropertySummary } from '../../sections/PropertySummary';
 import { ImageUploadSection } from '../../sections/ImageUploadSection';
+import { Loader2 } from 'lucide-react';
 
 interface FormContentProps {
   form: UseFormReturn<FormData>;
@@ -140,9 +141,26 @@ const FormContent = ({
   }
   
   if (currentStepId === 'photos') {
+    // Check if we have a property ID before rendering the image upload section
+    if (!savedPropertyId) {
+      return (
+        <div className="flex flex-col items-center justify-center py-16">
+          <Loader2 className="h-8 w-8 text-primary animate-spin mb-4" />
+          <p className="text-muted-foreground">Loading property details...</p>
+          <button
+            type="button"
+            onClick={handlePreviousStep}
+            className="mt-6 px-6 py-3 text-sm font-medium rounded-lg bg-secondary text-secondary-foreground"
+          >
+            Return to Previous Step
+          </button>
+        </div>
+      );
+    }
+    
     return (
       <ImageUploadSection
-        propertyId={savedPropertyId!}
+        propertyId={savedPropertyId}
         onUploadComplete={handleImageUploadComplete}
         onPrevious={handlePreviousStep}
       />
