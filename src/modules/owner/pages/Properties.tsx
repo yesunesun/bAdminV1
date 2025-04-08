@@ -1,15 +1,23 @@
 // src/modules/owner/pages/Properties.tsx
-// Version: 3.0.0
-// Last Modified: 27-02-2025 00:15 IST
-// Purpose: Properties page using PropertyList component and owner hook
+// Version: 3.1.0
+// Last Modified: 08-04-2025 11:30 IST
+// Purpose: Added confirmation dialog for property deletion
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { usePropertyOwner } from '../hooks/usePropertyOwner';
 import { PropertyList } from '../components/property/PropertyList';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 export default function Properties() {
   const { 
@@ -21,6 +29,25 @@ export default function Properties() {
     handleTogglePublishStatus,
     refreshProperties 
   } = usePropertyOwner();
+  
+  // State for delete confirmation dialog
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [propertyToDelete, setPropertyToDelete] = useState<string | null>(null);
+
+  // Handle delete button click
+  const onDeleteClick = (id: string) => {
+    setPropertyToDelete(id);
+    setDeleteConfirmOpen(true);
+  };
+
+  // Confirm deletion
+  const confirmDelete = () => {
+    if (propertyToDelete) {
+      handleDeleteProperty(propertyToDelete);
+      setDeleteConfirmOpen(false);
+      setPropertyToDelete(null);
+    }
+  };
 
   if (loading) {
     return (
@@ -60,10 +87,37 @@ export default function Properties() {
       <PropertyList 
         properties={properties}
         loading={false} // We're handling loading state outside the component
-        onDelete={handleDeleteProperty}
+        onDelete={onDeleteClick} // Changed to use our delete dialog handler
         onTogglePublish={handleTogglePublishStatus}
         isUpdating={updating}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Delete Property</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this property? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex flex-row justify-end gap-2 mt-4">
+            <Button
+              variant="outline"
+              onClick={() => setDeleteConfirmOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmDelete}
+              disabled={updating === propertyToDelete}
+            >
+              {updating === propertyToDelete ? 'Deleting...' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
