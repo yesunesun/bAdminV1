@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/hooks/usePropertyFormOperations.ts
-// Version: 1.7.0
-// Last Modified: 07-04-2025 20:15 IST
-// Purpose: Robust property creation with timestamp marker
+// Version: 1.8.0
+// Last Modified: 08-04-2025 21:30 IST
+// Purpose: Fixed property creation by removing non-existent column
 
 import { useCallback } from 'react';
 import { UseFormReturn } from 'react-hook-form';
@@ -146,78 +146,46 @@ export function usePropertyFormOperations({
         
         propertyId = existingPropertyId;
       } else {
-        console.log('Creating new property with timestamp marker');
+        console.log('Creating new property');
         
         try {
-          // Add a timestamp marker to help identify this specific property
+          // Create a timestamp-based unique identifier for logging only
           const timestamp = new Date().toISOString();
-          const markerTitle = `${propertyData.title} (${timestamp})`;
+          console.log(`Creating property at timestamp: ${timestamp}`);
           
-          // Use the marker in the property data
-          const propertyDataWithMarker = {
-            ...propertyData,
-            title: markerTitle,
-            marker_timestamp: timestamp
-          };
-          
-          console.log('Creating property with marker title:', markerTitle);
-          
-          // First, insert the property
-          const { error: insertError } = await supabase
+          // Insert the property WITHOUT the marker_timestamp field
+          const { data: newProperty, error: insertError } = await supabase
             .from('properties')
-            .insert([propertyDataWithMarker]);
+            .insert([propertyData])
+            .select('id')
+            .single();
           
           if (insertError) {
             console.error('Database insert error:', insertError);
             throw new Error(`Failed to create property: ${insertError.message}`);
           }
           
-          // Sleep briefly to ensure database consistency
-          await new Promise(resolve => setTimeout(resolve, 500));
-          
-          // Query for the property with the exact title (which now includes timestamp)
-          const { data: newProperty, error: queryError } = await supabase
-            .from('properties')
-            .select('id')
-            .eq('title', markerTitle)
-            .eq('owner_id', propertyData.owner_id)
-            .single();
-          
-          if (queryError) {
-            console.error('Error querying new property:', queryError);
-            throw new Error(`Failed to retrieve property ID: ${queryError.message}`);
-          }
-          
           if (!newProperty || !newProperty.id) {
-            // Fallback query if exact title match fails
-            console.warn('Exact title match failed, trying broader query');
+            console.error('Insert succeeded but no ID returned');
             
+            // Fallback query to get the most recently created property
             const { data: fallbackProperties, error: fallbackError } = await supabase
               .from('properties')
               .select('id, title, created_at')
               .eq('owner_id', propertyData.owner_id)
               .order('created_at', { ascending: false })
-              .limit(5);
+              .limit(1);
             
-            if (fallbackError) {
-              console.error('Fallback query error:', fallbackError);
-              throw new Error('All attempts to retrieve property ID failed');
+            if (fallbackError || !fallbackProperties || fallbackProperties.length === 0) {
+              console.error('Fallback query failed:', fallbackError);
+              throw new Error('Failed to retrieve property ID after creation');
             }
             
-            if (!fallbackProperties || fallbackProperties.length === 0) {
-              console.error('No properties found for this user');
-              throw new Error('No properties found for this user');
-            }
-            
-            // Log all found properties for debugging
-            console.log('Found recent properties:', fallbackProperties);
-            
-            // Use the most recent property
             propertyId = fallbackProperties[0].id;
-            console.log('Using most recent property ID as fallback:', propertyId);
+            console.log('Retrieved property ID via fallback:', propertyId);
           } else {
             propertyId = newProperty.id;
-            console.log('Successfully retrieved new property with ID:', propertyId);
+            console.log('Successfully created property with ID:', propertyId);
           }
         } catch (insertError) {
           console.error('Error during property creation process:', insertError);

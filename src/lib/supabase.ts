@@ -1,7 +1,7 @@
 // src/lib/supabase.ts
-// Version: 2.6.0
-// Last Modified: 06-04-2025 15:30 IST
-// Purpose: Advanced Supabase client configuration with robust error handling and network resilience
+// Version: 2.7.0
+// Last Modified: 08-04-2025 20:00 IST
+// Purpose: Fixed HTTP 400 errors in API requests and FormData handling
 
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './database.types';
@@ -19,114 +19,40 @@ if (!supabaseAnonKey) {
   throw new Error('VITE_SUPABASE_ANON_KEY is not defined in environment variables');
 }
 
-// Advanced fetch interceptor with comprehensive error handling
-const customFetch = (url: RequestInfo | URL, options: RequestInit = {}) => {
-  // Create a new Headers object to avoid mutation
-  const headers = new Headers(options.headers);
-
-  // Comprehensive header management
-  headers.set('Accept', 'application/json');
-  headers.set('Accept-Charset', 'utf-8');
-  
-  // Do not override content-type for auth-related endpoints to avoid 403 errors
-  const urlString = String(url);
-  const isAuthEndpoint = urlString.includes('/auth/') || urlString.includes('/token');
-  
-  // Only set Content-Type if not an auth endpoint and not FormData
-  if (!isAuthEndpoint && !(options.body instanceof FormData)) {
-    headers.set('Content-Type', 'application/json');
+// Simplified fetch handler that properly handles FormData
+const customFetch = (url: RequestInfo | URL, options: RequestInit = {}): Promise<Response> => {
+  // For FormData, we need to REMOVE Content-Type header completely
+  if (options.body instanceof FormData) {
+    const newOptions = { ...options };
+    // Create new headers without Content-Type
+    const headers = new Headers(newOptions.headers || {});
+    headers.delete('Content-Type');
+    
+    // Log for debugging
+    console.log('FormData detected - removed Content-Type header');
+    
+    // Apply modified headers
+    newOptions.headers = headers;
+    return fetch(url, newOptions);
   }
-
-  // Add custom client identifier
-  headers.set('x-client-info', 'bhoomitalli-web-client');
-
-  // Advanced error logging and retry mechanism
-  const fetchWithRetry = async (retriesLeft = 2): Promise<Response> => {
-    try {
-      const response = await fetch(url, { ...options, headers });
-      
-      // Log detailed request information for debugging (only in development)
-      if (import.meta.env.DEV) {
-        console.log('API Request Details:', {
-          url: String(url),
-          method: options.method || 'GET',
-          status: response.status,
-          isAuthEndpoint
-        });
-      }
-
-      // Special handling for auth endpoints - don't retry authentication endpoints
-      // as this can lead to account lockouts
-      if (!response.ok) {
-        if (response.status === 406 && retriesLeft > 0 && !isAuthEndpoint) {
-          console.warn(`Not Acceptable Error (406). Retrying... (${retriesLeft} attempts left)`);
-          return fetchWithRetry(retriesLeft - 1);
-        }
-
-        // Log the error but don't throw for auth endpoints - let Supabase handle these errors
-        if (isAuthEndpoint) {
-          console.warn(`Auth endpoint returned status: ${response.status}`);
-          return response; // Return the response to let Supabase handle it
-        }
-
-        // Throw error for non-successful responses on non-auth endpoints
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      return response;
-    } catch (error) {
-      // Avoid retrying auth endpoints
-      if (isAuthEndpoint) {
-        console.error('Auth endpoint error:', {
-          url: String(url),
-          error: error instanceof Error ? error.message : 'Unknown error'
-        });
-        throw error; // Don't retry auth errors
-      }
-
-      console.error('Fetch Request Failed:', {
-        url: String(url),
-        method: options.method || 'GET',
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
-
-      // Retry mechanism for network errors on non-auth endpoints
-      if (retriesLeft > 0) {
-        console.warn(`Network error. Retrying... (${retriesLeft} attempts left)`);
-        return fetchWithRetry(retriesLeft - 1);
-      }
-
-      throw error;
-    }
-  };
-
-  return fetchWithRetry();
+  
+  // For regular requests, proceed normally
+  return fetch(url, options);
 };
 
-// Supabase client options with enhanced configuration
+// Supabase client options with simplified configuration
 const supabaseOptions = {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: true,
-    flowType: 'pkce' as const,
     storage: window.localStorage,
-    storageKey: 'bhoomitalli-auth-token',
   },
   global: {
-    headers: {
-      'x-client-info': 'bhoomitalli-web-client',
-      'Accept': 'application/json',
-    },
     fetch: customFetch
   },
-  db: {
-    schema: 'public',
-  },
-  realtime: {
-    reconnectAfterMs: (tries: number) => Math.min(1000 + tries * 1000, 10000),
-  },
   storage: {
+    // Important for file uploads
     multipart: true
   }
 };
@@ -138,42 +64,75 @@ export const supabase = createClient<Database>(
   supabaseOptions
 );
 
-// Create an admin client with enhanced headers
+// Create an admin client
 export const adminSupabase = createClient<Database>(
   supabaseUrl,
   supabaseAnonKey,
-  {
-    ...supabaseOptions,
-    global: {
-      ...supabaseOptions.global,
-      headers: {
-        ...supabaseOptions.global.headers,
-        'x-client-info': 'bhoomitalli-admin-client',
-      }
-    }
-  }
+  supabaseOptions
 );
 
-// Initialize auth state with more comprehensive error handling
+// Initialize auth state
 (function initializeAuth() {
-  const initSession = async () => {
-    try {
-      const { data, error } = await supabase.auth.getSession();
-      
-      if (error) {
-        console.warn('Session initialization warning:', error.message);
-      }
-
-      // Optional: Additional session validation logic can be added here
-    } catch (error) {
-      console.error('Unexpected error during session initialization:', error);
-    }
-  };
-
-  initSession();
+  supabase.auth.getSession().catch(error => {
+    console.warn('Session initialization warning:', error instanceof Error ? error.message : 'Unknown error');
+  });
 })();
 
-// Comprehensive error handling utilities
+// Direct file upload helper
+export const directFileUpload = async (
+  bucket: string,
+  path: string,
+  file: File,
+  options?: { cacheControl?: string }
+): Promise<{ publicUrl: string | null; error: Error | null }> => {
+  try {
+    // Get auth session
+    const { data: { session } } = await supabase.auth.getSession();
+    const authToken = session?.access_token || supabaseAnonKey;
+    
+    // Create FormData
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    // Add cache control if specified
+    if (options?.cacheControl) {
+      formData.append('cacheControl', options.cacheControl);
+    }
+    
+    // Direct API call - explicitly NOT setting Content-Type
+    const response = await fetch(
+      `${supabaseUrl}/storage/v1/object/${bucket}/${path}`, 
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${authToken}`
+          // Critically, NO Content-Type header
+        },
+        body: formData
+      }
+    );
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`Upload failed: ${response.status} - ${errorData.error}`);
+    }
+    
+    // Get public URL
+    const publicUrl = `${supabaseUrl}/storage/v1/object/public/${bucket}/${path}`;
+    return { publicUrl, error: null };
+  } catch (error) {
+    console.error('Direct file upload failed:', error);
+    return { publicUrl: null, error: error instanceof Error ? error : new Error('Unknown error') };
+  }
+};
+
+// Export required types and utilities
+export type { Database } from './database.types';
+export type Json = Database['public']['Json'];
+export type Tables = Database['public']['Tables'];
+export type Enums = Database['public']['Enums'];
+
+// Error handling utility
 export const isErrorWithMessage = (error: unknown): error is { message: string } => {
   return (
     typeof error === 'object' &&
@@ -190,29 +149,21 @@ export const handleSupabaseError = (error: unknown): string => {
   return 'An unexpected error occurred';
 };
 
-// Detailed error logging with enhanced context
-export const logSupabaseError = (context: string, error: any) => {
-  console.error(`[${context}] Supabase Error:`, {
-    message: error?.message,
-    code: error?.code,
-    details: error?.details,
-    hint: error?.hint,
-    status: error?.status
-  });
-};
-
-// User admin status check with comprehensive validation
+// User admin status check utility
 export const isUserAdmin = async (): Promise<boolean> => {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return false;
 
+    // Check metadata for admin role
     const isAdminByMetadata = 
       user.user_metadata?.is_admin === true || 
-      ['admin', 'super_admin'].includes(user.user_metadata?.role);
+      user.user_metadata?.role === 'admin' ||
+      user.user_metadata?.role === 'super_admin';
 
     if (isAdminByMetadata) return true;
 
+    // Check admin_users table
     const { data: adminData } = await supabase
       .from('admin_users')
       .select('role_id')
@@ -226,12 +177,7 @@ export const isUserAdmin = async (): Promise<boolean> => {
   }
 };
 
-// Export commonly used types and utilities
-export type { Database } from './database.types';
-export type Json = Database['public']['Json'];
-export type Tables = Database['public']['Tables'];
-export type Enums = Database['public']['Enums'];
-
+// Export error type for handling
 export type SupabaseError = {
   message: string;
   details: string;

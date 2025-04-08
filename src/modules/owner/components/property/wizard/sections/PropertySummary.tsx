@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/PropertySummary.tsx
-// Version: 3.3.0
-// Last Modified: 07-04-2025 19:45 IST
-// Purpose: Improved error handling and diagnostics
+// Version: 3.6.0
+// Last Modified: 08-04-2025 21:45 IST
+// Purpose: Fixed navigation to Photos tab and error handling
 
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -108,22 +108,28 @@ export function PropertySummary({
   // Custom previous button handler to navigate directly to Features tab
   const handlePreviousClick = () => {
     try {
-      // Extract the base URL (everything before the last segment)
-      const baseUrl = window.location.pathname.replace(/\/[^\/]*$/, '');
-      
-      // Always navigate to Features tab, which is the correct previous step for Review
-      navigate(`${baseUrl}/features`);
+      if (typeof onPrevious === 'function') {
+        onPrevious();
+      } else {
+        // Extract the base URL (everything before the last segment)
+        const pathParts = window.location.pathname.split('/');
+        pathParts.pop(); // Remove the last part (current step)
+        const baseUrl = pathParts.join('/');
+        
+        // Navigate to Features tab
+        navigate(`${baseUrl}/features`);
+      }
     } catch (error) {
-      // Fallback to the provided onPrevious handler
-      onPrevious();
+      console.error('Navigation error:', error);
+      // Just call the provided function as fallback
+      if (typeof onPrevious === 'function') {
+        onPrevious();
+      }
     }
   };
 
   // Handler for Save and Photos navigation
   const handleSaveAndNavigateToPhotos = async () => {
-    // Local variable to track the property ID
-    let newPropertyId: string | null = null;
-    
     try {
       // Clear any previous errors
       setLocalError(null);
@@ -136,32 +142,63 @@ export function PropertySummary({
       
       console.log('Starting save and photo navigation process...');
       
+      // Extract property type and listing type for navigation
+      const propertyType = (formData.propertyType || 'residential').toLowerCase();
+      const listingType = (formData.listingType || 'rent').toLowerCase();
+      
+      let savedPropertyId: string;
+      
       try {
-        // Directly save the property and get the ID
-        newPropertyId = await onSaveAndPublish();
-        console.log('Property saved with ID:', newPropertyId);
+        // Log the action
+        console.log('Saving property data...');
         
-        if (!newPropertyId) {
+        // Save the property
+        savedPropertyId = await onSaveAndPublish();
+        
+        if (!savedPropertyId) {
           throw new Error('No property ID returned from save operation');
         }
-      } catch (saveError) {
+        
+        console.log('Property saved with ID:', savedPropertyId);
+      } catch (saveError: any) {
         console.error('Failed to save property:', saveError);
-        // Show more detailed error message
-        setLocalError(`Save failed: ${saveError.message || 'Unknown error during property save'}`);
+        setLocalError(`Failed to save property: ${saveError.message || 'Unknown error'}`);
         setIsSaving(false);
         return;
       }
       
-      // Now we have the property ID, navigate to photos tab
-      console.log('Navigating to photos with property ID:', newPropertyId);
-      
+      // Try different navigation methods
       try {
-        const baseUrl = window.location.pathname.replace(/\/[^\/]*$/, '');
-        navigate(`${baseUrl}/photos`);
+        console.log('Navigation attempt 1: Direct path construction');
+        const nextPath = `/properties/list/${propertyType}/${listingType}/photos`;
+        console.log('Navigating to:', nextPath);
+        
+        // Try programmatic navigation first
+        navigate(nextPath, { replace: true });
+        
+        // Set a fallback - direct location change if navigate doesn't work
+        setTimeout(() => {
+          if (window.location.pathname.indexOf('/photos') === -1) {
+            console.log('Fallback: using window.location');
+            window.location.href = nextPath;
+          }
+        }, 500);
       } catch (navError) {
         console.error('Navigation error:', navError);
-        setLocalError('Error navigating to photo upload. Please try again.');
-        setIsSaving(false);
+        
+        try {
+          console.log('Navigation attempt 2: Using last segment replacement');
+          // Extract the current path and replace last segment
+          const currentPath = window.location.pathname;
+          const newPath = currentPath.replace(/\/[^\/]*$/, '/photos');
+          console.log('Navigating to:', newPath);
+          navigate(newPath, { replace: true });
+        } catch (error) {
+          console.error('All navigation attempts failed:', error);
+          setLocalError('Navigation to Photos tab failed. Please try to navigate manually.');
+        } finally {
+          setIsSaving(false);
+        }
       }
     } catch (error) {
       console.error('Unhandled error in save and navigate process:', error);
@@ -391,3 +428,6 @@ export function PropertySummary({
     </FormSection>
   );
 }
+
+// Add a default export to ensure the component can be imported correctly
+export default PropertySummary;
