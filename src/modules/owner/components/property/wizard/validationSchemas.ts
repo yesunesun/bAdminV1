@@ -1,11 +1,20 @@
 // src/modules/owner/components/property/wizard/validationSchemas.ts
-// Version: 3.1.0
-// Last Modified: 06-03-2025 18:45 IST
-// Purpose: Added validation for sale-specific fields
+// Version: 4.0.0
+// Last Modified: 10-04-2025 21:45 IST
+// Purpose: Added validation for PG/Hostel specific fields
 
 import { z } from 'zod';
 // Updated import to use the migrated constants file
-import { PROPERTY_TYPES, BHK_TYPES, PROPERTY_AGE, FACING_OPTIONS, KITCHEN_TYPES } from './constants';
+import { 
+  PROPERTY_TYPES, 
+  BHK_TYPES, 
+  PROPERTY_AGE, 
+  FACING_OPTIONS, 
+  KITCHEN_TYPES,
+  ROOM_TYPES,
+  BATHROOM_TYPES,
+  MEAL_OPTIONS 
+} from './constants';
 
 export const propertyValidationSchema = z.object({
   // Property Selection
@@ -52,6 +61,31 @@ export const propertyValidationSchema = z.object({
   expectedPrice: z.string().min(1, 'Expected price is required'),
   maintenanceCost: z.string().min(1, 'Maintenance cost is required'),
   kitchenType: z.enum(KITCHEN_TYPES as [string, ...string[]]).min(1, 'Kitchen type is required'),
+  
+  // PG/Hostel Room Details
+  roomType: z.enum(ROOM_TYPES as [string, ...string[]]).optional(),
+  roomCapacity: z.string().optional(),
+  availableRooms: z.string().optional(),
+  totalRooms: z.string().optional(),
+  bathroomType: z.enum(BATHROOM_TYPES as [string, ...string[]]).optional(),
+  roomSize: z.string().optional(),
+  
+  // Room Features
+  hasAC: z.boolean().optional(),
+  hasFan: z.boolean().optional(),
+  hasFurniture: z.boolean().optional(),
+  hasTV: z.boolean().optional(),
+  hasWifi: z.boolean().optional(),
+  hasGeyser: z.boolean().optional(),
+  
+  // PG/Hostel Facility Details
+  monthlyRent: z.string().optional(),
+  mealOption: z.enum(MEAL_OPTIONS as [string, ...string[]]).optional(),
+  noticePeriod: z.string().optional(),
+  genderPreference: z.string().optional(),
+  occupantType: z.string().optional(),
+  houseRules: z.string().optional(),
+  pgAmenities: z.array(z.string()).optional(),
   
   // Common fields
   availableFrom: z.string().min(1, 'Available date is required'),
@@ -125,12 +159,41 @@ export const stepValidationSchemas = {
       maintenanceCost: true,
       kitchenType: true,
       availableFrom: true,
+    }),
+    // PG/Hostel Room Details Validation
+    propertyValidationSchema.pick({
+      roomType: true,
+      roomCapacity: true,
+      availableRooms: true,
+      totalRooms: true,
+      bathroomType: true,
+      roomSize: true,
+      hasAC: true,
+      hasFan: true,
+      hasFurniture: true,
+      hasTV: true,
+      hasWifi: true,
+      hasGeyser: true,
     })
   ]),
-  4: propertyValidationSchema.pick({
-    bathrooms: true,
-    propertyShowOption: true,
-    propertyCondition: true,
-    amenities: true,
-  }),
+  4: z.union([
+    // Standard Amenities Validation
+    propertyValidationSchema.pick({
+      bathrooms: true,
+      propertyShowOption: true,
+      propertyCondition: true,
+      amenities: true,
+    }),
+    // PG/Hostel Facility Validation
+    propertyValidationSchema.pick({
+      monthlyRent: true,
+      securityDeposit: true,
+      mealOption: true,
+      noticePeriod: true,
+      genderPreference: true,
+      occupantType: true,
+      houseRules: true,
+      pgAmenities: true,
+    })
+  ]),
 };

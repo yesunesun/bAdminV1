@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/hooks/usePropertyForm.ts
-// Version: 3.2.0
-// Last Modified: 08-03-2025 20:45 IST
-// Purpose: Exposed isSaleMode flag and improved form orchestration
+// Version: 3.3.0
+// Last Modified: 10-04-2025 15:50 IST
+// Purpose: Added support for PG/Hostel flow
 
 import { usePropertyFormState } from './usePropertyFormState';
 import { usePropertyFormNavigation } from './usePropertyFormNavigation';
@@ -40,6 +40,7 @@ export function usePropertyForm({
     status,
     setStatus,
     isSaleMode,
+    isPGHostelMode,
     user
   } = usePropertyFormState({
     initialData,
@@ -68,7 +69,8 @@ export function usePropertyForm({
     user,
     mode,
     existingPropertyId,
-    setError
+    setError,
+    isPGHostelMode
   });
   
   // Initialize operations (save, update, etc.)
@@ -84,6 +86,7 @@ export function usePropertyForm({
     existingPropertyId,
     adType,
     isSaleMode,
+    isPGHostelMode,
     status,
     setStatus,
     setSavedPropertyId,
@@ -100,7 +103,8 @@ export function usePropertyForm({
     savedPropertyId,
     user,
     status,
-    isSaleMode,  // Make sure we expose this flag
+    isSaleMode,
+    isPGHostelMode,  // Expose the new PG/Hostel flag
     handleAutoFill,
     handleNextStep,
     handlePreviousStep,

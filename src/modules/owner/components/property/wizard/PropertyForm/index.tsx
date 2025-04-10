@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/PropertyForm/index.tsx
-// Version: 4.5.0
-// Last Modified: 08-03-2025 18:00 IST
-// Purpose: Fixed navigation flow between different property types
+// Version: 5.0.0
+// Last Modified: 10-04-2025 21:00 IST
+// Purpose: Added PG/Hostel flow support with specialized navigation
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -9,7 +9,7 @@ import { useNavigate } from 'react-router-dom';
 // Fix hook and utility imports
 import { usePropertyForm } from '../hooks/usePropertyForm';
 import { FormData } from '../types'
-import { STEPS } from '../constants'
+import { STEPS, FLOW_STEPS } from '../constants'
 
 // Components
 import FormHeader from './components/FormHeader';
@@ -74,14 +74,36 @@ export function PropertyForm({
     initialData?.locality || ''
   );
 
+  // Determine if we're in PG/Hostel mode
+  const isPGHostelMode = useMemo(() => {
+    if (derivedAdType) {
+      return derivedAdType.toLowerCase() === 'pghostel';
+    }
+    
+    // Check URL path for keywords
+    const urlPath = window.location.pathname.toLowerCase();
+    return urlPath.includes('pghostel');
+  }, [derivedAdType]);
+
+  // Determine which flow steps to use based on property type
+  const flowSteps = useMemo(() => {
+    if (isPGHostelMode) {
+      return FLOW_STEPS.RESIDENTIAL_PGHOSTEL;
+    } else if (derivedAdType?.toLowerCase() === 'sale' || derivedAdType?.toLowerCase() === 'sell') {
+      return FLOW_STEPS.RESIDENTIAL_SALE;
+    } else {
+      return FLOW_STEPS.RESIDENTIAL_RENT;
+    }
+  }, [derivedAdType, isPGHostelMode]);
+
   // Determine initial step from URL or default to 1
   const initialStep = useMemo(() => {
     if (urlStep) {
-      const stepIndex = STEPS.findIndex(s => s.id === urlStep) + 1;
+      const stepIndex = flowSteps.findIndex(s => s.id === urlStep) + 1;
       return stepIndex > 0 ? stepIndex : 1;
     }
     return 1;
-  }, [urlStep]);
+  }, [urlStep, flowSteps]);
 
   // Initialize form with its context and state
   const {
@@ -121,7 +143,7 @@ export function PropertyForm({
   // Initialize debug tools
   const { debugFormData, handleDebugClick } = useDebugTools(form, formIsSaleMode);
 
-  // Initialize custom step navigation
+  // Initialize custom step navigation with the correct flow steps
   const { 
     isSaleMode, 
     getVisibleSteps, 
@@ -132,7 +154,7 @@ export function PropertyForm({
     formIsSaleMode, 
     originalHandleNextStep, 
     setCurrentStep, 
-    STEPS
+    STEPS: flowSteps // Use flow-specific steps
   });
 
   // Function to handle type selection completion
@@ -207,7 +229,7 @@ export function PropertyForm({
           <WizardBreadcrumbs
             category={effectiveCategory}
             adType={effectiveAdType}
-            currentStep={STEPS[formStep - 1]?.title || ''}
+            currentStep={flowSteps[formStep - 1]?.title || ''}
           />
         </div>
 
@@ -233,12 +255,13 @@ export function PropertyForm({
             <FormContent 
               form={form}
               formStep={formStep}
-              STEPS={STEPS}
+              STEPS={flowSteps}
               effectiveCategory={effectiveCategory}
               effectiveAdType={effectiveAdType}
               mode={mode}
               selectedCity={selectedCity || initialData?.locality || ''}
               isSaleMode={isSaleMode}
+              isPGHostelMode={isPGHostelMode}
               handlePreviousStep={handlePreviousStep}
               handleSaveAsDraft={handleSaveAsDraft}
               handleSaveAndPublish={handleSaveAndPublish}
@@ -252,7 +275,7 @@ export function PropertyForm({
             {/* Step Navigation (Previous/Next buttons) */}
             <StepNavigation 
               formStep={formStep}
-              STEPS={STEPS}
+              STEPS={flowSteps}
               handlePreviousStep={handlePreviousStep}
               handleNextStep={handleNextStep}
             />

@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/components/PropertyTypeSelection.tsx
-// Version: 1.6.0
-// Last Modified: 07-04-2025 17:30 IST
-// Purpose: Fix navigation issue with property listing wizard
+// Version: 1.7.0
+// Last Modified: 10-04-2025 18:15 IST
+// Purpose: Properly handle PG/Hostel property type selection
 
 import React, { useState, useEffect } from 'react';
 import { 
@@ -73,7 +73,15 @@ export default function PropertyTypeSelection({
     if (initialAdType) setSelectedListingType(initialAdType);
   }, [initialCategory, initialAdType]);
 
-  // Fixed to properly handle navigation and prevent redirection to root
+  // Handle URL-friendly conversion for listing types
+  const getURLFriendlyType = (type: string): string => {
+    if (type.toLowerCase() === 'pg/hostel') {
+      return 'pghostel';
+    }
+    return type.toLowerCase();
+  };
+
+  // Handle form submission with proper URL formatting
   const handleSubmit = (e: React.MouseEvent) => {
     e.preventDefault(); // Prevent default form submission
     
@@ -84,11 +92,12 @@ export default function PropertyTypeSelection({
     });
     
     if (selectedCategory && selectedListingType) {
-      // Ensure consistent casing for category and listing type
-      // This is critical for the URL structure and form handling
+      // Convert to URL-friendly format
+      const urlFriendlyType = getURLFriendlyType(selectedListingType);
+      
       onNext(
         selectedCategory.toLowerCase(), 
-        selectedListingType.toLowerCase(),
+        urlFriendlyType,
         selectedCity
       );
     }

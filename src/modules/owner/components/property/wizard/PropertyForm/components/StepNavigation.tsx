@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/PropertyForm/components/StepNavigation.tsx
-// Version: 6.0.0
-// Last Modified: 09-03-2025 04:00 IST
-// Purpose: Fixed Previous button navigation in Sale/Rental tabs
+// Version: 7.0.0
+// Last Modified: 10-04-2025 21:15 IST
+// Purpose: Added support for PG/Hostel flow navigation
 
 import React from 'react';
 import { cn } from '@/lib/utils';
@@ -35,10 +35,16 @@ const StepNavigation = ({
   // Only show previous button if not on the first step
   const showPreviousButton = formStep > 1;
 
-  // Determine if this is a sale property
-  const isSaleProperty = () => {
+  // Determine property type from URL
+  const getPropertyType = () => {
     const urlPath = window.location.pathname.toLowerCase();
-    return urlPath.includes('sale') || urlPath.includes('sell');
+    if (urlPath.includes('pghostel')) {
+      return 'pghostel';
+    } else if (urlPath.includes('sale') || urlPath.includes('sell')) {
+      return 'sale';
+    } else {
+      return 'rent';
+    }
   };
 
   // Custom previous button handler
@@ -46,24 +52,56 @@ const StepNavigation = ({
     try {
       // Extract the base URL without the current step
       const baseUrl = window.location.pathname.replace(/\/[^\/]*$/, '');
+      const propertyType = getPropertyType();
       
-      // Special handling for Previous from Rental or Sale tabs
-      if (currentStepId === 'rental' || currentStepId === 'sale') {
-        // Always go back to location from rental/sale
-        navigate(`${baseUrl}/location`);
-        return;
-      }
-      
-      // Special handling for Previous from Features
-      if (currentStepId === 'features') {
-        if (isSaleProperty()) {
+      // Special handling for PG/Hostel flow
+      if (propertyType === 'pghostel') {
+        // Handle PG/Hostel specific navigation
+        if (currentStepId === 'pg_details') {
+          // Go back to room_details from pg_details
+          navigate(`${baseUrl}/room_details`);
+          return;
+        }
+        
+        if (currentStepId === 'room_details') {
+          // Go back to location from room_details
+          navigate(`${baseUrl}/location`);
+          return;
+        }
+        
+        if (currentStepId === 'features') {
+          // Go back to pg_details from features
+          navigate(`${baseUrl}/pg_details`);
+          return;
+        }
+      } else if (propertyType === 'sale') {
+        // Special handling for Previous from Rental or Sale tabs in Sale flow
+        if (currentStepId === 'sale') {
+          // Always go back to location from sale
+          navigate(`${baseUrl}/location`);
+          return;
+        }
+        
+        // Special handling for Previous from Features
+        if (currentStepId === 'features') {
           // Go back to sale from features in sale flow
           navigate(`${baseUrl}/sale`);
-        } else {
+          return;
+        }
+      } else {
+        // Rent flow
+        if (currentStepId === 'rental') {
+          // Always go back to location from rental
+          navigate(`${baseUrl}/location`);
+          return;
+        }
+        
+        // Special handling for Previous from Features
+        if (currentStepId === 'features') {
           // Go back to rental from features in rental flow
           navigate(`${baseUrl}/rental`);
+          return;
         }
-        return;
       }
       
       // Get the previous step ID
@@ -83,31 +121,77 @@ const StepNavigation = ({
     try {
       // Extract the base URL without the current step
       const baseUrl = window.location.pathname.replace(/\/[^\/]*$/, '');
+      const propertyType = getPropertyType();
       
-      // Special handling for Next from Location
-      if (currentStepId === 'location') {
-        if (isSaleProperty()) {
+      // Special handling for PG/Hostel flow
+      if (propertyType === 'pghostel') {
+        // Handle PG/Hostel specific navigation
+        if (currentStepId === 'location') {
+          // Go to room_details from location in PG/Hostel flow
+          navigate(`${baseUrl}/room_details`);
+          return;
+        }
+        
+        if (currentStepId === 'room_details') {
+          // Go to pg_details from room_details
+          navigate(`${baseUrl}/pg_details`);
+          return;
+        }
+        
+        if (currentStepId === 'pg_details') {
+          // Go to features from pg_details
+          navigate(`${baseUrl}/features`);
+          return;
+        }
+        
+        if (currentStepId === 'features') {
+          // Go to review from features
+          navigate(`${baseUrl}/review`);
+          return;
+        }
+      } else if (propertyType === 'sale') {
+        // Special handling for Next from Location in Sale flow
+        if (currentStepId === 'location') {
           // Go to sale from location in sale flow
           navigate(`${baseUrl}/sale`);
-        } else {
+          return;
+        }
+        
+        // Special handling for Next from Sale
+        if (currentStepId === 'sale') {
+          // Always go to features from sale
+          navigate(`${baseUrl}/features`);
+          return;
+        }
+        
+        // Special handling for Next from Features
+        if (currentStepId === 'features') {
+          // Always go to review from features
+          navigate(`${baseUrl}/review`);
+          return;
+        }
+      } else {
+        // Rent flow
+        // Special handling for Next from Location
+        if (currentStepId === 'location') {
           // Go to rental from location in rental flow
           navigate(`${baseUrl}/rental`);
+          return;
         }
-        return;
-      }
-      
-      // Special handling for Next from Rental or Sale
-      if (currentStepId === 'rental' || currentStepId === 'sale') {
-        // Always go to features from rental/sale
-        navigate(`${baseUrl}/features`);
-        return;
-      }
-      
-      // Special handling for Next from Features
-      if (currentStepId === 'features') {
-        // Always go to review from features
-        navigate(`${baseUrl}/review`);
-        return;
+        
+        // Special handling for Next from Rental
+        if (currentStepId === 'rental') {
+          // Always go to features from rental
+          navigate(`${baseUrl}/features`);
+          return;
+        }
+        
+        // Special handling for Next from Features
+        if (currentStepId === 'features') {
+          // Always go to review from features
+          navigate(`${baseUrl}/review`);
+          return;
+        }
       }
       
       // For other steps, find the next step ID

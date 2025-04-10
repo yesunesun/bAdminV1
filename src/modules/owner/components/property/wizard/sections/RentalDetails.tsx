@@ -1,257 +1,349 @@
-// src/components/property/RentalDetails.tsx
-// Version: 1.2.0
-// Last Modified: 2025-03-06T15:25:00+05:30 (IST)
-// Author: Bhoomitalli Team
+// src/modules/owner/components/property/wizard/sections/RentalDetails.tsx
+// Version: 2.1.0
+// Last Modified: 11-04-2025 00:15 IST
+// Purpose: Fixed import for furnishing options
 
 import React from 'react';
-import { FormSection } from '@/components/FormSection';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
-import { IndianRupee } from 'lucide-react';
-import { FormSectionProps } from '../types';
-import { cn } from '@/lib/utils';
-import { RequiredLabel } from '@/components/ui/RequiredLabel';
-import {
-  RENTAL_TYPES,
+import { FormData, FormSectionProps } from '../types';
+import { 
+  RENTAL_TYPES, 
   MAINTENANCE_OPTIONS,
   TENANT_PREFERENCES,
-  FURNISHING_OPTIONS,
-  PARKING_OPTIONS,
+  FURNISHING_OPTIONS, // Fixed import - removing apostrophe
+  PARKING_OPTIONS 
 } from '../constants';
+import { FormSection } from '@/components/FormSection';
+import { RequiredLabel } from '@/components/ui/RequiredLabel';
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { 
+  Input 
+} from '@/components/ui/input';
+import { 
+  Checkbox 
+} from '@/components/ui/checkbox';
+import { cn } from '@/lib/utils';
 
-export function RentalDetails({ form }: FormSectionProps) {
-  const { register, watch, setValue, formState: { errors } } = form;
-
-  const handleCurrencyInput = (e: React.ChangeEvent<HTMLInputElement>, fieldName: string) => {
-    const value = e.target.value.replace(/[^0-9]/g, '');
-    if (value === '') {
-      setValue(fieldName, '');
-      return;
-    }
-    const numValue = parseInt(value);
-    if (!isNaN(numValue)) {
-      setValue(fieldName, numValue.toString());
-    }
-  };
-
-  // Get tomorrow's date in YYYY-MM-DD format
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const minDate = tomorrow.toISOString().split('T')[0];
+export const RentalDetails: React.FC<FormSectionProps> = ({ 
+  form,
+  mode = 'create',
+  adType
+}) => {
+  const isEditMode = mode === 'edit';
+  
+  // Get form methods
+  const { register, formState: { errors }, setValue, getValues, watch } = form;
+  
+  // Watch for dependencies
+  const rentalType = watch('rentalType');
+  const rentNegotiable = watch('rentNegotiable');
 
   return (
     <FormSection
       title="Rental Details"
-      description="Specify your rental terms and conditions"
+      description="Specify your rental terms and preferences"
     >
-      <div className="space-y-4">
-        {/* Rental Type Selection */}
-        <div className="grid grid-cols-2 gap-4">
-          {RENTAL_TYPES.map((type) => (
-            <div
-              key={type.id}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Rental Type */}
+        <div className="space-y-2">
+          <RequiredLabel htmlFor="rentalType">Rental Type</RequiredLabel>
+          <Select
+            value={getValues('rentalType') || 'rent'}
+            onValueChange={(value) => setValue('rentalType', value as 'rent' | 'lease', { shouldValidate: true })}
+            disabled={isEditMode}
+          >
+            <SelectTrigger 
+              id="rentalType"
               className={cn(
-                "flex items-center space-x-3 p-3 rounded-xl border border-slate-200 bg-white",
-                "transition-all hover:border-slate-300",
-                "shadow-[0_2px_4px_rgba(0,0,0,0.02)]"
+                "w-full",
+                errors.rentalType && "border-destructive focus-visible:ring-destructive"
               )}
             >
-              <Checkbox
-                id={type.id}
-                checked={watch('rentalType') === type.id}
-                onCheckedChange={(checked) => {
-                  if (checked) setValue('rentalType', type.id);
-                }}
-              />
-              <label htmlFor={type.id} className="text-base font-medium text-slate-700 cursor-pointer">
-                {type.label}
-              </label>
-            </div>
-          ))}
-        </div>
-
-        {/* Rent and Deposit - Two Column */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <RequiredLabel required>Monthly Rent</RequiredLabel>
-            <div className="relative">
-              <span className="absolute left-3 inset-y-0 flex items-center text-slate-500">
-                <IndianRupee className="h-4 w-4" />
-              </span>
-              <Input
-                type="text"
-                className="h-11 pl-9 pr-20 text-base"
-                {...register('rentAmount')}
-                placeholder="Enter amount"
-                onChange={(e) => handleCurrencyInput(e, 'rentAmount')}
-              />
-              <span className="absolute right-3 inset-y-0 flex items-center text-sm text-slate-500">
-                per month
-              </span>
-            </div>
-            {errors.rentAmount && (
-              <p className="text-sm text-red-600 mt-0.5">{errors.rentAmount.message}</p>
-            )}
-          </div>
-
-          <div>
-            <RequiredLabel required>Security Deposit</RequiredLabel>
-            <div className="relative">
-              <span className="absolute left-3 inset-y-0 flex items-center text-slate-500">
-                <IndianRupee className="h-4 w-4" />
-              </span>
-              <Input
-                type="text"
-                className="h-11 pl-9 text-base"
-                {...register('securityDeposit')}
-                placeholder="Enter deposit amount"
-                onChange={(e) => handleCurrencyInput(e, 'securityDeposit')}
-              />
-            </div>
-            {errors.securityDeposit && (
-              <p className="text-sm text-red-600 mt-0.5">{errors.securityDeposit.message}</p>
-            )}
-          </div>
-        </div>
-
-        {/* Rent Negotiable and Maintenance - Two Column */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="rentNegotiable"
-              checked={watch('rentNegotiable')}
-              onCheckedChange={(checked) => setValue('rentNegotiable', checked as boolean)}
-            />
-            <label htmlFor="rentNegotiable" className="text-base text-slate-700 cursor-pointer">
-              Rent Negotiable
-            </label>
-          </div>
-
-          <div>
-            <RequiredLabel required>Maintenance</RequiredLabel>
-            <Select 
-              value={watch('maintenance')} 
-              onValueChange={value => setValue('maintenance', value)}
-            >
-              <SelectTrigger className="h-11 text-base">
-                <SelectValue placeholder="Maintenance terms?" />
-              </SelectTrigger>
-              <SelectContent>
-                {MAINTENANCE_OPTIONS.map(option => (
-                  <SelectItem key={option} value={option} className="text-base">
-                    {option}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        {/* Available From and Furnishing - Two Column */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <RequiredLabel required>Available From</RequiredLabel>
-            <Input
-              type="date"
-              className="h-11 text-base"
-              min={minDate}
-              {...register('availableFrom')}
-            />
-            {errors.availableFrom && (
-              <p className="text-sm text-red-600 mt-0.5">{errors.availableFrom.message}</p>
-            )}
-          </div>
-
-          <div>
-            <RequiredLabel required>Furnishing</RequiredLabel>
-            <Select 
-              value={watch('furnishing')} 
-              onValueChange={value => setValue('furnishing', value)}
-            >
-              <SelectTrigger className="h-11 text-base">
-                <SelectValue placeholder="Furnishing status?" />
-              </SelectTrigger>
-              <SelectContent>
-                {FURNISHING_OPTIONS.map(option => (
-                  <SelectItem key={option} value={option} className="text-base">
-                    {option}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        {/* Parking */}
-        <div>
-          <RequiredLabel required>Parking</RequiredLabel>
-          <Select 
-            value={watch('parking')} 
-            onValueChange={value => setValue('parking', value)}
-          >
-            <SelectTrigger className="h-11 text-base">
-              <SelectValue placeholder="Available parking?" />
+              <SelectValue placeholder="Select Type" />
             </SelectTrigger>
             <SelectContent>
-              {PARKING_OPTIONS.map(option => (
-                <SelectItem key={option} value={option} className="text-base">
+              {RENTAL_TYPES.map((type) => (
+                <SelectItem key={type.id} value={type.id}>
+                  {type.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {errors.rentalType && (
+            <p className="text-sm text-destructive mt-1">{errors.rentalType.message as string}</p>
+          )}
+        </div>
+
+        {/* Rent Amount */}
+        <div className="space-y-2">
+          <RequiredLabel htmlFor="rentAmount">
+            {rentalType === 'lease' ? 'Lease Amount (₹)' : 'Rent Amount (₹) per month'}
+          </RequiredLabel>
+          <div className="relative">
+            <Input
+              id="rentAmount"
+              type="text"
+              {...register('rentAmount')}
+              placeholder="e.g. 15000"
+              className={cn(
+                errors.rentAmount && "border-destructive focus-visible:ring-destructive"
+              )}
+            />
+            <div className="absolute right-3 top-2.5">
+              <Checkbox
+                id="rentNegotiable"
+                checked={rentNegotiable}
+                onCheckedChange={(checked) => setValue('rentNegotiable', !!checked, { shouldValidate: true })}
+              />
+              <label
+                htmlFor="rentNegotiable"
+                className="ml-1.5 text-xs font-medium text-muted-foreground cursor-pointer"
+              >
+                Negotiable
+              </label>
+            </div>
+          </div>
+          {errors.rentAmount && (
+            <p className="text-sm text-destructive mt-1">{errors.rentAmount.message as string}</p>
+          )}
+        </div>
+
+        {/* Security Deposit */}
+        <div className="space-y-2">
+          <RequiredLabel htmlFor="securityDeposit">Security Deposit (₹)</RequiredLabel>
+          <Input
+            id="securityDeposit"
+            type="text"
+            {...register('securityDeposit')}
+            placeholder="e.g. 50000"
+            className={cn(
+              errors.securityDeposit && "border-destructive focus-visible:ring-destructive"
+            )}
+          />
+          {errors.securityDeposit && (
+            <p className="text-sm text-destructive mt-1">{errors.securityDeposit.message as string}</p>
+          )}
+        </div>
+
+        {/* Maintenance */}
+        <div className="space-y-2">
+          <RequiredLabel htmlFor="maintenance">Maintenance</RequiredLabel>
+          <Select
+            value={getValues('maintenance') || ''}
+            onValueChange={(value) => setValue('maintenance', value, { shouldValidate: true })}
+          >
+            <SelectTrigger 
+              id="maintenance"
+              className={cn(
+                "w-full",
+                errors.maintenance && "border-destructive focus-visible:ring-destructive"
+              )}
+            >
+              <SelectValue placeholder="Select Maintenance Option" />
+            </SelectTrigger>
+            <SelectContent>
+              {MAINTENANCE_OPTIONS.map((option) => (
+                <SelectItem key={option} value={option}>
                   {option}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
+          {errors.maintenance && (
+            <p className="text-sm text-destructive mt-1">{errors.maintenance.message as string}</p>
+          )}
         </div>
 
-        {/* Preferred Tenants */}
-        <div>
-          <RequiredLabel required>Preferred Tenants</RequiredLabel>
-          <div className="grid grid-cols-3 gap-3">
-            {TENANT_PREFERENCES.map((tenant) => (
-              <div
-                key={tenant}
-                className={cn(
-                  "flex items-center space-x-3 p-3 rounded-xl border border-slate-200 bg-white",
-                  "transition-all hover:border-slate-300"
-                )}
+        {/* Available From */}
+        <div className="space-y-2">
+          <RequiredLabel htmlFor="availableFrom">Available From</RequiredLabel>
+          <Input
+            id="availableFrom"
+            type="date"
+            {...register('availableFrom')}
+            className={cn(
+              errors.availableFrom && "border-destructive focus-visible:ring-destructive"
+            )}
+          />
+          {errors.availableFrom && (
+            <p className="text-sm text-destructive mt-1">{errors.availableFrom.message as string}</p>
+          )}
+        </div>
+
+        {/* Furnishing Status */}
+        <div className="space-y-2">
+          <RequiredLabel htmlFor="furnishing">Furnishing Status</RequiredLabel>
+          <Select
+            value={getValues('furnishing') || ''}
+            onValueChange={(value) => setValue('furnishing', value, { shouldValidate: true })}
+          >
+            <SelectTrigger 
+              id="furnishing"
+              className={cn(
+                "w-full",
+                errors.furnishing && "border-destructive focus-visible:ring-destructive"
+              )}
+            >
+              <SelectValue placeholder="Select Furnishing Status" />
+            </SelectTrigger>
+            <SelectContent>
+              {FURNISHING_OPTIONS.map((option) => (
+                <SelectItem key={option} value={option}>
+                  {option}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {errors.furnishing && (
+            <p className="text-sm text-destructive mt-1">{errors.furnishing.message as string}</p>
+          )}
+        </div>
+
+        {/* Parking */}
+        <div className="space-y-2">
+          <RequiredLabel htmlFor="parking">Parking</RequiredLabel>
+          <Select
+            value={getValues('parking') || ''}
+            onValueChange={(value) => setValue('parking', value, { shouldValidate: true })}
+          >
+            <SelectTrigger 
+              id="parking"
+              className={cn(
+                "w-full",
+                errors.parking && "border-destructive focus-visible:ring-destructive"
+              )}
+            >
+              <SelectValue placeholder="Select Parking Option" />
+            </SelectTrigger>
+            <SelectContent>
+              {PARKING_OPTIONS.map((option) => (
+                <SelectItem key={option} value={option}>
+                  {option}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {errors.parking && (
+            <p className="text-sm text-destructive mt-1">{errors.parking.message as string}</p>
+          )}
+        </div>
+      </div>
+
+      {/* Preferred Tenants */}
+      <div className="mt-8">
+        <RequiredLabel>Preferred Tenants</RequiredLabel>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-2">
+          {TENANT_PREFERENCES.map((preference) => (
+            <div key={preference} className="flex items-start space-x-2">
+              <Checkbox
+                id={`tenantPref-${preference}`}
+                checked={(getValues('preferredTenants') || []).includes(preference)}
+                onCheckedChange={(checked) => {
+                  const currentPreferences = getValues('preferredTenants') || [];
+                  if (checked) {
+                    setValue('preferredTenants', [...currentPreferences, preference], { shouldValidate: true });
+                  } else {
+                    setValue(
+                      'preferredTenants',
+                      currentPreferences.filter((item) => item !== preference),
+                      { shouldValidate: true }
+                    );
+                  }
+                }}
+              />
+              <label
+                htmlFor={`tenantPref-${preference}`}
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
               >
-                <Checkbox
-                  id={`tenant-${tenant}`}
-                  checked={watch('preferredTenants')?.includes(tenant)}
-                  onCheckedChange={(checked) => {
-                    const current = watch('preferredTenants') || [];
-                    if (checked) {
-                      setValue('preferredTenants', [...current, tenant]);
-                    } else {
-                      setValue('preferredTenants', current.filter(t => t !== tenant));
-                    }
-                  }}
-                />
-                <label
-                  htmlFor={`tenant-${tenant}`}
-                  className="text-base text-slate-700 cursor-pointer"
-                >
-                  {tenant}
-                </label>
-              </div>
-            ))}
+                {preference}
+              </label>
+            </div>
+          ))}
+        </div>
+        {errors.preferredTenants && (
+          <p className="text-sm text-destructive mt-2">{errors.preferredTenants.message as string}</p>
+        )}
+      </div>
+
+      {/* Additional Rental Info - can be expanded as needed */}
+      <div className="mt-8">
+        <h3 className="text-base font-medium mb-3">Additional Information</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="flex items-start space-x-2">
+            <Checkbox
+              id="nonVegAllowed"
+              checked={getValues('nonVegAllowed') || false}
+              onCheckedChange={(checked) => setValue('nonVegAllowed', !!checked, { shouldValidate: true })}
+            />
+            <label
+              htmlFor="nonVegAllowed"
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+            >
+              Non-Veg Allowed
+            </label>
+          </div>
+          
+          <div className="flex items-start space-x-2">
+            <Checkbox
+              id="petsAllowed"
+              checked={getValues('petsAllowed') || false}
+              onCheckedChange={(checked) => setValue('petsAllowed', !!checked, { shouldValidate: true })}
+            />
+            <label
+              htmlFor="petsAllowed"
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+            >
+              Pets Allowed
+            </label>
+          </div>
+          
+          <div className="flex items-start space-x-2">
+            <Checkbox
+              id="lockInPeriod"
+              checked={getValues('hasLockInPeriod') || false}
+              onCheckedChange={(checked) => {
+                setValue('hasLockInPeriod', !!checked, { shouldValidate: true });
+                if (!checked) {
+                  setValue('lockInPeriod', '', { shouldValidate: true });
+                }
+              }}
+            />
+            <label
+              htmlFor="lockInPeriod"
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+            >
+              Has Lock-in Period
+            </label>
           </div>
         </div>
-
-        {/* Description */}
-        <div>
-          <RequiredLabel>Description</RequiredLabel>
-          <textarea
-            {...register('description')}
-            rows={3}
-            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base
-              shadow-[0_2px_4px_rgba(0,0,0,0.02)] placeholder:text-slate-400
-              focus:border-slate-300 focus:outline-none focus:ring-4 focus:ring-slate-100
-              hover:border-slate-300"
-            placeholder="Additional details about your property (optional)"
-          />
-        </div>
+        
+        {getValues('hasLockInPeriod') && (
+          <div className="mt-4 max-w-xs">
+            <RequiredLabel htmlFor="lockInPeriod">Lock-in Period (months)</RequiredLabel>
+            <Input
+              id="lockInPeriod"
+              type="number"
+              min={1}
+              max={36}
+              {...register('lockInPeriod')}
+              placeholder="e.g. 6"
+              className={cn(
+                errors.lockInPeriod && "border-destructive focus-visible:ring-destructive"
+              )}
+            />
+            {errors.lockInPeriod && (
+              <p className="text-sm text-destructive mt-1">{errors.lockInPeriod.message as string}</p>
+            )}
+          </div>
+        )}
       </div>
     </FormSection>
   );
-}
+};
+
+export default RentalDetails;
