@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/PropertyForm/hooks/useStepNavigation.ts
-// Version: 6.8.1
-// Last Modified: 11-04-2025 23:30 IST
-// Purpose: Fixed syntax errors and removed debug UI elements to resolve build error
+// Version: 6.9.0
+// Last Modified: 10-04-2025 17:30 IST
+// Purpose: Fixed PG/Hostel navigation flow to properly go from Room Details to Location tab
 
 import { useMemo, useCallback, useEffect } from 'react';
 import { UseFormReturn } from 'react-hook-form';
@@ -132,8 +132,9 @@ export function useStepNavigation({
   }, [form, fillDemoData]);
 
   // Define explicit step sequences based on property type
+  // FIX: Updated the pgHostel sequence to match flows.ts
   const stepSequences = useMemo(() => ({
-    // PG/Hostel sequence - defining the exact order
+    // PG/Hostel sequence - FIXED to match the order in flows.ts
     pgHostel: ['room_details', 'location', 'pg_details', 'features', 'review', 'photos'],
     
     // Standard rental sequence
@@ -150,12 +151,12 @@ export function useStepNavigation({
     return stepSequences.rent;
   }, [isPGHostelMode, isSaleMode, stepSequences]);
 
-  // IMPROVED NAVIGATION FUNCTION FOR PG/HOSTEL FLOW
+  // FIXED NAVIGATION FUNCTION FOR PG/HOSTEL FLOW
   const handleNextStep = useCallback(() => {
     try {
       const currentStepId = getCurrentStepId();
       
-      // Debug information for navigation
+      // Enhanced debug information for navigation troubleshooting
       console.log(`Navigation - Current step: ${currentStepId} (${formStep}/${STEPS.length})`);
       console.log(`Next button clicked - isPGHostelMode: ${isPGHostelMode}`);
       
@@ -164,7 +165,7 @@ export function useStepNavigation({
         const pgSequence = getActiveSequence();
         const currentIndex = pgSequence.indexOf(currentStepId);
         
-        console.log(`PG Navigation - Current index in sequence: ${currentIndex}`);
+        console.log(`PG Navigation - Current index in sequence: ${currentIndex}, Sequence:`, pgSequence);
         
         // If found and not at the end, get next step
         if (currentIndex !== -1 && currentIndex < pgSequence.length - 1) {
@@ -178,7 +179,24 @@ export function useStepNavigation({
           if (nextStepIndex !== -1) {
             // Set the next step (adding 1 because formStep is 1-indexed)
             console.log(`Setting current step to: ${nextStepIndex + 1}`);
-            setCurrentStep(nextStepIndex + 1);
+            
+            // CRUCIAL FIX: Validate the step IDs to ensure location follows room_details
+            if (currentStepId === 'room_details' && nextStepId !== 'location') {
+              console.error('PG Navigation ERROR: Expected location to follow room_details!');
+              
+              // Force navigation to the location step
+              const locationIndex = STEPS.findIndex(step => step.id === 'location');
+              if (locationIndex !== -1) {
+                console.log(`Forcing navigation to location step at index: ${locationIndex + 1}`);
+                setCurrentStep(locationIndex + 1);
+              } else {
+                // Fall back to original handler if location step not found
+                originalHandleNextStep();
+              }
+            } else {
+              // Normal path - set the next step
+              setCurrentStep(nextStepIndex + 1);
+            }
             return;
           }
         }

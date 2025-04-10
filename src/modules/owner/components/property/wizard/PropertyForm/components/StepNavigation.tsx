@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/PropertyForm/components/StepNavigation.tsx
-// Version: 7.0.0
-// Last Modified: 10-04-2025 21:15 IST
-// Purpose: Added support for PG/Hostel flow navigation
+// Version: 7.1.0
+// Last Modified: 10-04-2025 18:30 IST
+// Purpose: Fixed PG/Hostel flow navigation to properly go from Room Details to Location tab
 
 import React from 'react';
 import { cn } from '@/lib/utils';
@@ -47,70 +47,42 @@ const StepNavigation = ({
     }
   };
 
+  // Get the correct flow steps for the current property type
+  const getFlowSteps = () => {
+    const propertyType = getPropertyType();
+    
+    // Define the flow steps for each property type
+    if (propertyType === 'pghostel') {
+      // FIX: Use the correct sequence for PG/Hostel flow as defined in flows.ts
+      return ['room_details', 'location', 'pg_details', 'features', 'review', 'photos'];
+    } else if (propertyType === 'sale') {
+      return ['details', 'location', 'sale', 'features', 'review', 'photos'];
+    } else {
+      return ['details', 'location', 'rental', 'features', 'review', 'photos'];
+    }
+  };
+
   // Custom previous button handler
   const onPreviousClick = () => {
     try {
       // Extract the base URL without the current step
       const baseUrl = window.location.pathname.replace(/\/[^\/]*$/, '');
       const propertyType = getPropertyType();
+      const flowSteps = getFlowSteps();
       
-      // Special handling for PG/Hostel flow
-      if (propertyType === 'pghostel') {
-        // Handle PG/Hostel specific navigation
-        if (currentStepId === 'pg_details') {
-          // Go back to room_details from pg_details
-          navigate(`${baseUrl}/room_details`);
-          return;
-        }
-        
-        if (currentStepId === 'room_details') {
-          // Go back to location from room_details
-          navigate(`${baseUrl}/location`);
-          return;
-        }
-        
-        if (currentStepId === 'features') {
-          // Go back to pg_details from features
-          navigate(`${baseUrl}/pg_details`);
-          return;
-        }
-      } else if (propertyType === 'sale') {
-        // Special handling for Previous from Rental or Sale tabs in Sale flow
-        if (currentStepId === 'sale') {
-          // Always go back to location from sale
-          navigate(`${baseUrl}/location`);
-          return;
-        }
-        
-        // Special handling for Previous from Features
-        if (currentStepId === 'features') {
-          // Go back to sale from features in sale flow
-          navigate(`${baseUrl}/sale`);
-          return;
-        }
+      // Find the current step in the flow
+      const currentStepIndex = flowSteps.indexOf(currentStepId);
+      
+      if (currentStepIndex > 0) {
+        // Navigate to the previous step in the flow
+        const prevStepId = flowSteps[currentStepIndex - 1];
+        navigate(`${baseUrl}/${prevStepId}`);
       } else {
-        // Rent flow
-        if (currentStepId === 'rental') {
-          // Always go back to location from rental
-          navigate(`${baseUrl}/location`);
-          return;
-        }
-        
-        // Special handling for Previous from Features
-        if (currentStepId === 'features') {
-          // Go back to rental from features in rental flow
-          navigate(`${baseUrl}/rental`);
-          return;
-        }
+        // Fallback to original handler
+        handlePreviousStep();
       }
-      
-      // Get the previous step ID
-      const prevStepIndex = formStep - 2; // -1 for 0-index, -1 for previous
-      const prevStepId = prevStepIndex >= 0 ? STEPS[prevStepIndex]?.id : 'details';
-      
-      // Navigate to previous step
-      navigate(`${baseUrl}/${prevStepId}`);
     } catch (error) {
+      console.error('Error in onPreviousClick:', error);
       // Fallback to original handler
       handlePreviousStep();
     }
@@ -121,88 +93,27 @@ const StepNavigation = ({
     try {
       // Extract the base URL without the current step
       const baseUrl = window.location.pathname.replace(/\/[^\/]*$/, '');
-      const propertyType = getPropertyType();
+      const flowSteps = getFlowSteps();
       
-      // Special handling for PG/Hostel flow
-      if (propertyType === 'pghostel') {
-        // Handle PG/Hostel specific navigation
-        if (currentStepId === 'location') {
-          // Go to room_details from location in PG/Hostel flow
-          navigate(`${baseUrl}/room_details`);
-          return;
-        }
-        
-        if (currentStepId === 'room_details') {
-          // Go to pg_details from room_details
-          navigate(`${baseUrl}/pg_details`);
-          return;
-        }
-        
-        if (currentStepId === 'pg_details') {
-          // Go to features from pg_details
-          navigate(`${baseUrl}/features`);
-          return;
-        }
-        
-        if (currentStepId === 'features') {
-          // Go to review from features
-          navigate(`${baseUrl}/review`);
-          return;
-        }
-      } else if (propertyType === 'sale') {
-        // Special handling for Next from Location in Sale flow
-        if (currentStepId === 'location') {
-          // Go to sale from location in sale flow
-          navigate(`${baseUrl}/sale`);
-          return;
-        }
-        
-        // Special handling for Next from Sale
-        if (currentStepId === 'sale') {
-          // Always go to features from sale
-          navigate(`${baseUrl}/features`);
-          return;
-        }
-        
-        // Special handling for Next from Features
-        if (currentStepId === 'features') {
-          // Always go to review from features
-          navigate(`${baseUrl}/review`);
-          return;
-        }
-      } else {
-        // Rent flow
-        // Special handling for Next from Location
-        if (currentStepId === 'location') {
-          // Go to rental from location in rental flow
-          navigate(`${baseUrl}/rental`);
-          return;
-        }
-        
-        // Special handling for Next from Rental
-        if (currentStepId === 'rental') {
-          // Always go to features from rental
-          navigate(`${baseUrl}/features`);
-          return;
-        }
-        
-        // Special handling for Next from Features
-        if (currentStepId === 'features') {
-          // Always go to review from features
-          navigate(`${baseUrl}/review`);
-          return;
-        }
-      }
+      console.log('Current step ID:', currentStepId);
+      console.log('Flow steps:', flowSteps);
       
-      // For other steps, find the next step ID
-      const nextStepIndex = formStep; // Current step index (1-based) is the next step index (0-based) + 1
-      const nextStepId = nextStepIndex < STEPS.length ? STEPS[nextStepIndex]?.id : '';
+      // Find the current step in the flow
+      const currentStepIndex = flowSteps.indexOf(currentStepId);
+      console.log('Current step index in flow:', currentStepIndex);
       
-      // Navigate to next step
-      if (nextStepId) {
+      if (currentStepIndex >= 0 && currentStepIndex < flowSteps.length - 1) {
+        // Navigate to the next step in the flow
+        const nextStepId = flowSteps[currentStepIndex + 1];
+        console.log('Navigating to next step:', nextStepId);
         navigate(`${baseUrl}/${nextStepId}`);
+      } else {
+        // Fallback to original handler
+        console.log('Using fallback navigation handler');
+        handleNextStep();
       }
     } catch (error) {
+      console.error('Error in onNextClick:', error);
       // Fallback to original handler
       handleNextStep();
     }

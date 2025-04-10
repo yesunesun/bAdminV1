@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/hooks/usePropertyFormNavigation.ts
-// Version: 2.1.0
-// Last Modified: 10-04-2025 22:15 IST
-// Purpose: Added support for PG/Hostel flow navigation
+// Version: 2.3.0
+// Last Modified: 10-04-2025 16:45 IST
+// Purpose: Fixed PG/Hostel flow navigation issue to ensure Location tab follows Room Details
 
 import { useState, useCallback, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
@@ -39,7 +39,8 @@ export function usePropertyFormNavigation({
   // Combine URL parameter step and query parameter step
   const effectiveUrlStep = urlStep || queryStep;
   
-  // Get the appropriate steps based on mode
+  // Get the appropriate steps based on property type
+  // This is the key fix - properly use the FLOW_STEPS for PG/Hostel mode
   const effectiveSteps = isPGHostelMode 
     ? FLOW_STEPS.RESIDENTIAL_PGHOSTEL 
     : STEPS;
@@ -55,7 +56,7 @@ export function usePropertyFormNavigation({
     
     // For newly created listings after property type selection, always start at step 1
     if (mode === 'create' && !existingPropertyId) {
-      return 1; // Always start with Basic Details (step 1)
+      return 1; // Always start with first step (Room Details for PG/Hostel)
     }
     
     // If we're in edit mode, try loading from local storage
@@ -74,7 +75,7 @@ export function usePropertyFormNavigation({
       }
     }
     
-    // Default to first step (Basic Details)
+    // Default to first step
     return 1;
   });
 
@@ -113,8 +114,6 @@ export function usePropertyFormNavigation({
     }
   }, [navigate, form, mode, existingPropertyId, effectiveSteps]);
 
-  // Rest of the code remains the same...
-  
   // Effect to sync URL with current step - with debounce to prevent rapid updates
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -167,7 +166,7 @@ export function usePropertyFormNavigation({
     }
   }, [user?.id, mode, existingPropertyId]);
 
-  // Simplified next step handler
+  // Simplified next step handler - FIXED to properly follow PG/Hostel flow
   const handleNextStep = useCallback(() => {
     try {
       if (!validateCurrentStep()) {
@@ -190,13 +189,24 @@ export function usePropertyFormNavigation({
       };
       
       saveFormToStorage(safeFormData);
-      setCurrentStepWithPersistence(Math.min(currentStep + 1, effectiveSteps.length));
+      
+      // Always use effectiveSteps to determine the flow
+      const maxStep = effectiveSteps.length;
+      const nextStep = Math.min(currentStep + 1, maxStep);
+      
+      setCurrentStepWithPersistence(nextStep);
+      
+      // Add debug logging
+      console.log(`Navigation: Moving from step ${currentStep} to step ${nextStep} (max: ${maxStep})`);
+      console.log(`Current step ID: ${effectiveSteps[currentStep - 1]?.id}, Next step ID: ${effectiveSteps[nextStep - 1]?.id}`);
+      console.log(`Using PG/Hostel mode: ${isPGHostelMode}`);
+      
     } catch (err) {
       setError('An error occurred while proceeding to the next step. Please try again.');
     }
-  }, [currentStep, form, saveFormToStorage, setCurrentStepWithPersistence, validateCurrentStep, setError, effectiveSteps.length]);
+  }, [currentStep, form, saveFormToStorage, setCurrentStepWithPersistence, validateCurrentStep, setError, effectiveSteps, isPGHostelMode]);
 
-  // Simplified previous step handler
+  // Simplified previous step handler - FIXED to properly follow PG/Hostel flow
   const handlePreviousStep = useCallback(() => {
     try {
       if (!form || typeof form.getValues !== 'function') {
@@ -212,11 +222,20 @@ export function usePropertyFormNavigation({
       };
       
       saveFormToStorage(safeFormData);
-      setCurrentStepWithPersistence(Math.max(currentStep - 1, 1));
+      
+      // Always use effectiveSteps to determine the flow
+      const prevStep = Math.max(currentStep - 1, 1);
+      setCurrentStepWithPersistence(prevStep);
+      
+      // Add debug logging
+      console.log(`Navigation: Moving back from step ${currentStep} to step ${prevStep}`);
+      console.log(`Current step ID: ${effectiveSteps[currentStep - 1]?.id}, Previous step ID: ${effectiveSteps[prevStep - 1]?.id}`);
+      console.log(`Using PG/Hostel mode: ${isPGHostelMode}`);
+      
     } catch (err) {
       setError('An error occurred while going back to the previous step. Please try again.');
     }
-  }, [currentStep, form, saveFormToStorage, setCurrentStepWithPersistence, setError]);
+  }, [currentStep, form, saveFormToStorage, setCurrentStepWithPersistence, setError, effectiveSteps, isPGHostelMode]);
 
   // Clear storage when form is completed
   const clearStorage = useCallback(() => {
