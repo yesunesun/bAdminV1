@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/components/FormNavigation.tsx
-// Version: 2.0.0
-// Last Modified: 10-04-2025 23:45 IST
-// Purpose: Tab navigation component for property form with support for different flows
+// Version: 2.1.0
+// Last Modified: 11-04-2025 10:15 IST
+// Purpose: Fixed PG/Hostel navigation sequence to include location step
 
 import React, { useMemo } from 'react';
 import { cn } from '@/lib/utils';
@@ -51,24 +51,27 @@ export const FormNavigation: React.FC<FormNavigationProps> = ({
   // Filter out hidden steps based on property type
   const visibleSteps = useMemo(() => {
     return steps.filter(step => {
-      // Always show Details, Location, Features, Photos, Review
-      if (['details', 'location', 'features', 'photos', 'review'].includes(step.id)) {
+      // Always include these common steps for all property types
+      if (['features', 'photos', 'review'].includes(step.id)) {
         return true;
       }
       
-      // For PG/Hostel flow, show room_details and pg_details
+      // For PG/Hostel flow
       if (propertyType === 'pghostel') {
-        return ['room_details', 'pg_details'].includes(step.id);
+        // Include room_details, location, and pg_details - correct sequence!
+        return ['room_details', 'location', 'pg_details'].includes(step.id);
       }
       
-      // For Sale flow, show only sale tab
+      // For Sale flow
       if (propertyType === 'sale') {
-        return step.id === 'sale';
+        // Include basic details, location, and sale specific info
+        return ['details', 'location', 'sale'].includes(step.id);
       }
       
-      // For Rent flow, show only rental tab
+      // For Rent flow
       if (propertyType === 'rent') {
-        return step.id === 'rental';
+        // Include basic details, location, and rental specific info
+        return ['details', 'location', 'rental'].includes(step.id);
       }
       
       return !step.hidden;

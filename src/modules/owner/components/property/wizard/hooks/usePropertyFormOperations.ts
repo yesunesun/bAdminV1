@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/hooks/usePropertyFormOperations.ts
-// Version: 1.8.0
-// Last Modified: 08-04-2025 21:30 IST
-// Purpose: Fixed property creation by removing non-existent column
+// Version: 2.2.0
+// Last Modified: 11-04-2025 12:15 IST
+// Purpose: Fixed Room Type and Amenities auto-fill issues
 
 import { useCallback } from 'react';
 import { UseFormReturn } from 'react-hook-form';
@@ -16,6 +16,7 @@ interface UsePropertyFormOperationsProps {
   existingPropertyId?: string;
   adType?: string;
   isSaleMode: boolean;
+  isPGHostelMode?: boolean; 
   status: 'draft' | 'published';
   setStatus: (status: 'draft' | 'published') => void;
   setSavedPropertyId: (id: string | null) => void;
@@ -31,6 +32,7 @@ export function usePropertyFormOperations({
   existingPropertyId,
   adType,
   isSaleMode,
+  isPGHostelMode = false,
   status,
   setStatus,
   setSavedPropertyId,
@@ -42,32 +44,129 @@ export function usePropertyFormOperations({
   const handleAutoFill = useCallback(() => {
     try {
       setError('');
+      
+      console.log("AUTO FILL TRIGGERED in usePropertyFormOperations");
+      console.log("isPGHostelMode:", isPGHostelMode);
+      console.log("isSaleMode:", isSaleMode);
+      console.log("adType:", adType);
+      
       if (!form || typeof form.setValue !== 'function') {
         console.error('Form is not properly initialized for auto-fill');
         return;
       }
       
-      Object.entries(TEST_DATA).forEach(([key, value]) => {
-        if (value !== undefined) {
+      // Try to fill each field directly from TEST_DATA top-level object
+      try {
+        console.log("Attempting basic auto fill");
+        Object.entries(TEST_DATA).forEach(([section, sectionData]) => {
+          console.log(`Filling section: ${section}`);
+          
+          if (typeof sectionData === 'object' && sectionData !== null) {
+            Object.entries(sectionData).forEach(([field, value]) => {
+              try {
+                // Skip roomType since we'll handle it separately
+                if (field !== 'roomType') {
+                  console.log(`Setting ${field} = `, value);
+                  form.setValue(field as any, value, { 
+                    shouldValidate: true, 
+                    shouldDirty: true, 
+                    shouldTouch: true 
+                  });
+                }
+              } catch (err) {
+                console.error(`Error setting ${field}:`, err);
+              }
+            });
+          }
+        });
+      } catch (err) {
+        console.error("Error in basic auto fill:", err);
+      }
+      
+      // Explicitly set amenities as an array
+      try {
+        console.log("Setting amenities array");
+        form.setValue('amenities', TEST_DATA.amenities, {
+          shouldValidate: true,
+          shouldDirty: true,
+          shouldTouch: true
+        });
+      } catch (err) {
+        console.error("Error setting amenities:", err);
+      }
+      
+      // Specifically handle PG and Room details
+      if (isPGHostelMode) {
+        console.log("Specifically filling PG/Hostel sections");
+        
+        // Fill room details first with special handling for roomType
+        try {
+          console.log("Filling room_details");
+          
+          // Set roomType explicitly using direct string
+          // IMPORTANT: This needs to match exactly one of the values in ROOM_TYPES array
           try {
-            form.setValue(key as keyof FormData, value, {
-              shouldValidate: true,
-              shouldDirty: true,
-              shouldTouch: true
+            console.log("Setting roomType = Single");
+            
+            // Force delay to let React properly handle the select input
+            setTimeout(() => {
+              form.setValue('roomType', 'Single', { 
+                shouldValidate: true, 
+                shouldDirty: true,
+                shouldTouch: true
+              });
+              console.log("roomType value after setting:", form.getValues('roomType'));
+            }, 0);
+          } catch (err) {
+            console.error("Error setting roomType:", err);
+          }
+          
+          // Set all other room details fields
+          setTimeout(() => {
+            Object.entries(TEST_DATA.room_details).forEach(([field, value]) => {
+              if (field !== 'roomType') {
+                console.log(`Room Detail: Setting ${field} = `, value);
+                form.setValue(field as any, value, { 
+                  shouldValidate: true, 
+                  shouldDirty: true,
+                  shouldTouch: true
+                });
+              }
+            });
+          }, 10);
+        } catch (err) {
+          console.error("Error filling room_details:", err);
+        }
+        
+        // Fill PG details after a slight delay
+        setTimeout(() => {
+          try {
+            console.log("Filling pg_details");
+            Object.entries(TEST_DATA.pg_details).forEach(([field, value]) => {
+              console.log(`PG Detail: Setting ${field} = `, value);
+              form.setValue(field as any, value, { 
+                shouldValidate: true, 
+                shouldDirty: true,
+                shouldTouch: true
+              });
             });
           } catch (err) {
-            console.error(`Error setting form value for ${key} during auto-fill:`, err);
+            console.error("Error filling pg_details:", err);
           }
-        }
-      });
+        }, 20);
+      }
       
+      // Trigger validation after all values are set
       if (typeof form.trigger === 'function') {
-        form.trigger();
+        setTimeout(() => {
+          console.log("Triggering form validation");
+          form.trigger();
+        }, 100);
       }
     } catch (err) {
       console.error('Error in handleAutoFill:', err);
     }
-  }, [form, setError]);
+  }, [form, setError, isSaleMode, isPGHostelMode, adType]);
 
   // Save property and return the saved property ID
   const saveProperty = async (isPublished: boolean): Promise<string> => {

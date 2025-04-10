@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/RoomDetails.tsx
-// Version: 1.0.0
-// Last Modified: 10-04-2025 20:30 IST
-// Purpose: Room details section for PG/Hostel properties
+// Version: 1.1.0
+// Last Modified: 10-04-2025 20:45 IST
+// Purpose: Updated Room details section for PG/Hostel properties
 
 import React from 'react';
 import { FormData, FormSectionProps } from '../types';
@@ -90,39 +90,39 @@ const RoomDetails: React.FC<FormSectionProps> = ({
           )}
         </div>
 
-        {/* Available Rooms */}
+        {/* Expected Rent */}
         <div className="space-y-2">
-          <RequiredLabel htmlFor="availableRooms">Available Rooms</RequiredLabel>
+          <RequiredLabel htmlFor="expectedRent">Expected Rent (₹/month)</RequiredLabel>
           <Input
-            id="availableRooms"
+            id="expectedRent"
             type="number"
             min={1}
-            {...register('availableRooms')}
-            placeholder="Number of rooms available"
+            {...register('expectedRent')}
+            placeholder="Monthly rent amount"
             className={cn(
-              errors.availableRooms && "border-destructive focus-visible:ring-destructive"
+              errors.expectedRent && "border-destructive focus-visible:ring-destructive"
             )}
           />
-          {errors.availableRooms && (
-            <p className="text-sm text-destructive mt-1">{errors.availableRooms.message as string}</p>
+          {errors.expectedRent && (
+            <p className="text-sm text-destructive mt-1">{errors.expectedRent.message as string}</p>
           )}
         </div>
 
-        {/* Total Rooms */}
+        {/* Expected Deposit */}
         <div className="space-y-2">
-          <RequiredLabel htmlFor="totalRooms">Total Rooms</RequiredLabel>
+          <RequiredLabel htmlFor="expectedDeposit">Expected Deposit (₹)</RequiredLabel>
           <Input
-            id="totalRooms"
+            id="expectedDeposit"
             type="number"
             min={1}
-            {...register('totalRooms')}
-            placeholder="Total number of rooms"
+            {...register('expectedDeposit')}
+            placeholder="Security deposit amount"
             className={cn(
-              errors.totalRooms && "border-destructive focus-visible:ring-destructive"
+              errors.expectedDeposit && "border-destructive focus-visible:ring-destructive"
             )}
           />
-          {errors.totalRooms && (
-            <p className="text-sm text-destructive mt-1">{errors.totalRooms.message as string}</p>
+          {errors.expectedDeposit && (
+            <p className="text-sm text-destructive mt-1">{errors.expectedDeposit.message as string}</p>
           )}
         </div>
 

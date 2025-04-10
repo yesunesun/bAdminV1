@@ -1,13 +1,13 @@
 // src/modules/owner/components/property/wizard/hooks/usePropertyFormNavigation.ts
-// Version: 2.0.0
-// Last Modified: 08-03-2025 22:00 IST
-// Purpose: Removed excessive logging and simplified navigation logic
+// Version: 2.1.0
+// Last Modified: 10-04-2025 22:15 IST
+// Purpose: Added support for PG/Hostel flow navigation
 
 import { useState, useCallback, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { UseFormReturn } from 'react-hook-form';
 import { FormData } from '../types';
-import { STEPS } from '../constants';
+import { STEPS, FLOW_STEPS } from '../constants'; // Updated to import FLOW_STEPS
 
 interface UsePropertyFormNavigationProps {
   form: UseFormReturn<FormData>;
@@ -16,6 +16,7 @@ interface UsePropertyFormNavigationProps {
   mode?: 'create' | 'edit';
   existingPropertyId?: string;
   setError: (error: string) => void;
+  isPGHostelMode?: boolean; // Add this parameter
 }
 
 export function usePropertyFormNavigation({
@@ -24,7 +25,8 @@ export function usePropertyFormNavigation({
   user,
   mode = 'create',
   existingPropertyId,
-  setError
+  setError,
+  isPGHostelMode = false // Default to false
 }: UsePropertyFormNavigationProps) {
   const navigate = useNavigate();
   const { step: urlStep } = useParams();
@@ -37,11 +39,16 @@ export function usePropertyFormNavigation({
   // Combine URL parameter step and query parameter step
   const effectiveUrlStep = urlStep || queryStep;
   
+  // Get the appropriate steps based on mode
+  const effectiveSteps = isPGHostelMode 
+    ? FLOW_STEPS.RESIDENTIAL_PGHOSTEL 
+    : STEPS;
+  
   // Define currentStep state
   const [currentStep, setCurrentStep] = useState<number>(() => {
     // If step is in URL or query params, prioritize that regardless of mode
     if (effectiveUrlStep) {
-      const stepIndex = STEPS.findIndex(s => s.id === effectiveUrlStep) + 1;
+      const stepIndex = effectiveSteps.findIndex(s => s.id === effectiveUrlStep) + 1;
       // Ensure a valid step index, defaulting to 1 (details) if not found or invalid
       return stepIndex > 0 ? stepIndex : 1;
     }
@@ -85,7 +92,7 @@ export function usePropertyFormNavigation({
         return;
       }
 
-      const stepData = STEPS[newStep - 1];
+      const stepData = effectiveSteps[newStep - 1];
       if (!stepData) {
         return;
       }
@@ -104,8 +111,10 @@ export function usePropertyFormNavigation({
     } catch (err) {
       // Silent error handling to avoid console spam
     }
-  }, [navigate, form, mode, existingPropertyId]);
+  }, [navigate, form, mode, existingPropertyId, effectiveSteps]);
 
+  // Rest of the code remains the same...
+  
   // Effect to sync URL with current step - with debounce to prevent rapid updates
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -181,11 +190,11 @@ export function usePropertyFormNavigation({
       };
       
       saveFormToStorage(safeFormData);
-      setCurrentStepWithPersistence(Math.min(currentStep + 1, STEPS.length));
+      setCurrentStepWithPersistence(Math.min(currentStep + 1, effectiveSteps.length));
     } catch (err) {
       setError('An error occurred while proceeding to the next step. Please try again.');
     }
-  }, [currentStep, form, saveFormToStorage, setCurrentStepWithPersistence, validateCurrentStep, setError]);
+  }, [currentStep, form, saveFormToStorage, setCurrentStepWithPersistence, validateCurrentStep, setError, effectiveSteps.length]);
 
   // Simplified previous step handler
   const handlePreviousStep = useCallback(() => {
