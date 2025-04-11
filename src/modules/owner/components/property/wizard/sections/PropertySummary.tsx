@@ -1,14 +1,14 @@
 // src/modules/owner/components/property/wizard/sections/PropertySummary.tsx
-// Version: 3.6.0
-// Last Modified: 08-04-2025 21:45 IST
-// Purpose: Fixed navigation to Photos tab and error handling
+// Version: 3.7.0
+// Last Modified: 10-04-2025 22:30 IST
+// Purpose: Added support for Commercial Rent properties in summary view
 
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FormSection } from '@/components/FormSection';
 import { cn } from '@/lib/utils';
 import { FormData } from '../types';
-import { Save, FileEdit, Send, Loader2, MapPin, Home, SquareStack, Sparkles, ImagePlus, IndianRupee, AlertCircle } from 'lucide-react';
+import { Save, FileEdit, Send, Loader2, MapPin, Home, SquareStack, Sparkles, ImagePlus, IndianRupee, AlertCircle, Building } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface PropertySummaryProps {
@@ -103,6 +103,27 @@ export function PropertySummary({
     
     // Return true if ANY of these indicators suggest it's a sale property
     return isSaleListingType || (hasExpectedPrice && hasNoRentAmount) || hasMaintenanceCost;
+  }, [formData]);
+  
+  // Logic to detect if this is a commercial property
+  const isCommercialProperty = useMemo(() => {
+    // Check the property category
+    const category = formData.propertyCategory?.toLowerCase();
+    const isCommercialCategory = category === 'commercial';
+    
+    // Check for commercial-specific fields
+    const hasCommercialType = !!formData.commercialPropertyType;
+    const hasLeaseDuration = !!formData.leaseDuration;
+    const hasLockInPeriod = !!formData.lockInPeriod;
+    const hasPowerBackup = !!formData.powerBackup;
+    
+    // Check URL path for commercial indicators
+    const urlPath = window.location.pathname.toLowerCase();
+    const isCommercialFromUrl = urlPath.includes('commercial');
+    
+    // Return true if ANY of these indicators suggest it's a commercial property
+    return isCommercialCategory || hasCommercialType || hasLeaseDuration || 
+           hasLockInPeriod || hasPowerBackup || isCommercialFromUrl;
   }, [formData]);
 
   // Custom previous button handler to navigate directly to Features tab
@@ -329,7 +350,7 @@ export function PropertySummary({
             title="Basic Details"
             icon={<Home className="h-4 w-4" />}
             items={[
-              { label: 'Property Type', value: formData.propertyType },
+              { label: 'Property Type', value: isCommercialProperty ? formData.commercialPropertyType : formData.propertyType },
               { label: 'BHK Type', value: formData.bhkType },
               { label: 'Built-up Area', value: formatArea(formData.builtUpArea, formData.builtUpAreaUnit) },
               { label: 'Floor', value: `${formData.floor} of ${formData.totalFloors}` },
@@ -353,7 +374,25 @@ export function PropertySummary({
             ]}
           />
 
-          {isSaleProperty ? (
+          {isCommercialProperty ? (
+            <SummarySection
+              title="Commercial Details"
+              icon={<Building className="h-4 w-4" />}
+              items={[
+                { label: 'Commercial Type', value: formData.commercialPropertyType },
+                { label: 'Rent Amount', value: formatCurrency(formData.rentAmount) },
+                { label: 'Security Deposit', value: formatCurrency(formData.securityDeposit) },
+                { label: 'Lease Duration', value: formData.leaseDuration },
+                { label: 'Lock-in Period', value: `${formData.lockInPeriod} months` },
+                { label: 'Maintenance', value: formData.maintenance },
+                { label: 'Furnishing', value: formData.furnishing },
+                { label: 'Power Backup', value: formData.powerBackup },
+                { label: 'Available From', value: formData.availableFrom },
+                { label: 'Fire Safety', value: formData.fireSafety ? 'Yes' : 'No' },
+                { label: 'Centralized AC', value: formData.centralizedAC ? 'Yes' : 'No' }
+              ]}
+            />
+          ) : isSaleProperty ? (
             <SummarySection
               title="Sale Details"
               icon={<IndianRupee className="h-4 w-4" />}

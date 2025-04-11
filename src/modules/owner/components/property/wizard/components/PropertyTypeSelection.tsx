@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/components/PropertyTypeSelection.tsx
-// Version: 1.7.0
-// Last Modified: 10-04-2025 18:15 IST
-// Purpose: Properly handle PG/Hostel property type selection
+// Version: 2.0.0
+// Last Modified: 10-04-2025 22:45 IST
+// Purpose: Updated to support all property flow types including Commercial Sale, Co-working, Land/Plot, and Flatmates
 
 import React, { useState, useEffect } from 'react';
 import { 
@@ -12,6 +12,7 @@ import { Building2, Home, Trees, Shield, Clock, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { HowItWorks } from '../../../property/HowItWorks';
 
+// Updated property categories to include all the new property types
 const propertyCategories = [
   {
     id: 'residential',
@@ -75,10 +76,13 @@ export default function PropertyTypeSelection({
 
   // Handle URL-friendly conversion for listing types
   const getURLFriendlyType = (type: string): string => {
-    if (type.toLowerCase() === 'pg/hostel') {
-      return 'pghostel';
-    }
-    return type.toLowerCase();
+    const typeMap: Record<string, string> = {
+      'PG/Hostel': 'pghostel',
+      'Co-working': 'coworking',
+      'Flatmates': 'flatmates'
+    };
+    
+    return typeMap[type] || type.toLowerCase();
   };
 
   // Handle form submission with proper URL formatting

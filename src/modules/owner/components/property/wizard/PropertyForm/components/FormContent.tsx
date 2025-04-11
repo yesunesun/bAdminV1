@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/PropertyForm/components/FormContent.tsx
-// Version: 3.0.0
-// Last Modified: 10-04-2025 20:45 IST
-// Purpose: Added support for PG/Hostel flow with RoomDetails and PGDetails sections
+// Version: 4.0.0
+// Last Modified: 10-04-2025 23:05 IST
+// Purpose: Added support for new property flows: Commercial Sale, Commercial Co-working, Land/Plot Sale, and Residential Flatmates
 
 import React from 'react';
 import { UseFormReturn } from 'react-hook-form';
@@ -17,9 +17,17 @@ import { PropertySummary } from '../../sections/PropertySummary';
 import { ImageUploadSection } from '../../sections/ImageUploadSection';
 import { Loader2 } from 'lucide-react';
 
-// Import new PG/Hostel specific components
+// Import existing specific components
 import RoomDetails from '../../sections/RoomDetails';
 import PGDetails from '../../sections/PGDetails';
+import CommercialDetails from '../../sections/CommercialDetails';
+
+// Import new components for the new flows
+import CommercialSaleDetails from '../../sections/CommercialSaleDetails';
+import CoworkingDetails from '../../sections/CoworkingDetails';
+import LandDetails from '../../sections/LandDetails';
+import LandFeaturesDetails from '../../sections/LandFeaturesDetails';
+import FlatmateDetails from '../../sections/FlatmateDetails';
 
 interface FormContentProps {
   form: UseFormReturn<FormData>;
@@ -30,7 +38,12 @@ interface FormContentProps {
   mode: 'create' | 'edit';
   selectedCity: string;
   isSaleMode: boolean;
-  isPGHostelMode: boolean; // New prop to identify PG/Hostel flow
+  isPGHostelMode: boolean; // Prop for PG/Hostel flow
+  isCommercialRentMode?: boolean; // Prop for Commercial Rent flow
+  isCommercialSaleMode?: boolean; // Prop for Commercial Sale flow
+  isCoworkingMode?: boolean; // Prop for Commercial Co-working flow
+  isLandSaleMode?: boolean; // Prop for Land/Plot Sale flow
+  isFlatmatesMode?: boolean; // Prop for Residential Flatmates flow
   handlePreviousStep: () => void;
   handleSaveAsDraft: () => Promise<void>;
   handleSaveAndPublish: () => Promise<void>;
@@ -50,7 +63,12 @@ const FormContent = ({
   mode,
   selectedCity,
   isSaleMode,
-  isPGHostelMode, // Use the new prop for conditional rendering
+  isPGHostelMode, // Prop for PG/Hostel flow
+  isCommercialRentMode = false, // Prop for Commercial Rent flow
+  isCommercialSaleMode = false, // Prop for Commercial Sale flow
+  isCoworkingMode = false, // Prop for Commercial Co-working flow
+  isLandSaleMode = false, // Prop for Land/Plot Sale flow
+  isFlatmatesMode = false, // Prop for Residential Flatmates flow
   handlePreviousStep,
   handleSaveAsDraft,
   handleSaveAndPublish,
@@ -67,6 +85,15 @@ const FormContent = ({
   
   // Render content based on the current step
   if (currentStepId === 'details') {
+    // Skip details for Land/Plot flow
+    if (isLandSaleMode) {
+      return (
+        <div className="py-6 text-center">
+          <p className="text-muted-foreground">This section is not applicable for Land/Plot properties.</p>
+        </div>
+      );
+    }
+    
     return (
       <PropertyDetails 
         form={form} 
@@ -87,8 +114,10 @@ const FormContent = ({
   }
   
   if (currentStepId === 'rental') {
-    // Only show rental details for rental properties
-    if (isSaleMode || isPGHostelMode) {
+    // Only show rental details for residential rental properties
+    if (isSaleMode || isPGHostelMode || isCommercialRentMode || 
+        isCommercialSaleMode || isCoworkingMode || isLandSaleMode || 
+        isFlatmatesMode) {
       return (
         <div className="py-6 text-center">
           <p className="text-muted-foreground">This section is not applicable for this property type.</p>
@@ -105,8 +134,10 @@ const FormContent = ({
   }
   
   if (currentStepId === 'sale') {
-    // Only show sale details for sale properties
-    if (!isSaleMode || isPGHostelMode) {
+    // Only show sale details for residential sale properties
+    if (!isSaleMode || isPGHostelMode || isCommercialRentMode || 
+        isCommercialSaleMode || isCoworkingMode || isLandSaleMode || 
+        isFlatmatesMode) {
       return (
         <div className="py-6 text-center">
           <p className="text-muted-foreground">This section is not applicable for this property type.</p>
@@ -122,7 +153,7 @@ const FormContent = ({
     );
   }
   
-  // New PG/Hostel specific sections
+  // PG/Hostel specific sections
   if (currentStepId === 'room_details') {
     // Only show room details for PG/Hostel properties
     if (!isPGHostelMode) {
@@ -159,6 +190,120 @@ const FormContent = ({
     );
   }
   
+  // Commercial Rent specific section
+  if (currentStepId === 'commercial') {
+    // Only show Commercial details for Commercial Rent properties
+    if (!isCommercialRentMode) {
+      return (
+        <div className="py-6 text-center">
+          <p className="text-muted-foreground">This section is not applicable for this property type.</p>
+        </div>
+      );
+    }
+    
+    return (
+      <CommercialDetails 
+        form={form}
+        adType={effectiveAdType}
+      />
+    );
+  }
+  
+  // Commercial Sale specific section
+  if (currentStepId === 'commercial_sale') {
+    // Only show Commercial Sale details for Commercial Sale properties
+    if (!isCommercialSaleMode) {
+      return (
+        <div className="py-6 text-center">
+          <p className="text-muted-foreground">This section is not applicable for this property type.</p>
+        </div>
+      );
+    }
+    
+    return (
+      <CommercialSaleDetails 
+        form={form}
+        adType={effectiveAdType}
+      />
+    );
+  }
+  
+  // Co-working specific section
+  if (currentStepId === 'coworking') {
+    // Only show Co-working details for Co-working properties
+    if (!isCoworkingMode) {
+      return (
+        <div className="py-6 text-center">
+          <p className="text-muted-foreground">This section is not applicable for this property type.</p>
+        </div>
+      );
+    }
+    
+    return (
+      <CoworkingDetails 
+        form={form}
+        adType={effectiveAdType}
+      />
+    );
+  }
+  
+  // Land/Plot specific sections
+  if (currentStepId === 'land_details') {
+    // Only show Land details for Land/Plot properties
+    if (!isLandSaleMode) {
+      return (
+        <div className="py-6 text-center">
+          <p className="text-muted-foreground">This section is not applicable for this property type.</p>
+        </div>
+      );
+    }
+    
+    return (
+      <LandDetails 
+        form={form}
+        adType={effectiveAdType}
+      />
+    );
+  }
+  
+  if (currentStepId === 'land_features') {
+    // Only show Land features for Land/Plot properties
+    if (!isLandSaleMode) {
+      return (
+        <div className="py-6 text-center">
+          <p className="text-muted-foreground">This section is not applicable for this property type.</p>
+        </div>
+      );
+    }
+    
+    return (
+      <LandFeaturesDetails 
+        form={form}
+        adType={effectiveAdType}
+      />
+    );
+  }
+  
+  // Flatmates specific section
+  if (currentStepId === 'flatmate_details') {
+    // Only show Flatmate details for Flatmates properties
+    if (!isFlatmatesMode) {
+      return (
+        <div className="py-6 text-center">
+          <p className="text-muted-foreground">This section is not applicable for this property type.</p>
+        </div>
+      );
+    }
+    
+    return (
+      <FlatmateDetails 
+        form={form}
+        adType={effectiveAdType}
+      />
+    );
+  }
+  
+  // Common sections for all property types
   if (currentStepId === 'features') {
     return (
       <AmenitiesSection 

@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/PropertyForm/index.tsx
-// Version: 5.0.0
-// Last Modified: 10-04-2025 21:00 IST
-// Purpose: Added PG/Hostel flow support with specialized navigation
+// Version: 6.0.0
+// Last Modified: 10-04-2025 23:00 IST
+// Purpose: Added support for new property flows: Commercial Sale, Commercial Co-working, Land/Plot Sale, and Residential Flatmates
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -84,17 +84,106 @@ export function PropertyForm({
     const urlPath = window.location.pathname.toLowerCase();
     return urlPath.includes('pghostel');
   }, [derivedAdType]);
+  
+  // Determine if we're in Commercial Rent mode
+  const isCommercialRentMode = useMemo(() => {
+    // Check if the ad type specifically indicates commercial rent
+    if (derivedAdType && derivedCategory) {
+      const isCommercialType = derivedAdType.toLowerCase() === 'commercialrent' || 
+                              (derivedAdType.toLowerCase() === 'rent' && 
+                               derivedCategory.toLowerCase() === 'commercial');
+      return isCommercialType;
+    }
+    
+    // Check URL path for commercial rent keywords
+    const urlPath = window.location.pathname.toLowerCase();
+    return urlPath.includes('commercial') && (urlPath.includes('rent') || urlPath.includes('lease'));
+  }, [derivedAdType, derivedCategory]);
+  
+  // Determine if we're in Commercial Sale mode
+  const isCommercialSaleMode = useMemo(() => {
+    // Check if the ad type specifically indicates commercial sale
+    if (derivedAdType && derivedCategory) {
+      const isCommercialSaleType = (derivedAdType.toLowerCase() === 'sale' || 
+                                  derivedAdType.toLowerCase() === 'sell') && 
+                                 derivedCategory.toLowerCase() === 'commercial';
+      return isCommercialSaleType;
+    }
+    
+    // Check URL path for commercial sale keywords
+    const urlPath = window.location.pathname.toLowerCase();
+    return urlPath.includes('commercial') && (urlPath.includes('sale') || urlPath.includes('sell'));
+  }, [derivedAdType, derivedCategory]);
+  
+  // Determine if we're in Commercial Co-working mode
+  const isCoworkingMode = useMemo(() => {
+    // Check if the ad type specifically indicates co-working
+    if (derivedAdType && derivedCategory) {
+      const isCoworkingType = derivedAdType.toLowerCase() === 'coworking' && 
+                            derivedCategory.toLowerCase() === 'commercial';
+      return isCoworkingType;
+    }
+    
+    // Check URL path for co-working keywords
+    const urlPath = window.location.pathname.toLowerCase();
+    return urlPath.includes('coworking') || urlPath.includes('co-working');
+  }, [derivedAdType, derivedCategory]);
+  
+  // Determine if we're in Land/Plot Sale mode
+  const isLandSaleMode = useMemo(() => {
+    // Check if the category indicates land
+    if (derivedCategory) {
+      const isLandType = derivedCategory.toLowerCase() === 'land';
+      return isLandType;
+    }
+    
+    // Check URL path for land keywords
+    const urlPath = window.location.pathname.toLowerCase();
+    return urlPath.includes('land') || urlPath.includes('plot');
+  }, [derivedCategory]);
+  
+  // Determine if we're in Residential Flatmates mode
+  const isFlatmatesMode = useMemo(() => {
+    // Check if the ad type specifically indicates flatmates
+    if (derivedAdType && derivedCategory) {
+      const isFlatmatesType = derivedAdType.toLowerCase() === 'flatmates' && 
+                            derivedCategory.toLowerCase() === 'residential';
+      return isFlatmatesType;
+    }
+    
+    // Check URL path for flatmates keywords
+    const urlPath = window.location.pathname.toLowerCase();
+    return urlPath.includes('flatmate');
+  }, [derivedAdType, derivedCategory]);
 
   // Determine which flow steps to use based on property type
   const flowSteps = useMemo(() => {
     if (isPGHostelMode) {
       return FLOW_STEPS.RESIDENTIAL_PGHOSTEL;
+    } else if (isCommercialRentMode) {
+      return FLOW_STEPS.COMMERCIAL_RENT;
+    } else if (isCommercialSaleMode) {
+      return FLOW_STEPS.COMMERCIAL_SALE;
+    } else if (isCoworkingMode) {
+      return FLOW_STEPS.COMMERCIAL_COWORKING;
+    } else if (isLandSaleMode) {
+      return FLOW_STEPS.LAND_SALE;
+    } else if (isFlatmatesMode) {
+      return FLOW_STEPS.RESIDENTIAL_FLATMATES;
     } else if (derivedAdType?.toLowerCase() === 'sale' || derivedAdType?.toLowerCase() === 'sell') {
       return FLOW_STEPS.RESIDENTIAL_SALE;
     } else {
       return FLOW_STEPS.RESIDENTIAL_RENT;
     }
-  }, [derivedAdType, isPGHostelMode]);
+  }, [
+    derivedAdType, 
+    isPGHostelMode, 
+    isCommercialRentMode, 
+    isCommercialSaleMode, 
+    isCoworkingMode, 
+    isLandSaleMode, 
+    isFlatmatesMode
+  ]);
 
   // Determine initial step from URL or default to 1
   const initialStep = useMemo(() => {
@@ -146,6 +235,12 @@ export function PropertyForm({
   // Initialize custom step navigation with the correct flow steps
   const { 
     isSaleMode, 
+    isPGHostelMode: detectedPGHostelMode,
+    isCommercialRentMode: detectedCommercialRentMode,
+    isCommercialSaleMode: detectedCommercialSaleMode,
+    isCoworkingMode: detectedCoworkingMode,
+    isLandSaleMode: detectedLandSaleMode,
+    isFlatmatesMode: detectedFlatmatesMode,
     getVisibleSteps, 
     handleNextStep 
   } = useStepNavigation({
@@ -262,6 +357,11 @@ export function PropertyForm({
               selectedCity={selectedCity || initialData?.locality || ''}
               isSaleMode={isSaleMode}
               isPGHostelMode={isPGHostelMode}
+              isCommercialRentMode={isCommercialRentMode}
+              isCommercialSaleMode={isCommercialSaleMode}
+              isCoworkingMode={isCoworkingMode}
+              isLandSaleMode={isLandSaleMode}
+              isFlatmatesMode={isFlatmatesMode}
               handlePreviousStep={handlePreviousStep}
               handleSaveAsDraft={handleSaveAsDraft}
               handleSaveAndPublish={handleSaveAndPublish}

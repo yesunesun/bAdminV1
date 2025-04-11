@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/constants/common.ts
-// Version: 1.0.0
-// Last Modified: 10-04-2025 14:30 IST
-// Purpose: Common constants used across various property form components
+// Version: 2.3.0
+// Last Modified: 11-04-2025 15:45 IST
+// Purpose: Fixed missing Shop icon by replacing with Store icon
 
 import { 
   Home, 
@@ -11,7 +11,11 @@ import {
   ImagePlus, 
   ClipboardCheck,
   Bed,
-  Building
+  Building,
+  LandPlot,
+  Store,  // Changed from Shop to Store
+  Briefcase,
+  Users
 } from 'lucide-react';
 
 // Step definitions with their icons and titles
@@ -39,6 +43,12 @@ export const STEP_DEFINITIONS = {
     title: 'Sale Details',
     icon: IndianRupee,
     description: 'Sale details'
+  },
+  commercial: {
+    id: 'commercial',
+    title: 'Commercial Details',
+    icon: Building,
+    description: 'Commercial property details'
   },
   room_details: {
     id: 'room_details',
@@ -69,6 +79,40 @@ export const STEP_DEFINITIONS = {
     title: 'Review',
     icon: ClipboardCheck,
     description: 'Review and publish'
+  },
+  // New step definitions for Commercial Sale flow
+  commercial_sale: {
+    id: 'commercial_sale',
+    title: 'Sale Details',
+    icon: Store,  // Changed from Shop to Store
+    description: 'Commercial sale details'
+  },
+  // New step definitions for Commercial Co-working flow
+  coworking: {
+    id: 'coworking',
+    title: 'Co-working Details',
+    icon: Briefcase,
+    description: 'Co-working space details'
+  },
+  // New step definitions for Land/Plot Sale flow - Using LandPlot icon
+  land_details: {
+    id: 'land_details',
+    title: 'Land Details',
+    icon: LandPlot,
+    description: 'Land details'
+  },
+  land_features: {
+    id: 'land_features',
+    title: 'Land Features',
+    icon: Settings,
+    description: 'Land features and specifications'
+  },
+  // New step definitions for Residential Flatmates flow
+  flatmate_details: {
+    id: 'flatmate_details',
+    title: 'Flatmate Preferences',
+    icon: Users,
+    description: 'Flatmate preferences and details'
   }
 };
 
@@ -97,6 +141,54 @@ export const STEPS = [
     title: 'Sale Details',
     icon: IndianRupee,
     description: 'Sale details'
+  },
+  {
+    id: 'commercial',
+    title: 'Commercial Details',
+    icon: Building,
+    description: 'Commercial property details'
+  },
+  {
+    id: 'room_details',
+    title: 'Room Details',
+    icon: Bed,
+    description: 'PG/Hostel room details'
+  },
+  {
+    id: 'pg_details',
+    title: 'PG Details',
+    icon: Building,
+    description: 'PG/Hostel facility details'
+  },
+  {
+    id: 'commercial_sale',
+    title: 'Sale Details',
+    icon: Store,  // Changed from Shop to Store
+    description: 'Commercial sale details'
+  },
+  {
+    id: 'coworking',
+    title: 'Co-working Details',
+    icon: Briefcase,
+    description: 'Co-working space details'
+  },
+  {
+    id: 'land_details',
+    title: 'Land Details',
+    icon: LandPlot,
+    description: 'Land details'
+  },
+  {
+    id: 'land_features',
+    title: 'Land Features',
+    icon: Settings,
+    description: 'Land features and specifications'
+  },
+  {
+    id: 'flatmate_details',
+    title: 'Flatmate Preferences',
+    icon: Users,
+    description: 'Flatmate preferences and details'
   },
   {
     id: 'features',

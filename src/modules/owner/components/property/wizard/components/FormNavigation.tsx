@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/components/FormNavigation.tsx
-// Version: 2.1.0
-// Last Modified: 11-04-2025 10:15 IST
-// Purpose: Fixed PG/Hostel navigation sequence to include location step
+// Version: 3.0.0
+// Last Modified: 10-04-2025 23:10 IST
+// Purpose: Added support for new property flows: Commercial Sale, Commercial Co-working, Land/Plot Sale, and Residential Flatmates
 
 import React, { useMemo } from 'react';
 import { cn } from '@/lib/utils';
@@ -36,17 +36,35 @@ export const FormNavigation: React.FC<FormNavigationProps> = ({
 }) => {
   const navigate = useNavigate();
 
-  // Determine property type (sale, rent, pghostel) for special handling
+  // Determine property type for special handling
   const propertyType = useMemo(() => {
     const normalizedAdType = adType.toLowerCase();
+    const normalizedCategory = category.toLowerCase();
+    
+    // Check for specific property types
     if (normalizedAdType === 'pghostel') {
       return 'pghostel';
+    } else if (normalizedAdType === 'flatmates') {
+      return 'flatmates';
+    } else if (normalizedAdType === 'coworking') {
+      return 'coworking';
+    } else if (normalizedCategory === 'land') {
+      return 'land';
     } else if (normalizedAdType === 'sale' || normalizedAdType === 'sell') {
+      if (normalizedCategory === 'commercial') {
+        return 'commercialsale';
+      }
       return 'sale';
-    } else {
+    } else if (normalizedAdType === 'rent' || normalizedAdType === 'lease') {
+      if (normalizedCategory === 'commercial') {
+        return 'commercialrent';
+      }
       return 'rent';
     }
-  }, [adType]);
+    
+    // Default to rent (most common)
+    return 'rent';
+  }, [adType, category]);
 
   // Filter out hidden steps based on property type
   const visibleSteps = useMemo(() => {
@@ -62,13 +80,43 @@ export const FormNavigation: React.FC<FormNavigationProps> = ({
         return ['room_details', 'location', 'pg_details'].includes(step.id);
       }
       
-      // For Sale flow
+      // For Residential Sale flow
       if (propertyType === 'sale') {
         // Include basic details, location, and sale specific info
         return ['details', 'location', 'sale'].includes(step.id);
       }
       
-      // For Rent flow
+      // For Commercial Rent flow
+      if (propertyType === 'commercialrent') {
+        // Include basic details, location, and commercial specific info
+        return ['details', 'location', 'commercial'].includes(step.id);
+      }
+      
+      // For Commercial Sale flow
+      if (propertyType === 'commercialsale') {
+        // Include basic details, location, and commercial sale specific info
+        return ['details', 'location', 'commercial_sale'].includes(step.id);
+      }
+      
+      // For Co-working flow
+      if (propertyType === 'coworking') {
+        // Include basic details, location, and co-working specific info
+        return ['details', 'location', 'coworking'].includes(step.id);
+      }
+      
+      // For Land/Plot flow
+      if (propertyType === 'land') {
+        // Include land details, location, and land features
+        return ['land_details', 'location', 'land_features'].includes(step.id);
+      }
+      
+      // For Flatmates flow
+      if (propertyType === 'flatmates') {
+        // Include basic details, location, and flatmate specific info
+        return ['details', 'location', 'flatmate_details'].includes(step.id);
+      }
+      
+      // For Residential Rent flow (default)
       if (propertyType === 'rent') {
         // Include basic details, location, and rental specific info
         return ['details', 'location', 'rental'].includes(step.id);
