@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/PropertyForm/components/StepNavigation.tsx
-// Version: 7.1.0
-// Last Modified: 10-04-2025 18:30 IST
-// Purpose: Fixed PG/Hostel flow navigation to properly go from Room Details to Location tab
+// Version: 7.2.0
+// Last Modified: 12-04-2025 15:45 IST
+// Purpose: Fixed Flatmates flow navigation to properly go from Location to Flatmate Details tab
 
 import React from 'react';
 import { cn } from '@/lib/utils';
@@ -35,10 +35,14 @@ const StepNavigation = ({
   // Only show previous button if not on the first step
   const showPreviousButton = formStep > 1;
 
-  // Determine property type from URL
+  // Determine property type from URL - FIXED: Added Flatmates detection
   const getPropertyType = () => {
     const urlPath = window.location.pathname.toLowerCase();
-    if (urlPath.includes('pghostel')) {
+    // Check for flatmates flow first (new case)
+    if (urlPath.includes('flatmate')) {
+      console.log('Detected FLATMATES flow from URL');
+      return 'flatmates';
+    } else if (urlPath.includes('pghostel')) {
       return 'pghostel';
     } else if (urlPath.includes('sale') || urlPath.includes('sell')) {
       return 'sale';
@@ -47,18 +51,24 @@ const StepNavigation = ({
     }
   };
 
-  // Get the correct flow steps for the current property type
+  // Get the correct flow steps for the current property type - FIXED: Added Flatmates flow steps
   const getFlowSteps = () => {
     const propertyType = getPropertyType();
     
-    // Define the flow steps for each property type
-    if (propertyType === 'pghostel') {
-      // FIX: Use the correct sequence for PG/Hostel flow as defined in flows.ts
-      return ['room_details', 'location', 'pg_details', 'features', 'review', 'photos'];
-    } else if (propertyType === 'sale') {
-      return ['details', 'location', 'sale', 'features', 'review', 'photos'];
-    } else {
-      return ['details', 'location', 'rental', 'features', 'review', 'photos'];
+    // Use switch for better readability
+    switch(propertyType) {
+      case 'flatmates':
+        // Flatmates flow
+        return ['details', 'location', 'flatmate_details', 'features', 'review', 'photos'];
+      case 'pghostel':
+        // PG/Hostel flow
+        return ['room_details', 'location', 'pg_details', 'features', 'review', 'photos'];
+      case 'sale':
+        // Sale flow
+        return ['details', 'location', 'sale', 'features', 'review', 'photos'];
+      default:
+        // Rental flow (default)
+        return ['details', 'location', 'rental', 'features', 'review', 'photos'];
     }
   };
 
@@ -88,10 +98,28 @@ const StepNavigation = ({
     }
   };
   
-  // Custom next button handler
+  // Custom next button handler - FIXED: Added special case handling for flatmates flow
   const onNextClick = () => {
     try {
-      // Extract the base URL without the current step
+      // CRITICAL FIX: Special case for flatmates flow location step
+      if (window.location.pathname.toLowerCase().includes('flatmate') && 
+          currentStepId === 'location') {
+        console.log('CRITICAL FIX: Detected Location step in Flatmates flow');
+        
+        // Extract the base path for flatmates flow
+        const basePath = window.location.pathname.match(/(.*)\/location/)?.[1];
+        if (basePath) {
+          // Form the correct next URL
+          const nextUrl = `${basePath}/flatmate_details`;
+          console.log('Navigating to flatmate_details:', nextUrl);
+          
+          // Use navigate with replace to avoid back button issues
+          navigate(nextUrl, { replace: true });
+          return; // Exit early
+        }
+      }
+      
+      // Standard navigation logic for other cases
       const baseUrl = window.location.pathname.replace(/\/[^\/]*$/, '');
       const flowSteps = getFlowSteps();
       
