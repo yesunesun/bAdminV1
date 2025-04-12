@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/PropertyForm/components/FormContent.tsx
-// Version: 4.2.0
-// Last Modified: 12-04-2025 17:30 IST
-// Purpose: Fixed rental tab display for Commercial Rent flow
+// Version: 4.4.0
+// Last Modified: 12-04-2025 18:45 IST
+// Purpose: Added specialized CommercialFeatures component for Commercial Rent flow
 
 import React from 'react';
 import { UseFormReturn } from 'react-hook-form';
@@ -28,6 +28,9 @@ import CoworkingDetails from '../../sections/CoworkingDetails';
 import LandDetails from '../../sections/LandDetails';
 import LandFeaturesDetails from '../../sections/LandFeaturesDetails';
 import FlatmateDetails from '../../sections/FlatmateDetails';
+
+// Import specialized Commercial Features component
+import CommercialFeatures from '../../sections/CommercialFeatures';
 
 interface FormContentProps {
   form: UseFormReturn<FormData>;
@@ -115,7 +118,7 @@ const FormContent = ({
   
   if (currentStepId === 'rental') {
     // Show rental details for both residential and commercial rent properties
-    // This is the critical change - explicitly check if this is a rent flow
+    // This is the critical change - explicitly check if this is a rent flow including commercial rent
     const isRentFlow = !isSaleMode && !isPGHostelMode && !isCommercialSaleMode && 
                       !isCoworkingMode && !isLandSaleMode && !isFlatmatesMode;
     
@@ -194,22 +197,13 @@ const FormContent = ({
     );
   }
   
-  // Commercial Rent specific section
+  // Commercial Rent specific section - REMOVED from flow, but keeping component for backward compatibility
   if (currentStepId === 'commercial') {
-    // Only show Commercial details for Commercial Rent properties
-    if (!isCommercialRentMode) {
-      return (
-        <div className="py-6 text-center">
-          <p className="text-muted-foreground">This section is not applicable for this property type.</p>
-        </div>
-      );
-    }
-    
+    // This section is now not used in any flow
     return (
-      <CommercialDetails 
-        form={form}
-        adType={effectiveAdType}
-      />
+      <div className="py-6 text-center">
+        <p className="text-muted-foreground">This section is not applicable for this property type.</p>
+      </div>
     );
   }
   
@@ -309,6 +303,17 @@ const FormContent = ({
   
   // Common sections for all property types
   if (currentStepId === 'features') {
+    // For Commercial Rent properties, use specialized Commercial Features component
+    if (isCommercialRentMode) {
+      return (
+        <CommercialFeatures
+          form={form}
+          adType={effectiveAdType}
+        />
+      );
+    }
+    
+    // For all other property types, use standard Amenities section
     return (
       <AmenitiesSection 
         form={form}
