@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/PropertyForm/components/FormContent.tsx
-// Version: 4.0.0
-// Last Modified: 10-04-2025 23:05 IST
-// Purpose: Added support for new property flows: Commercial Sale, Commercial Co-working, Land/Plot Sale, and Residential Flatmates
+// Version: 4.2.0
+// Last Modified: 12-04-2025 17:30 IST
+// Purpose: Fixed rental tab display for Commercial Rent flow
 
 import React from 'react';
 import { UseFormReturn } from 'react-hook-form';
@@ -114,22 +114,26 @@ const FormContent = ({
   }
   
   if (currentStepId === 'rental') {
-    // Only show rental details for residential rental properties
-    if (isSaleMode || isPGHostelMode || isCommercialRentMode || 
-        isCommercialSaleMode || isCoworkingMode || isLandSaleMode || 
-        isFlatmatesMode) {
+    // Show rental details for both residential and commercial rent properties
+    // This is the critical change - explicitly check if this is a rent flow
+    const isRentFlow = !isSaleMode && !isPGHostelMode && !isCommercialSaleMode && 
+                      !isCoworkingMode && !isLandSaleMode && !isFlatmatesMode;
+    
+    // Display rental details for both normal rent and commercial rent
+    if (isRentFlow || isCommercialRentMode) {
       return (
-        <div className="py-6 text-center">
-          <p className="text-muted-foreground">This section is not applicable for this property type.</p>
-        </div>
+        <RentalDetails 
+          form={form}
+          adType={effectiveAdType}
+        />
       );
     }
     
+    // For all other property types, show not applicable message
     return (
-      <RentalDetails 
-        form={form}
-        adType={effectiveAdType}
-      />
+      <div className="py-6 text-center">
+        <p className="text-muted-foreground">This section is not applicable for this property type.</p>
+      </div>
     );
   }
   

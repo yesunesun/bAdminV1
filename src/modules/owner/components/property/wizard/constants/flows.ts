@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/constants/flows.ts
-// Version: 2.0.0
-// Last Modified: 10-04-2025 22:45 IST
-// Purpose: Added four new property flows: Commercial Sale, Commercial Co-working, Land/Plot Sale, and Residential Flatmates
+// Version: 2.1.0
+// Last Modified: 12-04-2025 16:45 IST
+// Purpose: Added rental tab to Commercial Rent flow
 
 import { STEP_DEFINITIONS } from './common';
 
@@ -37,10 +37,11 @@ export const FLOW_STEPS = {
     STEP_DEFINITIONS.photos
   ],
   
-  // Commercial Rent flow (existing)
+  // Commercial Rent flow (updated to include rental tab)
   COMMERCIAL_RENT: [
     STEP_DEFINITIONS.details,
     STEP_DEFINITIONS.location,
+    STEP_DEFINITIONS.rental,
     STEP_DEFINITIONS.commercial,
     STEP_DEFINITIONS.features,
     STEP_DEFINITIONS.review,

@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/components/FormNavigation.tsx
-// Version: 3.0.0
-// Last Modified: 10-04-2025 23:10 IST
-// Purpose: Added support for new property flows: Commercial Sale, Commercial Co-working, Land/Plot Sale, and Residential Flatmates
+// Version: 3.1.0
+// Last Modified: 12-04-2025 18:15 IST
+// Purpose: Added 'rental' tab to Commercial Rent flow
 
 import React, { useMemo } from 'react';
 import { cn } from '@/lib/utils';
@@ -86,10 +86,10 @@ export const FormNavigation: React.FC<FormNavigationProps> = ({
         return ['details', 'location', 'sale'].includes(step.id);
       }
       
-      // For Commercial Rent flow
+      // For Commercial Rent flow - MODIFIED to include 'rental' step
       if (propertyType === 'commercialrent') {
-        // Include basic details, location, and commercial specific info
-        return ['details', 'location', 'commercial'].includes(step.id);
+        // Include basic details, location, rental details, and commercial specific info
+        return ['details', 'location', 'rental', 'commercial'].includes(step.id);
       }
       
       // For Commercial Sale flow
