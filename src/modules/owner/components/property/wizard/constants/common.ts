@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/constants/common.ts
-// Version: 2.3.0
-// Last Modified: 11-04-2025 15:45 IST
-// Purpose: Fixed missing Shop icon by replacing with Store icon
+// Version: 2.4.0
+// Last Modified: 12-04-2025 15:30 IST
+// Purpose: Updated 'Flatmate Preferences' to 'Flatmate Details'
 
 import { 
   Home, 
@@ -110,7 +110,7 @@ export const STEP_DEFINITIONS = {
   // New step definitions for Residential Flatmates flow
   flatmate_details: {
     id: 'flatmate_details',
-    title: 'Flatmate Preferences',
+    title: 'Flatmate Details', // Changed from "Flatmate Preferences" to "Flatmate Details"
     icon: Users,
     description: 'Flatmate preferences and details'
   }
@@ -186,7 +186,7 @@ export const STEPS = [
   },
   {
     id: 'flatmate_details',
-    title: 'Flatmate Preferences',
+    title: 'Flatmate Details', // Changed from "Flatmate Preferences" to "Flatmate Details"
     icon: Users,
     description: 'Flatmate preferences and details'
   },
