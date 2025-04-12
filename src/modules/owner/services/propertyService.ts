@@ -1,7 +1,7 @@
 // src/modules/owner/services/propertyService.ts
-// Version: 4.7.0
-// Last Modified: 07-03-2025 15:30 IST
-// Purpose: Added deleteProperty function to fix property deletion functionality
+// Version: 4.8.0
+// Last Modified: 12-04-2025 10:30 IST
+// Purpose: Added profile check before property creation to fix foreign key constraint error
 
 import { supabase } from '@/lib/supabase';
 import { Property, FormData } from '../components/property/PropertyFormTypes';
@@ -11,6 +11,65 @@ const propertiesCache = new Map<string, {data: Property[], timestamp: number}>()
 const CACHE_EXPIRY = 60000; // 1 minute cache expiry
 
 export const propertyService = {
+  // Ensure user profile exists before creating property
+  async ensureUserProfile(userId: string): Promise<boolean> {
+    try {
+      console.log('Checking if user profile exists for:', userId);
+      
+      // First check if the profile already exists
+      const { data: existingProfile, error: checkError } = await supabase
+        .from('profiles')
+        .select('id, email')
+        .eq('id', userId)
+        .single();
+      
+      if (!checkError && existingProfile) {
+        console.log('Profile already exists:', existingProfile.id);
+        return true;
+      }
+      
+      // If profile doesn't exist, get user's email from auth
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError || !userData.user) {
+        console.error('Failed to get auth user data:', userError);
+        return false;
+      }
+      
+      const userEmail = userData.user.email;
+      if (!userEmail) {
+        console.error('User email not available in auth data');
+        return false;
+      }
+      
+      // Create new profile
+      console.log('Creating missing profile for user:', userId);
+      const { data: newProfile, error: insertError } = await supabase
+        .from('profiles')
+        .insert([
+          {
+            id: userId,
+            email: userEmail,
+            role: 'property_owner', // Default role for property owners
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }
+        ])
+        .select()
+        .single();
+      
+      if (insertError) {
+        console.error('Failed to create profile:', insertError);
+        return false;
+      }
+      
+      console.log('Successfully created profile:', newProfile.id);
+      return true;
+    } catch (error) {
+      console.error('Error in ensureUserProfile:', error);
+      return false;
+    }
+  },
+
   // Fetch a user's properties with caching
   async getUserProperties(userId: string, forceRefresh = false): Promise<Property[]> {
     // Check cache first if not forcing refresh
@@ -267,6 +326,12 @@ export const propertyService = {
       console.log('=========== DEBUG: CREATE PROPERTY START ===========');
       console.log('Creating property with status:', status);
       
+      // IMPORTANT: Ensure user profile exists before creating property
+      const profileExists = await this.ensureUserProfile(userId);
+      if (!profileExists) {
+        throw new Error('Failed to ensure user profile exists. Cannot create property without user profile.');
+      }
+      
       // Ensure flatPlotNo field is included in the property details
       console.log('flatPlotNo value:', propertyData.flatPlotNo);
       
@@ -375,6 +440,13 @@ export const propertyService = {
     try {
       console.log('=========== DEBUG: UPDATE PROPERTY START ===========');
       console.log('Updating property:', propertyId);
+      
+      // IMPORTANT: Ensure user profile exists before updating property
+      const profileExists = await this.ensureUserProfile(userId);
+      if (!profileExists) {
+        throw new Error('Failed to ensure user profile exists. Cannot update property without user profile.');
+      }
+      
       console.log('flatPlotNo value:', propertyData.flatPlotNo);
       
       // Determine if this is a sale property
@@ -499,6 +571,12 @@ export const propertyService = {
   ): Promise<void> {
     try {
       console.log(`Updating property ${propertyId} status to ${status}`);
+      
+      // IMPORTANT: Ensure user profile exists before updating status
+      const profileExists = await this.ensureUserProfile(userId);
+      if (!profileExists) {
+        throw new Error('Failed to ensure user profile exists. Cannot update property status.');
+      }
       
       const updateData = {
         status,
