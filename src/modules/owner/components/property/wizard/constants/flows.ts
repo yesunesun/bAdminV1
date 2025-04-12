@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/constants/flows.ts
-// Version: 2.1.0
-// Last Modified: 12-04-2025 16:45 IST
-// Purpose: Added rental tab to Commercial Rent flow
+// Version: 2.2.0
+// Last Modified: 12-04-2025 17:30 IST
+// Purpose: Removed Commercial Details tab from Commercial Rent flow
 
 import { STEP_DEFINITIONS } from './common';
 
@@ -37,12 +37,11 @@ export const FLOW_STEPS = {
     STEP_DEFINITIONS.photos
   ],
   
-  // Commercial Rent flow (updated to include rental tab)
+  // Commercial Rent flow (updated to remove commercial tab)
   COMMERCIAL_RENT: [
     STEP_DEFINITIONS.details,
     STEP_DEFINITIONS.location,
     STEP_DEFINITIONS.rental,
-    STEP_DEFINITIONS.commercial,
     STEP_DEFINITIONS.features,
     STEP_DEFINITIONS.review,
     STEP_DEFINITIONS.photos

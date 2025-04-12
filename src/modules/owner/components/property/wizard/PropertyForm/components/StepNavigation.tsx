@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/PropertyForm/components/StepNavigation.tsx
-// Version: 7.2.0
-// Last Modified: 12-04-2025 15:45 IST
-// Purpose: Fixed Flatmates flow navigation to properly go from Location to Flatmate Details tab
+// Version: 7.3.0
+// Last Modified: 12-04-2025 17:45 IST
+// Purpose: Updated commercial rent flow to exclude commercial details tab
 
 import React from 'react';
 import { cn } from '@/lib/utils';
@@ -44,6 +44,14 @@ const StepNavigation = ({
       return 'flatmates';
     } else if (urlPath.includes('pghostel')) {
       return 'pghostel';
+    } else if (urlPath.includes('commercial') && (urlPath.includes('sale') || urlPath.includes('sell'))) {
+      return 'commercial_sale';
+    } else if (urlPath.includes('commercial') && (urlPath.includes('rent') || urlPath.includes('lease'))) {
+      return 'commercial_rent';
+    } else if (urlPath.includes('coworking') || urlPath.includes('co-working')) {
+      return 'coworking';
+    } else if (urlPath.includes('land') || urlPath.includes('plot')) {
+      return 'land_sale';
     } else if (urlPath.includes('sale') || urlPath.includes('sell')) {
       return 'sale';
     } else {
@@ -51,7 +59,7 @@ const StepNavigation = ({
     }
   };
 
-  // Get the correct flow steps for the current property type - FIXED: Added Flatmates flow steps
+  // Get the correct flow steps for the current property type - UPDATED: Added Commercial Rent flow without commercial details
   const getFlowSteps = () => {
     const propertyType = getPropertyType();
     
@@ -63,6 +71,18 @@ const StepNavigation = ({
       case 'pghostel':
         // PG/Hostel flow
         return ['room_details', 'location', 'pg_details', 'features', 'review', 'photos'];
+      case 'commercial_rent':
+        // Commercial Rent flow (updated to remove commercial details tab)
+        return ['details', 'location', 'rental', 'features', 'review', 'photos'];
+      case 'commercial_sale':
+        // Commercial Sale flow
+        return ['details', 'location', 'commercial_sale', 'features', 'review', 'photos'];
+      case 'coworking':
+        // Co-working flow
+        return ['details', 'location', 'coworking', 'features', 'review', 'photos'];
+      case 'land_sale':
+        // Land/Plot flow
+        return ['land_details', 'location', 'land_features', 'review', 'photos'];
       case 'sale':
         // Sale flow
         return ['details', 'location', 'sale', 'features', 'review', 'photos'];

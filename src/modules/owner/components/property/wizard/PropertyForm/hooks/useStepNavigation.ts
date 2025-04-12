@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/PropertyForm/hooks/useStepNavigation.ts
-// Version: 8.0.0
-// Last Modified: 10-04-2025 22:50 IST
-// Purpose: Added support for four new property flows: Commercial Sale, Commercial Co-working, Land/Plot Sale, and Residential Flatmates
+// Version: 8.1.0
+// Last Modified: 12-04-2025 17:30 IST
+// Purpose: Removed Commercial Details from Commercial Rent step sequence
 
 import { useMemo, useCallback, useEffect } from 'react';
 import { UseFormReturn } from 'react-hook-form';
@@ -267,8 +267,8 @@ export function useStepNavigation({
     // Sale sequence
     sale: ['details', 'location', 'sale', 'features', 'review', 'photos'],
     
-    // Commercial Rent sequence
-    commercialRent: ['details', 'location', 'commercial', 'features', 'review', 'photos'],
+    // Commercial Rent sequence (updated to remove commercial details)
+    commercialRent: ['details', 'location', 'rental', 'features', 'review', 'photos'],
     
     // Commercial Sale sequence
     commercialSale: ['details', 'location', 'commercial_sale', 'features', 'review', 'photos'],
@@ -386,7 +386,7 @@ export function useStepNavigation({
       ...step,
       hidden: 
         // Rental step hidden for non-rental flows
-        (step.id === 'rental' && (isSaleMode || isPGHostelMode || isCommercialRentMode || 
+        (step.id === 'rental' && (isSaleMode || isPGHostelMode || 
                                  isCommercialSaleMode || isCoworkingMode || isLandSaleMode || 
                                  isFlatmatesMode)) || 
         // Sale step hidden for non-sale flows
@@ -398,8 +398,8 @@ export function useStepNavigation({
         // PG/Hostel steps hidden for non-PG/Hostel flows
         (step.id === 'room_details' && !isPGHostelMode) ||
         (step.id === 'pg_details' && !isPGHostelMode) ||
-        // Commercial details step hidden for non-Commercial Rent flows
-        (step.id === 'commercial' && !isCommercialRentMode) ||
+        // Commercial details step hidden for all flows (removed step)
+        (step.id === 'commercial') ||
         // Commercial sale step hidden for non-Commercial Sale flows
         (step.id === 'commercial_sale' && !isCommercialSaleMode) ||
         // Co-working step hidden for non-Co-working flows
