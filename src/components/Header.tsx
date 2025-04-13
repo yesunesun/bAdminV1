@@ -1,7 +1,7 @@
 // src/components/Header.tsx
-// Version: 4.1.0
-// Last Modified: 06-04-2025 17:30 IST
-// Purpose: Add /browse link in the header
+// Version: 5.0.0
+// Last Modified: 14-04-2025 08:45 IST
+// Purpose: Fix "List My Property" navigation with a hard redirect approach
 
 import React, { useEffect, useState, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
@@ -100,6 +100,29 @@ export function Header({ onFavoritesClick }: HeaderProps) {
     } catch (error) {
       console.error('Error signing out:', error);
     }
+  };
+
+  // Function to handle List Property with a hard navigation
+  const handleListPropertyClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    
+    // First, clear any stored wizard data
+    const userId = localStorage.getItem('userId');
+    if (userId) {
+      localStorage.removeItem(`propertyWizard_${userId}_data`);
+      localStorage.removeItem(`propertyWizard_${userId}_step`);
+    }
+    
+    // Set a reset flag in localStorage
+    localStorage.setItem('resetPropertyWizard', 'true');
+    
+    // Close dropdown
+    setIsProfileDropdownOpen(false);
+    
+    // Use window.location for a hard navigation that will fully reset React state
+    // Add a timestamp to force a fresh load and prevent caching
+    const timestamp = new Date().getTime();
+    window.location.href = `/properties/list?reset=${timestamp}`;
   };
 
   // Get theme icon based on current theme
@@ -253,14 +276,14 @@ export function Header({ onFavoritesClick }: HeaderProps) {
                       <Search className="h-4 w-4 mr-2" />
                       Browse Properties
                     </Link>
-                    <Link 
-                      to="/properties/list" 
-                      className="flex w-full items-center px-4 py-2 text-sm text-foreground hover:bg-accent"
-                      onClick={() => setIsProfileDropdownOpen(false)}
+                    {/* Use button with onClick for hard navigation */}
+                    <button 
+                      onClick={handleListPropertyClick}
+                      className="flex w-full items-center px-4 py-2 text-sm text-foreground hover:bg-accent text-left"
                     >
                       <Home className="h-4 w-4 mr-2" />
                       List My Property
-                    </Link>
+                    </button>
                     <Link 
                       to="/properties" 
                       className="flex w-full items-center px-4 py-2 text-sm text-foreground hover:bg-accent"

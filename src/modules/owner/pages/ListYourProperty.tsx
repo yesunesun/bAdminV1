@@ -1,34 +1,60 @@
 // src/modules/owner/pages/ListYourProperty.tsx
-// Version: 1.0.0
-// Last Modified: 07-04-2025 17:00 IST
-// Purpose: Fix routing issue with property listing wizard
+// Version: 2.0.0
+// Last Modified: 14-04-2025 08:45 IST
+// Purpose: Fully reset wizard state when accessed with reset parameter
 
 import React, { useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { PropertyForm } from '@/modules/owner/components/property/wizard/PropertyForm/index';
 
 export default function ListYourProperty() {
   const { category, type, step } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  // Add debugging for development
+  // Process reset parameter and localStorage flag on mount
   useEffect(() => {
-    console.log('ListYourProperty params:', { category, type, step });
+    // Check if reset parameter exists
+    const hasResetParam = searchParams.has('reset');
+    const resetFlag = localStorage.getItem('resetPropertyWizard');
+
+    console.log('ListYourProperty mounted with params:', { 
+      category, 
+      type, 
+      step,
+      hasResetParam,
+      resetFlag,
+      pathname: location.pathname
+    });
+
+    // Clear any reset flags and parameters
+    if (hasResetParam) {
+      // Remove the reset parameter from URL
+      searchParams.delete('reset');
+      setSearchParams(searchParams);
+    }
     
-    // Clear any stored form data on component mount
-    const userId = localStorage.getItem('userId');
-    if (userId) {
-      localStorage.removeItem(`propertyWizard_${userId}_data`);
-      localStorage.removeItem(`propertyWizard_${userId}_step`);
+    if (resetFlag === 'true') {
+      // Clear the localStorage flag
+      localStorage.removeItem('resetPropertyWizard');
+      
+      // If we're in a deep path and not already at the root listing path, redirect to it
+      if ((category || type || step) && location.pathname !== '/properties/list') {
+        console.log('Redirecting to /properties/list due to reset flag');
+        navigate('/properties/list', { replace: true });
+        return;
+      }
     }
 
-    // Fix for navigation: If no step specified, redirect to details step
+    // If we have category and type but no step, add details step
     if (category && type && !step) {
       console.log('No step specified, redirecting to details step');
       navigate(`/properties/list/${category.toLowerCase()}/${type.toLowerCase()}/details`, { replace: true });
     }
-  }, [category, type, step, navigate]);
+  }, [category, type, step, navigate, searchParams, setSearchParams, location.pathname]);
 
+  // Function to handle property type selection
   const handlePropertyTypeSelect = (selectedCategory: string, selectedType: string, selectedCity: string) => {
     console.log('PropertyType selection:', { selectedCategory, selectedType, selectedCity });
     

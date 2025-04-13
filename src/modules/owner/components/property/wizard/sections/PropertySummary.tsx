@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/PropertySummary.tsx
-// Version: 3.7.0
-// Last Modified: 10-04-2025 22:30 IST
-// Purpose: Added support for Commercial Rent properties in summary view
+// Version: 3.8.0
+// Last Modified: 14-04-2025 10:30 IST
+// Purpose: Removed Save to Draft button from Review tab
 
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -269,22 +269,7 @@ export function PropertySummary({
 
     return (
       <div className="flex gap-3">
-        <button
-          type="button"
-          onClick={onSaveAsDraft}
-          className={cn(
-            "flex items-center px-6 py-3 rounded-lg",
-            "text-sm font-medium",
-            "bg-secondary text-secondary-foreground",
-            "hover:bg-secondary/90 transition-colors",
-            "focus:outline-none focus:ring-2 focus:ring-ring",
-            "disabled:opacity-50"
-          )}
-          disabled={saving || isSaving}
-        >
-          <FileEdit className="h-4 w-4 mr-2" />
-          Save to Draft
-        </button>
+        {/* "Save to Draft" button removed as requested */}
         <button
           type="button"
           onClick={isNewListing ? handleSaveAndNavigateToPhotos : onSaveAndPublish}
