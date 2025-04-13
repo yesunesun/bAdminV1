@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/PropertyForm/index.tsx
-// Version: 6.0.0
-// Last Modified: 10-04-2025 23:00 IST
-// Purpose: Added support for new property flows: Commercial Sale, Commercial Co-working, Land/Plot Sale, and Residential Flatmates
+// Version: 6.1.0
+// Last Modified: 13-04-2025 21:00 IST
+// Purpose: Fixed reference error for handlePreviousStep
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -252,6 +252,17 @@ export function PropertyForm({
     STEPS: flowSteps // Use flow-specific steps
   });
 
+  // Define a safe handlePreviousStep function that won't cause reference errors
+  const safePreviousStep = () => {
+    if (typeof handlePreviousStep === 'function') {
+      handlePreviousStep();
+    } else {
+      // Fallback to basic navigation
+      const prevStep = Math.max(formStep - 1, 1);
+      setCurrentStep(prevStep);
+    }
+  };
+
   // Function to handle type selection completion
   const handleTypeSelectionComplete = (category: string, adType: string, city: string) => {
     console.log('Type selection complete:', { category, adType, city });
@@ -362,7 +373,7 @@ export function PropertyForm({
               isCoworkingMode={isCoworkingMode}
               isLandSaleMode={isLandSaleMode}
               isFlatmatesMode={isFlatmatesMode}
-              handlePreviousStep={handlePreviousStep}
+              handlePreviousStep={safePreviousStep}
               handleSaveAsDraft={handleSaveAsDraft}
               handleSaveAndPublish={handleSaveAndPublish}
               handleUpdate={handleUpdate}
@@ -376,7 +387,7 @@ export function PropertyForm({
             <StepNavigation 
               formStep={formStep}
               STEPS={flowSteps}
-              handlePreviousStep={handlePreviousStep}
+              handlePreviousStep={safePreviousStep}
               handleNextStep={handleNextStep}
             />
           </div>

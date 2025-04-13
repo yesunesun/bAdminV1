@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/hooks/usePropertyFormNavigation.ts
-// Version: 2.3.0
-// Last Modified: 10-04-2025 16:45 IST
-// Purpose: Fixed PG/Hostel flow navigation issue to ensure Location tab follows Room Details
+// Version: 2.5.0
+// Last Modified: 14-04-2025 11:30 IST
+// Purpose: Added handlePreviousStep implementation to fix reference error
 
 import { useState, useCallback, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
@@ -166,9 +166,10 @@ export function usePropertyFormNavigation({
     }
   }, [user?.id, mode, existingPropertyId]);
 
-  // Simplified next step handler - FIXED to properly follow PG/Hostel flow
+  // Simplified next step handler - Updated to validate before proceeding
   const handleNextStep = useCallback(() => {
     try {
+      // Validate current step before proceeding
       if (!validateCurrentStep()) {
         setError('Please fill in all required fields');
         return;
@@ -206,7 +207,7 @@ export function usePropertyFormNavigation({
     }
   }, [currentStep, form, saveFormToStorage, setCurrentStepWithPersistence, validateCurrentStep, setError, effectiveSteps, isPGHostelMode]);
 
-  // Simplified previous step handler - FIXED to properly follow PG/Hostel flow
+  // Added handlePreviousStep implementation - this was missing before
   const handlePreviousStep = useCallback(() => {
     try {
       if (!form || typeof form.getValues !== 'function') {
@@ -223,8 +224,10 @@ export function usePropertyFormNavigation({
       
       saveFormToStorage(safeFormData);
       
-      // Always use effectiveSteps to determine the flow
+      // Calculate previous step
       const prevStep = Math.max(currentStep - 1, 1);
+      
+      // Update the current step with persistence
       setCurrentStepWithPersistence(prevStep);
       
       // Add debug logging
@@ -270,6 +273,7 @@ export function usePropertyFormNavigation({
     handlePreviousStep,
     clearStorage,
     handleImageUploadComplete,
-    saveFormToStorage
+    saveFormToStorage,
+    validateCurrentStep
   };
 }
