@@ -1,25 +1,32 @@
 // src/modules/owner/components/property/wizard/sections/CommercialSaleDetails.tsx
-// Version: 1.0.0
-// Last Modified: 10-04-2025 23:15 IST
-// Purpose: Commercial Sale details form section for the Commercial Sale property flow
+// Version: 1.6.0
+// Last Modified: 13-04-2025 19:15 IST
+// Purpose: Fixed create new tag button styling to match design
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { FormSection } from '@/components/FormSection';
 import { RequiredLabel } from '@/components/ui/RequiredLabel';
 import { Input } from '@/components/ui/input';
-import { Select } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 import { FormSectionProps } from '../types';
-import { 
-  COMMERCIAL_SALE_PROPERTY_TYPES, 
-  COMMERCIAL_PRICE_OPTIONS, 
-  COMMERCIAL_OWNERSHIP_OPTIONS,
-  TRANSACTION_TYPES,
-  APPROVED_USAGE_TYPES,
-  PROPERTY_STATUS_OPTIONS,
-  TITLE_DEED_STATUS
-} from '../constants/commercialSaleDetails';
+
+// Ownership type options
+const OWNERSHIP_TYPES = [
+  'Self Owned',
+  'Rented',
+  'Leased',
+  'Company Owned',
+  'Others'
+];
+
+// Predefined ideal for tags
+const PREDEFINED_IDEAL_TAGS = [
+  'Bank',
+  'Service Center',
+  'Show Room',
+  'ATM',
+  'Retail'
+];
 
 const CommercialSaleDetails: React.FC<FormSectionProps> = ({ 
   form,
@@ -27,318 +34,197 @@ const CommercialSaleDetails: React.FC<FormSectionProps> = ({
 }) => {
   const { register, watch, setValue, formState: { errors } } = form;
   
-  // Watch for property status to conditionally show fields
-  const propertyStatus = watch('propertyStatus');
-  const isUnderConstruction = propertyStatus === 'Under Construction';
+  // State for custom tags management
+  const [customTagInput, setCustomTagInput] = useState('');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   
-  // Calculate price per sq. ft automatically
+  // Watch for expected price and negotiable checkbox
   const expectedPrice = watch('expectedPrice');
-  const builtUpArea = watch('builtUpArea');
+  const isNegotiable = watch('isNegotiable');
   
-  React.useEffect(() => {
-    if (expectedPrice && builtUpArea && !isNaN(Number(expectedPrice)) && !isNaN(Number(builtUpArea))) {
-      const pricePerSqFt = Math.round(Number(expectedPrice) / Number(builtUpArea));
-      setValue('pricePerSqFt', pricePerSqFt.toString());
+  // Function to convert number to Indian currency format (e.g. 2500000 to "₹ 25 Lacs")
+  const formatToIndianCurrency = (value: number): string => {
+    if (!value) return '';
+    
+    if (value >= 10000000) {
+      return `₹ ${(value / 10000000).toFixed(2)} Crores`;
+    } else if (value >= 100000) {
+      return `₹ ${(value / 100000).toFixed(0)} Lacs`;
+    } else if (value >= 1000) {
+      return `₹ ${(value / 1000).toFixed(0)} Thousand`;
+    } else {
+      return `₹ ${value}`;
     }
-  }, [expectedPrice, builtUpArea, setValue]);
-
+  };
+  
+  // Handle tag selection toggle
+  const handleTagToggle = (tag: string) => {
+    setSelectedTags(prev => {
+      if (prev.includes(tag)) {
+        return prev.filter(t => t !== tag);
+      } else {
+        return [...prev, tag];
+      }
+    });
+  };
+  
+  // Add custom tag
+  const handleAddCustomTag = () => {
+    if (customTagInput && !selectedTags.includes(customTagInput)) {
+      setSelectedTags(prev => [...prev, customTagInput]);
+      setCustomTagInput('');
+    }
+  };
+  
+  // Update form value when selected tags change
+  useEffect(() => {
+    setValue('idealFor', selectedTags);
+  }, [selectedTags, setValue]);
+  
   return (
     <FormSection
       title="Commercial Sale Details"
       description="Provide details about your commercial property for sale"
     >
       <div className="space-y-6">
-        {/* Property Type */}
-        <div className="grid gap-3">
-          <RequiredLabel htmlFor="commercialPropertyType">
-            Commercial Property Type
-          </RequiredLabel>
-          <Select
-            id="commercialPropertyType"
-            placeholder="Select property type"
-            error={errors.commercialPropertyType?.message}
-            {...register('commercialPropertyType')}
-          >
-            <option value="">Select property type</option>
-            {COMMERCIAL_SALE_PROPERTY_TYPES.map((type) => (
-              <option key={type} value={type}>
-                {type}
-              </option>
-            ))}
-          </Select>
-        </div>
-        
-        {/* Price details */}
-        <div className="grid md:grid-cols-2 gap-4">
-          <div className="grid gap-3">
+        <div className="grid md:grid-cols-2 gap-6">
+          {/* Expected Price */}
+          <div className="space-y-2">
             <RequiredLabel htmlFor="expectedPrice">
-              Expected Price (₹)
+              Expected Price
             </RequiredLabel>
-            <Input
-              id="expectedPrice"
-              type="number"
-              placeholder="e.g., 25000000"
-              error={errors.expectedPrice?.message}
-              {...register('expectedPrice')}
-            />
+            <div className="relative">
+              <Input
+                id="expectedPrice"
+                type="number"
+                placeholder="7500000"
+                className="pl-8"
+                error={errors.expectedPrice?.message}
+                {...register('expectedPrice')}
+              />
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">₹</span>
+            </div>
+            {expectedPrice && !isNaN(Number(expectedPrice)) && (
+              <p className="text-sm text-teal-500 text-right">
+                {formatToIndianCurrency(Number(expectedPrice))}
+              </p>
+            )}
+            <div className="flex items-center space-x-2 pt-1">
+              <input
+                type="radio"
+                id="isNegotiable"
+                className="h-4 w-4 text-primary border-gray-300 focus:ring-primary"
+                {...register('isNegotiable')}
+              />
+              <label
+                htmlFor="isNegotiable"
+                className="text-sm text-gray-600 font-medium"
+              >
+                Price Negotiable
+              </label>
+            </div>
           </div>
           
-          <div className="grid gap-3">
-            <RequiredLabel htmlFor="pricePerSqFt">
-              Price Per Sq. Ft. (₹)
-            </RequiredLabel>
-            <Input
-              id="pricePerSqFt"
-              type="number"
-              placeholder="Auto-calculated"
-              error={errors.pricePerSqFt?.message}
-              {...register('pricePerSqFt')}
-              readOnly
-            />
-          </div>
-        </div>
-        
-        {/* Price Options */}
-        <div className="grid gap-3">
-          <RequiredLabel htmlFor="priceOption">
-            Price Option
-          </RequiredLabel>
-          <Select
-            id="priceOption"
-            placeholder="Select price option"
-            error={errors.priceOption?.message}
-            {...register('priceOption')}
-          >
-            <option value="">Select price option</option>
-            {COMMERCIAL_PRICE_OPTIONS.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </Select>
-        </div>
-        
-        {/* Ownership details */}
-        <div className="grid md:grid-cols-2 gap-4">
-          <div className="grid gap-3">
+          {/* Ownership Type - implemented as radio buttons */}
+          <div className="space-y-2">
             <RequiredLabel htmlFor="ownershipType">
               Ownership Type
             </RequiredLabel>
-            <Select
-              id="ownershipType"
-              placeholder="Select ownership type"
-              error={errors.ownershipType?.message}
-              {...register('ownershipType')}
-            >
-              <option value="">Select ownership type</option>
-              {COMMERCIAL_OWNERSHIP_OPTIONS.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
+            <div className="space-y-2">
+              {OWNERSHIP_TYPES.map((type) => (
+                <div key={type} className="flex items-center space-x-2">
+                  <input
+                    type="radio"
+                    id={`ownershipType_${type}`}
+                    value={type}
+                    className="h-4 w-4 text-primary border-gray-300 focus:ring-primary"
+                    {...register('ownershipType')}
+                  />
+                  <label
+                    htmlFor={`ownershipType_${type}`}
+                    className="text-sm font-medium text-gray-700"
+                  >
+                    {type}
+                  </label>
+                </div>
               ))}
-            </Select>
+            </div>
+          </div>
+        </div>
+        
+        {/* Available From - removed right icon */}
+        <div className="space-y-2">
+          <RequiredLabel htmlFor="availableFrom">
+            Available From
+          </RequiredLabel>
+          <div className="relative">
+            <Input
+              id="availableFrom"
+              type="date"
+              placeholder="Select date"
+              error={errors.availableFrom?.message}
+              {...register('availableFrom')}
+              className="w-full md:w-1/2"
+            />
+          </div>
+        </div>
+        
+        {/* Ideal For */}
+        <div className="space-y-2">
+          <div className="flex items-center">
+            <span className="text-sm font-medium">Ideal For</span>
+            <span className="ml-1 text-gray-400">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="16" x2="12" y2="12"></line>
+                <line x1="12" y1="8" x2="12" y2="8"></line>
+              </svg>
+            </span>
           </div>
           
-          <div className="grid gap-3">
-            <RequiredLabel htmlFor="transactionType">
-              Transaction Type
-            </RequiredLabel>
-            <Select
-              id="transactionType"
-              placeholder="Select transaction type"
-              error={errors.transactionType?.message}
-              {...register('transactionType')}
-            >
-              <option value="">Select transaction type</option>
-              {TRANSACTION_TYPES.map((type) => (
-                <option key={type} value={type}>
-                  {type}
-                </option>
-              ))}
-            </Select>
-          </div>
-        </div>
-        
-        {/* Property Status */}
-        <div className="grid gap-3">
-          <RequiredLabel htmlFor="propertyStatus">
-            Property Status
-          </RequiredLabel>
-          <Select
-            id="propertyStatus"
-            placeholder="Select property status"
-            error={errors.propertyStatus?.message}
-            {...register('propertyStatus')}
-          >
-            <option value="">Select property status</option>
-            {PROPERTY_STATUS_OPTIONS.map((status) => (
-              <option key={status} value={status}>
-                {status}
-              </option>
-            ))}
-          </Select>
-        </div>
-        
-        {/* Conditional fields based on property status */}
-        {isUnderConstruction ? (
-          <div className="grid md:grid-cols-2 gap-4">
-            <div className="grid gap-3">
-              <RequiredLabel htmlFor="possessionDate">
-                Expected Possession Date
-              </RequiredLabel>
-              <Input
-                id="possessionDate"
-                type="date"
-                placeholder="Select date"
-                error={errors.possessionDate?.message}
-                {...register('possessionDate')}
-              />
-            </div>
-            
-            <div className="grid gap-3">
-              <RequiredLabel htmlFor="completionStatus">
-                Construction Status
-              </RequiredLabel>
-              <Select
-                id="completionStatus"
-                placeholder="Select completion status"
-                error={errors.completionStatus?.message}
-                {...register('completionStatus')}
+          {/* Tag selection area */}
+          <div className="flex flex-wrap gap-2">
+            {PREDEFINED_IDEAL_TAGS.map(tag => (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => handleTagToggle(tag)}
+                className={cn(
+                  "px-4 py-2 text-sm rounded-sm",
+                  selectedTags.includes(tag)
+                    ? "bg-teal-500 text-white"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                )}
               >
-                <option value="">Select completion status</option>
-                {PROPERTY_STATUS_OPTIONS.map((status) => (
-                  <option key={status} value={status}>
-                    {status}
-                  </option>
-                ))}
-              </Select>
-            </div>
-          </div>
-        ) : (
-          <div className="grid md:grid-cols-2 gap-4">
-            <div className="grid gap-3">
-              <RequiredLabel htmlFor="propertyAge">
-                Property Age (in years)
-              </RequiredLabel>
-              <Input
-                id="propertyAge"
-                type="number"
-                placeholder="e.g., 2"
-                error={errors.propertyAge?.message}
-                {...register('propertyAge')}
-              />
-            </div>
-            
-            <div className="grid gap-3">
-              <RequiredLabel htmlFor="availableFrom">
-                Available From
-              </RequiredLabel>
-              <Input
-                id="availableFrom"
-                type="date"
-                placeholder="Select date"
-                error={errors.availableFrom?.message}
-                {...register('availableFrom')}
-              />
-            </div>
-          </div>
-        )}
-        
-        {/* Approved Usage */}
-        <div className="grid gap-3">
-          <RequiredLabel htmlFor="approvedUsage">
-            Approved Usage
-          </RequiredLabel>
-          <Select
-            id="approvedUsage"
-            placeholder="Select approved usage"
-            error={errors.approvedUsage?.message}
-            {...register('approvedUsage')}
-          >
-            <option value="">Select approved usage</option>
-            {APPROVED_USAGE_TYPES.map((type) => (
-              <option key={type} value={type}>
-                {type}
-              </option>
+                {tag}
+              </button>
             ))}
-          </Select>
-        </div>
-        
-        {/* Title deed status */}
-        <div className="grid gap-3">
-          <RequiredLabel htmlFor="titleDeedStatus">
-            Title Deed Status
-          </RequiredLabel>
-          <Select
-            id="titleDeedStatus"
-            placeholder="Select title deed status"
-            error={errors.titleDeedStatus?.message}
-            {...register('titleDeedStatus')}
-          >
-            <option value="">Select title deed status</option>
-            {TITLE_DEED_STATUS.map((status) => (
-              <option key={status} value={status}>
-                {status}
-              </option>
-            ))}
-          </Select>
-        </div>
-        
-        {/* Additional Options */}
-        <div className="space-y-4">
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="hasMaintenanceCharges"
-              {...register('hasMaintenanceCharges')}
-            />
-            <label
-              htmlFor="hasMaintenanceCharges"
-              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-            >
-              Include maintenance charges
-            </label>
           </div>
           
-          {watch('hasMaintenanceCharges') && (
-            <div className="grid gap-3 pl-6">
-              <RequiredLabel htmlFor="maintenanceAmount">
-                Maintenance Amount (₹)
-              </RequiredLabel>
-              <Input
-                id="maintenanceAmount"
-                type="number"
-                placeholder="e.g., 5000"
-                error={errors.maintenanceAmount?.message}
-                {...register('maintenanceAmount')}
-              />
-            </div>
-          )}
-          
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="fireSafety"
-              {...register('fireSafety')}
+          {/* Improved custom tag input and button layout */}
+          <div className="flex mt-2">
+            <Input
+              placeholder="Add other tags"
+              value={customTagInput}
+              onChange={(e) => setCustomTagInput(e.target.value)}
+              className="flex-grow rounded-r-none"
             />
-            <label
-              htmlFor="fireSafety"
-              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            <button
+              type="button"
+              onClick={handleAddCustomTag}
+              className="px-4 py-2 bg-blue-500 text-white rounded-l-none rounded-r-md"
             >
-              Fire safety measures installed
-            </label>
+              Create
+            </button>
           </div>
           
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="centralizedAC"
-              {...register('centralizedAC')}
-            />
-            <label
-              htmlFor="centralizedAC"
-              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-            >
-              Centralized AC
-            </label>
-          </div>
+          {/* Hidden input to store selected tags */}
+          <input 
+            type="hidden" 
+            {...register('idealFor')} 
+            id="idealFor" 
+            value={selectedTags.join(',')} 
+          />
         </div>
       </div>
     </FormSection>

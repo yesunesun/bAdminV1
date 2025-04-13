@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/PropertyForm/components/StepNavigation.tsx
-// Version: 7.3.0
-// Last Modified: 12-04-2025 17:45 IST
-// Purpose: Updated commercial rent flow to exclude commercial details tab
+// Version: 7.4.0
+// Last Modified: 13-04-2025 16:30 IST
+// Purpose: Fixed navigation issue in Commercial Sale flow
 
 import React from 'react';
 import { cn } from '@/lib/utils';
@@ -45,6 +45,7 @@ const StepNavigation = ({
     } else if (urlPath.includes('pghostel')) {
       return 'pghostel';
     } else if (urlPath.includes('commercial') && (urlPath.includes('sale') || urlPath.includes('sell'))) {
+      console.log('Detected COMMERCIAL SALE flow from URL');
       return 'commercial_sale';
     } else if (urlPath.includes('commercial') && (urlPath.includes('rent') || urlPath.includes('lease'))) {
       return 'commercial_rent';
@@ -118,7 +119,7 @@ const StepNavigation = ({
     }
   };
   
-  // Custom next button handler - FIXED: Added special case handling for flatmates flow
+  // Custom next button handler - FIXED: Added special case handling for flatmates flow and commercial sale flow
   const onNextClick = () => {
     try {
       // CRITICAL FIX: Special case for flatmates flow location step
@@ -132,6 +133,26 @@ const StepNavigation = ({
           // Form the correct next URL
           const nextUrl = `${basePath}/flatmate_details`;
           console.log('Navigating to flatmate_details:', nextUrl);
+          
+          // Use navigate with replace to avoid back button issues
+          navigate(nextUrl, { replace: true });
+          return; // Exit early
+        }
+      }
+      
+      // CRITICAL FIX: Special case for commercial sale flow
+      if (window.location.pathname.toLowerCase().includes('commercial') && 
+          window.location.pathname.toLowerCase().includes('sale') && 
+          currentStepId === 'location') {
+        console.log('CRITICAL FIX: Detected Location step in Commercial Sale flow');
+        
+        // Extract the base path for commercial sale flow
+        const basePath = window.location.pathname.match(/(.*)\/location/)?.[1];
+        if (basePath) {
+          // Form the correct next URL without 'rental' in the path
+          const properPath = basePath.replace(/\/rental$/, '');
+          const nextUrl = `${properPath}/commercial_sale`;
+          console.log('Navigating to commercial_sale:', nextUrl);
           
           // Use navigate with replace to avoid back button issues
           navigate(nextUrl, { replace: true });
