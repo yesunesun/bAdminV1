@@ -1,6 +1,7 @@
 // src/pages/Login.tsx
-// Version: 1.7.0
-// Last Modified: 22-02-2025 11:30 IST
+// Version: 1.8.1
+// Last Modified: 13-04-2025 17:45 IST
+// Purpose: Fix syntax error in Login.tsx and redirect to root path
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
@@ -43,7 +44,8 @@ export default function Login() {
           setError(signInError.message);
           return;
         }
-        navigate('/dashboard');
+        // Navigate to root path instead of dashboard
+        navigate('/');
       } else {
         const { error: signInError } = await signInWithOTP(email);
         if (signInError) {
@@ -71,7 +73,8 @@ export default function Login() {
         setError(verifyError.message);
         return;
       }
-      navigate('/dashboard');
+      // Navigate to root path instead of dashboard
+      navigate('/');
     } catch (err) {
       setError('An unexpected error occurred. Please try again later.');
       console.error('Verification error:', err);
