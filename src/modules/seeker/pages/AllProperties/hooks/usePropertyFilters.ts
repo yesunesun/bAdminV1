@@ -1,53 +1,74 @@
 // src/modules/seeker/pages/AllProperties/hooks/usePropertyFilters.ts
-// Version: 1.0.0
-// Last Modified: 05-04-2025 22:40 IST
-// Purpose: Hook to manage property filters
+// Version: 1.3.0
+// Last Modified: 14-04-2025 15:15 IST
+// Purpose: Added property flow filtering
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { PropertyType } from '@/modules/owner/components/property/PropertyFormTypes';
+import { getPropertyFlow } from '../utils/propertyUtils';
 
-export type Filters = {
-  coordinatesFilter: 'all' | 'available' | 'notAvailable';
-  ownerFilter: string;
+type Filters = {
+  propertyType: string;
+  priceRange: string;
+  ownerId: string;
+  propertyFlow: string;
+  [key: string]: string;
 };
 
-export const usePropertyFilters = (properties: PropertyType[]) => {
+export function usePropertyFilters(properties: PropertyType[]) {
   const [filters, setFilters] = useState<Filters>({
-    coordinatesFilter: 'all',
-    ownerFilter: '',
+    propertyType: '',
+    priceRange: '',
+    ownerId: '',
+    propertyFlow: ''
   });
-  
-  const [filteredProperties, setFilteredProperties] = useState<PropertyType[]>([]);
 
-  // Apply filters whenever properties or filter values change
-  useEffect(() => {
-    let result = [...properties];
-    
-    // Apply coordinates filter
-    if (filters.coordinatesFilter !== 'all') {
-      result = result.filter(property => {
-        const hasCoords = hasCoordinates(property);
-        return filters.coordinatesFilter === 'available' ? hasCoords : !hasCoords;
-      });
-    }
-    
-    // Apply owner filter
-    if (filters.ownerFilter) {
-      result = result.filter(property => 
-        property.profiles && property.profiles.id === filters.ownerFilter
-      );
-    }
-    
-    setFilteredProperties(result);
-  }, [properties, filters]);
-
-  // Reset filters
+  // Reset filters function
   const resetFilters = () => {
     setFilters({
-      coordinatesFilter: 'all',
-      ownerFilter: '',
+      propertyType: '',
+      priceRange: '',
+      ownerId: '',
+      propertyFlow: ''
     });
   };
+
+  // Apply filters and return filtered properties
+  const filteredProperties = useMemo(() => {
+    return properties.filter((property) => {
+      // Property Type Filter
+      if (filters.propertyType && property.property_details?.propertyType !== filters.propertyType) {
+        return false;
+      }
+
+      // Price Range Filter
+      if (filters.priceRange) {
+        const price = property.price || 0;
+        const [min, max] = filters.priceRange.split('-').map(Number);
+        
+        if (filters.priceRange === '100000+') {
+          if (price < 100000) return false;
+        } else if (price < min || (max && price > max)) {
+          return false;
+        }
+      }
+      
+      // Owner Filter
+      if (filters.ownerId && property.profiles?.id !== filters.ownerId) {
+        return false;
+      }
+      
+      // Property Flow Filter
+      if (filters.propertyFlow) {
+        const flow = getPropertyFlow(property);
+        if (flow !== filters.propertyFlow) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [properties, filters]);
 
   return {
     filters,
@@ -55,75 +76,4 @@ export const usePropertyFilters = (properties: PropertyType[]) => {
     filteredProperties,
     resetFilters
   };
-};
-
-// Enhanced function to check if a property has coordinates
-const hasCoordinates = (property: PropertyType) => {
-  // Check all possible locations where coordinates might be stored
-  
-  // Check in property_details.coordinates
-  if (property.property_details?.coordinates) {
-    const lat = property.property_details.coordinates.lat;
-    const lng = property.property_details.coordinates.lng;
-    if (lat !== undefined && lng !== undefined) {
-      // Ensure lat and lng are numbers
-      const parsedLat = parseFloat(lat as any);
-      const parsedLng = parseFloat(lng as any);
-      if (!isNaN(parsedLat) && !isNaN(parsedLng)) {
-        return true;
-      }
-    }
-  }
-  
-  // Check in property_details.location.coordinates
-  if (property.property_details?.location?.coordinates) {
-    const lat = property.property_details.location.coordinates.lat;
-    const lng = property.property_details.location.coordinates.lng;
-    if (lat !== undefined && lng !== undefined) {
-      const parsedLat = parseFloat(lat as any);
-      const parsedLng = parseFloat(lng as any);
-      if (!isNaN(parsedLat) && !isNaN(parsedLng)) {
-        return true;
-      }
-    }
-  }
-  
-  // Check in property_details.mapCoordinates
-  if (property.property_details?.mapCoordinates) {
-    const lat = property.property_details.mapCoordinates.lat;
-    const lng = property.property_details.mapCoordinates.lng;
-    if (lat !== undefined && lng !== undefined) {
-      const parsedLat = parseFloat(lat as any);
-      const parsedLng = parseFloat(lng as any);
-      if (!isNaN(parsedLat) && !isNaN(parsedLng)) {
-        return true;
-      }
-    }
-  }
-  
-  // Check for latitude and longitude directly in property_details
-  if (property.property_details?.latitude !== undefined && 
-      property.property_details?.longitude !== undefined) {
-    const lat = property.property_details.latitude;
-    const lng = property.property_details.longitude;
-    const parsedLat = parseFloat(lat as any);
-    const parsedLng = parseFloat(lng as any);
-    if (!isNaN(parsedLat) && !isNaN(parsedLng)) {
-      return true;
-    }
-  }
-  
-  // Check for lat and lng directly in property_details
-  if (property.property_details?.lat !== undefined && 
-      property.property_details?.lng !== undefined) {
-    const lat = property.property_details.lat;
-    const lng = property.property_details.lng;
-    const parsedLat = parseFloat(lat as any);
-    const parsedLng = parseFloat(lng as any);
-    if (!isNaN(parsedLat) && !isNaN(parsedLng)) {
-      return true;
-    }
-  }
-  
-  return false;
-};
+}

@@ -1,323 +1,195 @@
 // src/modules/seeker/pages/AllProperties/components/PropertyCard.tsx
-// Version: 2.1.0
-// Last Modified: 06-04-2025 15:00 IST
-// Purpose: Added property ID display and improved coordinate functionality
+// Version: 4.3.0
+// Last Modified: 14-04-2025 22:15 IST
+// Purpose: Fixed property deletion functionality by correcting propertyService import
 
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { PropertyType } from '@/modules/owner/components/property/PropertyFormTypes';
 import { formatPrice } from '@/modules/seeker/services/seekerService';
-import { useCoordinatesUtils } from '../hooks/useCoordinatesUtils';
-import { usePropertyCoordinates } from '../hooks/usePropertyCoordinates';
+import { getPropertyFlow, getFlowLabel } from '../utils/propertyUtils';
 import { Card, CardHeader, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/lib/supabase';
+import { Trash2, AlertTriangle, Pencil, ShieldAlert } from 'lucide-react';
+import { 
+  Dialog,
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogDescription,
+  DialogFooter
+} from '@/components/ui/dialog';
+import { useAuth } from '@/contexts/AuthContext';
+import { propertyService } from '@/modules/owner/services/propertyService';
 
 interface PropertyCardProps {
   property: PropertyType;
-  googleMapsLoaded: boolean;
-  geocodingInProgress: string | null;
-  setGeocodingInProgress: (id: string | null) => void;
+  onPropertyDeleted?: () => void;
+  onPropertyUpdated?: () => void;
 }
 
 const PropertyCard: React.FC<PropertyCardProps> = ({ 
   property, 
-  googleMapsLoaded,
-  geocodingInProgress,
-  setGeocodingInProgress
+  onPropertyDeleted,
+  onPropertyUpdated
 }) => {
-  const { hasCoordinates, getCoordinatesDisplay } = useCoordinatesUtils();
-  const { geocodeAddress, verifyCoordinates, updatePropertyCoordinates } = usePropertyCoordinates();
-  const [localCoordinates, setLocalCoordinates] = useState<string | null>(null);
-  const [isUpdated, setIsUpdated] = useState(false);
-  const [debugInfo, setDebugInfo] = useState<any>(null);
-  const [hasVerifiedCoordinates, setHasVerifiedCoordinates] = useState<boolean | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isFixingTitle, setIsFixingTitle] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const { toast } = useToast();
+  const { user } = useAuth();
   
-  // Check coordinates on mount
+  // Get property flow type
+  const propertyFlow = getPropertyFlow(property);
+  const flowLabel = getFlowLabel(propertyFlow);
+
+  // Check if current user is an admin
   useEffect(() => {
-    const checkCoords = async () => {
-      const has = await verifyCoordinates(property.id);
-      setHasVerifiedCoordinates(has);
+    const checkAdminStatus = async () => {
+      if (!user?.id) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('admin_users')
+          .select('role_id, admin_roles(role_type)')
+          .eq('user_id', user.id)
+          .single();
+        
+        if (!error && data) {
+          // Check if user has admin role
+          const roleType = data.admin_roles?.role_type;
+          const hasAdminRole = roleType === 'admin' || 
+            roleType === 'super_admin' || 
+            roleType === 'property_moderator';
+          
+          setIsAdmin(hasAdminRole);
+          console.log('User admin status:', hasAdminRole, 'Role type:', roleType);
+        }
+      } catch (error) {
+        console.error('Error checking admin status:', error);
+      }
     };
-    checkCoords();
-  }, [property.id, verifyCoordinates]);
-  
-  // Direct database update function for emergency testing
-  const directUpdateCoordinates = async (e: React.MouseEvent) => {
-    e.preventDefault();
     
-    // Log property ID to console
-    console.log("===== DIRECT UPDATE =====");
-    console.log("Property ID:", property.id);
-    console.log("Property Title:", property.title);
-    console.log("=========================");
+    checkAdminStatus();
+  }, [user?.id]);
+
+  // Generate a formatted property title
+  const generateFormattedTitle = (property: PropertyType): string => {
+    const details = property.property_details || {};
+    
+    // Extract needed information
+    const bhkType = details.bhkType || (property.bedrooms ? `${property.bedrooms} BHK` : '');
+    const propertyType = details.propertyType || 'Property';
+    const listingType = details.listingType?.toLowerCase() || '';
+    const locality = details.locality || property.city || '';
+    
+    // Determine if this is for sale or rent
+    const isForSale = 
+      listingType === 'sale' || 
+      listingType === 'sell' ||
+      details.isSaleProperty === true;
+    
+    const forText = isForSale ? 'for Sale' : 'for Rent';
+    
+    // Construct the title
+    return `${bhkType} ${propertyType} ${forText} in ${locality}`;
+  };
+  
+  // Function to fix property title
+  const handleFixTitle = async () => {
+    if (!property.id || !user?.id) return;
     
     try {
-      setGeocodingInProgress(property.id);
+      setIsFixingTitle(true);
       
-      // For testing - use hard-coded coordinates
-      const coordinates = { lat: 37.7749, lng: -122.4194 };
+      // Generate the new formatted title
+      const newTitle = generateFormattedTitle(property);
       
-      console.log("[EMERGENCY] Starting direct update with:", coordinates);
+      // Update the property in the database
+      const { error } = await supabase
+        .from('properties')
+        .update({ title: newTitle })
+        .eq('id', property.id);
       
-      // APPROACH 1: Direct SQL approach using RPC
-      // This is the most reliable method as it bypasses any ORM complexity
-      const { data: rpcResult, error: rpcError } = await supabase.rpc(
-        'update_property_coordinates',
-        {
-          p_property_id: property.id,
-          p_lat: coordinates.lat,
-          p_lng: coordinates.lng
-        }
-      );
-      
-      if (rpcError) {
-        // If RPC fails (function may not exist), fall back to direct update
-        console.warn("[EMERGENCY] RPC method failed, trying direct update:", rpcError);
-        
-        // APPROACH 2: Direct update with fresh fetch first
-        const { data: propertyData, error: fetchError } = await supabase
-          .from('properties')
-          .select('property_details')
-          .eq('id', property.id)
-          .single();
-        
-        if (fetchError) {
-          console.error("[EMERGENCY] Fetch error:", fetchError);
-          throw new Error(`Failed to fetch property: ${fetchError.message}`);
-        }
-        
-        console.log("[EMERGENCY] Current property data:", propertyData);
-        
-        // Create a completely new property_details object to avoid reference issues
-        const updatedDetails = {
-          ...JSON.parse(JSON.stringify(propertyData.property_details || {})),
-          coordinates: {
-            lat: coordinates.lat,
-            lng: coordinates.lng
-          },
-          emergency_test: true,
-          lastUpdated: new Date().toISOString()
-        };
-        
-        console.log("[EMERGENCY] New property details:", updatedDetails);
-        
-        // Direct update approach
-        const { error: updateError } = await supabase
-          .from('properties')
-          .update({ 
-            property_details: updatedDetails 
-          })
-          .eq('id', property.id);
-        
-        if (updateError) {
-          console.error("[EMERGENCY] Update error:", updateError);
-          throw new Error(`Failed to update property: ${updateError.message}`);
-        }
-      } else {
-        console.log("[EMERGENCY] RPC update successful:", rpcResult);
+      if (error) {
+        throw error;
       }
       
-      console.log("[EMERGENCY] Update completed. Waiting before verification...");
+      // Show success toast
+      toast({
+        title: "Title updated",
+        description: `Title changed to "${newTitle}"`,
+      });
       
-      // Force a significant delay before verification to ensure the database has time to update
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Verify the update
-      console.log("[EMERGENCY] Running verification...");
-      const verified = await verifyCoordinates(property.id);
-      console.log("[EMERGENCY] Verification result:", verified);
-      setHasVerifiedCoordinates(verified);
-      
-      if (verified) {
-        // Fetch the updated property details to confirm
-        const { data: verifyData, error: verifyError } = await supabase
-          .from('properties')
-          .select('property_details')
-          .eq('id', property.id)
-          .single();
-        
-        if (verifyError) {
-          console.error("[EMERGENCY] Verify fetch error:", verifyError);
-        } else {
-          console.log("[EMERGENCY] Verification data:", verifyData);
-          setDebugInfo(verifyData.property_details);
-          
-          if (verifyData.property_details?.coordinates) {
-            setLocalCoordinates(`${verifyData.property_details.coordinates.lat.toFixed(6)}, ${verifyData.property_details.coordinates.lng.toFixed(6)}`);
-            setIsUpdated(true);
-            
-            toast({
-              title: "Direct update successful",
-              description: `Coordinates updated and verified: ${verifyData.property_details.coordinates.lat.toFixed(6)}, ${verifyData.property_details.coordinates.lng.toFixed(6)}`,
-            });
-          } else {
-            throw new Error("Coordinates were not found in the updated property details");
-          }
-        }
-      } else {
-        throw new Error("Update was performed but coordinates could not be verified");
+      // Refresh the property list
+      if (onPropertyUpdated) {
+        onPropertyUpdated();
       }
     } catch (error) {
-      console.error("[EMERGENCY] Error:", error);
+      console.error('Error updating property title:', error);
       toast({
         title: "Update failed",
-        description: error instanceof Error ? error.message : "Unknown error occurred",
+        description: error instanceof Error ? error.message : "An error occurred while updating the property title",
         variant: "destructive"
       });
-      
-      // Try to determine what went wrong
-      console.log("[EMERGENCY] Running diagnostic checks...");
-      try {
-        const { data: diagnosticData, error: diagnosticError } = await supabase
-          .from('properties')
-          .select('property_details')
-          .eq('id', property.id)
-          .single();
-        
-        if (diagnosticError) {
-          console.error("[EMERGENCY] Diagnostic fetch error:", diagnosticError);
-        } else {
-          console.log("[EMERGENCY] Current property_details:", diagnosticData.property_details);
-          setDebugInfo({
-            ...diagnosticData.property_details,
-            _diagnostic: "Retrieved during error recovery"
-          });
-        }
-      } catch (diagError) {
-        console.error("[EMERGENCY] Diagnostic error:", diagError);
-      }
     } finally {
-      setGeocodingInProgress(null);
+      setIsFixingTitle(false);
     }
   };
   
-  // Verify coordinates function for debugging
-  const checkCoordinates = async (e: React.MouseEvent) => {
-    e.preventDefault();
-    
-    // Log property ID to console
-    console.log("===== VERIFY COORDINATES =====");
-    console.log("Property ID:", property.id);
-    console.log("Property Title:", property.title);
-    console.log("=============================");
+  // Function to delete property
+  const deleteProperty = async (propertyId: string) => {
+    if (!user) return;
     
     try {
-      setGeocodingInProgress(property.id);
-      console.log("[CHECK] Verifying coordinates for property:", property.id);
+      setIsDeleting(true);
+      console.log('Deleting property:', propertyId);
       
-      const verified = await verifyCoordinates(property.id);
-      setHasVerifiedCoordinates(verified);
-      
-      if (verified) {
-        const { data, error } = await supabase
-          .from('properties')
-          .select('property_details')
-          .eq('id', property.id)
-          .single();
-          
-        if (error) {
-          console.error("[CHECK] Error fetching property details:", error);
-          throw error;
-        }
-        
-        if (data && data.property_details) {
-          console.log("[CHECK] Verification data:", data.property_details);
-          setDebugInfo(data.property_details);
-          
-          // Update local coordinates display
-          if (data.property_details.coordinates) {
-            setLocalCoordinates(`${data.property_details.coordinates.lat.toFixed(6)}, ${data.property_details.coordinates.lng.toFixed(6)}`);
-            setIsUpdated(true);
-            
-            toast({
-              title: "Coordinates verified",
-              description: `Found: ${data.property_details.coordinates.lat.toFixed(6)}, ${data.property_details.coordinates.lng.toFixed(6)}`,
-            });
-          } else {
-            toast({
-              title: "Verification issue",
-              description: "Property has property_details but no coordinates field",
-              variant: "destructive"
-            });
-          }
-        } else {
-          toast({
-            title: "Verification issue",
-            description: "Property found but no property_details available",
-            variant: "destructive"
-          });
-        }
+      // Check if user is admin and use appropriate delete method
+      if (isAdmin) {
+        // Use admin delete method if user is admin
+        await propertyService.adminDeleteProperty(propertyId);
       } else {
-        toast({
-          title: "No coordinates found",
-          description: "This property does not have coordinates in the database",
-          variant: "destructive"
-        });
+        // Use regular delete method for property owners
+        await propertyService.deleteProperty(propertyId, user.id);
       }
-    } catch (error) {
-      console.error("[CHECK] Error during verification:", error);
+      
       toast({
-        title: "Verification error",
-        description: error instanceof Error ? error.message : "Unknown error occurred",
+        title: "Property deleted",
+        description: "The property has been successfully deleted",
+      });
+      
+      // Notify parent component to refresh the list
+      if (onPropertyDeleted) {
+        onPropertyDeleted();
+      }
+      
+    } catch (err) {
+      console.error('Error deleting property:', err);
+      toast({
+        title: "Delete failed",
+        description: err instanceof Error ? err.message : "Failed to delete property",
         variant: "destructive"
       });
     } finally {
-      setGeocodingInProgress(null);
+      setIsDeleting(false);
     }
   };
   
-  // Function to get coordinates from address using Google Maps Geocoding API
-  const getCoordinatesFromAddress = async (e: React.MouseEvent) => {
-    e.preventDefault(); // Prevent the default action to avoid page refresh
-    
-    if (!property.address || !googleMapsLoaded) return;
-    
-    try {
-      setGeocodingInProgress(property.id);
-      
-      // Construct a complete address string
-      const fullAddress = [
-        property.address,
-        property.city,
-        property.state,
-        property.zip_code
-      ].filter(Boolean).join(', ');
-      
-      console.log(`[CARD] Geocoding address: ${fullAddress}`);
-      
-      // Use the geocodeAddress function from our hook
-      const result = await geocodeAddress(property.id, fullAddress, (coords) => {
-        console.log(`[CARD] Coordinates callback received:`, coords);
-        setLocalCoordinates(`${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`);
-        setIsUpdated(true);
-        setHasVerifiedCoordinates(true);
-      });
-      
-      console.log(`[CARD] Geocode result:`, result);
-      
-      if (!result.success) {
-        console.error(`[CARD] Geocoding was not successful`);
-      }
-    } catch (error) {
-      console.error(`[CARD] Error during geocoding:`, error);
-    } finally {
-      setGeocodingInProgress(null);
+  // Confirm deletion
+  const confirmDelete = () => {
+    if (property.id) {
+      deleteProperty(property.id);
+      setIsDeleteDialogOpen(false);
     }
   };
-
-  // Determine what coordinates to display
-  const coordinatesToDisplay = localCoordinates || getCoordinatesDisplay(property);
-  const showCoordinatesUpdated = isUpdated && localCoordinates;
-  
-  // Determine if property has coordinates (either from database or local update)
-  const propertyHasCoordinates = hasVerifiedCoordinates === true || hasCoordinates(property) || isUpdated;
   
   return (
-    <Card className={`overflow-hidden transition-shadow ${isUpdated ? 'border-green-500' : 'hover:shadow-lg'}`}>
+    <Card className="overflow-hidden transition-shadow hover:shadow-lg">
       <div className="flex flex-col sm:flex-row">
         <div className="sm:w-1/4 h-48 sm:h-auto bg-gray-200 dark:bg-gray-700 relative">
           <img
@@ -327,15 +199,22 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
             alt={property.title}
             className="w-full h-full object-cover"
           />
-          {/* Coordinates Badge */}
-          <div className="absolute top-2 right-2">
-            <Badge className={propertyHasCoordinates ? 
-              "bg-green-500 hover:bg-green-600" : 
-              "bg-red-500 hover:bg-red-600"
-            }>
-              {propertyHasCoordinates ? "Has Coordinates" : "No Coordinates"}
+          {/* Property Flow Badge */}
+          <div className="absolute top-2 left-2">
+            <Badge className="bg-blue-500 hover:bg-blue-600">
+              {flowLabel}
             </Badge>
           </div>
+          
+          {/* Admin Badge */}
+          {isAdmin && (
+            <div className="absolute top-2 right-2">
+              <Badge className="bg-purple-600 hover:bg-purple-700 flex items-center gap-1">
+                <ShieldAlert className="h-3 w-3" />
+                Admin
+              </Badge>
+            </div>
+          )}
         </div>
         
         <div className="flex-1 p-4">
@@ -346,9 +225,13 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
                 <p className="text-gray-500 dark:text-gray-400 text-sm line-clamp-1">
                   {property.address}, {property.city}, {property.state}
                 </p>
-                {/* Property ID Display - Added */}
+                {/* Property ID Display */}
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                   ID: <span className="font-mono select-all">{property.id}</span>
+                </p>
+                {/* Property Flow Display */}
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Flow: <span className="font-medium text-blue-600 dark:text-blue-400">{propertyFlow}</span>
                 </p>
                 {property.profiles && (
                   <p className="text-xs text-blue-600 dark:text-blue-400">
@@ -383,80 +266,87 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
                 </div>
               )}
             </div>
-            
-            <div className={`mt-3 p-2 rounded text-sm ${showCoordinatesUpdated ? 'bg-green-50 dark:bg-green-900/20' : 'bg-gray-50 dark:bg-gray-800'}`}>
-              <div className="flex justify-between items-center">
-                <div>
-                  <p className="font-medium">Coordinates:</p>
-                  <p className={`text-gray-600 dark:text-gray-400 ${showCoordinatesUpdated ? 'font-medium text-green-600 dark:text-green-400' : ''}`}>
-                    {coordinatesToDisplay}
-                    {showCoordinatesUpdated && <span className="ml-2 text-xs bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-200 px-1 py-0.5 rounded">Updated</span>}
-                  </p>
-                </div>
-                
-                <div className="flex gap-2">
-                  {(!propertyHasCoordinates && property.address) && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={getCoordinatesFromAddress}
-                      disabled={geocodingInProgress === property.id || !googleMapsLoaded}
-                      type="button"
-                    >
-                      {geocodingInProgress === property.id ? (
-                        <>
-                          <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                          </svg>
-                          Processing...
-                        </>
-                      ) : (
-                        "Fix Coordinates"
-                      )}
-                    </Button>
-                  )}
-                  
-                  {/* Debug buttons */}
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={directUpdateCoordinates}
-                    disabled={geocodingInProgress === property.id}
-                    className="text-xs bg-blue-500 text-white hover:bg-blue-600"
-                    type="button"
-                  >
-                    Direct Update
-                  </Button>
-                  
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={checkCoordinates}
-                    className="text-xs bg-purple-500 text-white hover:bg-purple-600"
-                    type="button"
-                  >
-                    Verify
-                  </Button>
-                </div>
-              </div>
-              
-              {debugInfo && (
-                <div className="mt-2 p-2 bg-gray-100 dark:bg-gray-700 rounded text-xs">
-                  <p className="font-bold">Debug Info:</p>
-                  <pre className="whitespace-pre-wrap">{JSON.stringify(debugInfo, null, 2)}</pre>
-                </div>
-              )}
-            </div>
           </CardContent>
           
-          <CardFooter className="p-0 pt-3 flex justify-end">
-            <Link to={`/seeker/property/${property.id}`}>
+          <CardFooter className="p-0 pt-3 flex flex-wrap gap-2">
+            <Button 
+              size="sm" 
+              variant="destructive"
+              onClick={() => setIsDeleteDialogOpen(true)}
+              className="flex items-center gap-1"
+            >
+              <Trash2 className="h-4 w-4" />
+              {isAdmin ? "Admin Delete" : "Delete"}
+            </Button>
+            
+            <Button 
+              size="sm" 
+              variant="outline"
+              onClick={handleFixTitle}
+              disabled={isFixingTitle}
+              className="flex items-center gap-1"
+            >
+              {isFixingTitle ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Fixing...
+                </>
+              ) : (
+                <>
+                  <Pencil className="h-4 w-4" />
+                  Fix Title
+                </>
+              )}
+            </Button>
+            
+            <Link to={`/seeker/property/${property.id}`} className="ml-auto">
               <Button size="sm">View Details</Button>
             </Link>
           </CardFooter>
         </div>
       </div>
+      
+      {/* Delete Confirmation Dialog - Same as in Properties.tsx */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Delete Property</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this property? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-3">
+            <h3 className="font-medium">{property.title}</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              {property.address}, {property.city}, {property.state}
+            </p>
+            {property.profiles && (
+              <p className="text-sm text-blue-600 font-medium mt-1">
+                Owner: {property.profiles.email}
+              </p>
+            )}
+          </div>
+          <DialogFooter className="flex flex-row justify-end gap-2 mt-4">
+            <Button
+              variant="outline"
+              onClick={() => setIsDeleteDialogOpen(false)}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmDelete}
+              disabled={isDeleting}
+            >
+              {isDeleting ? 'Deleting...' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 };

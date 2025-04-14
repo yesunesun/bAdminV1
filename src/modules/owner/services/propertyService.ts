@@ -1,7 +1,7 @@
 // src/modules/owner/services/propertyService.ts
-// Version: 4.7.0
-// Last Modified: 07-03-2025 15:30 IST
-// Purpose: Added deleteProperty function to fix property deletion functionality
+// Version: 4.8.0
+// Last Modified: 14-04-2025 16:45 IST
+// Purpose: Added adminDeleteProperty function to allow admins to delete any property
 
 import { supabase } from '@/lib/supabase';
 import { Property, FormData } from '../components/property/PropertyFormTypes';
@@ -522,7 +522,7 @@ export const propertyService = {
     }
   },
 
-  // Delete a property
+  // Delete a property (owner only)
   async deleteProperty(propertyId: string, userId: string): Promise<void> {
     try {
       console.log('=========== DEBUG: DELETE PROPERTY START ===========');
@@ -544,7 +544,7 @@ export const propertyService = {
         .from('properties')
         .delete()
         .eq('id', propertyId)
-        .eq('owner_id', userId); // Security check
+        .eq('owner_id', userId); // Security check - owner can only delete their own properties
       
       if (error) {
         console.error('Error deleting property:', error);
@@ -559,6 +559,70 @@ export const propertyService = {
     } catch (error) {
       console.error('Error in deleteProperty:', error);
       throw error;
+    }
+  },
+
+  // Delete any property (admin only)
+  async adminDeleteProperty(propertyId: string): Promise<void> {
+    try {
+      console.log('=========== DEBUG: ADMIN DELETE PROPERTY START ===========');
+      console.log(`Admin deleting property ${propertyId}`);
+      
+      // First, delete all property images (this handles the foreign key constraint)
+      const { error: imagesError } = await supabase
+        .from('property_images')
+        .delete()
+        .eq('property_id', propertyId);
+      
+      if (imagesError) {
+        console.error('Error deleting property images:', imagesError);
+        throw imagesError;
+      }
+      
+      // Then delete the property without the owner_id check
+      // The database policy will ensure only admins can do this
+      const { error } = await supabase
+        .from('properties')
+        .delete()
+        .eq('id', propertyId);
+      
+      if (error) {
+        console.error('Error in admin property deletion:', error);
+        throw error;
+      }
+      
+      // Clear all user caches since we don't know which user owned this property
+      propertiesCache.clear();
+      
+      console.log(`Property ${propertyId} successfully deleted by admin`);
+      console.log('=========== DEBUG: ADMIN DELETE PROPERTY END ===========');
+    } catch (error) {
+      console.error('Error in adminDeleteProperty:', error);
+      throw error;
+    }
+  },
+
+  // Check if user is an admin
+  async isUserAdmin(userId: string): Promise<boolean> {
+    try {
+      if (!userId) return false;
+      
+      const { data, error } = await supabase
+        .from('admin_users')
+        .select('role_id, admin_roles(role_type)')
+        .eq('user_id', userId)
+        .single();
+      
+      if (error || !data) return false;
+      
+      // Check if user has admin role
+      const roleType = data.admin_roles?.role_type;
+      return roleType === 'admin' || 
+             roleType === 'super_admin' || 
+             roleType === 'property_moderator';
+    } catch (error) {
+      console.error('Error checking admin status:', error);
+      return false;
     }
   }
 };

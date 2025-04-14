@@ -1,7 +1,7 @@
 // src/modules/seeker/pages/AllProperties/index.tsx
-// Version: 1.20.0
-// Last Modified: 07-04-2025 12:30 IST
-// Purpose: Remove direct database update section
+// Version: 1.24.0
+// Last Modified: 15-04-2025 10:40 IST
+// Purpose: Added support for property title updates
 
 import React, { useEffect, useState } from 'react';
 import { fetchProperties } from '../../services/seekerService';
@@ -14,13 +14,13 @@ import PropertyGrid from './components/PropertyGrid';
 import Pagination from './components/Pagination';
 
 // Hooks
-import { useLoadGoogleMaps } from './hooks/useLoadGoogleMaps';
 import { usePropertyFilters } from './hooks/usePropertyFilters';
+
+// Utils
+import { getPropertyFlow } from './utils/propertyUtils';
 
 // UI Components
 import { useToast } from '@/components/ui/use-toast';
-import { Button } from '@/components/ui/button';
-import { supabase } from '@/lib/supabase';
 
 const AllProperties: React.FC = () => {
   const [properties, setProperties] = useState<PropertyType[]>([]);
@@ -30,12 +30,11 @@ const AllProperties: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [totalPages, setTotalPages] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(20);
-  const [geocodingInProgress, setGeocodingInProgress] = useState<string | null>(null);
   const [uniqueOwners, setUniqueOwners] = useState<{id: string, email: string}[]>([]);
   const [targetPropertyId, setTargetPropertyId] = useState<string>('4eab82e3-eea0-4c07-9ba0-b64691d59410');
+  const [propertyFlows, setPropertyFlows] = useState<string[]>([]);
   
   // Custom hooks
-  const { googleMapsLoaded } = useLoadGoogleMaps();
   const { 
     filters, 
     setFilters, 
@@ -68,6 +67,16 @@ const AllProperties: React.FC = () => {
       });
       setUniqueOwners(Array.from(owners.values()));
       
+      // Extract unique property flows
+      const flows = new Set<string>();
+      result.properties.forEach(property => {
+        const flow = getPropertyFlow(property);
+        if (flow !== "UNKNOWN") {
+          flows.add(flow);
+        }
+      });
+      setPropertyFlows(Array.from(flows));
+      
       setTotalCount(result.totalCount);
       setTotalPages(result.totalPages);
     } catch (err) {
@@ -76,6 +85,18 @@ const AllProperties: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Handler for property deletion
+  const handlePropertyDeleted = () => {
+    // Refresh the property list after deletion
+    loadProperties();
+  };
+  
+  // Handler for property updates
+  const handlePropertyUpdated = () => {
+    // Refresh the property list after update
+    loadProperties();
   };
 
   useEffect(() => {
@@ -121,7 +142,6 @@ const AllProperties: React.FC = () => {
     <div className="container mx-auto py-8 px-4 sm:px-6">
       {/* Debug Tools */}
       <DebugTools 
-        googleMapsLoaded={googleMapsLoaded} 
         propertyId={targetPropertyId}
         onPropertyIdChange={setTargetPropertyId}
       />
@@ -138,6 +158,7 @@ const AllProperties: React.FC = () => {
         filters={filters}
         setFilters={setFilters}
         uniqueOwners={uniqueOwners}
+        propertyFlows={propertyFlows}
         pageSize={pageSize}
         onPageSizeChange={handlePageSizeChange}
         onResetFilters={resetFilters}
@@ -146,9 +167,9 @@ const AllProperties: React.FC = () => {
       {/* Property Grid */}
       <PropertyGrid 
         properties={filteredProperties}
-        googleMapsLoaded={googleMapsLoaded}
-        geocodingInProgress={geocodingInProgress}
-        setGeocodingInProgress={setGeocodingInProgress}
+        isLoading={loading}
+        onPropertyDeleted={handlePropertyDeleted}
+        onPropertyUpdated={handlePropertyUpdated}
       />
 
       {/* Pagination */}
