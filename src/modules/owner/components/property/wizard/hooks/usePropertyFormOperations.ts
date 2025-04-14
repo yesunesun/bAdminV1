@@ -1,12 +1,12 @@
 // src/modules/owner/components/property/wizard/hooks/usePropertyFormOperations.ts
-// Version: 3.1.0
-// Last Modified: 14-04-2025 16:45 IST
-// Purpose: Fix missing export and improve flow determination logic
+// Version: 3.2.0
+// Last Modified: 14-04-2025 17:30 IST
+// Purpose: Fix auto-fill functionality
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FormData } from '../types';
-import { TEST_DATA } from '../test-data'; // Changed from testData to TEST_DATA to match actual export
+import { TEST_DATA, autoFillAllSections } from '../test-data'; // Updated import to include autoFillAllSections
 import { supabase } from '@/lib/supabase';
 
 interface UsePropertyFormOperationsProps {
@@ -285,31 +285,28 @@ export function usePropertyFormOperations({
   };
   
   // Handle autofill for debugging and testing
-  const handleAutoFill = (formType?: string) => {
+  const handleAutoFill = () => {
     if (process.env.NODE_ENV !== 'production') {
-      // Create a mapping of form types to TEST_DATA keys
-      const testDataMapping: Record<string, keyof typeof TEST_DATA> = {
-        'residential_rent': 'rental',
-        'residential_sale': 'sale',
-        'pg_hostel': 'pg_details',
-        'room_details': 'room_details',
-        'basic': 'basic',
-        'location': 'location',
-        'amenities': 'amenities'
-      };
+      // Get form values to determine property type and ad type
+      const formValues = form.getValues();
       
-      // Get the appropriate test data section
-      const testDataKey = testDataMapping[formType || 'residential_rent'] || 'rental';
-      const testDataToUse = TEST_DATA[testDataKey];
+      // Extract property type and ad type from form values or URL
+      let propertyType = formValues.propertyCategory || '';
+      let adType = formValues.listingType || '';
       
-      if (testDataToUse) {
-        form.reset({
-          ...form.getValues(),
-          ...testDataToUse
-        });
-      } else {
-        console.warn(`No test data found for form type: ${formType}`);
+      // If not available in form values, try to extract from URL
+      if (!propertyType || !adType) {
+        const pathParts = window.location.pathname.split('/');
+        if (pathParts.length > 2) {
+          propertyType = pathParts[pathParts.length - 3] || '';
+          adType = pathParts[pathParts.length - 2] || '';
+        }
       }
+      
+      console.log("Auto-filling form with data for property type:", propertyType, "and ad type:", adType);
+      
+      // Use the enhanced auto-fill function from test-data.ts
+      autoFillAllSections(form, propertyType, adType);
     }
   };
   

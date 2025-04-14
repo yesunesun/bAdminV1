@@ -1,7 +1,7 @@
 // src/modules/seeker/pages/AllProperties/components/PropertyCard.tsx
-// Version: 4.3.0
-// Last Modified: 14-04-2025 22:15 IST
-// Purpose: Fixed property deletion functionality by correcting propertyService import
+// Version: 4.4.0
+// Last Modified: 14-04-2025 23:30 IST
+// Purpose: Added flow_property_type and flow_listing_type tags display
 
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
@@ -46,6 +46,11 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
   // Get property flow type
   const propertyFlow = getPropertyFlow(property);
   const flowLabel = getFlowLabel(propertyFlow);
+  
+  // Extract property type and listing type from the flow
+  const flowParts = propertyFlow.split('_');
+  const flowPropertyType = flowParts[0] || 'UNKNOWN';
+  const flowListingType = flowParts[1] || 'UNKNOWN';
 
   // Check if current user is an admin
   useEffect(() => {
@@ -229,12 +234,22 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                   ID: <span className="font-mono select-all">{property.id}</span>
                 </p>
-                {/* Property Flow Display */}
+                {/* Property Flow Display - Complete flow string */}
                 <p className="text-xs text-gray-500 dark:text-gray-400">
                   Flow: <span className="font-medium text-blue-600 dark:text-blue-400">{propertyFlow}</span>
                 </p>
+                {/* Property Type Tag - NEW */}
+                <div className="flex flex-wrap gap-1 mt-1">
+                  <Badge variant="outline" className="text-xs border-blue-500 text-blue-600 dark:text-blue-400">
+                    Type: {flowPropertyType}
+                  </Badge>
+                  {/* Listing Type Tag - NEW */}
+                  <Badge variant="outline" className="text-xs border-green-500 text-green-600 dark:text-green-400">
+                    Listing: {flowListingType}
+                  </Badge>
+                </div>
                 {property.profiles && (
-                  <p className="text-xs text-blue-600 dark:text-blue-400">
+                  <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
                     Owner: {property.profiles.email}
                   </p>
                 )}
