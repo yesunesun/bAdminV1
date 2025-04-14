@@ -1,14 +1,14 @@
 // src/modules/owner/components/property/wizard/sections/PropertySummary.tsx
-// Version: 3.8.0
-// Last Modified: 14-04-2025 10:30 IST
-// Purpose: Removed Save to Draft button from Review tab
+// Version: 3.9.0
+// Last Modified: 15-04-2025 10:30 IST
+// Purpose: Added flow property type and listing type to Review tab
 
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FormSection } from '@/components/FormSection';
 import { cn } from '@/lib/utils';
 import { FormData } from '../types';
-import { Save, FileEdit, Send, Loader2, MapPin, Home, SquareStack, Sparkles, ImagePlus, IndianRupee, AlertCircle, Building } from 'lucide-react';
+import { Save, FileEdit, Send, Loader2, MapPin, Home, SquareStack, Sparkles, ImagePlus, IndianRupee, AlertCircle, Building, Info } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface PropertySummaryProps {
@@ -58,6 +58,12 @@ const SummarySection: React.FC<SummarySectionProps> = ({ title, icon, items }) =
   </Card>
 );
 
+// Helper function to capitalize a string
+const capitalize = (str: string): string => {
+  if (!str) return '';
+  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+};
+
 const formatCurrency = (value?: string | number) => {
   if (!value) return '-';
   return `₹${Number(value).toLocaleString('en-IN')}`;
@@ -86,6 +92,32 @@ export function PropertySummary({
   const isNewListing = !propertyId;
   const [localError, setLocalError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState<boolean>(false);
+  
+  // Extract flow information from URL path for display
+  const pathParts = useMemo(() => window.location.pathname.split('/'), []);
+  const urlPropertyType = useMemo(() => 
+    pathParts.length > 2 ? pathParts[pathParts.length - 3] : '', 
+  [pathParts]);
+  
+  const urlListingType = useMemo(() => 
+    pathParts.length > 2 ? pathParts[pathParts.length - 2] : '',
+  [pathParts]);
+  
+  // Get flow information from URL or form data
+  const flowPropertyType = useMemo(() => 
+    capitalize(urlPropertyType || formData.flow_property_type || ''),
+  [urlPropertyType, formData.flow_property_type]);
+  
+  const flowListingType = useMemo(() => 
+    capitalize(urlListingType || formData.flow_listing_type || ''),
+  [urlListingType, formData.flow_listing_type]);
+  
+  // Log flow information for debugging
+  console.log('Flow information display:', {
+    url: { property: urlPropertyType, listing: urlListingType },
+    form: { property: formData.flow_property_type, listing: formData.flow_listing_type },
+    display: { property: flowPropertyType, listing: flowListingType }
+  });
   
   // Improved logic to detect if this is a sale property
   const isSaleProperty = useMemo(() => {
@@ -126,6 +158,23 @@ export function PropertySummary({
            hasLockInPeriod || hasPowerBackup || isCommercialFromUrl;
   }, [formData]);
 
+  // Before saving, make sure flow information is included
+  const updateFormWithFlowInfo = () => {
+    // Set flow information from URL if available
+    if (urlPropertyType && !formData.flow_property_type) {
+      formData.flow_property_type = urlPropertyType;
+    }
+    
+    if (urlListingType && !formData.flow_listing_type) {
+      formData.flow_listing_type = urlListingType;
+    }
+    
+    console.log('Updated form with flow info:', {
+      flow_property_type: formData.flow_property_type,
+      flow_listing_type: formData.flow_listing_type
+    });
+  };
+
   // Custom previous button handler to navigate directly to Features tab
   const handlePreviousClick = () => {
     try {
@@ -152,6 +201,9 @@ export function PropertySummary({
   // Handler for Save and Photos navigation
   const handleSaveAndNavigateToPhotos = async () => {
     try {
+      // Update form with flow info before saving
+      updateFormWithFlowInfo();
+      
       // Clear any previous errors
       setLocalError(null);
       
@@ -250,7 +302,10 @@ export function PropertySummary({
       return (
         <button
           type="button"
-          onClick={onUpdate}
+          onClick={() => {
+            updateFormWithFlowInfo();
+            onUpdate();
+          }}
           className={cn(
             "flex items-center px-6 py-3 rounded-lg",
             "text-sm font-medium",
@@ -272,7 +327,10 @@ export function PropertySummary({
         {/* "Save to Draft" button removed as requested */}
         <button
           type="button"
-          onClick={isNewListing ? handleSaveAndNavigateToPhotos : onSaveAndPublish}
+          onClick={isNewListing ? handleSaveAndNavigateToPhotos : () => {
+            updateFormWithFlowInfo();
+            onSaveAndPublish();
+          }}
           className={cn(
             "flex items-center px-6 py-3 rounded-lg",
             "text-sm font-medium",
@@ -330,6 +388,16 @@ export function PropertySummary({
           </div>
         )}
         
+        {/* Listing Information Section - Added for flow information */}
+        <SummarySection
+          title="Listing Information"
+          icon={<Info className="h-4 w-4" />}
+          items={[
+            { label: 'Property Type', value: flowPropertyType || capitalize(formData.propertyType) },
+            { label: 'Listing Type', value: flowListingType || capitalize(formData.listingType) }
+          ]}
+        />
+        
         <div className="grid gap-6 md:grid-cols-2">
           <SummarySection
             title="Basic Details"
@@ -368,7 +436,7 @@ export function PropertySummary({
                 { label: 'Rent Amount', value: formatCurrency(formData.rentAmount) },
                 { label: 'Security Deposit', value: formatCurrency(formData.securityDeposit) },
                 { label: 'Lease Duration', value: formData.leaseDuration },
-                { label: 'Lock-in Period', value: `${formData.lockInPeriod} months` },
+                { label: 'Lock-in Period', value: formData.lockInPeriod ? `${formData.lockInPeriod} months` : '-' },
                 { label: 'Maintenance', value: formData.maintenance },
                 { label: 'Furnishing', value: formData.furnishing },
                 { label: 'Power Backup', value: formData.powerBackup },
