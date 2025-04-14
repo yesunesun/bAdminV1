@@ -1,7 +1,7 @@
 // src/modules/seeker/pages/BrowseProperties.tsx
-// Version: 3.0.0
-// Last Modified: 03-04-2025 14:45 IST
-// Purpose: Removed duplicate header
+// Version: 3.1.0
+// Last Modified: 13-04-2025 13:00 IST
+// Purpose: Added request throttling to prevent 406 errors when checking property likes
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -34,7 +34,7 @@ const BrowseProperties: React.FC = () => {
   const [loadingLikes, setLoadingLikes] = useState(false);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
 
-  // Load user's liked properties
+  // Load user's liked properties with throttling to prevent 406 errors
   useEffect(() => {
     const fetchLikedProperties = async () => {
       if (!user || properties.length === 0) return;
@@ -44,13 +44,19 @@ const BrowseProperties: React.FC = () => {
       try {
         const likes: Record<string, boolean> = {};
         
-        // Check likes for each property (in parallel)
-        await Promise.all(
-          properties.map(async (property) => {
+        // Check likes for each property (sequentially with delay to prevent 406 errors)
+        for (const property of properties) {
+          try {
             const { liked } = await checkPropertyLike(property.id, user.id);
             likes[property.id] = liked;
-          })
-        );
+            
+            // Small delay between requests to avoid overwhelming the server
+            await new Promise(resolve => setTimeout(resolve, 25));
+          } catch (error) {
+            console.error(`Error checking like for property ${property.id}:`, error);
+            likes[property.id] = false; // Default to not liked on error
+          }
+        }
         
         setLikedProperties(likes);
       } catch (error) {

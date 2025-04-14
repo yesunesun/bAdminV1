@@ -1,7 +1,7 @@
 // src/modules/seeker/services/seekerService.ts
-// Version: 4.5.0
-// Last Modified: 07-04-2025 16:30 IST
-// Purpose: Added property age and furnishing filters
+// Version: 4.8.0
+// Last Modified: 13-04-2025 15:30 IST
+// Purpose: Fixed exports and optimized property likes functionality
 
 import { supabase } from '@/lib/supabase';
 import { PropertyType } from '@/modules/owner/components/property/types';
@@ -19,6 +19,7 @@ export interface PropertyFilters {
   page?: number;
   pageSize?: number;
 }
+
 // Colored marker URLs from Google Maps
 export const markerPins = {
   residential: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png',
@@ -102,7 +103,6 @@ export const fetchProperties = async (filters: PropertyFilters = {}) => {
       .select('id', { count: 'exact' });
 
     // Apply filters to both queries
-    // Inside fetchProperties function, add these filter conditions:
     if (filters.furnishing) {
       query = query.filter('property_details->furnishing', 'eq', filters.furnishing);
       countQuery = countQuery.filter('property_details->furnishing', 'eq', filters.furnishing);
@@ -533,20 +533,51 @@ export const getUserFavorites = async () => {
   }
 };
 
-export const checkPropertyLike = async (propertyId: string, userId: string) => {
+// Fixed version - Get all user's liked property IDs
+export const getUserLikedPropertyIds = async (userId: string): Promise<string[]> => {
   try {
+    if (!userId) {
+      return [];
+    }
+    
     const { data, error } = await supabase
       .from('property_likes')
-      .select('id')
-      .eq('property_id', propertyId)
-      .eq('user_id', userId)
-      .single();
+      .select('property_id')
+      .eq('user_id', userId);
+      
+    if (error) {
+      console.error('Error fetching user liked properties:', error);
+      return [];
+    }
+    
+    return data.map(item => item.property_id);
+  } catch (error) {
+    console.error('Error getting user liked property IDs:', error);
+    return [];
+  }
+};
 
-    if (error && error.code !== 'PGRST116') { // PGRST116 is "row not found"
-      throw error;
+// Fixed version with better error handling
+export const checkPropertyLike = async (propertyId: string, userId: string) => {
+  try {
+    if (!propertyId || !userId) {
+      console.warn('Missing propertyId or userId in checkPropertyLike', { propertyId, userId });
+      return { liked: false };
+    }
+    
+    // Use count instead of single to avoid 406 errors when no record exists
+    const { data, error, count } = await supabase
+      .from('property_likes')
+      .select('id', { count: 'exact' })
+      .eq('property_id', propertyId)
+      .eq('user_id', userId);
+
+    if (error) {
+      console.error('Error checking property like:', error);
+      return { liked: false };
     }
 
-    return { liked: !!data };
+    return { liked: (count || 0) > 0 };
   } catch (error) {
     console.error('Error checking property like:', error);
     return { liked: false };
@@ -559,6 +590,18 @@ export const addFavorite = async (propertyId: string) => {
 
     if (!user?.user) {
       throw new Error('User not authenticated');
+    }
+
+    // First check if like already exists to avoid duplicates
+    const { count } = await supabase
+      .from('property_likes')
+      .select('id', { count: 'exact' })
+      .eq('property_id', propertyId)
+      .eq('user_id', user.user.id);
+    
+    // If like already exists, return success without inserting
+    if ((count || 0) > 0) {
+      return { success: true };
     }
 
     const { error } = await supabase
@@ -872,4 +915,25 @@ export const fetchSimilarProperties = async (options: SimilarPropertiesOptions) 
     // Return empty array instead of throwing to prevent component errors
     return [];
   }
+};
+
+// Helper function for processing similar properties
+const processSimilarProperties = (properties: any[]) => {
+  return properties.map(property => {
+    // Find primary image or first image
+    let primaryImage = '/noimage.png';
+    if (property.property_images && property.property_images.length > 0) {
+      const primary = property.property_images.find((img: any) => img.is_primary);
+      primaryImage = primary ? primary.url : property.property_images[0].url;
+    }
+
+    // Add primary image to property_details
+    return {
+      ...property,
+      property_details: {
+        ...property.property_details,
+        primaryImage
+      }
+    };
+  });
 };
