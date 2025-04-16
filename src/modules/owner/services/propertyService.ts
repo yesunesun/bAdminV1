@@ -1,41 +1,22 @@
 // src/modules/owner/services/propertyService.ts
-// Version: 4.9.0
-// Last Modified: 15-04-2025 16:45 IST
-// Purpose: Added version tracking to property data structure
+// Version: 5.0.0
+// Last Modified: 16-04-2025 14:50 IST
+// Purpose: Added support for v2 data structure with conversion utilities
 
 import { supabase } from '@/lib/supabase';
-import { Property, FormData } from '../components/property/PropertyFormTypes';
-
-// Current version identifier for property data structure
-export const CURRENT_DATA_VERSION = 'v1';
+import { Property, FormData, FormDataV1, FormDataV2 } from '../components/property/PropertyFormTypes';
+import { 
+  detectDataVersion, 
+  DATA_VERSION_V1, 
+  DATA_VERSION_V2, 
+  CURRENT_DATA_VERSION,
+  convertV1ToV2,
+  convertV2ToV1 
+} from '../components/property/wizard/utils/propertyDataAdapter';
 
 // Cache for properties to avoid redundant fetches
 const propertiesCache = new Map<string, {data: Property[], timestamp: number}>();
 const CACHE_EXPIRY = 60000; // 1 minute cache expiry
-
-// Utility function to detect data version
-export const detectDataVersion = (propertyData: any): string => {
-  // If the property_details is a string, parse it first
-  let details = propertyData.property_details;
-  if (typeof details === 'string') {
-    try {
-      details = JSON.parse(details);
-    } catch (e) {
-      console.warn('Could not parse property_details as JSON:', e);
-      details = {};
-    }
-  }
-  
-  // If the version is explicitly set in property_details, return it
-  if (details && details._version) {
-    console.log(`Detected explicit data version: ${details._version}`);
-    return details._version;
-  }
-  
-  // No version information - assume it's pre-versioning data
-  console.log('No version information found, assuming legacy data structure');
-  return 'legacy';
-};
 
 export const propertyService = {
   // Fetch a user's properties with caching
@@ -83,49 +64,29 @@ export const propertyService = {
         }
         
         // Detect data version to handle backward compatibility
-        const dataVersion = detectDataVersion(property);
+        const dataVersion = detectDataVersion(property.property_details);
         console.log(`Property ${property.id} has data version: ${dataVersion}`);
-        
-        // Ensure required fields exist in property_details
-        if (!property.property_details.flatPlotNo) {
-          property.property_details.flatPlotNo = '';
-        }
-        
-        // Check if this is a sale property and ensure sale fields exist
-        const isSaleProperty = 
-          property.property_details.listingType?.toLowerCase() === 'sale' || 
-          property.property_details.listingType?.toLowerCase() === 'sell' ||
-          property.property_details.isSaleProperty === true;
-        
-        if (isSaleProperty) {
-          property.property_details.expectedPrice = property.property_details.expectedPrice || property.price?.toString() || '';
-          property.property_details.maintenanceCost = property.property_details.maintenanceCost || '';
-          property.property_details.kitchenType = property.property_details.kitchenType || '';
-          property.property_details.priceNegotiable = property.property_details.priceNegotiable || false;
-          
-          // Explicitly mark as sale property
-          property.property_details.isSaleProperty = true;
-          property.property_details.propertyPriceType = 'sale';
-        } else {
-          // For rental properties, ensure rental fields exist
-          property.property_details.rentalType = property.property_details.rentalType || 'rent';
-          property.property_details.rentAmount = property.property_details.rentAmount || property.price?.toString() || '';
-          property.property_details.securityDeposit = property.property_details.securityDeposit || '';
-          property.property_details.rentNegotiable = property.property_details.rentNegotiable || false;
-          
-          // Explicitly mark as rental property
-          property.property_details.isSaleProperty = false;
-          property.property_details.propertyPriceType = 'rental';
-        }
         
         // Add version information if missing
         if (dataVersion === 'legacy') {
           console.log(`Adding version information to legacy property ${property.id}`);
-          property.property_details._version = CURRENT_DATA_VERSION;
+          property.property_details._version = DATA_VERSION_V1;
+        }
+        
+        // If needed, normalize data structure to the current version
+        let normalizedDetails = property.property_details;
+        
+        if (dataVersion === DATA_VERSION_V1 && CURRENT_DATA_VERSION === DATA_VERSION_V2) {
+          console.log(`Converting property ${property.id} from V1 to V2`);
+          normalizedDetails = convertV1ToV2(property.property_details);
+        } else if (dataVersion === DATA_VERSION_V2 && CURRENT_DATA_VERSION === DATA_VERSION_V1) {
+          console.log(`Converting property ${property.id} from V2 to V1`);
+          normalizedDetails = convertV2ToV1(property.property_details);
         }
         
         return {
           ...property,
+          property_details: normalizedDetails,
           images
         };
       });
@@ -192,115 +153,30 @@ export const propertyService = {
       }
       
       // Detect data version to handle backward compatibility
-      const dataVersion = detectDataVersion(data);
+      const dataVersion = detectDataVersion(data.property_details);
       console.log(`Property ${data.id} has data version: ${dataVersion}`);
-      
-      // Check if this is a sale property and ensure all required fields exist
-      const isSaleProperty = 
-        data.property_details.listingType?.toLowerCase() === 'sale' || 
-        data.property_details.listingType?.toLowerCase() === 'sell' ||
-        data.property_details.isSaleProperty === true ||
-        data.property_details.propertyPriceType === 'sale';
-      
-      console.log('Property is sale type:', isSaleProperty);
-      console.log('Sale fields before processing:', {
-        expectedPrice: data.property_details.expectedPrice,
-        maintenanceCost: data.property_details.maintenanceCost,
-        kitchenType: data.property_details.kitchenType,
-        isSaleProperty: data.property_details.isSaleProperty,
-        propertyPriceType: data.property_details.propertyPriceType
-      });
-      
-      // IMPORTANT: Explicitly check and set required fields
-      if (!data.property_details.flatPlotNo) {
-        console.log('Property has no flatPlotNo field, initializing with empty string');
-        data.property_details.flatPlotNo = '';
-      }
-      
-      if (isSaleProperty) {
-        // For sale properties, ensure sale fields exist with price fallback
-        console.log('Setting up sale property fields');
-        
-        // If expectedPrice is missing but price exists, use price
-        if (!data.property_details.expectedPrice && data.price) {
-          console.log('Setting expectedPrice from price:', data.price);
-          data.property_details.expectedPrice = data.price.toString();
-        } else if (!data.property_details.expectedPrice) {
-          console.log('No expectedPrice or price found, setting to empty string');
-          data.property_details.expectedPrice = '';
-        }
-        
-        // Set other fields with defaults if missing
-        data.property_details.maintenanceCost = data.property_details.maintenanceCost || '';
-        data.property_details.kitchenType = data.property_details.kitchenType || '';
-        data.property_details.priceNegotiable = data.property_details.priceNegotiable || false;
-        
-        // Explicitly mark as sale property
-        data.property_details.isSaleProperty = true;
-        data.property_details.propertyPriceType = 'sale';
-        
-        console.log('Sale property fields set:', {
-          expectedPrice: data.property_details.expectedPrice,
-          maintenanceCost: data.property_details.maintenanceCost,
-          kitchenType: data.property_details.kitchenType,
-          priceNegotiable: data.property_details.priceNegotiable
-        });
-      } else {
-        // For rental properties, ensure rental fields exist
-        console.log('Setting up rental property fields');
-        data.property_details.rentalType = data.property_details.rentalType || 'rent';
-        
-        // If rentAmount is missing but price exists, use price
-        if (!data.property_details.rentAmount && data.price) {
-          console.log('Setting rentAmount from price:', data.price);
-          data.property_details.rentAmount = data.price.toString();
-        } else if (!data.property_details.rentAmount) {
-          console.log('No rentAmount or price found, setting to empty string');
-          data.property_details.rentAmount = '';
-        }
-        
-        data.property_details.securityDeposit = data.property_details.securityDeposit || '';
-        data.property_details.rentNegotiable = data.property_details.rentNegotiable || false;
-        
-        // Explicitly mark as rental property
-        data.property_details.isSaleProperty = false;
-        data.property_details.propertyPriceType = 'rental';
-      }
       
       // Add version information if missing
       if (dataVersion === 'legacy') {
         console.log(`Adding version information to legacy property ${data.id}`);
-        data.property_details._version = CURRENT_DATA_VERSION;
+        data.property_details._version = DATA_VERSION_V1;
       }
       
-      // Log property details for debugging
-      console.log('Final property details after processing:', {
-        _version: data.property_details._version,
-        listingType: data.property_details.listingType,
-        isSaleProperty: data.property_details.isSaleProperty,
-        propertyPriceType: data.property_details.propertyPriceType,
-        expectedPrice: data.property_details.expectedPrice,
-        maintenanceCost: data.property_details.maintenanceCost,
-        kitchenType: data.property_details.kitchenType
-      });
+      // Normalize data structure to the current version if needed
+      let normalizedDetails = data.property_details;
       
-      // Ensure required properties exist
-      if (!data.property_details.propertyType) {
-        // Try to derive from title if available
-        if (data.title && data.title.includes(' in ')) {
-          const parts = data.title.split(' in ');
-          if (parts[0].includes(' ')) {
-            data.property_details.propertyType = parts[0].split(' ').slice(1).join(' ');
-          }
-        }
+      if (dataVersion === DATA_VERSION_V1 && CURRENT_DATA_VERSION === DATA_VERSION_V2) {
+        console.log(`Converting property ${data.id} from V1 to V2`);
+        normalizedDetails = convertV1ToV2(data.property_details);
+      } else if (dataVersion === DATA_VERSION_V2 && CURRENT_DATA_VERSION === DATA_VERSION_V1) {
+        console.log(`Converting property ${data.id} from V2 to V1`);
+        normalizedDetails = convertV2ToV1(data.property_details);
       }
-      
-      // Set defaults for any missing fields that are required
-      data.property_details.listingType = data.property_details.listingType || (isSaleProperty ? 'sale' : 'rent');
       
       console.log('=========== DEBUG: LOADING PROPERTY END ===========');
       return {
         ...data,
+        property_details: normalizedDetails,
         images
       };
     } catch (error) {
@@ -309,110 +185,115 @@ export const propertyService = {
     }
   },
 
-  // Create a new property
+  // Create a new property - Always use current version
   async createProperty(propertyData: FormData, userId: string, status: 'draft' | 'published' = 'draft'): Promise<Property> {
     try {
       console.log('=========== DEBUG: CREATE PROPERTY START ===========');
       console.log('Creating property with status:', status);
       
-      // Ensure version information exists
-      if (!propertyData._version) {
-        console.log(`Setting property data version to: ${CURRENT_DATA_VERSION}`);
-        propertyData._version = CURRENT_DATA_VERSION;
+      // Detect data version
+      const dataVersion = detectDataVersion(propertyData);
+      console.log(`Form data version: ${dataVersion}`);
+      
+      // Convert to current version if needed
+      let processedData = propertyData;
+      
+      if (dataVersion === DATA_VERSION_V1 && CURRENT_DATA_VERSION === DATA_VERSION_V2) {
+        console.log('Converting form data from V1 to V2');
+        processedData = convertV1ToV2(propertyData as FormDataV1);
+      } else if (dataVersion === DATA_VERSION_V2 && CURRENT_DATA_VERSION === DATA_VERSION_V1) {
+        console.log('Converting form data from V2 to V1');
+        processedData = convertV2ToV1(propertyData as FormDataV2);
       }
       
-      // Ensure flatPlotNo field is included in the property details
-      console.log('flatPlotNo value:', propertyData.flatPlotNo);
+      // Ensure version information is set
+      if (CURRENT_DATA_VERSION === DATA_VERSION_V2) {
+        (processedData as FormDataV2)._version = CURRENT_DATA_VERSION;
+      } else {
+        (processedData as FormDataV1)._version = CURRENT_DATA_VERSION;
+      }
       
-      // Determine if this is a sale property
-      const isSaleProperty = 
-        propertyData.listingType?.toLowerCase() === 'sale' || 
-        propertyData.listingType?.toLowerCase() === 'sell';
+      // Determine price based on data version and property type
+      let price = 0;
       
-      console.log('Creating property as sale type:', isSaleProperty);
-      console.log('Sale-specific fields:', {
-        expectedPrice: propertyData.expectedPrice,
-        maintenanceCost: propertyData.maintenanceCost,
-        kitchenType: propertyData.kitchenType
-      });
+      if (CURRENT_DATA_VERSION === DATA_VERSION_V2) {
+        const v2Data = processedData as FormDataV2;
+        if (v2Data.flow.listingType === 'sale' && v2Data.sale) {
+          price = v2Data.sale.expectedPrice || 0;
+        } else if (v2Data.rental) {
+          price = v2Data.rental.rentAmount || 0;
+        }
+      } else {
+        const v1Data = processedData as FormDataV1;
+        const isSaleProperty = v1Data.isSaleProperty || 
+                              v1Data.listingType?.toLowerCase() === 'sale' || 
+                              v1Data.propertyPriceType === 'sale';
+        
+        price = isSaleProperty 
+          ? parseFloat(v1Data.expectedPrice || '0') 
+          : parseFloat(v1Data.rentAmount || '0');
+      }
       
-      // Create a safe version of property data with required fields guaranteed
-      const safePropertyData = {
-        ...propertyData,
-        flatPlotNo: propertyData.flatPlotNo || '',
-        // Explicitly mark as sale or rental property
-        isSaleProperty: isSaleProperty,
-        propertyPriceType: isSaleProperty ? 'sale' : 'rental',
-        // Ensure sale-specific fields exist
-        expectedPrice: isSaleProperty ? (propertyData.expectedPrice || '') : '',
-        maintenanceCost: isSaleProperty ? (propertyData.maintenanceCost || '') : '',
-        kitchenType: isSaleProperty ? (propertyData.kitchenType || '') : ''
-      };
-      
-      // Determine price field based on property type
-      const price = isSaleProperty
-        ? parseFloat(safePropertyData.expectedPrice) || 0
-        : parseFloat(safePropertyData.rentAmount) || 0;
-      
-      console.log('Using price value:', price, 'from', isSaleProperty ? 'expectedPrice' : 'rentAmount');
-      
+      // Create the database record
       const dbPropertyData = {
         owner_id: userId,
-        title: safePropertyData.title || `${safePropertyData.bhkType} ${safePropertyData.propertyType} in ${safePropertyData.locality}`,
-        description: safePropertyData.description || '',
+        title: CURRENT_DATA_VERSION === DATA_VERSION_V2 
+          ? (processedData as FormDataV2).basicDetails.title || 'New Property'
+          : (processedData as FormDataV1).title || 'New Property',
+        description: CURRENT_DATA_VERSION === DATA_VERSION_V2 
+          ? (processedData as FormDataV2).features.description || ''
+          : (processedData as FormDataV1).description || '',
         price: price,
-        bedrooms: safePropertyData.bhkType ? parseInt(safePropertyData.bhkType.split(' ')[0]) : 0,
-        bathrooms: safePropertyData.bathrooms ? parseInt(safePropertyData.bathrooms) : 0,
-        square_feet: safePropertyData.builtUpArea ? parseFloat(safePropertyData.builtUpArea) : null,
-        address: safePropertyData.address || '',
-        city: safePropertyData.locality,
-        state: 'Telangana',
-        zip_code: safePropertyData.pinCode || '',
+        bedrooms: CURRENT_DATA_VERSION === DATA_VERSION_V2
+          ? ((processedData as FormDataV2).basicDetails.bhkType 
+             ? parseInt((processedData as FormDataV2).basicDetails.bhkType.split(' ')[0]) 
+             : 0)
+          : ((processedData as FormDataV1).bhkType 
+             ? parseInt((processedData as FormDataV1).bhkType.split(' ')[0]) 
+             : 0),
+        bathrooms: CURRENT_DATA_VERSION === DATA_VERSION_V2
+          ? (processedData as FormDataV2).basicDetails.bathrooms || 0
+          : ((processedData as FormDataV1).bathrooms 
+             ? parseInt((processedData as FormDataV1).bathrooms) 
+             : 0),
+        square_feet: CURRENT_DATA_VERSION === DATA_VERSION_V2
+          ? (processedData as FormDataV2).basicDetails.builtUpArea || 0
+          : ((processedData as FormDataV1).builtUpArea 
+             ? parseFloat((processedData as FormDataV1).builtUpArea) 
+             : 0),
+        address: CURRENT_DATA_VERSION === DATA_VERSION_V2
+          ? (processedData as FormDataV2).location.address || ''
+          : (processedData as FormDataV1).address || '',
+        city: CURRENT_DATA_VERSION === DATA_VERSION_V2
+          ? (processedData as FormDataV2).location.city || ''
+          : (processedData as FormDataV1).city || (processedData as FormDataV1).locality || '',
+        state: CURRENT_DATA_VERSION === DATA_VERSION_V2
+          ? (processedData as FormDataV2).location.state || 'Telangana'
+          : (processedData as FormDataV1).state || 'Telangana',
+        zip_code: CURRENT_DATA_VERSION === DATA_VERSION_V2
+          ? (processedData as FormDataV2).location.pinCode || ''
+          : (processedData as FormDataV1).pinCode || '',
         status,
-        // IMPORTANT: Make sure sale-specific fields are included at top level
-        property_details: {
-          ...safePropertyData,
-          expectedPrice: safePropertyData.expectedPrice,
-          maintenanceCost: safePropertyData.maintenanceCost,
-          kitchenType: safePropertyData.kitchenType,
-          _version: CURRENT_DATA_VERSION // Ensure version is explicitly set
-        },
+        property_details: processedData,
         tags: status === 'published' ? ['public'] : []
       };
-      
-      console.log('Property details payload for DB:', JSON.stringify(dbPropertyData.property_details, null, 2));
+// src/modules/owner/services/propertyService.ts (continued)
+
+      console.log('Property database payload:', dbPropertyData);
       
       const { data, error } = await supabase
         .from('properties')
         .insert([dbPropertyData])
-        .select()
-        .single();
+        .select();
 
       if (error) throw error;
-      
-      // Verify what was saved
-      const { data: savedProperty, error: fetchError } = await supabase
-        .from('properties')
-        .select('property_details, price')
-        .eq('id', data.id)
-        .single();
-        
-      if (!fetchError) {
-        console.log('Verify saved property:', {
-          price: savedProperty.price,
-          expectedPrice: savedProperty.property_details.expectedPrice,
-          maintenanceCost: savedProperty.property_details.maintenanceCost,
-          kitchenType: savedProperty.property_details.kitchenType,
-          _version: savedProperty.property_details._version
-        });
-      }
       
       // Clear cache for this user
       propertiesCache.delete(userId);
       
       console.log('=========== DEBUG: CREATE PROPERTY END ===========');
       return {
-        ...data,
+        ...data[0],
         images: []
       };
     } catch (error) {
@@ -431,67 +312,89 @@ export const propertyService = {
     try {
       console.log('=========== DEBUG: UPDATE PROPERTY START ===========');
       console.log('Updating property:', propertyId);
-      console.log('flatPlotNo value:', propertyData.flatPlotNo);
       
-      // Ensure version information exists
-      if (!propertyData._version) {
-        console.log(`Setting property data version to: ${CURRENT_DATA_VERSION}`);
-        propertyData._version = CURRENT_DATA_VERSION;
+      // Detect data version
+      const dataVersion = detectDataVersion(propertyData);
+      console.log(`Form data version: ${dataVersion}`);
+      
+      // Convert to current version if needed
+      let processedData = propertyData;
+      
+      if (dataVersion === DATA_VERSION_V1 && CURRENT_DATA_VERSION === DATA_VERSION_V2) {
+        console.log('Converting form data from V1 to V2');
+        processedData = convertV1ToV2(propertyData as FormDataV1);
+      } else if (dataVersion === DATA_VERSION_V2 && CURRENT_DATA_VERSION === DATA_VERSION_V1) {
+        console.log('Converting form data from V2 to V1');
+        processedData = convertV2ToV1(propertyData as FormDataV2);
       }
       
-      // Determine if this is a sale property
-      const isSaleProperty = 
-        propertyData.listingType?.toLowerCase() === 'sale' || 
-        propertyData.listingType?.toLowerCase() === 'sell';
+      // Ensure version information is set
+      if (CURRENT_DATA_VERSION === DATA_VERSION_V2) {
+        (processedData as FormDataV2)._version = CURRENT_DATA_VERSION;
+      } else {
+        (processedData as FormDataV1)._version = CURRENT_DATA_VERSION;
+      }
       
-      console.log('Updating property as sale type:', isSaleProperty);
-      console.log('Sale property fields:', {
-        expectedPrice: propertyData.expectedPrice,
-        maintenanceCost: propertyData.maintenanceCost,
-        kitchenType: propertyData.kitchenType
-      });
+      // Determine price based on data version and property type
+      let price = 0;
       
-      // Create a safe version of property data with required fields guaranteed
-      const safePropertyData = {
-        ...propertyData,
-        flatPlotNo: propertyData.flatPlotNo || '',
-        // Explicitly mark as sale or rental property
-        isSaleProperty: isSaleProperty,
-        propertyPriceType: isSaleProperty ? 'sale' : 'rental',
-        // Explicitly include sale-specific fields
-        expectedPrice: isSaleProperty ? (propertyData.expectedPrice || '') : '',
-        maintenanceCost: isSaleProperty ? (propertyData.maintenanceCost || '') : '',
-        kitchenType: isSaleProperty ? (propertyData.kitchenType || '') : '',
-        priceNegotiable: isSaleProperty ? (propertyData.priceNegotiable || false) : false
-      };
+      if (CURRENT_DATA_VERSION === DATA_VERSION_V2) {
+        const v2Data = processedData as FormDataV2;
+        if (v2Data.flow.listingType === 'sale' && v2Data.sale) {
+          price = v2Data.sale.expectedPrice || 0;
+        } else if (v2Data.rental) {
+          price = v2Data.rental.rentAmount || 0;
+        }
+      } else {
+        const v1Data = processedData as FormDataV1;
+        const isSaleProperty = v1Data.isSaleProperty || 
+                              v1Data.listingType?.toLowerCase() === 'sale' || 
+                              v1Data.propertyPriceType === 'sale';
+        
+        price = isSaleProperty 
+          ? parseFloat(v1Data.expectedPrice || '0') 
+          : parseFloat(v1Data.rentAmount || '0');
+      }
       
-      // Determine price field based on property type
-      const price = isSaleProperty
-        ? parseFloat(safePropertyData.expectedPrice) || 0
-        : parseFloat(safePropertyData.rentAmount) || 0;
-      
-      console.log('Using price value:', price, 'from', isSaleProperty ? 'expectedPrice' : 'rentAmount');
-      
+      // Create the update object
       const updateData: any = {
-        title: safePropertyData.title || `${safePropertyData.bhkType} ${safePropertyData.propertyType} in ${safePropertyData.locality}`,
-        description: safePropertyData.description || '',
+        title: CURRENT_DATA_VERSION === DATA_VERSION_V2 
+          ? (processedData as FormDataV2).basicDetails.title || 'Updated Property'
+          : (processedData as FormDataV1).title || 'Updated Property',
+        description: CURRENT_DATA_VERSION === DATA_VERSION_V2 
+          ? (processedData as FormDataV2).features.description || ''
+          : (processedData as FormDataV1).description || '',
         price: price,
-        bedrooms: safePropertyData.bhkType ? parseInt(safePropertyData.bhkType.split(' ')[0]) : 0,
-        bathrooms: safePropertyData.bathrooms ? parseInt(safePropertyData.bathrooms) : 0,
-        square_feet: safePropertyData.builtUpArea ? parseFloat(safePropertyData.builtUpArea) : null,
-        address: safePropertyData.address || '',
-        city: safePropertyData.locality,
-        state: 'Telangana',
-        zip_code: safePropertyData.pinCode || '',
-        // IMPORTANT: Make sure sale-specific fields are included at top level
-        property_details: {
-          ...safePropertyData,
-          expectedPrice: safePropertyData.expectedPrice,
-          maintenanceCost: safePropertyData.maintenanceCost,
-          kitchenType: safePropertyData.kitchenType,
-          priceNegotiable: safePropertyData.priceNegotiable,
-          _version: CURRENT_DATA_VERSION // Ensure version is explicitly set
-        },
+        bedrooms: CURRENT_DATA_VERSION === DATA_VERSION_V2
+          ? ((processedData as FormDataV2).basicDetails.bhkType 
+             ? parseInt((processedData as FormDataV2).basicDetails.bhkType.split(' ')[0]) 
+             : 0)
+          : ((processedData as FormDataV1).bhkType 
+             ? parseInt((processedData as FormDataV1).bhkType.split(' ')[0]) 
+             : 0),
+        bathrooms: CURRENT_DATA_VERSION === DATA_VERSION_V2
+          ? (processedData as FormDataV2).basicDetails.bathrooms || 0
+          : ((processedData as FormDataV1).bathrooms 
+             ? parseInt((processedData as FormDataV1).bathrooms) 
+             : 0),
+        square_feet: CURRENT_DATA_VERSION === DATA_VERSION_V2
+          ? (processedData as FormDataV2).basicDetails.builtUpArea || 0
+          : ((processedData as FormDataV1).builtUpArea 
+             ? parseFloat((processedData as FormDataV1).builtUpArea) 
+             : 0),
+        address: CURRENT_DATA_VERSION === DATA_VERSION_V2
+          ? (processedData as FormDataV2).location.address || ''
+          : (processedData as FormDataV1).address || '',
+        city: CURRENT_DATA_VERSION === DATA_VERSION_V2
+          ? (processedData as FormDataV2).location.city || ''
+          : (processedData as FormDataV1).city || (processedData as FormDataV1).locality || '',
+        state: CURRENT_DATA_VERSION === DATA_VERSION_V2
+          ? (processedData as FormDataV2).location.state || 'Telangana'
+          : (processedData as FormDataV1).state || 'Telangana',
+        zip_code: CURRENT_DATA_VERSION === DATA_VERSION_V2
+          ? (processedData as FormDataV2).location.pinCode || ''
+          : (processedData as FormDataV1).pinCode || '',
+        property_details: processedData
       };
 
       // Only update status if provided
@@ -500,7 +403,7 @@ export const propertyService = {
         updateData.tags = status === 'published' ? ['public'] : [];
       }
       
-      console.log('Property details payload for DB:', JSON.stringify(updateData.property_details, null, 2));
+      console.log('Property update payload:', updateData);
 
       const { data, error } = await supabase
         .from('properties')
@@ -514,23 +417,6 @@ export const propertyService = {
         .single();
 
       if (error) throw error;
-      
-      // Verify what was updated
-      const { data: updatedProperty, error: fetchError } = await supabase
-        .from('properties')
-        .select('property_details, price')
-        .eq('id', propertyId)
-        .single();
-        
-      if (!fetchError) {
-        console.log('Verify updated property:', {
-          price: updatedProperty.price,
-          expectedPrice: updatedProperty.property_details.expectedPrice,
-          maintenanceCost: updatedProperty.property_details.maintenanceCost,
-          kitchenType: updatedProperty.property_details.kitchenType,
-          _version: updatedProperty.property_details._version
-        });
-      }
       
       // Process the images
       const images = data.property_images
@@ -573,54 +459,40 @@ export const propertyService = {
         
       if (!fetchError && currentProperty) {
         // Detect data version
-        const dataVersion = detectDataVersion(currentProperty);
+        const dataVersion = detectDataVersion(currentProperty.property_details);
         
-        // If no version info, add it while updating status
-        if (dataVersion === 'legacy') {
-          console.log(`Adding version information to legacy property ${propertyId}`);
-          
-          // Get property details as object
-          let details = currentProperty.property_details;
-          if (typeof details === 'string') {
-            try {
-              details = JSON.parse(details);
-            } catch (e) {
-              details = {};
-            }
-          }
-          
-          // Add version info
-          details._version = CURRENT_DATA_VERSION;
-          
-          // Update property with version info and status
-          const updateData = {
-            status,
-            tags: status === 'published' ? ['public'] : [],
-            property_details: details
-          };
-          
-          const { error } = await supabase
-            .from('properties')
-            .update(updateData)
-            .eq('id', propertyId)
-            .eq('owner_id', userId);
-          
-          if (error) throw error;
-        } else {
-          // Just update status without changing version info
-          const updateData = {
-            status,
-            tags: status === 'published' ? ['public'] : []
-          };
-          
-          const { error } = await supabase
-            .from('properties')
-            .update(updateData)
-            .eq('id', propertyId)
-            .eq('owner_id', userId);
-          
-          if (error) throw error;
+        // If data is not in current version, convert it
+        let processedData = currentProperty.property_details;
+        
+        if (dataVersion === DATA_VERSION_V1 && CURRENT_DATA_VERSION === DATA_VERSION_V2) {
+          console.log('Converting property data from V1 to V2');
+          processedData = convertV1ToV2(currentProperty.property_details as FormDataV1);
+        } else if (dataVersion === DATA_VERSION_V2 && CURRENT_DATA_VERSION === DATA_VERSION_V1) {
+          console.log('Converting property data from V2 to V1');
+          processedData = convertV2ToV1(currentProperty.property_details as FormDataV2);
         }
+        
+        // Add version info
+        if (CURRENT_DATA_VERSION === DATA_VERSION_V2) {
+          (processedData as FormDataV2)._version = CURRENT_DATA_VERSION;
+        } else {
+          (processedData as FormDataV1)._version = CURRENT_DATA_VERSION;
+        }
+        
+        // Update property with version info and status
+        const updateData = {
+          status,
+          tags: status === 'published' ? ['public'] : [],
+          property_details: processedData
+        };
+        
+        const { error } = await supabase
+          .from('properties')
+          .update(updateData)
+          .eq('id', propertyId)
+          .eq('owner_id', userId);
+        
+        if (error) throw error;
       } else {
         // Fallback if can't get current property
         const updateData = {
@@ -646,7 +518,8 @@ export const propertyService = {
     }
   },
 
-  // Delete a property (owner only)
+  // The remaining methods (deleteProperty, adminDeleteProperty, isUserAdmin) 
+  // don't need changes since they don't interact with the property data structure directly
   async deleteProperty(propertyId: string, userId: string): Promise<void> {
     try {
       console.log('=========== DEBUG: DELETE PROPERTY START ===========');
@@ -686,7 +559,6 @@ export const propertyService = {
     }
   },
 
-  // Delete any property (admin only)
   async adminDeleteProperty(propertyId: string): Promise<void> {
     try {
       console.log('=========== DEBUG: ADMIN DELETE PROPERTY START ===========');
@@ -726,7 +598,6 @@ export const propertyService = {
     }
   },
 
-  // Check if user is an admin
   async isUserAdmin(userId: string): Promise<boolean> {
     try {
       if (!userId) return false;

@@ -1,13 +1,19 @@
 // src/modules/owner/components/property/wizard/hooks/usePropertyForm.ts
-// Version: 3.3.0
-// Last Modified: 10-04-2025 15:50 IST
-// Purpose: Added support for PG/Hostel flow
+// Version: 4.0.0
+// Last Modified: 16-04-2025 14:55 IST
+// Purpose: Added support for v2 data structure
 
 import { usePropertyFormState } from './usePropertyFormState';
 import { usePropertyFormNavigation } from './usePropertyFormNavigation';
 import { usePropertyFormOperations } from './usePropertyFormOperations';
 import { usePropertyFormValidation } from './usePropertyFormValidation';
 import { FormData } from '../types';
+import { 
+  detectDataVersion, 
+  DATA_VERSION_V1, 
+  DATA_VERSION_V2,
+  CURRENT_DATA_VERSION 
+} from '../utils/propertyDataAdapter';
 
 interface UsePropertyFormProps {
   initialData?: FormData;
@@ -78,7 +84,9 @@ export function usePropertyForm({
     handleSaveAsDraft,
     handleSaveAndPublish,
     handleUpdate,
-    handleAutoFill
+    handleAutoFill,
+    detectDataVersion: detectPropertyVersion,
+    CURRENT_DATA_VERSION: currentVersion
   } = usePropertyFormOperations({
     form,
     user,
@@ -95,6 +103,13 @@ export function usePropertyForm({
     handleNextStep
   });
 
+  // Get the current data version of the form
+  const formData = form.getValues();
+  const dataVersion = detectDataVersion(formData);
+  
+  // Check if form is using v2 structure
+  const isV2Structure = dataVersion === DATA_VERSION_V2;
+
   return {
     form,
     currentStep,
@@ -104,7 +119,10 @@ export function usePropertyForm({
     user,
     status,
     isSaleMode,
-    isPGHostelMode,  // Expose the new PG/Hostel flag
+    isPGHostelMode,
+    isV2Structure,
+    dataVersion,
+    currentVersion,
     handleAutoFill,
     handleNextStep,
     handlePreviousStep,
