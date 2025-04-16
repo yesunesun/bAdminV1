@@ -1,13 +1,16 @@
 // src/modules/owner/components/property/wizard/types.ts
-// Version: 3.2.0
-// Last Modified: 15-04-2025 10:30 IST
-// Purpose: Added flow_property_type and flow_listing_type fields
+// Version: 3.1.0
+// Last Modified: 06-03-2025 18:40 IST
+// Purpose: Added sale-specific fields (expectedPrice, maintenanceCost, kitchenType)
 
 import { UseFormReturn } from 'react-hook-form';
 // Update this import to point to the new location
 import { PropertyValidationSchema } from './validationSchemas';
 
 export type FormData = {
+  // Version tracking field
+  _version?: string;
+
   // Property Selection Fields
   propertyCategory: 'residential' | 'commercial' | 'land';
   listingType: string;
@@ -86,4 +89,100 @@ export type FormData = {
   primaryImage?: string;
 };
 
-// Rest of the file remains unchanged
+export interface FormSectionProps {
+  form: UseFormReturn<FormData>;
+  mode?: 'create' | 'edit';
+  category?: string;
+  adType?: string;
+}
+
+export interface Property {
+  id: string;
+  owner_id: string;
+  title: string;
+  price: number;
+  address: string;
+  city?: string;
+  state?: string;
+  zip_code: string;
+  status: 'draft' | 'published' | 'archived';
+  tags: string[];
+  created_at: string;
+  updated_at: string;
+  property_details: FormData;
+  images?: Array<{
+    id: string;
+    url: string;
+    type: 'primary' | 'additional';
+  }>;
+}
+
+export interface FormStepProps extends FormSectionProps {
+  onNext: () => void;
+  onPrevious: () => void;
+}
+
+export interface PropertySelectionSectionProps extends FormSectionProps {
+  isFirstStep?: boolean;
+}
+
+export interface ImageUploadSectionProps {
+  propertyId: string;
+  onUploadComplete: () => void;
+  onPrevious: () => void;
+}
+
+export interface PropertySummaryProps {
+  formData: FormData;
+  onSave: () => Promise<void>;
+  onSaveAsDraft: () => Promise<void>;
+  onPublish: () => Promise<void>;
+  onPrevious: () => void;
+  saving: boolean;
+  status?: 'draft' | 'published';
+}
+
+export type StepValidationStatus = {
+  [key: number]: boolean;
+};
+
+export type PropertyFilter = {
+  state?: string;
+  district?: string;
+  city?: string;
+  locality?: string;
+  propertyType?: string;
+  bhkType?: string;
+  rentRange?: {
+    min: number;
+    max: number;
+  };
+  furnishing?: string;
+  availability?: string;
+  sortBy?: 'price_asc' | 'price_desc' | 'latest';
+};
+
+export type PropertyStats = {
+  total: number;
+  published: number;
+  draft: number;
+  archived: number;
+  views: number;
+  inquiries: number;
+};
+
+// Property Selection Types
+export type PropertyCategory = 'residential' | 'commercial' | 'land';
+
+export interface PropertyCategoryOption {
+  id: PropertyCategory;
+  title: string;
+  listingTypes: string[];
+  icon: React.FC<{ className?: string }>;
+}
+
+export interface HowItWorksProps {
+  onStartListing?: () => void;
+  showCTA?: boolean;
+  className?: string;
+}

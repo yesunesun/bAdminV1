@@ -1,19 +1,20 @@
 // src/modules/seeker/pages/AllProperties/components/PropertyCard.tsx
-// Version: 4.4.0
-// Last Modified: 14-04-2025 23:30 IST
-// Purpose: Added flow_property_type and flow_listing_type tags display
+// Version: 4.7.0
+// Last Modified: 15-04-2025 14:00 IST
+// Purpose: Updated to use propertyVersionService for version information
 
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { PropertyType } from '@/modules/owner/components/property/PropertyFormTypes';
 import { formatPrice } from '@/modules/seeker/services/seekerService';
 import { getPropertyFlow, getFlowLabel } from '../utils/propertyUtils';
+import { getPropertyVersion } from '../services/propertyVersionService';
 import { Card, CardHeader, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/lib/supabase';
-import { Trash2, AlertTriangle, Pencil, ShieldAlert } from 'lucide-react';
+import { Trash2, AlertTriangle, Pencil, ShieldAlert, Info } from 'lucide-react';
 import { 
   Dialog,
   DialogContent, 
@@ -51,6 +52,9 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
   const flowParts = propertyFlow.split('_');
   const flowPropertyType = flowParts[0] || 'UNKNOWN';
   const flowListingType = flowParts[1] || 'UNKNOWN';
+  
+  // Get property version using our service
+  const propertyVersion = getPropertyVersion(property.property_details);
 
   // Check if current user is an admin
   useEffect(() => {
@@ -211,6 +215,17 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
             </Badge>
           </div>
           
+          {/* Version Badge */}
+          <div className="absolute bottom-2 right-2">
+            <Badge 
+              className={`flex items-center gap-1 ${isAdmin ? 'bg-amber-500 hover:bg-amber-600' : 'bg-gray-500 hover:bg-gray-600'}`}
+              title="Data Structure Version"
+            >
+              <Info className="h-3 w-3" />
+              v{propertyVersion}
+            </Badge>
+          </div>
+          
           {/* Admin Badge */}
           {isAdmin && (
             <div className="absolute top-2 right-2">
@@ -238,12 +253,18 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
                 <p className="text-xs text-gray-500 dark:text-gray-400">
                   Flow: <span className="font-medium text-blue-600 dark:text-blue-400">{propertyFlow}</span>
                 </p>
-                {/* Property Type Tag - NEW */}
+                {/* Version Display */}
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Version: <span className={`font-medium ${isAdmin ? 'text-amber-600 dark:text-amber-400' : 'text-gray-600 dark:text-gray-400'}`}>
+                    {propertyVersion}
+                  </span>
+                </p>
+                {/* Property Type Tag */}
                 <div className="flex flex-wrap gap-1 mt-1">
                   <Badge variant="outline" className="text-xs border-blue-500 text-blue-600 dark:text-blue-400">
                     Type: {flowPropertyType}
                   </Badge>
-                  {/* Listing Type Tag - NEW */}
+                  {/* Listing Type Tag */}
                   <Badge variant="outline" className="text-xs border-green-500 text-green-600 dark:text-green-400">
                     Listing: {flowListingType}
                   </Badge>
@@ -324,7 +345,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
         </div>
       </div>
       
-      {/* Delete Confirmation Dialog - Same as in Properties.tsx */}
+      {/* Delete Confirmation Dialog */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>

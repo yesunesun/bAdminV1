@@ -1,13 +1,16 @@
 // src/modules/owner/components/property/wizard/hooks/usePropertyFormOperations.ts
-// Version: 3.2.0
-// Last Modified: 14-04-2025 17:30 IST
-// Purpose: Fix auto-fill functionality
+// Version: 3.3.0
+// Last Modified: 15-04-2025 17:45 IST
+// Purpose: Added version tracking to property data
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FormData } from '../types';
 import { TEST_DATA, autoFillAllSections } from '../test-data'; // Updated import to include autoFillAllSections
 import { supabase } from '@/lib/supabase';
+
+// Current version identifier for property data structure
+export const CURRENT_DATA_VERSION = 'v1';
 
 interface UsePropertyFormOperationsProps {
   form: any;
@@ -24,6 +27,19 @@ interface UsePropertyFormOperationsProps {
   setError: (error: string | null) => void;
   handleNextStep: () => void;
 }
+
+// Utility function to detect form data version
+export const detectDataVersion = (formData: FormData): string => {
+  // If the version is explicitly set, return it
+  if (formData._version) {
+    console.log(`Detected explicit data version: ${formData._version}`);
+    return formData._version;
+  }
+  
+  // No version information - assume it's pre-versioning data
+  console.log('No version information found, assuming legacy data structure');
+  return 'legacy';
+};
 
 export function usePropertyFormOperations({
   form,
@@ -206,17 +222,29 @@ export function usePropertyFormOperations({
       // Determine the proper flows
       const { propertyCategory, propertyFlow } = determinePropertyFlow(formData);
       
+      // Add version tracking to form data
+      const dataVersion = detectDataVersion(formData);
+      console.log(`Data version before save: ${dataVersion}`);
+      
+      // Always set the current version for new/updated properties
+      const versionedFormData = {
+        ...formData,
+        _version: CURRENT_DATA_VERSION
+      };
+      
+      console.log(`Setting property data version to: ${CURRENT_DATA_VERSION}`);
+      
       // Make sure all required fields exist in the data
       const safeFormData = {
-        ...formData,
+        ...versionedFormData,
         owner_id: user.id,
         status: finalStatus,
-        property_details: JSON.stringify(formData),
+        property_details: JSON.stringify(versionedFormData),
         propertyCategory,
         propertyFlow,
         // Add flow_property_type and flow_listing_type - prioritize URL values
-        flow_property_type: urlPropertyType || formData.flow_property_type || '',
-        flow_listing_type: urlListingType || formData.flow_listing_type || ''
+        flow_property_type: urlPropertyType || versionedFormData.flow_property_type || '',
+        flow_listing_type: urlListingType || versionedFormData.flow_listing_type || ''
       };
       
       // Use the flow information to ensure propertyCategory and propertyFlow are consistent
@@ -307,6 +335,9 @@ export function usePropertyFormOperations({
       
       // Use the enhanced auto-fill function from test-data.ts
       autoFillAllSections(form, propertyType, adType);
+      
+      // Add version info to auto-filled data
+      form.setValue('_version', CURRENT_DATA_VERSION);
     }
   };
   
@@ -384,6 +415,8 @@ export function usePropertyFormOperations({
     handleSaveAsDraft,
     handleSaveAndPublish,
     handleUpdate,
-    handleAutoFill
+    handleAutoFill,
+    detectDataVersion,
+    CURRENT_DATA_VERSION
   };
 }

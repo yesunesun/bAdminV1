@@ -1,14 +1,41 @@
 // src/modules/owner/services/propertyService.ts
-// Version: 4.8.0
-// Last Modified: 14-04-2025 16:45 IST
-// Purpose: Added adminDeleteProperty function to allow admins to delete any property
+// Version: 4.9.0
+// Last Modified: 15-04-2025 16:45 IST
+// Purpose: Added version tracking to property data structure
 
 import { supabase } from '@/lib/supabase';
 import { Property, FormData } from '../components/property/PropertyFormTypes';
 
+// Current version identifier for property data structure
+export const CURRENT_DATA_VERSION = 'v1';
+
 // Cache for properties to avoid redundant fetches
 const propertiesCache = new Map<string, {data: Property[], timestamp: number}>();
 const CACHE_EXPIRY = 60000; // 1 minute cache expiry
+
+// Utility function to detect data version
+export const detectDataVersion = (propertyData: any): string => {
+  // If the property_details is a string, parse it first
+  let details = propertyData.property_details;
+  if (typeof details === 'string') {
+    try {
+      details = JSON.parse(details);
+    } catch (e) {
+      console.warn('Could not parse property_details as JSON:', e);
+      details = {};
+    }
+  }
+  
+  // If the version is explicitly set in property_details, return it
+  if (details && details._version) {
+    console.log(`Detected explicit data version: ${details._version}`);
+    return details._version;
+  }
+  
+  // No version information - assume it's pre-versioning data
+  console.log('No version information found, assuming legacy data structure');
+  return 'legacy';
+};
 
 export const propertyService = {
   // Fetch a user's properties with caching
@@ -55,6 +82,10 @@ export const propertyService = {
           property.property_details = {};
         }
         
+        // Detect data version to handle backward compatibility
+        const dataVersion = detectDataVersion(property);
+        console.log(`Property ${property.id} has data version: ${dataVersion}`);
+        
         // Ensure required fields exist in property_details
         if (!property.property_details.flatPlotNo) {
           property.property_details.flatPlotNo = '';
@@ -85,6 +116,12 @@ export const propertyService = {
           // Explicitly mark as rental property
           property.property_details.isSaleProperty = false;
           property.property_details.propertyPriceType = 'rental';
+        }
+        
+        // Add version information if missing
+        if (dataVersion === 'legacy') {
+          console.log(`Adding version information to legacy property ${property.id}`);
+          property.property_details._version = CURRENT_DATA_VERSION;
         }
         
         return {
@@ -153,6 +190,10 @@ export const propertyService = {
         console.warn('Property has no property_details, creating empty object');
         data.property_details = {};
       }
+      
+      // Detect data version to handle backward compatibility
+      const dataVersion = detectDataVersion(data);
+      console.log(`Property ${data.id} has data version: ${dataVersion}`);
       
       // Check if this is a sale property and ensure all required fields exist
       const isSaleProperty = 
@@ -226,8 +267,15 @@ export const propertyService = {
         data.property_details.propertyPriceType = 'rental';
       }
       
+      // Add version information if missing
+      if (dataVersion === 'legacy') {
+        console.log(`Adding version information to legacy property ${data.id}`);
+        data.property_details._version = CURRENT_DATA_VERSION;
+      }
+      
       // Log property details for debugging
       console.log('Final property details after processing:', {
+        _version: data.property_details._version,
         listingType: data.property_details.listingType,
         isSaleProperty: data.property_details.isSaleProperty,
         propertyPriceType: data.property_details.propertyPriceType,
@@ -266,6 +314,12 @@ export const propertyService = {
     try {
       console.log('=========== DEBUG: CREATE PROPERTY START ===========');
       console.log('Creating property with status:', status);
+      
+      // Ensure version information exists
+      if (!propertyData._version) {
+        console.log(`Setting property data version to: ${CURRENT_DATA_VERSION}`);
+        propertyData._version = CURRENT_DATA_VERSION;
+      }
       
       // Ensure flatPlotNo field is included in the property details
       console.log('flatPlotNo value:', propertyData.flatPlotNo);
@@ -320,7 +374,8 @@ export const propertyService = {
           ...safePropertyData,
           expectedPrice: safePropertyData.expectedPrice,
           maintenanceCost: safePropertyData.maintenanceCost,
-          kitchenType: safePropertyData.kitchenType
+          kitchenType: safePropertyData.kitchenType,
+          _version: CURRENT_DATA_VERSION // Ensure version is explicitly set
         },
         tags: status === 'published' ? ['public'] : []
       };
@@ -347,7 +402,8 @@ export const propertyService = {
           price: savedProperty.price,
           expectedPrice: savedProperty.property_details.expectedPrice,
           maintenanceCost: savedProperty.property_details.maintenanceCost,
-          kitchenType: savedProperty.property_details.kitchenType
+          kitchenType: savedProperty.property_details.kitchenType,
+          _version: savedProperty.property_details._version
         });
       }
       
@@ -376,6 +432,12 @@ export const propertyService = {
       console.log('=========== DEBUG: UPDATE PROPERTY START ===========');
       console.log('Updating property:', propertyId);
       console.log('flatPlotNo value:', propertyData.flatPlotNo);
+      
+      // Ensure version information exists
+      if (!propertyData._version) {
+        console.log(`Setting property data version to: ${CURRENT_DATA_VERSION}`);
+        propertyData._version = CURRENT_DATA_VERSION;
+      }
       
       // Determine if this is a sale property
       const isSaleProperty = 
@@ -427,7 +489,8 @@ export const propertyService = {
           expectedPrice: safePropertyData.expectedPrice,
           maintenanceCost: safePropertyData.maintenanceCost,
           kitchenType: safePropertyData.kitchenType,
-          priceNegotiable: safePropertyData.priceNegotiable
+          priceNegotiable: safePropertyData.priceNegotiable,
+          _version: CURRENT_DATA_VERSION // Ensure version is explicitly set
         },
       };
 
@@ -464,7 +527,8 @@ export const propertyService = {
           price: updatedProperty.price,
           expectedPrice: updatedProperty.property_details.expectedPrice,
           maintenanceCost: updatedProperty.property_details.maintenanceCost,
-          kitchenType: updatedProperty.property_details.kitchenType
+          kitchenType: updatedProperty.property_details.kitchenType,
+          _version: updatedProperty.property_details._version
         });
       }
       
@@ -500,18 +564,78 @@ export const propertyService = {
     try {
       console.log(`Updating property ${propertyId} status to ${status}`);
       
-      const updateData = {
-        status,
-        tags: status === 'published' ? ['public'] : []
-      };
-      
-      const { error } = await supabase
+      // Get current property data to ensure version info exists
+      const { data: currentProperty, error: fetchError } = await supabase
         .from('properties')
-        .update(updateData)
+        .select('property_details')
         .eq('id', propertyId)
-        .eq('owner_id', userId); // Security check
-      
-      if (error) throw error;
+        .single();
+        
+      if (!fetchError && currentProperty) {
+        // Detect data version
+        const dataVersion = detectDataVersion(currentProperty);
+        
+        // If no version info, add it while updating status
+        if (dataVersion === 'legacy') {
+          console.log(`Adding version information to legacy property ${propertyId}`);
+          
+          // Get property details as object
+          let details = currentProperty.property_details;
+          if (typeof details === 'string') {
+            try {
+              details = JSON.parse(details);
+            } catch (e) {
+              details = {};
+            }
+          }
+          
+          // Add version info
+          details._version = CURRENT_DATA_VERSION;
+          
+          // Update property with version info and status
+          const updateData = {
+            status,
+            tags: status === 'published' ? ['public'] : [],
+            property_details: details
+          };
+          
+          const { error } = await supabase
+            .from('properties')
+            .update(updateData)
+            .eq('id', propertyId)
+            .eq('owner_id', userId);
+          
+          if (error) throw error;
+        } else {
+          // Just update status without changing version info
+          const updateData = {
+            status,
+            tags: status === 'published' ? ['public'] : []
+          };
+          
+          const { error } = await supabase
+            .from('properties')
+            .update(updateData)
+            .eq('id', propertyId)
+            .eq('owner_id', userId);
+          
+          if (error) throw error;
+        }
+      } else {
+        // Fallback if can't get current property
+        const updateData = {
+          status,
+          tags: status === 'published' ? ['public'] : []
+        };
+        
+        const { error } = await supabase
+          .from('properties')
+          .update(updateData)
+          .eq('id', propertyId)
+          .eq('owner_id', userId);
+        
+        if (error) throw error;
+      }
       
       // Clear cache for this user
       propertiesCache.delete(userId);
