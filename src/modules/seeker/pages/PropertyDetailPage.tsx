@@ -1,9 +1,9 @@
 // src/modules/seeker/pages/PropertyDetailPage.tsx
-// Version: 3.1.0
-// Last Modified: 05-04-2025 17:45 IST
-// Purpose: Added enhanced debugging and fixed property data passing
+// Version: 3.2.0
+// Last Modified: 30-04-2025 10:30 IST
+// Purpose: Added data refresh mechanism for image uploads
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { usePropertyDetails } from '../hooks/usePropertyDetails';
 import PropertyDetails from '../components/PropertyDetails';
@@ -14,7 +14,8 @@ import { useToast } from '@/components/ui/use-toast';
 const PropertyDetailPage: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  const { property, loading, error, isLiked, toggleLike } = usePropertyDetails();
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const { property, loading, error, isLiked, toggleLike, refreshData } = usePropertyDetails(refreshTrigger);
   const { toast } = useToast();
 
   // Debug the component render and property data
@@ -23,7 +24,8 @@ const PropertyDetailPage: React.FC = () => {
     console.log('[PropertyDetailPage] Property data:', property);
     console.log('[PropertyDetailPage] Loading state:', loading);
     console.log('[PropertyDetailPage] Error state:', error);
-  }, [id, property, loading, error]);
+    console.log('[PropertyDetailPage] Refresh trigger:', refreshTrigger);
+  }, [id, property, loading, error, refreshTrigger]);
 
   // Handle back button click
   const handleBack = () => {
@@ -55,6 +57,11 @@ const PropertyDetailPage: React.FC = () => {
     }
     
     return result;
+  };
+
+  // Function to trigger a data refresh (called after image upload)
+  const handleDataRefresh = () => {
+    setRefreshTrigger(prev => prev + 1);
   };
   
   return (

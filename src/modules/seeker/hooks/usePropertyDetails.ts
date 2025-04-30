@@ -1,7 +1,7 @@
 // src/modules/seeker/hooks/usePropertyDetails.ts
-// Version: 4.4.0
-// Last Modified: 05-04-2025 20:00 IST
-// Purpose: Fixed property data loading with URL parameter debugging
+// Version: 4.5.0
+// Last Modified: 30-04-2025 10:45 IST
+// Purpose: Added refresh functionality for property data
 
 import { useState, useEffect } from 'react';
 import { useParams, useLocation } from 'react-router-dom';
@@ -37,7 +37,7 @@ export interface PropertyDetails {
   } | null;
 }
 
-export const usePropertyDetails = () => {
+export const usePropertyDetails = (refreshDependency = 0) => {
   const params = useParams();
   const location = useLocation();
   const [property, setProperty] = useState<PropertyDetails | null>(null);
@@ -49,102 +49,112 @@ export const usePropertyDetails = () => {
   // Extract property ID from URL manually to ensure we're getting the right value
   const propertyId = params.id || location.pathname.split('/').pop();
 
-  useEffect(() => {
-    // Debug all possible parameter sources
-    console.log('[DEBUG] URL Path:', location.pathname);
-    console.log('[DEBUG] URL Params:', params);
-    console.log('[DEBUG] Property ID extracted:', propertyId);
-    
+  // Function to manually refresh data
+  const refreshData = async () => {
+    if (propertyId) {
+      await fetchPropertyDetails();
+    }
+  };
+
+  // The main data fetching function
+  const fetchPropertyDetails = async () => {
     if (!propertyId) {
       console.error('[usePropertyDetails] No property ID found in URL');
       setLoading(false);
       setError('No property ID found');
       return;
     }
-
-    const fetchPropertyDetails = async () => {
-      setLoading(true);
+    
+    setLoading(true);
+    
+    try {
+      console.log(`[usePropertyDetails] Fetching property with ID: ${propertyId}`);
       
-      try {
-        console.log(`[usePropertyDetails] Fetching property with ID: ${propertyId}`);
-        
-        // Make a direct query to debug SQL results
-        const { data, error: fetchError } = await supabase
-          .from('properties')
-          .select('*')
-          .eq('id', propertyId);
-        
-        console.log('[usePropertyDetails] Raw query result:', data);
-        
-        if (fetchError) {
-          console.error('[usePropertyDetails] Error fetching property:', fetchError);
-          throw new Error(`Failed to load property: ${fetchError.message}`);
-        }
-        
-        if (!data || data.length === 0) {
-          console.error('[usePropertyDetails] Property not found');
-          throw new Error('Property not found');
-        }
-        
-        // Get the property data (first result)
-        const propertyData = data[0];
-        console.log('[usePropertyDetails] Property data found:', propertyData);
-        
-        // Fetch images in a separate query
-        const { data: imagesData } = await supabase
-          .from('property_images')
-          .select('*')
-          .eq('property_id', propertyId);
-        
-        console.log('[usePropertyDetails] Images found:', imagesData?.length || 0);
-        
-        // Fetch owner info
-        let ownerInfo = null;
-        if (propertyData.owner_id) {
-          const { data: ownerData } = await supabase
-            .from('profiles')
-            .select('id, email, phone')
-            .eq('id', propertyData.owner_id)
-            .maybeSingle();
-            
-          ownerInfo = ownerData;
-        }
-        
-        // Check if the user has liked this property
-        if (user) {
-          const { data: likeData } = await supabase
-            .from('property_likes')
-            .select('id')
-            .eq('property_id', propertyId)
-            .eq('user_id', user.id)
-            .maybeSingle();
-            
-          setIsLiked(!!likeData);
-        }
-        
-        // Create the final property object
-        const completeProperty: PropertyDetails = {
-          ...propertyData,
-          property_images: imagesData || [],
-          ownerInfo: ownerInfo
-        };
-        
-        console.log('[usePropertyDetails] Final property object:', completeProperty);
-        
-        setProperty(completeProperty);
-        setError(null);
-        
-      } catch (err) {
-        console.error('[usePropertyDetails] Error:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load property details');
-        setProperty(null);
-      } finally {
-        setLoading(false);
+      // Make a direct query to debug SQL results
+      const { data, error: fetchError } = await supabase
+        .from('properties')
+        .select('*')
+        .eq('id', propertyId);
+      
+      console.log('[usePropertyDetails] Raw query result:', data);
+      
+      if (fetchError) {
+        console.error('[usePropertyDetails] Error fetching property:', fetchError);
+        throw new Error(`Failed to load property: ${fetchError.message}`);
       }
-    };
+      
+      if (!data || data.length === 0) {
+        console.error('[usePropertyDetails] Property not found');
+        throw new Error('Property not found');
+      }
+      
+      // Get the property data (first result)
+      const propertyData = data[0];
+      console.log('[usePropertyDetails] Property data found:', propertyData);
+      
+      // Fetch images in a separate query
+      const { data: imagesData } = await supabase
+        .from('property_images')
+        .select('*')
+        .eq('property_id', propertyId);
+      
+      console.log('[usePropertyDetails] Images found:', imagesData?.length || 0);
+      
+      // Fetch owner info
+      let ownerInfo = null;
+      if (propertyData.owner_id) {
+        const { data: ownerData } = await supabase
+          .from('profiles')
+          .select('id, email, phone')
+          .eq('id', propertyData.owner_id)
+          .maybeSingle();
+          
+        ownerInfo = ownerData;
+      }
+      
+      // Check if the user has liked this property
+      if (user) {
+        const { data: likeData } = await supabase
+          .from('property_likes')
+          .select('id')
+          .eq('property_id', propertyId)
+          .eq('user_id', user.id)
+          .maybeSingle();
+          
+        setIsLiked(!!likeData);
+      }
+      
+      // Create the final property object
+      const completeProperty: PropertyDetails = {
+        ...propertyData,
+        property_images: imagesData || [],
+        ownerInfo: ownerInfo
+      };
+      
+      console.log('[usePropertyDetails] Final property object:', completeProperty);
+      
+      setProperty(completeProperty);
+      setError(null);
+      
+    } catch (err) {
+      console.error('[usePropertyDetails] Error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load property details');
+      setProperty(null);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  // Fetch property details when component mounts or propertyId/user/refreshDependency changes
+  useEffect(() => {
+    // Debug all possible parameter sources
+    console.log('[DEBUG] URL Path:', location.pathname);
+    console.log('[DEBUG] URL Params:', params);
+    console.log('[DEBUG] Property ID extracted:', propertyId);
+    console.log('[DEBUG] Refresh dependency value:', refreshDependency);
+    
     fetchPropertyDetails();
-  }, [propertyId, user]);
+  }, [propertyId, user, refreshDependency]);
 
   // Toggle property like function remains the same
   const toggleLike = async () => {
@@ -188,6 +198,7 @@ export const usePropertyDetails = () => {
     loading,
     error,
     isLiked,
-    toggleLike
+    toggleLike,
+    refreshData
   };
 };

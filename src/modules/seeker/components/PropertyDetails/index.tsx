@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyDetails/index.tsx
-// Version: 4.1.0
-// Last Modified: 08-04-2025 17:45 IST
-// Purpose: Update main component to use the redesigned section components
+// Version: 4.2.0
+// Last Modified: 30-04-2025 10:15 IST
+// Purpose: Add image upload functionality to property details page
 
 import React, { useState, useEffect } from 'react';
 import { PropertyDetails as PropertyDetailsType } from '../../hooks/usePropertyDetails';
@@ -25,6 +25,7 @@ import PropertyHighlightsCard from './PropertyHighlightsCard';
 import SimilarProperties from './SimilarProperties';
 import NearbyAmenities from './NearbyAmenities';
 import VisitRequestDialog from './VisitRequestDialog';
+import PropertyImageUpload from './PropertyImageUpload';
 
 // Static similar properties data
 const similarPropertiesData = [
@@ -81,6 +82,7 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
 }) => {
   const { toast } = useToast();
   const [visitDialogOpen, setVisitDialogOpen] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   
   // Add debugging for property data
   useEffect(() => {
@@ -101,7 +103,7 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
       console.log('- property_images:', property.property_images?.length || 0, 'images');
       console.log('- ownerInfo:', property.ownerInfo);
     }
-  }, [property, isLoading]);
+  }, [property, isLoading, refreshTrigger]);
   
   // Loading state
   if (isLoading) {
@@ -173,6 +175,17 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
       });
     }
   };
+
+  // Handle image upload complete
+  const handleImageUploaded = () => {
+    toast({
+      title: "Image Uploaded",
+      description: "Your image has been added to the property",
+      variant: "default"
+    });
+    // Trigger a refresh of the property data
+    setRefreshTrigger(prev => prev + 1);
+  };
   
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -187,6 +200,12 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
         <div className="lg:col-span-2 space-y-6">
           {/* Image Gallery */}
           <PropertyGalleryCard images={safeProperty.property_images} />
+          
+          {/* Image Upload Component (only shown to authorized users) */}
+          <PropertyImageUpload 
+            property={safeProperty} 
+            onImageUploaded={handleImageUploaded} 
+          />
           
           {/* Quick Actions */}
           <PropertyActionButtons
