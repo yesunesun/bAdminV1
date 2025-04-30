@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyDetails/index.tsx
-// Version: 4.2.0
-// Last Modified: 30-04-2025 10:15 IST
-// Purpose: Add image upload functionality to property details page
+// Version: 4.3.0
+// Last Modified: 30-04-2025 16:00 IST
+// Purpose: Updated to handle image refresh and integrate with PropertyImageUpload
 
 import React, { useState, useEffect } from 'react';
 import { PropertyDetails as PropertyDetailsType } from '../../hooks/usePropertyDetails';
@@ -72,13 +72,15 @@ interface PropertyDetailsProps {
   isLiked: boolean;
   onToggleLike: () => Promise<{ success: boolean; message?: string }>;
   isLoading: boolean;
+  onRefresh?: () => void;
 }
 
 const PropertyDetails: React.FC<PropertyDetailsProps> = ({
   property,
   isLiked,
   onToggleLike,
-  isLoading
+  isLoading,
+  onRefresh
 }) => {
   const { toast } = useToast();
   const [visitDialogOpen, setVisitDialogOpen] = useState(false);
@@ -88,6 +90,7 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
   useEffect(() => {
     console.log('[PropertyDetails Component] Received property data:', property);
     console.log('[PropertyDetails Component] Loading state:', isLoading);
+    console.log('[PropertyDetails Component] Refresh trigger:', refreshTrigger);
     
     if (property) {
       // Check key property fields
@@ -104,6 +107,25 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
       console.log('- ownerInfo:', property.ownerInfo);
     }
   }, [property, isLoading, refreshTrigger]);
+  
+  // Handle image upload completed and trigger refresh
+  const handleImageUploaded = () => {
+    console.log("[PropertyDetails Component] Image uploaded, refreshing property data...");
+    
+    // Notify the parent component to refresh the data immediately
+    if (onRefresh) {
+      onRefresh();
+      
+      // Show toast after a short delay to ensure UI is updated
+      setTimeout(() => {
+        toast({
+          title: "Images Updated",
+          description: "Your property images have been updated",
+          variant: "default"
+        });
+      }, 500);
+    }
+  };
   
   // Loading state
   if (isLoading) {
@@ -174,17 +196,6 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
         variant: "default"
       });
     }
-  };
-
-  // Handle image upload complete
-  const handleImageUploaded = () => {
-    toast({
-      title: "Image Uploaded",
-      description: "Your image has been added to the property",
-      variant: "default"
-    });
-    // Trigger a refresh of the property data
-    setRefreshTrigger(prev => prev + 1);
   };
   
   return (
