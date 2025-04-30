@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/PropertyForm/components/StepNavigation.tsx
-// Version: 3.1.0
-// Last Modified: 17-04-2025 10:45 IST
-// Purpose: Fixed navigation button functionality for all property flows
+// Version: 3.4.0
+// Last Modified: 16-04-2025 18:30 IST
+// Purpose: Fixed Photos tab navigation by using standard navigation flow
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -33,7 +33,7 @@ export default function StepNavigation({
   saveText = 'Save as Draft',
   showBack = true,
   showNext = true,
-  showSave = true,
+  showSave = false,
   showPublish = false,
   isLastStep = false,
   isFirstStep = false
@@ -50,45 +50,52 @@ export default function StepNavigation({
   const computedIsFirstStep = formStep === 1;
   const computedIsLastStep = formStep === STEPS.length;
 
-  // Check if we're on the review step
+  // Check for specific steps
   const isReviewStep = currentStepId === 'review';
+  const isPhotosStep = currentStepId === 'photos';
   
-  // Get save button text based on current step
-  const getSaveButtonText = () => {
-    if (isReviewStep) {
-      return 'Save and Upload Photos';
-    }
-    return saveText;
+  // Get the base URL path (removing the last segment)
+  const getBasePath = () => {
+    const url = window.location.pathname;
+    const lastSlashIndex = url.lastIndexOf('/');
+    return url.substring(0, lastSlashIndex);
   };
-  
-  // Determine if we should show the Save button
-  const shouldShowSaveButton = showSave && 
-    currentStepId !== 'details' && 
-    currentStepId !== 'room_details';
   
   // Debugging information
   useEffect(() => {
     console.log(`StepNavigation rendered with step ${formStep} (${currentStepId})`);
     console.log(`Is first step: ${computedIsFirstStep}, Is last step: ${computedIsLastStep}`);
-  }, [formStep, currentStepId, computedIsFirstStep, computedIsLastStep]);
+    console.log(`Is photos step: ${isPhotosStep}, Is review step: ${isReviewStep}`);
+  }, [formStep, currentStepId, computedIsFirstStep, computedIsLastStep, isPhotosStep, isReviewStep]);
 
-  // Handle Save and Next for Review step
-  const handleSaveAndNext = () => {
-    console.log('Save and Continue clicked');
-    if (onSave) {
-      setIsSaving(true);
-      onSave();
-      
-      // Give time for the save to complete
-      setTimeout(() => {
-        handleNextStep();
-        setIsSaving(false);
-      }, 300);
-    } else {
-      // If no save handler, just navigate
-      handleNextStep();
-    }
-  };
+  // Special handling for photos step - if we're on the photos step, show the return button
+  if (isPhotosStep) {
+    return (
+      <div className="flex justify-between mt-6">
+        <div>
+          <button
+            type="button"
+            className="px-4 py-2 text-gray-600 bg-white border border-gray-300 rounded shadow-sm hover:bg-gray-50"
+            onClick={handlePreviousStep}
+          >
+            Return to Review
+          </button>
+        </div>
+        
+        <div className="flex gap-3">
+          {showPublish && (
+            <button
+              type="button"
+              className="px-4 py-2 text-white bg-blue-600 rounded shadow-sm hover:bg-blue-700"
+              onClick={onPublish}
+            >
+              Publish
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex justify-between mt-6">
@@ -105,24 +112,21 @@ export default function StepNavigation({
         )}
       </div>
       
-      {/* Right section - Next/Save/Publish buttons */}
+      {/* Right section - Next/Publish buttons */}
       <div className="flex gap-3">
-        {/* Only show Save button if not on details step */}
-        {shouldShowSaveButton && (
+        {/* Only show special review button if on review step */}
+        {isReviewStep && (
           <button
             type="button"
-            className={cn(
-              "px-4 py-2 text-gray-600 bg-white border border-gray-300 rounded shadow-sm hover:bg-gray-50",
-              isSaving && "opacity-50 cursor-not-allowed"
-            )}
-            onClick={isReviewStep ? handleSaveAndNext : onSave}
-            disabled={isSaving}
+            className="px-4 py-2 text-white bg-blue-600 rounded shadow-sm hover:bg-blue-700"
+            onClick={handleNextStep} // Use standard handleNextStep instead of custom navigation
           >
-            {isSaving ? 'Saving...' : getSaveButtonText()}
+            Continue to Photos
           </button>
         )}
         
-        {showNext && !computedIsLastStep && (
+        {/* Only show Next button if not on review step and not last step */}
+        {showNext && !computedIsLastStep && !isReviewStep && (
           <button
             type="button"
             className="px-4 py-2 text-white bg-green-600 rounded shadow-sm hover:bg-green-700"

@@ -1,9 +1,9 @@
 // src/modules/owner/components/property/wizard/sections/PropertyDetails.tsx
-// Version: 3.7.0
-// Last Modified: 03-03-2025 19:15 IST
-// Purpose: Added Possession Date field to Property Details
+// Version: 3.8.0
+// Last Modified: 18-04-2025 09:30 IST
+// Purpose: Enhanced form value observation and reactivity
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { FormSection } from '@/components/FormSection';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -18,28 +18,14 @@ import {
 } from '../constants';
 
 export function PropertyDetails({ form, mode = 'create', category, adType }: FormSectionProps) {
+  // Track mount status to avoid updates after unmount
+  const isMounted = useRef(true);
+  
+  // Track if initial form values have been processed
+  const initialProcessDone = useRef(false);
+  
   // Get initial form values directly
   const initialValues = form.getValues();
-  
-  // Ensure builtUpAreaUnit has a default value of 'sqft' if it's not already set
-  useEffect(() => {
-    // Always check if builtUpAreaUnit is empty or undefined and set default
-    const currentUnit = form.getValues().builtUpAreaUnit;
-    console.log('Initial builtUpAreaUnit:', currentUnit);
-    
-    if (!currentUnit) {
-      console.log('Setting default builtUpAreaUnit to sqft');
-      form.setValue('builtUpAreaUnit', 'sqft', { shouldValidate: false });
-    }
-    
-    // Log all form values to debug
-    console.log('All form values on mount:', form.getValues());
-  }, [form]);
-  
-  // Get tomorrow's date in YYYY-MM-DD format for min date
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const minDate = tomorrow.toISOString().split('T')[0];
   
   // Use component state to render values with proper initialization
   const [values, setValues] = useState({
@@ -55,41 +41,148 @@ export function PropertyDetails({ form, mode = 'create', category, adType }: For
     title: initialValues.title || ''
   });
   
-  // Force set default value for builtUpAreaUnit if not present in initial state
+  // Debug counter to track re-renders and updates
+  const updateCounter = useRef(0);
+  
+  // Clean up on unmount
   useEffect(() => {
-    if (!values.builtUpAreaUnit) {
-      setValues(prev => ({
-        ...prev,
-        builtUpAreaUnit: 'sqft'
-      }));
-    }
+    return () => {
+      isMounted.current = false;
+    };
   }, []);
   
-  // Subscribe to form changes to keep local state in sync
+  // Subscribe to form changes with improved handling
   useEffect(() => {
-    const subscription = form.watch((value, { name }) => {
-      // Only update our state if specific fields we care about change
-      if (name && ['propertyType', 'bhkType', 'floor', 'totalFloors', 'propertyAge', 'facing', 'builtUpArea', 'builtUpAreaUnit', 'possessionDate', 'title'].includes(name)) {
-        console.log(`Form field "${name}" changed to:`, value[name]);
-        setValues(prev => ({
-          ...prev,
-          [name]: value[name] || (name === 'builtUpAreaUnit' ? 'sqft' : '')
-        }));
+    console.log('Setting up form subscription');
+    
+    // Watch all fields that we're interested in
+    const watchFields = [
+      'propertyType', 
+      'bhkType', 
+      'floor', 
+      'totalFloors', 
+      'propertyAge', 
+      'facing', 
+      'builtUpArea', 
+      'builtUpAreaUnit', 
+      'possessionDate', 
+      'title',
+      // Also watch v2 nested structure fields
+      'basicDetails'
+    ];
+    
+    // Subscribe to form changes for specific fields
+    const subscription = form.watch((value, { name, type }) => {
+      updateCounter.current += 1;
+      const count = updateCounter.current;
+      
+      console.log(`[${count}] Form update - Changed field: ${name}, Type: ${type}`);
+      
+      // If specific fields we care about change, update our state
+      if (watchFields.includes(name as string) || name === undefined) {
+        console.log(`[${count}] Updating component state from form values`);
+        updateStateFromForm(true, `subscription-${count}`);
+      }
+      
+      // For nested structure changes (v2 format)
+      if (name === 'basicDetails') {
+        console.log(`[${count}] Updating from nested basicDetails structure`);
+        const basicDetails = form.getValues('basicDetails');
+        if (basicDetails) {
+          // Update flat fields from nested structure
+          const nestedValues = {
+            title: basicDetails.title || values.title,
+            propertyType: basicDetails.propertyType || values.propertyType,
+            bhkType: basicDetails.bhkType || values.bhkType,
+            floor: basicDetails.floor?.toString() || values.floor,
+            totalFloors: basicDetails.totalFloors?.toString() || values.totalFloors,
+            propertyAge: basicDetails.propertyAge || values.propertyAge,
+            facing: basicDetails.facing || values.facing,
+            builtUpArea: basicDetails.builtUpArea?.toString() || values.builtUpArea,
+            builtUpAreaUnit: basicDetails.builtUpAreaUnit || values.builtUpAreaUnit
+          };
+          
+          console.log(`[${count}] Updating flat fields from nested values:`, nestedValues);
+          
+          // Set local state
+          if (isMounted.current) {
+            setValues(prev => ({...prev, ...nestedValues}));
+          }
+          
+          // Also set flat fields in form if they're not already set
+          Object.entries(nestedValues).forEach(([field, value]) => {
+            const currentValue = form.getValues(field);
+            if (!currentValue && value) {
+              console.log(`[${count}] Setting flat field ${field} from nested structure:`, value);
+              form.setValue(field, value, { shouldValidate: false });
+            }
+          });
+        }
       }
     });
     
+    // One-time initialization
+    if (!initialProcessDone.current) {
+      console.log('First-time processing of initial values');
+      initialProcessDone.current = true;
+      
+      // Ensure builtUpAreaUnit has a default value of 'sqft'
+      if (!form.getValues().builtUpAreaUnit) {
+        console.log('Setting default builtUpAreaUnit to sqft');
+        form.setValue('builtUpAreaUnit', 'sqft', { shouldValidate: false });
+      }
+      
+      // Process nested structure (v2 format)
+      const basicDetails = form.getValues('basicDetails');
+      if (basicDetails) {
+        console.log('Processing nested basicDetails:', basicDetails);
+        
+        // Map nested values to flat fields if they're not set
+        if (basicDetails.propertyType && !form.getValues('propertyType')) {
+          form.setValue('propertyType', basicDetails.propertyType, { shouldValidate: false });
+        }
+        if (basicDetails.bhkType && !form.getValues('bhkType')) {
+          form.setValue('bhkType', basicDetails.bhkType, { shouldValidate: false });
+        }
+        if (basicDetails.floor && !form.getValues('floor')) {
+          form.setValue('floor', basicDetails.floor.toString(), { shouldValidate: false });
+        }
+        if (basicDetails.totalFloors && !form.getValues('totalFloors')) {
+          form.setValue('totalFloors', basicDetails.totalFloors.toString(), { shouldValidate: false });
+        }
+        if (basicDetails.propertyAge && !form.getValues('propertyAge')) {
+          form.setValue('propertyAge', basicDetails.propertyAge, { shouldValidate: false });
+        }
+        if (basicDetails.facing && !form.getValues('facing')) {
+          form.setValue('facing', basicDetails.facing, { shouldValidate: false });
+        }
+        if (basicDetails.builtUpArea && !form.getValues('builtUpArea')) {
+          form.setValue('builtUpArea', basicDetails.builtUpArea.toString(), { shouldValidate: false });
+        }
+        if (basicDetails.builtUpAreaUnit && !form.getValues('builtUpAreaUnit')) {
+          form.setValue('builtUpAreaUnit', basicDetails.builtUpAreaUnit, { shouldValidate: false });
+        }
+      }
+      
+      // Update state after processing initial values
+      updateStateFromForm(false, 'initial-process');
+    }
+    
     return () => subscription.unsubscribe();
-  }, [form]);
+  }, [form, category]);
   
-  // After the component mounts, check if we need to sync state with form
-  useEffect(() => {
+  // Function to update component state from form values
+  const updateStateFromForm = (validateAfter = false, source = 'unknown') => {
+    if (!isMounted.current) return;
+    
     const formValues = form.getValues();
-    console.log('Checking sync - current form values:', formValues);
+    console.log(`Updating state from form values (source: ${source})`, formValues);
     
     // Ensure builtUpAreaUnit has a value
     const areaUnit = formValues.builtUpAreaUnit || 'sqft';
     
-    const needsSync = Object.entries({
+    // Create new state object based on current form values
+    const newValues = {
       propertyType: formValues.propertyType || category || '',
       bhkType: formValues.bhkType || '',
       floor: formValues.floor || '',
@@ -100,30 +193,28 @@ export function PropertyDetails({ form, mode = 'create', category, adType }: For
       builtUpAreaUnit: areaUnit,
       possessionDate: formValues.possessionDate || '',
       title: formValues.title || ''
-    }).some(([key, value]) => {
-      const isDifferent = values[key as keyof typeof values] !== value;
-      if (isDifferent) {
-        console.log(`Field ${key} needs sync: state=${values[key as keyof typeof values]}, form=${value}`);
-      }
-      return isDifferent;
+    };
+    
+    // Only update state if any values have changed
+    const hasChanges = Object.entries(newValues).some(([key, value]) => {
+      const currentValue = values[key as keyof typeof values];
+      return currentValue !== value;
     });
     
-    if (needsSync) {
-      console.log('Syncing component state with form values');
-      setValues({
-        propertyType: formValues.propertyType || category || '',
-        bhkType: formValues.bhkType || '',
-        floor: formValues.floor || '',
-        totalFloors: formValues.totalFloors || '',
-        propertyAge: formValues.propertyAge || '',
-        facing: formValues.facing || '',
-        builtUpArea: formValues.builtUpArea || '',
-        builtUpAreaUnit: areaUnit,
-        possessionDate: formValues.possessionDate || '',
-        title: formValues.title || ''
-      });
+    if (hasChanges) {
+      console.log(`State needs update - Changes detected (source: ${source})`, newValues);
+      setValues(newValues);
+      
+      // Validate form after update if requested
+      if (validateAfter) {
+        setTimeout(() => {
+          form.trigger();
+        }, 100);
+      }
+    } else {
+      console.log(`No state changes needed (source: ${source})`);
     }
-  }, [form, category]);
+  };
   
   // Update form when local state changes
   const updateFormAndState = (field: string, value: any) => {
@@ -133,12 +224,32 @@ export function PropertyDetails({ form, mode = 'create', category, adType }: For
       [field]: value
     }));
     
-    // Update form
+    // Update form flat field
     form.setValue(field, value, { shouldValidate: true });
+    
+    // Also update nested structure if it exists (v2 format)
+    const basicDetails = form.getValues('basicDetails');
+    if (basicDetails) {
+      console.log(`Also updating nested basicDetails.${field}:`, value);
+      
+      // Convert value format for nested structure if needed
+      let structuredValue = value;
+      if (field === 'floor' || field === 'totalFloors' || field === 'builtUpArea') {
+        const numValue = parseInt(value);
+        structuredValue = !isNaN(numValue) ? numValue : null;
+      }
+      
+      // Update the nested field
+      const updatedBasicDetails = {
+        ...basicDetails,
+        [field]: structuredValue
+      };
+      
+      form.setValue('basicDetails', updatedBasicDetails, { shouldValidate: false });
+    }
     
     // Debug log
     console.log(`Updated ${field} to:`, value);
-    console.log('Current form values after update:', form.getValues());
   };
   
   // Process numeric input
@@ -163,7 +274,11 @@ export function PropertyDetails({ form, mode = 'create', category, adType }: For
 
   // Force a unit value to avoid blank display
   const unitValue = values.builtUpAreaUnit || 'sqft';
-  console.log('Current unitValue for rendering:', unitValue);
+  
+  // Get tomorrow's date in YYYY-MM-DD format for min date
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const minDate = tomorrow.toISOString().split('T')[0];
 
   return (
     <FormSection
@@ -375,36 +490,43 @@ export function PropertyDetails({ form, mode = 'create', category, adType }: For
           <div>Form builtUpAreaUnit value: {form.getValues().builtUpAreaUnit || 'not set'}</div>
           <div>Form possessionDate value: {form.getValues().possessionDate || 'not set'}</div>
           <div>Mode: {mode}</div>
+          <div>Update counter: {updateCounter.current}</div>
+          <div>Has basicDetails: {form.getValues().basicDetails ? 'Yes' : 'No'}</div>
         </div>
       )}
       
       {/* Add a special auto-refresh button in development */}
       {process.env.NODE_ENV === 'development' && (
-        <button
-          type="button"
-          onClick={() => {
-            // Direct access to form values
-            const currentValues = form.getValues();
-            console.log('Manual refresh - current form values:', currentValues);
-            
-            // Force update local state from form values
-            setValues({
-              propertyType: currentValues.propertyType || category || '',
-              bhkType: currentValues.bhkType || '',
-              floor: currentValues.floor || '',
-              totalFloors: currentValues.totalFloors || '',
-              propertyAge: currentValues.propertyAge || '',
-              facing: currentValues.facing || '',
-              builtUpArea: currentValues.builtUpArea || '',
-              builtUpAreaUnit: currentValues.builtUpAreaUnit || 'sqft',
-              possessionDate: currentValues.possessionDate || '',
-              title: currentValues.title || ''
-            });
-          }}
-          className="mt-4 px-3 py-1 text-xs bg-blue-500 text-white rounded"
-        >
-          Reload Form Values
-        </button>
+        <div className="flex space-x-2 mt-2">
+          <button
+            type="button"
+            onClick={() => {
+              updateStateFromForm(true, 'manual-refresh');
+            }}
+            className="px-3 py-1 text-xs bg-blue-500 text-white rounded"
+          >
+            Reload Values
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              // Alert the current form values for debugging
+              const currentValues = form.getValues();
+              alert(JSON.stringify({
+                flat: {
+                  propertyType: currentValues.propertyType,
+                  bhkType: currentValues.bhkType,
+                  floor: currentValues.floor,
+                  builtUpAreaUnit: currentValues.builtUpAreaUnit,
+                },
+                nested: currentValues.basicDetails
+              }, null, 2));
+            }}
+            className="px-3 py-1 text-xs bg-green-500 text-white rounded"
+          >
+            Debug Values
+          </button>
+        </div>
       )}
     </FormSection>
   );

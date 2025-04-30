@@ -1,9 +1,9 @@
 // src/modules/owner/components/property/wizard/PropertyForm/components/FormContent.tsx
-// Version: 4.4.0
-// Last Modified: 12-04-2025 18:45 IST
-// Purpose: Added specialized CommercialFeatures component for Commercial Rent flow
+// Version: 4.5.0
+// Last Modified: 16-04-2025 16:15 IST
+// Purpose: Fixed Photos tab loading issue and improved error handling
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { UseFormReturn } from 'react-hook-form';
 import { FormData } from '../../types';
 
@@ -15,7 +15,7 @@ import { SaleDetails } from '../../sections/SaleDetails';
 import { AmenitiesSection } from '../../sections/AmenitiesSection';
 import { PropertySummary } from '../../sections/PropertySummary';
 import { ImageUploadSection } from '../../sections/ImageUploadSection';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertCircle } from 'lucide-react';
 
 // Import existing specific components
 import RoomDetails from '../../sections/RoomDetails';
@@ -81,10 +81,40 @@ const FormContent = ({
   savedPropertyId,
   handleImageUploadComplete
 }: FormContentProps) => {
+  // State to track loading retries for photos section
+  const [photoLoadRetries, setPhotoLoadRetries] = useState(0);
+  const [photoLoadError, setPhotoLoadError] = useState<string | null>(null);
+  
   // Get the current step ID safely
   const currentStepId = formStep > 0 && formStep <= STEPS.length 
     ? STEPS[formStep - 1]?.id 
     : null;
+  
+  // Effect to log savedPropertyId when on photos step
+  useEffect(() => {
+    if (currentStepId === 'photos') {
+      console.log('Photos step - savedPropertyId:', savedPropertyId);
+      console.log('Current mode:', mode);
+      
+      if (!savedPropertyId && mode === 'edit') {
+        // In edit mode, we should always have a propertyId
+        setPhotoLoadError('Unable to load property details. Please try again or contact support.');
+      } else if (!savedPropertyId && photoLoadRetries === 0) {
+        // In create mode, try to trigger a save if we don't have an ID
+        const attemptSave = async () => {
+          try {
+            await handleSaveAsDraft();
+            setPhotoLoadRetries(prev => prev + 1);
+          } catch (error) {
+            console.error('Error saving property before photos:', error);
+            setPhotoLoadError('Failed to save property details. Please try going back and clicking Save Draft first.');
+          }
+        };
+        
+        attemptSave();
+      }
+    }
+  }, [currentStepId, savedPropertyId, mode, photoLoadRetries, handleSaveAsDraft]);
   
   // Render content based on the current step
   if (currentStepId === 'details') {
@@ -338,12 +368,56 @@ const FormContent = ({
   }
   
   if (currentStepId === 'photos') {
+    // Check if there's a loading error
+    if (photoLoadError) {
+      return (
+        <div className="flex flex-col items-center justify-center py-16">
+          <div className="flex items-center text-destructive mb-4">
+            <AlertCircle className="h-6 w-6 mr-2" />
+            <h3 className="text-lg font-medium">Error Loading Photos</h3>
+          </div>
+          
+          <p className="text-muted-foreground text-center max-w-md mb-4">
+            {photoLoadError}
+          </p>
+          
+          <div className="flex gap-3 mt-4">
+            <button
+              type="button"
+              onClick={handlePreviousStep}
+              className="px-6 py-3 text-sm font-medium rounded-lg bg-secondary text-secondary-foreground"
+            >
+              Return to Previous Step
+            </button>
+            
+            <button
+              type="button"
+              onClick={() => {
+                setPhotoLoadError(null);
+                setPhotoLoadRetries(0);
+              }}
+              className="px-6 py-3 text-sm font-medium rounded-lg bg-primary text-primary-foreground"
+            >
+              Try Again
+            </button>
+          </div>
+        </div>
+      );
+    }
+    
     // Check if we have a property ID before rendering the image upload section
     if (!savedPropertyId) {
       return (
         <div className="flex flex-col items-center justify-center py-16">
           <Loader2 className="h-8 w-8 text-primary animate-spin mb-4" />
-          <p className="text-muted-foreground">Loading property details...</p>
+          <p className="text-muted-foreground">
+            {photoLoadRetries === 0 
+              ? "Preparing property for photos..." 
+              : "Loading property details..."}
+          </p>
+          <p className="text-xs text-muted-foreground mt-2">
+            This may take a few moments
+          </p>
           <button
             type="button"
             onClick={handlePreviousStep}
@@ -355,6 +429,7 @@ const FormContent = ({
       );
     }
     
+    // We have a property ID, render the image upload section
     return (
       <ImageUploadSection
         propertyId={savedPropertyId}

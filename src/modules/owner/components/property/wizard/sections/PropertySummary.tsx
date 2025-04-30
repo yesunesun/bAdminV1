@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/PropertySummary.tsx
-// Version: 3.9.0
-// Last Modified: 15-04-2025 10:30 IST
-// Purpose: Added flow property type and listing type to Review tab
+// Version: 4.0.0
+// Last Modified: 16-04-2025 14:30 IST
+// Purpose: Fixed navigation issue when clicking "Save and Upload Photos"
 
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -215,10 +215,6 @@ export function PropertySummary({
       
       console.log('Starting save and photo navigation process...');
       
-      // Extract property type and listing type for navigation
-      const propertyType = (formData.propertyType || 'residential').toLowerCase();
-      const listingType = (formData.listingType || 'rent').toLowerCase();
-      
       let savedPropertyId: string;
       
       try {
@@ -240,38 +236,28 @@ export function PropertySummary({
         return;
       }
       
-      // Try different navigation methods
+      // Fixed navigation logic: Navigate to Photos tab of the saved property
       try {
-        console.log('Navigation attempt 1: Direct path construction');
-        const nextPath = `/properties/list/${propertyType}/${listingType}/photos`;
-        console.log('Navigating to:', nextPath);
+        console.log('Navigating to the Photos tab of the saved property...');
         
-        // Try programmatic navigation first
-        navigate(nextPath, { replace: true });
+        // Navigate to the property's photos tab
+        const photosPath = `/owner/properties/${savedPropertyId}/edit/photos`;
+        console.log('Navigating to:', photosPath);
         
-        // Set a fallback - direct location change if navigate doesn't work
+        // Use navigate with replace to prevent back button issues
+        navigate(photosPath, { replace: true });
+        
+        // Fallback with direct location change if navigate doesn't work
         setTimeout(() => {
-          if (window.location.pathname.indexOf('/photos') === -1) {
+          if (!window.location.pathname.includes(savedPropertyId)) {
             console.log('Fallback: using window.location');
-            window.location.href = nextPath;
+            window.location.href = photosPath;
           }
         }, 500);
       } catch (navError) {
         console.error('Navigation error:', navError);
-        
-        try {
-          console.log('Navigation attempt 2: Using last segment replacement');
-          // Extract the current path and replace last segment
-          const currentPath = window.location.pathname;
-          const newPath = currentPath.replace(/\/[^\/]*$/, '/photos');
-          console.log('Navigating to:', newPath);
-          navigate(newPath, { replace: true });
-        } catch (error) {
-          console.error('All navigation attempts failed:', error);
-          setLocalError('Navigation to Photos tab failed. Please try to navigate manually.');
-        } finally {
-          setIsSaving(false);
-        }
+        setLocalError('Navigation to Photos tab failed. Please try manually navigating to your property.');
+        setIsSaving(false);
       }
     } catch (error) {
       console.error('Unhandled error in save and navigate process:', error);
