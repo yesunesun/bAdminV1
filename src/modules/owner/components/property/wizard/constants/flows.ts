@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/constants/flows.ts
-// Version: 2.2.0
-// Last Modified: 12-04-2025 17:30 IST
-// Purpose: Removed Commercial Details tab from Commercial Rent flow
+// Version: 2.3.0
+// Last Modified: 01-05-2025 13:15 IST
+// Purpose: Removed Photos step from all property flows
 
 import { STEP_DEFINITIONS } from './common';
 
@@ -13,8 +13,8 @@ export const FLOW_STEPS = {
     STEP_DEFINITIONS.location,
     STEP_DEFINITIONS.rental,
     STEP_DEFINITIONS.features,
-    STEP_DEFINITIONS.review,
-    STEP_DEFINITIONS.photos
+    STEP_DEFINITIONS.review
+    // Photos step removed
   ],
   
   // Residential Sale flow
@@ -23,8 +23,8 @@ export const FLOW_STEPS = {
     STEP_DEFINITIONS.location,
     STEP_DEFINITIONS.sale,
     STEP_DEFINITIONS.features,
-    STEP_DEFINITIONS.review,
-    STEP_DEFINITIONS.photos
+    STEP_DEFINITIONS.review
+    // Photos step removed
   ],
   
   // Residential PG/Hostel flow
@@ -33,8 +33,8 @@ export const FLOW_STEPS = {
     STEP_DEFINITIONS.location,
     STEP_DEFINITIONS.pg_details,
     STEP_DEFINITIONS.features,
-    STEP_DEFINITIONS.review,
-    STEP_DEFINITIONS.photos
+    STEP_DEFINITIONS.review
+    // Photos step removed
   ],
   
   // Commercial Rent flow (updated to remove commercial tab)
@@ -43,8 +43,8 @@ export const FLOW_STEPS = {
     STEP_DEFINITIONS.location,
     STEP_DEFINITIONS.rental,
     STEP_DEFINITIONS.features,
-    STEP_DEFINITIONS.review,
-    STEP_DEFINITIONS.photos
+    STEP_DEFINITIONS.review
+    // Photos step removed
   ],
   
   // New Flow 1: Commercial Sale flow
@@ -53,8 +53,8 @@ export const FLOW_STEPS = {
     STEP_DEFINITIONS.location,
     STEP_DEFINITIONS.commercial_sale,
     STEP_DEFINITIONS.features,
-    STEP_DEFINITIONS.review,
-    STEP_DEFINITIONS.photos
+    STEP_DEFINITIONS.review
+    // Photos step removed
   ],
   
   // New Flow 2: Commercial Co-working flow
@@ -63,8 +63,8 @@ export const FLOW_STEPS = {
     STEP_DEFINITIONS.location,
     STEP_DEFINITIONS.coworking,
     STEP_DEFINITIONS.features,
-    STEP_DEFINITIONS.review,
-    STEP_DEFINITIONS.photos
+    STEP_DEFINITIONS.review
+    // Photos step removed
   ],
   
   // New Flow 3: Land/Plot Sale flow
@@ -72,8 +72,8 @@ export const FLOW_STEPS = {
     STEP_DEFINITIONS.land_details,
     STEP_DEFINITIONS.location,
     STEP_DEFINITIONS.land_features,
-    STEP_DEFINITIONS.review,
-    STEP_DEFINITIONS.photos
+    STEP_DEFINITIONS.review
+    // Photos step removed
   ],
   
   // New Flow 4: Residential Flatmates flow
@@ -82,7 +82,7 @@ export const FLOW_STEPS = {
     STEP_DEFINITIONS.location,
     STEP_DEFINITIONS.flatmate_details,
     STEP_DEFINITIONS.features,
-    STEP_DEFINITIONS.review,
-    STEP_DEFINITIONS.photos
+    STEP_DEFINITIONS.review
+    // Photos step removed
   ]
 };

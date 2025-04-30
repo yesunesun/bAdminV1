@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/PropertyFormTypes.ts
-// Version: 1.7.0
-// Last Modified: 02-04-2025 21:15 IST
-// Purpose: Enhanced type definitions with robust image handling
+// Version: 2.0.0
+// Last Modified: 01-05-2025 12:45 IST
+// Purpose: Added support for v2 property data structure
 
 import { UseFormReturn } from 'react-hook-form';
 import { PropertyValidationSchema } from './validationSchemas';
@@ -44,6 +44,71 @@ export type PropertyType = {
     latitude?: number;
     longitude?: number;
     [key: string]: any; // Allow for additional dynamic properties
+  };
+  
+  // V2 format properties
+  _version?: string;
+  flow?: {
+    category: string;
+    listingType: string;
+  };
+  rental?: {
+    rentAmount: number;
+    availableFrom: string;
+    leaseDuration: string;
+    rentNegotiable: boolean;
+    securityDeposit: number;
+    furnishingStatus: string;
+    preferredTenants: string[];
+    maintenanceCharges: number | null;
+  };
+  features?: {
+    hasGym: boolean;
+    parking: string;
+    amenities: string[];
+    direction: string;
+    description: string;
+    petFriendly: boolean;
+    powerBackup: string;
+    waterSupply: string;
+    gatedSecurity: boolean;
+    nonVegAllowed: boolean;
+    hasSimilarUnits: boolean;
+    secondaryNumber: string;
+    propertyCondition: string;
+    propertyShowOption: string;
+  };
+  location?: {
+    area: string;
+    city: string;
+    state: string;
+    address: string;
+    pinCode: string;
+    district: string;
+    landmark: string;
+    locality: string;
+    flatPlotNo: string;
+    coordinates: {
+      latitude: number;
+      longitude: number;
+    };
+  };
+  basicDetails?: {
+    floor: number;
+    title: string;
+    facing: string;
+    bhkType: string;
+    balconies: string;
+    bathrooms: string;
+    builtUpArea: number;
+    propertyAge: string;
+    totalFloors: number;
+    propertyType: string;
+    possessionDate: string;
+    builtUpAreaUnit: string;
+  };
+  photos?: {
+    images: PropertyImage[];
   };
 }
 
@@ -104,6 +169,10 @@ export type FormData = {
   // Enhanced Image Handling
   images?: PropertyImage[];
   primaryImage?: string;
+  
+  // V2 Format Support
+  _version?: 'v1' | 'v2';
+  dataFormat?: 'v1' | 'v2';
 }
 
 // Interfaces for Form Steps and Validation
@@ -189,6 +258,77 @@ export interface HowItWorksProps {
   className?: string;
 }
 
+// V2 Format specific interfaces
+export interface PropertyV2 {
+  id: string;
+  owner_id: string;
+  status: 'draft' | 'published' | 'archived';
+  _version: 'v2';
+  title: string;
+  flow: {
+    category: 'residential' | 'commercial' | 'land';
+    listingType: 'rent' | 'sale';
+  };
+  basicDetails: {
+    title: string;
+    propertyType: string;
+    bhkType: string;
+    floor: number;
+    totalFloors: number;
+    propertyAge: string;
+    facing: string;
+    builtUpArea: number;
+    builtUpAreaUnit: string;
+    possessionDate: string;
+    bathrooms: string;
+    balconies: string;
+  };
+  location: {
+    address: string;
+    city: string;
+    state: string;
+    pinCode: string;
+    district: string;
+    landmark: string;
+    locality: string;
+    flatPlotNo: string;
+    area: string;
+    coordinates: {
+      latitude: number;
+      longitude: number;
+    };
+  };
+  rental?: {
+    rentAmount: number;
+    securityDeposit: number;
+    rentNegotiable: boolean;
+    availableFrom: string;
+    leaseDuration: string;
+    furnishingStatus: string;
+    preferredTenants: string[];
+    maintenanceCharges: number | null;
+  };
+  features: {
+    description: string;
+    amenities: string[];
+    parking: string;
+    direction: string;
+    hasGym: boolean;
+    nonVegAllowed: boolean;
+    gatedSecurity: boolean;
+    petFriendly: boolean;
+    propertyShowOption: string;
+    propertyCondition: string;
+    secondaryNumber: string;
+    hasSimilarUnits: boolean;
+    powerBackup: string;
+    waterSupply: string;
+  };
+  photos: {
+    images: PropertyImage[];
+  };
+}
+
 // Export the types for use in other components
 export default {
   PropertyType,
@@ -197,5 +337,6 @@ export default {
   PropertyFilter,
   PropertyStats,
   PropertyTypeFormData,
-  PropertyCategoryOption
+  PropertyCategoryOption,
+  PropertyV2
 };

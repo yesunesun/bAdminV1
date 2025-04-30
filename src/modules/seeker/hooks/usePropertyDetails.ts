@@ -1,7 +1,7 @@
 // src/modules/seeker/hooks/usePropertyDetails.ts
-// Version: 4.6.0
-// Last Modified: 30-04-2025 16:15 IST
-// Purpose: Updated to improve image refreshing and caching behavior
+// Version: 5.2.0
+// Last Modified: 01-05-2025 16:30 IST
+// Purpose: Fixed data extraction for v2 format properties
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useLocation } from 'react-router-dom';
@@ -36,6 +36,70 @@ export interface PropertyDetails {
     email: string | null;
     phone: string | null;
   } | null;
+  // Added for v2 format
+  _version?: string;
+  flow?: {
+    category: string;
+    listingType: string;
+  };
+  rental?: {
+    rentAmount: number;
+    availableFrom: string;
+    leaseDuration: string;
+    rentNegotiable: boolean;
+    securityDeposit: number;
+    furnishingStatus: string;
+    preferredTenants: string[];
+    maintenanceCharges: number | null;
+  };
+  features?: {
+    hasGym: boolean;
+    parking: string;
+    amenities: string[];
+    direction: string;
+    description: string;
+    petFriendly: boolean;
+    powerBackup: string;
+    waterSupply: string;
+    gatedSecurity: boolean;
+    nonVegAllowed: boolean;
+    hasSimilarUnits: boolean;
+    secondaryNumber: string;
+    propertyCondition: string;
+    propertyShowOption: string;
+  };
+  location?: {
+    area: string;
+    city: string;
+    state: string;
+    address: string;
+    pinCode: string;
+    district: string;
+    landmark: string;
+    locality: string;
+    flatPlotNo: string;
+    coordinates: {
+      latitude: number;
+      longitude: number;
+    };
+  };
+  basicDetails?: {
+    floor: number;
+    title: string;
+    facing: string;
+    bhkType: string;
+    balconies: string;
+    bathrooms: string;
+    builtUpArea: number;
+    propertyAge: string;
+    totalFloors: number;
+    propertyType: string;
+    possessionDate: string;
+    builtUpAreaUnit: string;
+  };
+  photos?: {
+    images: PropertyImage[];
+  };
 }
 
 export const usePropertyDetails = (refreshDependency = 0) => {
@@ -49,6 +113,109 @@ export const usePropertyDetails = (refreshDependency = 0) => {
 
   // Extract property ID from URL manually to ensure we're getting the right value
   const propertyId = params.id || location.pathname.split('/').pop();
+
+  // Parse numeric values safely
+  const safeParseInt = (value: any): number => {
+    if (typeof value === 'number') return value;
+    if (typeof value === 'string') {
+      // Extract the first numeric part if it's something like "2 BHK"
+      const numMatch = value.match(/^(\d+)/);
+      if (numMatch && numMatch[1]) {
+        return parseInt(numMatch[1], 10) || 0;
+      }
+      return parseInt(value, 10) || 0;
+    }
+    return 0;
+  };
+
+  // Function to normalize property data format (v1 or v2)
+  const normalizePropertyData = (propertyData: any): PropertyDetails => {
+    const isV2Format = propertyData._version === 'v2';
+    console.log(`[usePropertyDetails] Property format detected: ${isV2Format ? 'v2' : 'v1'}`);
+    
+    // If it's v2 format, adapt it to ensure backward compatibility
+    if (isV2Format) {
+      // Check each property path and extract with fallbacks
+      const rentalDetails = propertyData.rental || {};
+      const locationDetails = propertyData.location || {};
+      const basicDetails = propertyData.basicDetails || {};
+      const featureDetails = propertyData.features || {};
+      const flowDetails = propertyData.flow || { category: 'residential', listingType: 'rent' };
+      
+      // Extract price - for rent use rentAmount, for sale use price
+      let price = 0;
+      if (flowDetails.listingType === 'rent' && rentalDetails.rentAmount) {
+        price = safeParseInt(rentalDetails.rentAmount);
+      } else if (flowDetails.listingType === 'sale' && propertyData.price) {
+        price = safeParseInt(propertyData.price);
+      }
+      
+      // Extract bedrooms from bhkType 
+      let bedrooms = 0;
+      if (basicDetails.bhkType) {
+        bedrooms = safeParseInt(basicDetails.bhkType);
+      }
+      
+      // Extract bathrooms
+      let bathrooms = safeParseInt(basicDetails.bathrooms);
+      
+      // Extract square feet
+      let squareFeet = safeParseInt(basicDetails.builtUpArea);
+      
+      // Deep debug output for v2 format extraction
+      console.log('[usePropertyDetails] V2 Format Extraction:');
+      console.log('- Original rental amount:', rentalDetails.rentAmount);
+      console.log('- Extracted price:', price);
+      console.log('- Original bhkType:', basicDetails.bhkType);
+      console.log('- Extracted bedrooms:', bedrooms);
+      console.log('- Original bathrooms:', basicDetails.bathrooms);
+      console.log('- Extracted bathrooms:', bathrooms);
+      console.log('- Original builtUpArea:', basicDetails.builtUpArea);
+      console.log('- Extracted square_feet:', squareFeet);
+      console.log('- Property type:', basicDetails.propertyType);
+      console.log('- Location address:', locationDetails.address);
+      
+      // Build property details object for backward compatibility
+      const propertyDetails = {
+        propertyType: basicDetails.propertyType || 'Residential',
+        listingType: flowDetails.listingType || 'rent',
+        amenities: featureDetails.amenities || [],
+        furnishingStatus: rentalDetails.furnishingStatus || 'Unfurnished',
+        facing: basicDetails.facing || '',
+        floor: safeParseInt(basicDetails.floor),
+        totalFloors: safeParseInt(basicDetails.totalFloors),
+        propertyAge: basicDetails.propertyAge || '',
+        // Add coordinates for map
+        latitude: locationDetails.coordinates?.latitude,
+        longitude: locationDetails.coordinates?.longitude,
+        // Additional details for Property Details section
+        yearBuilt: basicDetails.propertyAge || 'Not specified',
+        availability: rentalDetails.availableFrom 
+          ? new Date(rentalDetails.availableFrom).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }) 
+          : 'Not specified',
+      };
+      
+      return {
+        ...propertyData,
+        // Set backward compatible fields
+        title: propertyData.title || basicDetails.title || 'Untitled Property',
+        description: featureDetails.description || null,
+        price: price,
+        bedrooms: bedrooms,
+        bathrooms: bathrooms,
+        square_feet: squareFeet,
+        address: locationDetails.address || null,
+        city: locationDetails.city || null,
+        state: locationDetails.state || null,
+        zip_code: locationDetails.pinCode || null,
+        // Essential property details for backward compatibility
+        property_details: propertyDetails
+      };
+    }
+    
+    // Return original data for v1 format
+    return propertyData;
+  };
 
   // The main data fetching function
   const fetchPropertyDetails = useCallback(async () => {
@@ -82,6 +249,11 @@ export const usePropertyDetails = (refreshDependency = 0) => {
 
       // Get the property data (first result)
       const propertyData = data[0];
+      
+      // Check if we have a v2 format property
+      const isV2Format = propertyData._version === 'v2';
+      console.log(`[usePropertyDetails] Property version: ${isV2Format ? 'v2' : 'v1'}`);
+      console.log('[usePropertyDetails] Raw property data:', propertyData);
 
       // Fetch images in a separate query with timestamp to avoid caching issues
       const timestamp = new Date().getTime();
@@ -136,16 +308,16 @@ export const usePropertyDetails = (refreshDependency = 0) => {
         setIsLiked(!!likeData);
       }
 
-      // Create the final property object
-      const completeProperty: PropertyDetails = {
+      // Create the normalized property object with consistent format
+      const normalizedProperty = normalizePropertyData({
         ...propertyData,
         property_images: imagesData || [],
         ownerInfo: ownerInfo
-      };
+      });
 
-      console.log('[usePropertyDetails] Final property object assembled with images');
+      console.log('[usePropertyDetails] Normalized property object:', normalizedProperty);
 
-      setProperty(completeProperty);
+      setProperty(normalizedProperty);
       setError(null);
 
     } catch (err) {

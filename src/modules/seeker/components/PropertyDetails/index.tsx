@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyDetails/index.tsx
-// Version: 4.3.0
-// Last Modified: 30-04-2025 16:00 IST
-// Purpose: Updated to handle image refresh and integrate with PropertyImageUpload
+// Version: 6.0.0
+// Last Modified: 01-05-2025 17:45 IST
+// Purpose: Complete rewrite to properly support v2 property data format
 
 import React, { useState, useEffect } from 'react';
 import { PropertyDetails as PropertyDetailsType } from '../../hooks/usePropertyDetails';
@@ -11,7 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { AlertCircle } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 
-// Import small components
+// Import components
 import PropertyHeader from './PropertyHeader';
 import PropertyGalleryCard from './PropertyGalleryCard';
 import PropertyActionButtons from './PropertyActionButtons';
@@ -75,6 +75,21 @@ interface PropertyDetailsProps {
   onRefresh?: () => void;
 }
 
+// Helper function to safely parse numbers
+const safeParseInt = (value: any): number => {
+  if (value === null || value === undefined) return 0;
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') {
+    // Extract the first numeric part if it's something like "2 BHK"
+    const numMatch = value.match(/^(\d+)/);
+    if (numMatch && numMatch[1]) {
+      return parseInt(numMatch[1], 10) || 0;
+    }
+    return parseInt(value, 10) || 0;
+  }
+  return 0;
+};
+
 const PropertyDetails: React.FC<PropertyDetailsProps> = ({
   property,
   isLiked,
@@ -84,29 +99,13 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
 }) => {
   const { toast } = useToast();
   const [visitDialogOpen, setVisitDialogOpen] = useState(false);
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
   
   // Add debugging for property data
   useEffect(() => {
-    console.log('[PropertyDetails Component] Received property data:', property);
-    console.log('[PropertyDetails Component] Loading state:', isLoading);
-    console.log('[PropertyDetails Component] Refresh trigger:', refreshTrigger);
-    
     if (property) {
-      // Check key property fields
-      console.log('[PropertyDetails Component] Key fields check:');
-      console.log('- title:', property.title);
-      console.log('- address:', property.address);
-      console.log('- description:', property.description);
-      console.log('- price:', property.price);
-      console.log('- bedrooms:', property.bedrooms);
-      console.log('- bathrooms:', property.bathrooms);
-      console.log('- square_feet:', property.square_feet);
-      console.log('- property_details:', property.property_details);
-      console.log('- property_images:', property.property_images?.length || 0, 'images');
-      console.log('- ownerInfo:', property.ownerInfo);
+      console.log('[PropertyDetails Component] Property data:', property);
     }
-  }, [property, isLoading, refreshTrigger]);
+  }, [property]);
   
   // Handle image upload completed and trigger refresh
   const handleImageUploaded = () => {
@@ -150,42 +149,139 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
     );
   }
   
-  // Ensure property has required fields with defaults
-  const safeProperty = {
-    ...property,
-    title: property.title || "Untitled Property",
-    price: property.price || 0,
-    bedrooms: property.bedrooms || 0,
-    bathrooms: property.bathrooms || 0,
-    square_feet: property.square_feet || 0,
-    description: property.description || "No description provided for this property.",
-    property_details: property.property_details || {},
-    property_images: property.property_images || []
-  };
+  // Check if it's v2 format
+  const isV2Format = property._version === 'v2';
   
-  // Get formatted location string
-  const getLocationString = () => {
-    return [safeProperty.address, safeProperty.city, safeProperty.state, safeProperty.zip_code]
-      .filter(Boolean)
-      .join(", ") || "Location not specified";
-  };
+  // Extract property data based on format
+  // V2 FORMAT DATA EXTRACTION
   
-  // Get property coordinates from property_details if available
-  const getPropertyCoordinates = () => {
-    const lat = parseFloat(safeProperty.property_details?.latitude || '0');
-    const lng = parseFloat(safeProperty.property_details?.longitude || '0');
-    
-    if (!isNaN(lat) && !isNaN(lng) && (lat !== 0 || lng !== 0)) {
-      return { lat, lng };
+  // 1. Extract title
+  const propertyTitle = property.title || 
+                       (isV2Format ? property.basicDetails?.title : null) || 
+                       "Untitled Property";
+  
+  // 2. Extract price
+  let propertyPrice = 0;
+  if (isV2Format) {
+    // For v2, get price from rental amount if rental property
+    if (property.flow?.listingType === 'rent' && property.rental?.rentAmount) {
+      propertyPrice = safeParseInt(property.rental.rentAmount);
+    } else {
+      // Fallback to regular price field
+      propertyPrice = safeParseInt(property.price);
+    }
+  } else {
+    // For v1, use the price field directly
+    propertyPrice = safeParseInt(property.price);
+  }
+  
+  // 3. Extract listing type
+  const listingType = isV2Format 
+    ? (property.flow?.listingType || 'rent')
+    : (property.property_details?.listingType || 'rent');
+  
+  // 4. Extract bedrooms
+  let bedrooms = 0;
+  if (isV2Format && property.basicDetails?.bhkType) {
+    // Extract number from BHK type (e.g., "2 BHK" -> 2)
+    const match = property.basicDetails.bhkType.match(/^(\d+)/);
+    if (match && match[1]) {
+      bedrooms = safeParseInt(match[1]);
+    }
+  } else {
+    bedrooms = safeParseInt(property.bedrooms);
+  }
+  
+  // 5. Extract bathrooms
+  let bathrooms = 0;
+  if (isV2Format && property.basicDetails?.bathrooms) {
+    bathrooms = safeParseInt(property.basicDetails.bathrooms);
+  } else {
+    bathrooms = safeParseInt(property.bathrooms);
+  }
+  
+  // 6. Extract square feet
+  let squareFeet = 0;
+  if (isV2Format && property.basicDetails?.builtUpArea) {
+    squareFeet = safeParseInt(property.basicDetails.builtUpArea);
+  } else {
+    squareFeet = safeParseInt(property.square_feet);
+  }
+  
+  // 7. Extract description
+  const description = isV2Format && property.features?.description
+    ? property.features.description
+    : property.description || "No description provided for this property.";
+  
+  // 8. Extract property details for features section
+  let propertyDetails = property.property_details || {};
+  
+  // For v2 format, construct property details from various sections
+  if (isV2Format) {
+    propertyDetails = {
+      propertyType: property.basicDetails?.propertyType || 'Residential',
+      furnishingStatus: property.rental?.furnishingStatus || 'Unfurnished',
+      facing: property.basicDetails?.facing || 'Not specified',
+      floor: safeParseInt(property.basicDetails?.floor),
+      totalFloors: safeParseInt(property.basicDetails?.totalFloors),
+      propertyAge: property.basicDetails?.propertyAge || 'Not specified',
+      amenities: property.features?.amenities || [],
+      yearBuilt: property.basicDetails?.propertyAge || 'Not specified',
+      availability: property.rental?.availableFrom 
+        ? new Date(property.rental.availableFrom).toLocaleDateString('en-IN', { 
+            day: '2-digit', 
+            month: '2-digit', 
+            year: 'numeric' 
+          }) 
+        : 'Not specified',
+      listingType: property.flow?.listingType || 'rent',
+      // For location map
+      latitude: property.location?.coordinates?.latitude,
+      longitude: property.location?.coordinates?.longitude
+    };
+  }
+  
+  // 9. Extract location info
+  const locationAddress = isV2Format ? property.location?.address : property.address;
+  const locationCity = isV2Format ? property.location?.city : property.city;
+  const locationState = isV2Format ? property.location?.state : property.state;
+  const locationZipCode = isV2Format ? property.location?.pinCode : property.zip_code;
+  
+  // 10. Get formatted location string
+  const locationString = [locationAddress, locationCity, locationState, locationZipCode]
+    .filter(Boolean)
+    .join(", ") || "Location not specified";
+  
+  // 11. Get property coordinates
+  const propertyCoordinates = (() => {
+    if (isV2Format && property.location?.coordinates) {
+      const lat = property.location.coordinates.latitude;
+      const lng = property.location.coordinates.longitude;
+      
+      if (!isNaN(lat) && !isNaN(lng) && (lat !== 0 || lng !== 0)) {
+        return { lat, lng };
+      }
+    } else if (propertyDetails.latitude && propertyDetails.longitude) {
+      const lat = parseFloat(propertyDetails.latitude.toString());
+      const lng = parseFloat(propertyDetails.longitude.toString());
+      
+      if (!isNaN(lat) && !isNaN(lng) && (lat !== 0 || lng !== 0)) {
+        return { lat, lng };
+      }
     }
     return undefined;
-  };
+  })();
+  
+  // 12. Extract amenities
+  const amenities = isV2Format
+    ? (property.features?.amenities || [])
+    : (propertyDetails.amenities || []);
 
   // Handle share functionality
   const handleShare = () => {
     if (navigator.share) {
       navigator.share({
-        title: safeProperty.title,
+        title: propertyTitle,
         url: window.location.href
       }).catch(console.error);
     } else {
@@ -200,21 +296,37 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
   
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      {/* Debug info - only in development */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="bg-yellow-50 p-2 mb-4 text-xs border rounded">
+          <p><strong>Debug Info (v{property._version || '1'}):</strong></p>
+          <p>Title: {propertyTitle}</p>
+          <p>Price: {propertyPrice}</p>
+          <p>Listing Type: {listingType}</p>
+          <p>Bedrooms: {bedrooms}</p>
+          <p>Bathrooms: {bathrooms}</p>
+          <p>Square Feet: {squareFeet}</p>
+          <p>Location: {locationString}</p>
+          <p>Has Coordinates: {propertyCoordinates ? 'Yes' : 'No'}</p>
+          <p>Amenities Count: {amenities.length}</p>
+        </div>
+      )}
+      
       {/* Property Title Section */}
       <PropertyHeader 
-        title={safeProperty.title} 
-        location={getLocationString()} 
+        title={propertyTitle} 
+        location={locationString} 
       />
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Content Column */}
         <div className="lg:col-span-2 space-y-6">
           {/* Image Gallery */}
-          <PropertyGalleryCard images={safeProperty.property_images} />
+          <PropertyGalleryCard images={property.property_images || []} />
           
           {/* Image Upload Component (only shown to authorized users) */}
           <PropertyImageUpload 
-            property={safeProperty} 
+            property={property} 
             onImageUploaded={handleImageUploaded} 
           />
           
@@ -228,48 +340,46 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
           
           {/* Property Overview Card */}
           <PropertyOverviewCard
-            price={safeProperty.price}
-            listingType={safeProperty.property_details?.listingType}
-            bedrooms={safeProperty.bedrooms}
-            bathrooms={safeProperty.bathrooms}
-            squareFeet={safeProperty.square_feet}
+            price={propertyPrice}
+            listingType={listingType}
+            bedrooms={bedrooms}
+            bathrooms={bathrooms}
+            squareFeet={squareFeet}
           />
           
           {/* About this property */}
-          <PropertyDescriptionSection description={safeProperty.description} />
+          <PropertyDescriptionSection description={description} />
           
           {/* Property Type and Features */}
-          {safeProperty.property_details && (
-            <PropertyFeaturesSection propertyDetails={safeProperty.property_details} />
-          )}
+          <PropertyFeaturesSection propertyDetails={propertyDetails} />
           
           {/* Amenities */}
-          {safeProperty.property_details?.amenities && (
-            <PropertyAmenitiesSection amenities={safeProperty.property_details.amenities} />
+          {amenities.length > 0 && (
+            <PropertyAmenitiesSection amenities={amenities} />
           )}
           
           {/* Property Location Map */}
           <PropertyLocationSection
-            address={safeProperty.address || ''}
-            city={safeProperty.city || ''}
-            state={safeProperty.state || ''}
-            zipCode={safeProperty.zip_code || ''}
-            coordinates={getPropertyCoordinates()}
+            address={locationAddress || ''}
+            city={locationCity || ''}
+            state={locationState || ''}
+            zipCode={locationZipCode || ''}
+            coordinates={propertyCoordinates}
           />
         </div>
         
         {/* Sidebar Column */}
         <div className="space-y-6">
           <ContactOwnerCard
-            propertyTitle={safeProperty.title}
-            propertyId={safeProperty.id}
-            ownerId={safeProperty.owner_id}
-            ownerInfo={safeProperty.ownerInfo}
+            propertyTitle={propertyTitle}
+            propertyId={property.id}
+            ownerId={property.owner_id}
+            ownerInfo={property.ownerInfo}
           />
           
-          {safeProperty.property_details?.highlights && (
+          {propertyDetails.highlights && (
             <PropertyHighlightsCard 
-              highlights={safeProperty.property_details.highlights} 
+              highlights={propertyDetails.highlights} 
             />
           )}
           
@@ -287,10 +397,10 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
           />
           
           <NearbyAmenities
-            address={safeProperty.address || ''}
-            city={safeProperty.city || ''}
-            state={safeProperty.state || ''}
-            coordinates={getPropertyCoordinates()}
+            address={locationAddress || ''}
+            city={locationCity || ''}
+            state={locationState || ''}
+            coordinates={propertyCoordinates}
             radius={1500}
           />
         </div>
@@ -298,7 +408,7 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
       
       {/* Visit Request Dialog */}
       <VisitRequestDialog
-        propertyId={safeProperty.id}
+        propertyId={property.id}
         open={visitDialogOpen}
         onOpenChange={setVisitDialogOpen}
       />

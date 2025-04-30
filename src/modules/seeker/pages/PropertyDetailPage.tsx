@@ -1,7 +1,7 @@
 // src/modules/seeker/pages/PropertyDetailPage.tsx
-// Version: 3.5.0
-// Last Modified: 30-04-2025 19:15 IST
-// Purpose: Renamed button, keeps it enabled, and improved refresh handling
+// Version: 5.0.0
+// Last Modified: 01-05-2025 17:45 IST
+// Purpose: Updated to properly support v2 property data format
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
@@ -19,17 +19,86 @@ const PropertyDetailPage: React.FC = () => {
   const { toast } = useToast();
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Debug the component render and property data
+  // Debug the raw property data structure
   useEffect(() => {
     console.log('[PropertyDetailPage] Rendering with ID:', id);
     console.log('[PropertyDetailPage] Refresh key:', refreshKey);
     console.log('[PropertyDetailPage] Loading state:', loading);
-    console.log('[PropertyDetailPage] Image count:', property?.property_images?.length || 0);
+    console.log('[PropertyDetailPage] Property version:', property?._version || 'v1');
     
-    if (property?.property_images?.length) {
-      console.log('[PropertyDetailPage] First few images:', 
-        property.property_images.slice(0, 3).map(img => ({ id: img.id, url: img.url }))
-      );
+    if (property) {
+      // Detailed debugging for v2 properties
+      if (property._version === 'v2') {
+        console.log('====== DEBUGGING V2 PROPERTY DATA ======');
+        console.log('Raw property data:', property);
+        
+        // Debug core fields
+        console.log('Property ID:', property.id);
+        console.log('Title:', property.title);
+        
+        // Flow data
+        if (property.flow) {
+          console.log('Flow data:', {
+            category: property.flow.category,
+            listingType: property.flow.listingType
+          });
+        } else {
+          console.log('Flow data: not available');
+        }
+        
+        // Rental data
+        if (property.rental) {
+          console.log('Rental data:', {
+            rentAmount: property.rental.rentAmount,
+            type: typeof property.rental.rentAmount,
+            availableFrom: property.rental.availableFrom,
+            furnishingStatus: property.rental.furnishingStatus
+          });
+        } else {
+          console.log('Rental data: not available');
+        }
+        
+        // Basic details
+        if (property.basicDetails) {
+          console.log('Basic details:', {
+            bhkType: property.basicDetails.bhkType,
+            type_bhkType: typeof property.basicDetails.bhkType,
+            bathrooms: property.basicDetails.bathrooms,
+            type_bathrooms: typeof property.basicDetails.bathrooms,
+            builtUpArea: property.basicDetails.builtUpArea,
+            type_builtUpArea: typeof property.basicDetails.builtUpArea
+          });
+        } else {
+          console.log('Basic details: not available');
+        }
+        
+        // Location data
+        if (property.location) {
+          console.log('Location data:', {
+            address: property.location.address,
+            city: property.location.city,
+            coordinates: property.location.coordinates
+          });
+        } else {
+          console.log('Location data: not available');
+        }
+        
+        // Feature data
+        if (property.features) {
+          console.log('Features data:', {
+            description: property.features.description,
+            amenities: property.features.amenities
+          });
+        } else {
+          console.log('Features data: not available');
+        }
+        
+        console.log('====== END DEBUG ======');
+      } else {
+        console.log('[PropertyDetailPage] Standard v1 property data loaded');
+      }
+      
+      console.log('[PropertyDetailPage] Image count:', property?.property_images?.length || 0);
     }
   }, [id, property, loading, refreshKey]);
 
@@ -103,6 +172,23 @@ const PropertyDetailPage: React.FC = () => {
     handleDataRefresh();
   };
   
+  // Get property type for breadcrumbs
+  const getPropertyTypeForBreadcrumb = () => {
+    if (!property) return "Property";
+    
+    if (property._version === 'v2' && property.flow) {
+      return property.flow.category === 'residential' 
+        ? 'Residential' 
+        : property.flow.category === 'commercial'
+          ? 'Commercial'
+          : 'Property';
+    } else if (property.property_details?.propertyType) {
+      return property.property_details.propertyType;
+    }
+    
+    return "Property";
+  };
+  
   return (
     <div className="min-h-screen bg-background pb-12">
       {/* Breadcrumb navigation */}
@@ -121,7 +207,9 @@ const PropertyDetailPage: React.FC = () => {
               <>
                 <span className="mx-2 text-muted-foreground">/</span>
                 <span className="text-foreground font-medium truncate max-w-[200px]">
-                  {property.title || "Property Details"}
+                  {property._version === 'v2' 
+                    ? (property.basicDetails?.title || property.title || "Property Details")
+                    : (property.title || "Property Details")}
                 </span>
               </>
             )}
@@ -157,9 +245,19 @@ const PropertyDetailPage: React.FC = () => {
       {process.env.NODE_ENV === 'development' && (
         <div className="container mx-auto px-4 pt-2">
           <div className="text-xs text-muted-foreground bg-slate-50 p-2 rounded border">
+            <div>Property Version: {property?._version || 'v1'}</div>
             <div>Refresh Key: {refreshKey}</div>
             <div>Loading: {loading ? 'Yes' : 'No'}</div>
             <div>Image Count: {property?.property_images?.length || 0}</div>
+            {property?._version === 'v2' && (
+              <>
+                <div>Category: {property?.flow?.category}</div>
+                <div>Listing Type: {property?.flow?.listingType}</div>
+                <div>Rent Amount: {property?.rental?.rentAmount}</div>
+                <div>BHK Type: {property?.basicDetails?.bhkType}</div>
+                <div>Built-up Area: {property?.basicDetails?.builtUpArea} {property?.basicDetails?.builtUpAreaUnit}</div>
+              </>
+            )}
           </div>
         </div>
       )}
