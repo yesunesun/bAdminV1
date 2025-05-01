@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/PropertyForm/components/StepNavigation.tsx
-// Version: 4.1.0
-// Last Modified: 01-05-2025 17:45 IST
-// Purpose: Improved handling of save completion and property ID retrieval
+// Version: 4.2.0
+// Last Modified: 01-05-2025 18:35 IST
+// Purpose: Updated navigation to support proper URL updates when moving between steps
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
