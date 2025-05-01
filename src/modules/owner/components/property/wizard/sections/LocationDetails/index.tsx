@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/LocationDetails/index.tsx
-// Version: 4.0.0
-// Last Modified: 07-03-2025 22:15 IST
-// Purpose: Completely rebuilt with minimal React-Maps interaction
+// Version: 4.1.0
+// Last Modified: 02-05-2025 14:45 IST
+// Purpose: Fixed Google Maps initialization and controlled input issues
 
 import React, { useEffect, useRef, useState } from 'react';
 import { FormSection } from '@/components/FormSection';
@@ -15,15 +15,8 @@ import { MapPin, Navigation } from 'lucide-react';
 import { RequiredLabel } from '@/components/ui/RequiredLabel';
 import ErrorBoundary from '@/components/ui/ErrorBoundary';
 
-// Define global initialization function
-if (typeof window !== 'undefined') {
-  window.initGoogleMaps = () => {
-    console.log("Google Maps initialized");
-  };
-}
-
 export function LocationDetails({ form }: FormSectionProps) {
-  const { setValue, watch, getValues } = form;
+  const { setValue, watch, register } = form;
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const [isGeolocating, setIsGeolocating] = useState(false);
   const [isGeocoding, setIsGeocoding] = useState(false);
@@ -32,10 +25,10 @@ export function LocationDetails({ form }: FormSectionProps) {
   const [locationError, setLocationError] = useState<string | null>(null);
 
   // Get form values
-  const address = watch('address');
-  const flatPlotNo = watch('flatPlotNo');
-  const latitude = watch('latitude');
-  const longitude = watch('longitude');
+  const address = watch('address') || '';
+  const flatPlotNo = watch('flatPlotNo') || '';
+  const latitude = watch('latitude') || '';
+  const longitude = watch('longitude') || '';
   
   // Check for edit mode by looking at URL
   const isEditMode = window.location.pathname.includes('/edit');
@@ -49,6 +42,12 @@ export function LocationDetails({ form }: FormSectionProps) {
   // Initialize map once when component mounts and maps API is loaded
   useEffect(() => {
     if (!mapLoaded || !mapContainerRef.current || mapInstance) return;
+    
+    // Wait to make sure window.google.maps is available
+    if (!window.google || !window.google.maps) {
+      console.log('Google Maps not fully loaded yet');
+      return;
+    }
     
     try {
       // Create map instance
@@ -64,7 +63,7 @@ export function LocationDetails({ form }: FormSectionProps) {
       setMapInstance(map);
       
       // Add click listener to map
-      const clickListener = map.addListener('click', (event: any) => {
+      map.addListener('click', (event: any) => {
         if (!event.latLng) return;
         
         // Update form coordinates
@@ -90,13 +89,6 @@ export function LocationDetails({ form }: FormSectionProps) {
         map.setCenter(position);
         updateMarkerPosition(position);
       }
-      
-      // Cleanup function
-      return () => {
-        if (clickListener) {
-          window.google.maps.event.removeListener(clickListener);
-        }
-      };
     } catch (error) {
       console.error('Error initializing map:', error);
       setLocationError('Error initializing map');
@@ -105,7 +97,7 @@ export function LocationDetails({ form }: FormSectionProps) {
   
   // Function to update marker position
   const updateMarkerPosition = (position: any) => {
-    if (!mapInstance) return;
+    if (!mapInstance || !window.google || !window.google.maps) return;
     
     try {
       // Remove existing marker if any
@@ -121,7 +113,7 @@ export function LocationDetails({ form }: FormSectionProps) {
       });
       
       // Add dragend listener
-      const dragendListener = marker.addListener('dragend', function() {
+      marker.addListener('dragend', function() {
         const newPosition = marker.getPosition();
         if (!newPosition) return;
         
@@ -141,7 +133,7 @@ export function LocationDetails({ form }: FormSectionProps) {
   
   // Function to geocode address
   const geocodeAddress = (addressText: string) => {
-    if (!mapLoaded || !window.google || !addressText) {
+    if (!mapLoaded || !window.google || !window.google.maps || !addressText) {
       return;
     }
     
@@ -191,7 +183,7 @@ export function LocationDetails({ form }: FormSectionProps) {
   
   // Function to reverse geocode
   const reverseGeocode = (position: any) => {
-    if (!window.google || !position) return;
+    if (!window.google || !window.google.maps || !position) return;
     
     try {
       const geocoder = new window.google.maps.Geocoder();
@@ -228,7 +220,7 @@ export function LocationDetails({ form }: FormSectionProps) {
   
   // Function to get user's current location
   const getUserCurrentLocation = () => {
-    if (!mapLoaded || !window.google) {
+    if (!mapLoaded || !window.google || !window.google.maps) {
       setLocationError('Google Maps is not yet loaded');
       return;
     }
@@ -354,15 +346,15 @@ export function LocationDetails({ form }: FormSectionProps) {
         />
 
         {/* Map Container - Wrapped in ErrorBoundary */}
-        <div className="space-y-2">
-          <RequiredLabel>Location on Map</RequiredLabel>
-          <ErrorBoundary
-            fallback={
-              <div className="h-64 w-full bg-slate-100 flex items-center justify-center text-red-500 p-4 text-center rounded-xl border border-slate-200">
-                <p>There was an error loading the map. Please refresh the page and try again.</p>
-              </div>
-            }
-          >
+        <ErrorBoundary
+          fallback={
+            <div className="h-64 w-full bg-slate-100 flex items-center justify-center text-red-500 p-4 text-center rounded-xl border border-slate-200">
+              <p>There was an error loading the map. Please refresh the page and try again.</p>
+            </div>
+          }
+        >
+          <div className="space-y-2">
+            <RequiredLabel>Location on Map</RequiredLabel>
             <div className="relative rounded-xl border border-slate-200 overflow-hidden">
               {/* Map Container */}
               <div className="h-64 w-full">
@@ -417,36 +409,38 @@ export function LocationDetails({ form }: FormSectionProps) {
                 </button>
               </div>
             </div>
-          </ErrorBoundary>
-          
-          {/* Display selected coordinates if any */}
-          {latitude && longitude && (
-            <div className="text-xs text-slate-500 flex justify-between">
-              <span>Coordinates: {parseFloat(String(latitude)).toFixed(6)}, {parseFloat(String(longitude)).toFixed(6)}</span>
-              <button 
-                type="button" 
-                className="text-blue-500 hover:text-blue-700"
-                onClick={resetMarker}
-                disabled={isGeocoding || isGeolocating}
-              >
-                Reset location
-              </button>
-            </div>
-          )}
-          
-          <p className="text-xs text-slate-500">
-            * Click on the map to mark your property location or use the "Find on Map" button
-          </p>
-        </div>
+            
+            {/* Display selected coordinates if any */}
+            {latitude && longitude && (
+              <div className="text-xs text-slate-500 flex justify-between">
+                <span>Coordinates: {parseFloat(String(latitude)).toFixed(6)}, {parseFloat(String(longitude)).toFixed(6)}</span>
+                <button 
+                  type="button" 
+                  className="text-blue-500 hover:text-blue-700"
+                  onClick={resetMarker}
+                  disabled={isGeocoding || isGeolocating}
+                >
+                  Reset location
+                </button>
+              </div>
+            )}
+            
+            <p className="text-xs text-slate-500">
+              * Click on the map to mark your property location or use the "Find on Map" button
+            </p>
+          </div>
+        </ErrorBoundary>
 
-        {/* Hidden inputs for coordinates and removed fields */}
-        <input type="hidden" {...form.register('latitude')} />
-        <input type="hidden" {...form.register('longitude')} />
-        <input type="hidden" {...form.register('state')} value="" />
-        <input type="hidden" {...form.register('district')} value="" />
-        <input type="hidden" {...form.register('city')} value="" />
-        <input type="hidden" {...form.register('locality')} value="" />
-        <input type="hidden" {...form.register('area')} value="" />
+        {/* Hidden inputs for coordinates */}
+        <div style={{ display: 'none' }}>
+          <input {...register('latitude')} defaultValue={latitude || ''} />
+          <input {...register('longitude')} defaultValue={longitude || ''} />
+          <input {...register('state')} defaultValue="" />
+          <input {...register('district')} defaultValue="" />
+          <input {...register('city')} defaultValue="" />
+          <input {...register('locality')} defaultValue="" />
+          <input {...register('area')} defaultValue="" />
+        </div>
       </div>
     </FormSection>
   );
