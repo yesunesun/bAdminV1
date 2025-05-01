@@ -1,7 +1,7 @@
 // src/modules/seeker/pages/PropertyDetailPage.tsx
-// Version: 5.1.0
-// Last Modified: 01-05-2025 21:30 IST
-// Purpose: Enhanced debugging for property data loading
+// Version: 5.2.0
+// Last Modified: 02-05-2025 00:15 IST
+// Purpose: Removed all debug information from UI
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
@@ -18,106 +18,6 @@ const PropertyDetailPage: React.FC = () => {
   const { property, loading, error, isLiked, toggleLike } = usePropertyDetails(refreshKey);
   const { toast } = useToast();
   const [isRefreshing, setIsRefreshing] = useState(false);
-
-  // Debug the raw property data structure
-  useEffect(() => {
-    console.log('[PropertyDetailPage] Rendering with ID:', id);
-    console.log('[PropertyDetailPage] Refresh key:', refreshKey);
-    console.log('[PropertyDetailPage] Loading state:', loading);
-    console.log('[PropertyDetailPage] Property version:', property?._version || 'v1');
-    
-    if (property) {
-      // Force console log of raw property data
-      console.log('[PropertyDetailPage] FORCE RAW PROPERTY DATA:', JSON.stringify(property, null, 2));
-      
-      // Check if property exists but basicDetails is missing
-      if (property && !property.basicDetails) {
-        console.error('[PropertyDetailPage] WARNING: Property exists but basicDetails is missing!');
-        console.log('[PropertyDetailPage] Available property keys:', Object.keys(property));
-      }
-      
-      // Detailed debugging for v2 properties
-      if (property._version === 'v2') {
-        console.log('====== DEBUGGING V2 PROPERTY DATA ======');
-        console.log('Raw property data:', property);
-        
-        // Debug core fields
-        console.log('Property ID:', property.id);
-        console.log('Title:', property.title);
-        
-        // Flow data
-        if (property.flow) {
-          console.log('Flow data:', {
-            category: property.flow.category,
-            listingType: property.flow.listingType
-          });
-        } else {
-          console.log('Flow data: not available');
-        }
-        
-        // Rental data
-        if (property.rental) {
-          console.log('Rental data:', {
-            rentAmount: property.rental.rentAmount,
-            type: typeof property.rental.rentAmount,
-            availableFrom: property.rental.availableFrom,
-            furnishingStatus: property.rental.furnishingStatus
-          });
-        } else {
-          console.log('Rental data: not available');
-        }
-        
-        // Basic details
-        if (property.basicDetails) {
-          console.log('Basic details:', {
-            bhkType: property.basicDetails.bhkType,
-            type_bhkType: typeof property.basicDetails.bhkType,
-            bathrooms: property.basicDetails.bathrooms,
-            type_bathrooms: typeof property.basicDetails.bathrooms,
-            builtUpArea: property.basicDetails.builtUpArea,
-            type_builtUpArea: typeof property.basicDetails.builtUpArea
-          });
-        } else {
-          console.log('Basic details: not available');
-        }
-        
-        // Location data
-        if (property.location) {
-          console.log('Location data:', {
-            address: property.location.address,
-            city: property.location.city,
-            coordinates: property.location.coordinates
-          });
-        } else {
-          console.log('Location data: not available');
-        }
-        
-        // Feature data
-        if (property.features) {
-          console.log('Features data:', {
-            description: property.features.description,
-            amenities: property.features.amenities
-          });
-        } else {
-          console.log('Features data: not available');
-        }
-        
-        console.log('====== END DEBUG ======');
-      } else {
-        console.log('[PropertyDetailPage] Standard v1 property data loaded');
-        // Check for property_details which is typical in v1 format
-        if (property.property_details) {
-          console.log('[PropertyDetailPage] V1 property_details:', property.property_details);
-        } else {
-          console.error('[PropertyDetailPage] WARNING: V1 format missing property_details!');
-        }
-      }
-      
-      console.log('[PropertyDetailPage] Image count:', property?.property_images?.length || 0);
-    } else if (!loading) {
-      console.error('[PropertyDetailPage] Property data is null after loading completed!');
-    }
-  }, [id, property, loading, refreshKey]);
 
   // Reset refresh flag when loading completes
   useEffect(() => {
@@ -141,11 +41,9 @@ const PropertyDetailPage: React.FC = () => {
   // Handle like toggle with toast notification
   const handleToggleLike = async () => {
     if (!id) {
-      console.error('[PropertyDetailPage] No property ID available for toggle like');
       return { success: false, message: 'Property ID not available' };
     }
     
-    console.log('[PropertyDetailPage] Toggling like for property:', id);
     const result = await toggleLike();
     
     if (result.success) {
@@ -167,7 +65,6 @@ const PropertyDetailPage: React.FC = () => {
 
   // Function to force refresh the property data
   const handleDataRefresh = useCallback(() => {
-    console.log('[PropertyDetailPage] Forcing data refresh with new key');
     setIsRefreshing(true);
     
     // Use a timestamp to guarantee uniqueness
@@ -185,25 +82,7 @@ const PropertyDetailPage: React.FC = () => {
   
   // Manual refresh button handler
   const handleManualRefresh = () => {
-    console.log('[PropertyDetailPage] Manual refresh triggered');
     handleDataRefresh();
-  };
-  
-  // Get property type for breadcrumbs
-  const getPropertyTypeForBreadcrumb = () => {
-    if (!property) return "Property";
-    
-    if (property._version === 'v2' && property.flow) {
-      return property.flow.category === 'residential' 
-        ? 'Residential' 
-        : property.flow.category === 'commercial'
-          ? 'Commercial'
-          : 'Property';
-    } else if (property.property_details?.propertyType) {
-      return property.property_details.propertyType;
-    }
-    
-    return "Property";
   };
   
   return (
@@ -257,30 +136,6 @@ const PropertyDetailPage: React.FC = () => {
           </div>
         </div>
       </div>
-      
-      {/* Debug info - only in development environment */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="container mx-auto px-4 pt-2">
-          <div className="text-xs text-muted-foreground bg-slate-50 p-2 rounded border">
-            <div>Property ID: {id}</div>
-            <div>Property Version: {property?._version || 'v1'}</div>
-            <div>Refresh Key: {refreshKey}</div>
-            <div>Loading: {loading ? 'Yes' : 'No'}</div>
-            <div>Image Count: {property?.property_images?.length || 0}</div>
-            <div>Has Basic Details: {property?.basicDetails ? 'Yes' : 'No'}</div>
-            <div>Has Property Details: {property?.property_details ? 'Yes' : 'No'}</div>
-            {property?._version === 'v2' && (
-              <>
-                <div>Category: {property?.flow?.category}</div>
-                <div>Listing Type: {property?.flow?.listingType}</div>
-                <div>Rent Amount: {property?.rental?.rentAmount}</div>
-                <div>BHK Type: {property?.basicDetails?.bhkType}</div>
-                <div>Built-up Area: {property?.basicDetails?.builtUpArea} {property?.basicDetails?.builtUpAreaUnit}</div>
-              </>
-            )}
-          </div>
-        </div>
-      )}
       
       {/* Main content */}
       <div className="container mx-auto px-4 pt-6">
