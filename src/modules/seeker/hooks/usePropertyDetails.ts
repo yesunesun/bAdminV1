@@ -1,7 +1,7 @@
 // src/modules/seeker/hooks/usePropertyDetails.ts
-// Version: 5.2.0
-// Last Modified: 01-05-2025 16:30 IST
-// Purpose: Fixed data extraction for v2 format properties
+// Version: 5.5.0
+// Last Modified: 01-05-2025 23:00 IST
+// Purpose: Extract data from property_details JSON field
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useLocation } from 'react-router-dom';
@@ -100,6 +100,13 @@ export interface PropertyDetails {
   photos?: {
     images: PropertyImage[];
   };
+  sale?: {
+    expectedPrice: number;
+    maintenanceCost: number;
+    kitchenType: string;
+    possessionDate: string;
+    priceNegotiable: boolean;
+  };
 }
 
 export const usePropertyDetails = (refreshDependency = 0) => {
@@ -128,95 +135,6 @@ export const usePropertyDetails = (refreshDependency = 0) => {
     return 0;
   };
 
-  // Function to normalize property data format (v1 or v2)
-  const normalizePropertyData = (propertyData: any): PropertyDetails => {
-    const isV2Format = propertyData._version === 'v2';
-    console.log(`[usePropertyDetails] Property format detected: ${isV2Format ? 'v2' : 'v1'}`);
-    
-    // If it's v2 format, adapt it to ensure backward compatibility
-    if (isV2Format) {
-      // Check each property path and extract with fallbacks
-      const rentalDetails = propertyData.rental || {};
-      const locationDetails = propertyData.location || {};
-      const basicDetails = propertyData.basicDetails || {};
-      const featureDetails = propertyData.features || {};
-      const flowDetails = propertyData.flow || { category: 'residential', listingType: 'rent' };
-      
-      // Extract price - for rent use rentAmount, for sale use price
-      let price = 0;
-      if (flowDetails.listingType === 'rent' && rentalDetails.rentAmount) {
-        price = safeParseInt(rentalDetails.rentAmount);
-      } else if (flowDetails.listingType === 'sale' && propertyData.price) {
-        price = safeParseInt(propertyData.price);
-      }
-      
-      // Extract bedrooms from bhkType 
-      let bedrooms = 0;
-      if (basicDetails.bhkType) {
-        bedrooms = safeParseInt(basicDetails.bhkType);
-      }
-      
-      // Extract bathrooms
-      let bathrooms = safeParseInt(basicDetails.bathrooms);
-      
-      // Extract square feet
-      let squareFeet = safeParseInt(basicDetails.builtUpArea);
-      
-      // Deep debug output for v2 format extraction
-      console.log('[usePropertyDetails] V2 Format Extraction:');
-      console.log('- Original rental amount:', rentalDetails.rentAmount);
-      console.log('- Extracted price:', price);
-      console.log('- Original bhkType:', basicDetails.bhkType);
-      console.log('- Extracted bedrooms:', bedrooms);
-      console.log('- Original bathrooms:', basicDetails.bathrooms);
-      console.log('- Extracted bathrooms:', bathrooms);
-      console.log('- Original builtUpArea:', basicDetails.builtUpArea);
-      console.log('- Extracted square_feet:', squareFeet);
-      console.log('- Property type:', basicDetails.propertyType);
-      console.log('- Location address:', locationDetails.address);
-      
-      // Build property details object for backward compatibility
-      const propertyDetails = {
-        propertyType: basicDetails.propertyType || 'Residential',
-        listingType: flowDetails.listingType || 'rent',
-        amenities: featureDetails.amenities || [],
-        furnishingStatus: rentalDetails.furnishingStatus || 'Unfurnished',
-        facing: basicDetails.facing || '',
-        floor: safeParseInt(basicDetails.floor),
-        totalFloors: safeParseInt(basicDetails.totalFloors),
-        propertyAge: basicDetails.propertyAge || '',
-        // Add coordinates for map
-        latitude: locationDetails.coordinates?.latitude,
-        longitude: locationDetails.coordinates?.longitude,
-        // Additional details for Property Details section
-        yearBuilt: basicDetails.propertyAge || 'Not specified',
-        availability: rentalDetails.availableFrom 
-          ? new Date(rentalDetails.availableFrom).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }) 
-          : 'Not specified',
-      };
-      
-      return {
-        ...propertyData,
-        // Set backward compatible fields
-        title: propertyData.title || basicDetails.title || 'Untitled Property',
-        description: featureDetails.description || null,
-        price: price,
-        bedrooms: bedrooms,
-        bathrooms: bathrooms,
-        square_feet: squareFeet,
-        address: locationDetails.address || null,
-        city: locationDetails.city || null,
-        state: locationDetails.state || null,
-        zip_code: locationDetails.pinCode || null,
-        // Essential property details for backward compatibility
-        property_details: propertyDetails
-      };
-    }
-    
-    // Return original data for v1 format
-    return propertyData;
-  };
-
   // The main data fetching function
   const fetchPropertyDetails = useCallback(async () => {
     if (!propertyId) {
@@ -242,6 +160,54 @@ export const usePropertyDetails = (refreshDependency = 0) => {
         throw new Error(`Failed to load property: ${fetchError.message}`);
       }
 
+      // Add this for debugging - log raw DB results
+      console.log('=================== DB QUERY RESULTS ===================');
+      console.log('RAW DB RESULT:', data);
+      if (data && data.length > 0) {
+        console.log('FIRST RECORD FROM DB:', {
+          id: data[0].id,
+          hasData: !!data[0],
+          keys: Object.keys(data[0]),
+          dataType: typeof data[0]
+        });
+        
+        // Log complete stringified JSON
+        console.log('COMPLETE DB RECORD AS JSON:', JSON.stringify(data[0], null, 2));
+        
+        // Check if property_details contains nested JSON
+        if (data[0].property_details) {
+          console.log('PROPERTY_DETAILS FIELD TYPE:', typeof data[0].property_details);
+          
+          // Log property_details content
+          if (typeof data[0].property_details === 'object') {
+            console.log('PROPERTY_DETAILS CONTENT:', data[0].property_details);
+            console.log('PROPERTY_DETAILS KEYS:', Object.keys(data[0].property_details));
+            
+            // Check for basic details inside property_details
+            if (data[0].property_details.basicDetails) {
+              console.log('BASIC DETAILS FOUND IN PROPERTY_DETAILS:', 
+                data[0].property_details.basicDetails);
+            }
+          } else if (typeof data[0].property_details === 'string') {
+            // Attempt to parse if it's a JSON string
+            try {
+              const parsedDetails = JSON.parse(data[0].property_details);
+              console.log('PARSED PROPERTY_DETAILS:', parsedDetails);
+              
+              if (parsedDetails.basicDetails) {
+                console.log('BASIC DETAILS FOUND IN PARSED PROPERTY_DETAILS:',
+                  parsedDetails.basicDetails);
+              }
+            } catch (parseError) {
+              console.error('ERROR PARSING PROPERTY_DETAILS STRING:', parseError);
+            }
+          }
+        }
+      } else {
+        console.error('[usePropertyDetails] No data returned from database query');
+      }
+      console.log('=========================================================');
+
       if (!data || data.length === 0) {
         console.error('[usePropertyDetails] Property not found');
         throw new Error('Property not found');
@@ -250,11 +216,54 @@ export const usePropertyDetails = (refreshDependency = 0) => {
       // Get the property data (first result)
       const propertyData = data[0];
       
-      // Check if we have a v2 format property
-      const isV2Format = propertyData._version === 'v2';
-      console.log(`[usePropertyDetails] Property version: ${isV2Format ? 'v2' : 'v1'}`);
-      console.log('[usePropertyDetails] Raw property data:', propertyData);
-
+      // Extract the nested data from property_details if it exists
+      let extractedData: any = { ...propertyData };
+      
+      // Check if property_details is an object with the data we need
+      if (propertyData.property_details && typeof propertyData.property_details === 'object') {
+        console.log('[usePropertyDetails] Extracting data from property_details object');
+        
+        // Extract all the nested properties
+        const details = propertyData.property_details;
+        
+        // Check each key that might be in property_details
+        const keysToExtract = ['basicDetails', 'flow', 'features', 'location', 'sale', 'rental', '_version', 'photos'];
+        
+        keysToExtract.forEach(key => {
+          if (details[key]) {
+            console.log(`[usePropertyDetails] Found ${key} in property_details:`, details[key]);
+            extractedData[key] = details[key];
+          }
+        });
+        
+        // Log the extracted data
+        console.log('[usePropertyDetails] Extracted data from property_details:', 
+          JSON.stringify(extractedData, null, 2));
+      }
+      // If property_details is a string, try to parse it
+      else if (propertyData.property_details && typeof propertyData.property_details === 'string') {
+        console.log('[usePropertyDetails] Attempting to parse property_details string');
+        
+        try {
+          const parsedDetails = JSON.parse(propertyData.property_details);
+          
+          // Extract all the nested properties from parsed JSON
+          const keysToExtract = ['basicDetails', 'flow', 'features', 'location', 'sale', 'rental', '_version', 'photos'];
+          
+          keysToExtract.forEach(key => {
+            if (parsedDetails[key]) {
+              console.log(`[usePropertyDetails] Found ${key} in parsed property_details:`, parsedDetails[key]);
+              extractedData[key] = parsedDetails[key];
+            }
+          });
+          
+          console.log('[usePropertyDetails] Extracted data from parsed property_details:', 
+            JSON.stringify(extractedData, null, 2));
+        } catch (parseError) {
+          console.error('[usePropertyDetails] Error parsing property_details string:', parseError);
+        }
+      }
+      
       // Fetch images in a separate query with timestamp to avoid caching issues
       const timestamp = new Date().getTime();
       const { data: imagesData, error: imagesError } = await supabase
@@ -308,16 +317,34 @@ export const usePropertyDetails = (refreshDependency = 0) => {
         setIsLiked(!!likeData);
       }
 
-      // Create the normalized property object with consistent format
-      const normalizedProperty = normalizePropertyData({
-        ...propertyData,
-        property_images: imagesData || [],
-        ownerInfo: ownerInfo
-      });
+      // Ensure we have a basicDetails object 
+      if (!extractedData.basicDetails) {
+        console.log('[usePropertyDetails] Creating default basicDetails object');
+        
+        // Create a default basicDetails object
+        extractedData.basicDetails = {
+          propertyType: 'Residential',
+          bhkType: extractedData.bedrooms ? `${extractedData.bedrooms} BHK` : '',
+          bathrooms: extractedData.bathrooms || '',
+          builtUpArea: extractedData.square_feet || 0,
+          builtUpAreaUnit: 'sqft',
+          floor: 0,
+          totalFloors: 0,
+          facing: '',
+          propertyAge: '',
+          possessionDate: ''
+        };
+      }
+      
+      // Add images to the final property object
+      extractedData.property_images = imagesData || [];
+      extractedData.ownerInfo = ownerInfo;
+      
+      // Log the final property data
+      console.log('[usePropertyDetails] Final property data with basicDetails:', 
+        JSON.stringify(extractedData.basicDetails, null, 2));
 
-      console.log('[usePropertyDetails] Normalized property object:', normalizedProperty);
-
-      setProperty(normalizedProperty);
+      setProperty(extractedData);
       setError(null);
 
     } catch (err) {

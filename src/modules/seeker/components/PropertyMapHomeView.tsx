@@ -1,11 +1,11 @@
 // src/modules/seeker/components/PropertyMapHomeView.tsx
-// Version: 3.12.0
-// Last Modified: 07-04-2025 14:30 IST
-// Purpose: Made layout responsive - hide map on mobile devices
+// Version: 3.13.0
+// Last Modified: 01-05-2025 14:05 IST
+// Purpose: Fixed Google Maps loading issue by using centralized hook
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { useJsApiLoader } from '@react-google-maps/api';
 import { usePropertyMapData } from '../hooks/usePropertyMapData';
+import { useGoogleMaps } from '../hooks/useGoogleMaps'; // Import centralized Google Maps hook
 import CompactSearchBar from './CompactSearchBar';
 import PropertyListingPanel from './PropertyListingPanel';
 import MapPanel from './MapPanel';
@@ -14,9 +14,6 @@ import { Button } from '@/components/ui/button';
 import { getUserFavorites, togglePropertyLike } from '../services/seekerService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
-
-// Libraries to load
-const libraries = ['places'];
 
 interface PropertyMapHomeViewProps {
   onFavoriteAction?: (propertyId: string) => boolean;
@@ -31,9 +28,6 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
   const [isLoadingFavorites, setIsLoadingFavorites] = useState<boolean>(false);
   const { user } = useAuth();
   const { toast } = useToast();
-  
-  // Memoize API key to prevent unnecessary re-renders
-  const apiKey = useMemo(() => import.meta.env.VITE_GOOGLE_MAPS_KEY || '', []);
   
   // Property data and state management - keeping hook calls in consistent order
   const {
@@ -58,12 +52,8 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
     searchLocations
   } = usePropertyMapData();
   
-  // Google Maps script loader - only load on non-mobile devices
-  const { isLoaded, loadError } = useJsApiLoader({
-    googleMapsApiKey: apiKey,
-    libraries,
-    preventGoogleFontsLoading: true
-  });
+  // Use the centralized Google Maps loading hook
+  const { isLoaded, loadError } = useGoogleMaps(properties);
   
   // Load user favorites when component mounts or user changes
   useEffect(() => {

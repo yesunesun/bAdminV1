@@ -1,7 +1,7 @@
 // src/modules/seeker/pages/PropertyDetailPage.tsx
-// Version: 5.0.0
-// Last Modified: 01-05-2025 17:45 IST
-// Purpose: Updated to properly support v2 property data format
+// Version: 5.1.0
+// Last Modified: 01-05-2025 21:30 IST
+// Purpose: Enhanced debugging for property data loading
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
@@ -27,6 +27,15 @@ const PropertyDetailPage: React.FC = () => {
     console.log('[PropertyDetailPage] Property version:', property?._version || 'v1');
     
     if (property) {
+      // Force console log of raw property data
+      console.log('[PropertyDetailPage] FORCE RAW PROPERTY DATA:', JSON.stringify(property, null, 2));
+      
+      // Check if property exists but basicDetails is missing
+      if (property && !property.basicDetails) {
+        console.error('[PropertyDetailPage] WARNING: Property exists but basicDetails is missing!');
+        console.log('[PropertyDetailPage] Available property keys:', Object.keys(property));
+      }
+      
       // Detailed debugging for v2 properties
       if (property._version === 'v2') {
         console.log('====== DEBUGGING V2 PROPERTY DATA ======');
@@ -96,9 +105,17 @@ const PropertyDetailPage: React.FC = () => {
         console.log('====== END DEBUG ======');
       } else {
         console.log('[PropertyDetailPage] Standard v1 property data loaded');
+        // Check for property_details which is typical in v1 format
+        if (property.property_details) {
+          console.log('[PropertyDetailPage] V1 property_details:', property.property_details);
+        } else {
+          console.error('[PropertyDetailPage] WARNING: V1 format missing property_details!');
+        }
       }
       
       console.log('[PropertyDetailPage] Image count:', property?.property_images?.length || 0);
+    } else if (!loading) {
+      console.error('[PropertyDetailPage] Property data is null after loading completed!');
     }
   }, [id, property, loading, refreshKey]);
 
@@ -109,8 +126,8 @@ const PropertyDetailPage: React.FC = () => {
       
       // Show success toast after refresh completes
       toast({
-        title: "Images Updated",
-        description: "Property images have been refreshed",
+        title: "Data Refreshed",
+        description: "Property data has been refreshed",
         variant: "default"
       });
     }
@@ -159,8 +176,8 @@ const PropertyDetailPage: React.FC = () => {
     
     // Show temporary refresh toast
     toast({
-        title: "Refreshing Images",
-        description: "Please wait while we update the property images...",
+        title: "Refreshing Data",
+        description: "Please wait while we update the property data...",
         variant: "default",
         duration: 1500
     });
@@ -245,10 +262,13 @@ const PropertyDetailPage: React.FC = () => {
       {process.env.NODE_ENV === 'development' && (
         <div className="container mx-auto px-4 pt-2">
           <div className="text-xs text-muted-foreground bg-slate-50 p-2 rounded border">
+            <div>Property ID: {id}</div>
             <div>Property Version: {property?._version || 'v1'}</div>
             <div>Refresh Key: {refreshKey}</div>
             <div>Loading: {loading ? 'Yes' : 'No'}</div>
             <div>Image Count: {property?.property_images?.length || 0}</div>
+            <div>Has Basic Details: {property?.basicDetails ? 'Yes' : 'No'}</div>
+            <div>Has Property Details: {property?.property_details ? 'Yes' : 'No'}</div>
             {property?._version === 'v2' && (
               <>
                 <div>Category: {property?.flow?.category}</div>

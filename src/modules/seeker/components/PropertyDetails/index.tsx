@@ -1,9 +1,9 @@
 // src/modules/seeker/components/PropertyDetails/index.tsx
-// Version: 6.0.0
-// Last Modified: 01-05-2025 17:45 IST
-// Purpose: Complete rewrite to properly support v2 property data format
+// Version: 7.3.0
+// Last Modified: 01-05-2025 23:30 IST
+// Purpose: Enhanced listing type display and removed debugging code
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { PropertyDetails as PropertyDetailsType } from '../../hooks/usePropertyDetails';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -26,6 +26,7 @@ import SimilarProperties from './SimilarProperties';
 import NearbyAmenities from './NearbyAmenities';
 import VisitRequestDialog from './VisitRequestDialog';
 import PropertyImageUpload from './PropertyImageUpload';
+import BasicDetailsSection from './BasicDetailsSection';
 
 // Static similar properties data
 const similarPropertiesData = [
@@ -90,6 +91,57 @@ const safeParseInt = (value: any): number => {
   return 0;
 };
 
+// Format currency values
+const formatCurrency = (value: number): string => {
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    maximumFractionDigits: 0
+  }).format(value);
+};
+
+// Format date values
+const formatDate = (dateString: string | null | undefined): string => {
+  if (!dateString) return 'Not specified';
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+  } catch (e) {
+    return dateString;
+  }
+};
+
+// Function to prepare basic details data from property
+const prepareBasicDetailsData = (property: any) => {
+  if (!property) {
+    return undefined;
+  }
+  
+  // Use the basicDetails if available, or create a minimal object
+  if (property.basicDetails) {
+    return property.basicDetails;
+  } else {
+    // Create a compatible basicDetails object from property
+    return {
+      propertyType: property.property_details?.propertyType || 'Residential',
+      bhkType: property.bedrooms ? `${property.bedrooms} BHK` : '',
+      bathrooms: property.bathrooms || 0,
+      balconies: property.property_details?.balconies || 0,
+      floor: property.property_details?.floor || 0,
+      totalFloors: property.property_details?.totalFloors || 0,
+      builtUpArea: property.square_feet || 0,
+      builtUpAreaUnit: 'sqft',
+      facing: property.property_details?.facing || '',
+      propertyAge: property.property_details?.propertyAge || '',
+      possessionDate: property.property_details?.possessionDate || ''
+    };
+  }
+};
+
 const PropertyDetails: React.FC<PropertyDetailsProps> = ({
   property,
   isLiked,
@@ -100,22 +152,11 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
   const { toast } = useToast();
   const [visitDialogOpen, setVisitDialogOpen] = useState(false);
   
-  // Add debugging for property data
-  useEffect(() => {
-    if (property) {
-      console.log('[PropertyDetails Component] Property data:', property);
-    }
-  }, [property]);
-  
   // Handle image upload completed and trigger refresh
   const handleImageUploaded = () => {
-    console.log("[PropertyDetails Component] Image uploaded, refreshing property data...");
-    
-    // Notify the parent component to refresh the data immediately
     if (onRefresh) {
       onRefresh();
       
-      // Show toast after a short delay to ensure UI is updated
       setTimeout(() => {
         toast({
           title: "Images Updated",
@@ -152,118 +193,101 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
   // Check if it's v2 format
   const isV2Format = property._version === 'v2';
   
-  // Extract property data based on format
-  // V2 FORMAT DATA EXTRACTION
-  
-  // 1. Extract title
+  // Get property title
   const propertyTitle = property.title || 
-                       (isV2Format ? property.basicDetails?.title : null) || 
-                       "Untitled Property";
+                       (property.basicDetails && property.basicDetails.title) || 
+                       `${property.basicDetails?.propertyType || 'Property'} in ${property.location?.city || property.city || ''}`;
   
-  // 2. Extract price
+  // Get property price based on listing type
   let propertyPrice = 0;
-  if (isV2Format) {
-    // For v2, get price from rental amount if rental property
-    if (property.flow?.listingType === 'rent' && property.rental?.rentAmount) {
-      propertyPrice = safeParseInt(property.rental.rentAmount);
-    } else {
-      // Fallback to regular price field
-      propertyPrice = safeParseInt(property.price);
-    }
+  if (property.flow?.listingType === 'rent' && property.rental?.rentAmount) {
+    propertyPrice = safeParseInt(property.rental.rentAmount);
+  } else if (property.flow?.listingType === 'sale' && property.sale?.expectedPrice) {
+    propertyPrice = safeParseInt(property.sale.expectedPrice);
   } else {
-    // For v1, use the price field directly
     propertyPrice = safeParseInt(property.price);
   }
   
-  // 3. Extract listing type
-  const listingType = isV2Format 
-    ? (property.flow?.listingType || 'rent')
-    : (property.property_details?.listingType || 'rent');
+  // Get listing type
+  const listingType = property.flow?.listingType || 'rent';
+  const isSaleProperty = listingType === 'sale';
   
-  // 4. Extract bedrooms
+  // Get property category
+  const propertyCategory = property.flow?.category || 'residential';
+  
+  // Format listing type for display
+  const getListingTypeDisplay = () => {
+    if (isSaleProperty) {
+      return 'For Sale';
+    } else {
+      return 'For Rent';
+    }
+  };
+  
+  // Format price label based on listing type
+  const getPriceLabel = () => {
+    if (isSaleProperty) {
+      return 'Sale Price';
+    } else {
+      return 'Monthly Rent';
+    }
+  };
+  
+  // Extract bedrooms from bhkType
   let bedrooms = 0;
-  if (isV2Format && property.basicDetails?.bhkType) {
-    // Extract number from BHK type (e.g., "2 BHK" -> 2)
+  if (property.basicDetails?.bhkType) {
     const match = property.basicDetails.bhkType.match(/^(\d+)/);
     if (match && match[1]) {
-      bedrooms = safeParseInt(match[1]);
+      bedrooms = parseInt(match[1], 10);
     }
-  } else {
+  } else if (property.bedrooms) {
     bedrooms = safeParseInt(property.bedrooms);
   }
   
-  // 5. Extract bathrooms
-  let bathrooms = 0;
-  if (isV2Format && property.basicDetails?.bathrooms) {
-    bathrooms = safeParseInt(property.basicDetails.bathrooms);
-  } else {
-    bathrooms = safeParseInt(property.bathrooms);
-  }
+  // Get bathrooms
+  const bathrooms = property.basicDetails?.bathrooms 
+    ? safeParseInt(property.basicDetails.bathrooms)
+    : property.bathrooms
+      ? safeParseInt(property.bathrooms)
+      : 0;
   
-  // 6. Extract square feet
-  let squareFeet = 0;
-  if (isV2Format && property.basicDetails?.builtUpArea) {
-    squareFeet = safeParseInt(property.basicDetails.builtUpArea);
-  } else {
-    squareFeet = safeParseInt(property.square_feet);
-  }
+  // Get square feet
+  const squareFeet = property.basicDetails?.builtUpArea
+    ? safeParseInt(property.basicDetails.builtUpArea)
+    : property.square_feet
+      ? safeParseInt(property.square_feet)
+      : 0;
   
-  // 7. Extract description
-  const description = isV2Format && property.features?.description
-    ? property.features.description
-    : property.description || "No description provided for this property.";
+  // Get description
+  const description = property.features?.description || property.description || "No description provided for this property.";
   
-  // 8. Extract property details for features section
-  let propertyDetails = property.property_details || {};
+  // Get amenities
+  const amenities = property.features?.amenities || [];
   
-  // For v2 format, construct property details from various sections
-  if (isV2Format) {
-    propertyDetails = {
-      propertyType: property.basicDetails?.propertyType || 'Residential',
-      furnishingStatus: property.rental?.furnishingStatus || 'Unfurnished',
-      facing: property.basicDetails?.facing || 'Not specified',
-      floor: safeParseInt(property.basicDetails?.floor),
-      totalFloors: safeParseInt(property.basicDetails?.totalFloors),
-      propertyAge: property.basicDetails?.propertyAge || 'Not specified',
-      amenities: property.features?.amenities || [],
-      yearBuilt: property.basicDetails?.propertyAge || 'Not specified',
-      availability: property.rental?.availableFrom 
-        ? new Date(property.rental.availableFrom).toLocaleDateString('en-IN', { 
-            day: '2-digit', 
-            month: '2-digit', 
-            year: 'numeric' 
-          }) 
-        : 'Not specified',
-      listingType: property.flow?.listingType || 'rent',
-      // For location map
-      latitude: property.location?.coordinates?.latitude,
-      longitude: property.location?.coordinates?.longitude
-    };
-  }
+  // Get location info
+  const locationAddress = property.location?.address || property.address;
+  const locationCity = property.location?.city || property.city;
+  const locationState = property.location?.state || property.state;
+  const locationZipCode = property.location?.pinCode || property.zip_code;
   
-  // 9. Extract location info
-  const locationAddress = isV2Format ? property.location?.address : property.address;
-  const locationCity = isV2Format ? property.location?.city : property.city;
-  const locationState = isV2Format ? property.location?.state : property.state;
-  const locationZipCode = isV2Format ? property.location?.pinCode : property.zip_code;
-  
-  // 10. Get formatted location string
+  // Format location string
   const locationString = [locationAddress, locationCity, locationState, locationZipCode]
     .filter(Boolean)
     .join(", ") || "Location not specified";
   
-  // 11. Get property coordinates
+  // Get coordinates
   const propertyCoordinates = (() => {
-    if (isV2Format && property.location?.coordinates) {
+    if (property.location?.coordinates) {
       const lat = property.location.coordinates.latitude;
       const lng = property.location.coordinates.longitude;
       
       if (!isNaN(lat) && !isNaN(lng) && (lat !== 0 || lng !== 0)) {
         return { lat, lng };
       }
-    } else if (propertyDetails.latitude && propertyDetails.longitude) {
-      const lat = parseFloat(propertyDetails.latitude.toString());
-      const lng = parseFloat(propertyDetails.longitude.toString());
+    }
+    if (property.property_details?.latitude && property.property_details?.longitude) {
+      const lat = property.property_details.latitude;
+      const lng = property.property_details.longitude;
       
       if (!isNaN(lat) && !isNaN(lng) && (lat !== 0 || lng !== 0)) {
         return { lat, lng };
@@ -271,11 +295,6 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
     }
     return undefined;
   })();
-  
-  // 12. Extract amenities
-  const amenities = isV2Format
-    ? (property.features?.amenities || [])
-    : (propertyDetails.amenities || []);
 
   // Handle share functionality
   const handleShare = () => {
@@ -294,29 +313,26 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
     }
   };
   
+  // Prepare the basicDetails data
+  const basicDetailsData = prepareBasicDetailsData(property);
+  
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-      {/* Debug info - only in development */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="bg-yellow-50 p-2 mb-4 text-xs border rounded">
-          <p><strong>Debug Info (v{property._version || '1'}):</strong></p>
-          <p>Title: {propertyTitle}</p>
-          <p>Price: {propertyPrice}</p>
-          <p>Listing Type: {listingType}</p>
-          <p>Bedrooms: {bedrooms}</p>
-          <p>Bathrooms: {bathrooms}</p>
-          <p>Square Feet: {squareFeet}</p>
-          <p>Location: {locationString}</p>
-          <p>Has Coordinates: {propertyCoordinates ? 'Yes' : 'No'}</p>
-          <p>Amenities Count: {amenities.length}</p>
+      {/* Property Title Section with Listing Type Badge */}
+      <div className="mb-6">
+        <div className="flex flex-wrap items-center gap-3 mb-2">
+          <h1 className="text-2xl sm:text-3xl font-bold">{propertyTitle}</h1>
+          <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+            isSaleProperty ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
+          }`}>
+            {getListingTypeDisplay()}
+          </span>
+          <span className="px-3 py-1 rounded-full bg-purple-100 text-purple-800 text-sm font-medium capitalize">
+            {propertyCategory}
+          </span>
         </div>
-      )}
-      
-      {/* Property Title Section */}
-      <PropertyHeader 
-        title={propertyTitle} 
-        location={locationString} 
-      />
+        <p className="text-muted-foreground">{locationString}</p>
+      </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Content Column */}
@@ -338,25 +354,209 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
             onScheduleVisit={() => setVisitDialogOpen(true)}
           />
           
-          {/* Property Overview Card */}
-          <PropertyOverviewCard
-            price={propertyPrice}
-            listingType={listingType}
-            bedrooms={bedrooms}
-            bathrooms={bathrooms}
-            squareFeet={squareFeet}
-          />
+          {/* Property Overview Card with Price Label */}
+          <Card className="overflow-hidden">
+            <CardContent className="p-6">
+              <div className="flex flex-col md:flex-row md:justify-between mb-6">
+                <div className="mb-4 md:mb-0">
+                  <h3 className="text-lg font-semibold">{getPriceLabel()}</h3>
+                  <p className="text-3xl font-bold text-primary">{formatCurrency(propertyPrice)}</p>
+                  {isSaleProperty && property.sale?.priceNegotiable && (
+                    <p className="text-sm text-green-600 mt-1">Price Negotiable</p>
+                  )}
+                  {!isSaleProperty && property.rental?.rentNegotiable && (
+                    <p className="text-sm text-green-600 mt-1">Rent Negotiable</p>
+                  )}
+                </div>
+                
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="flex flex-col items-center justify-center p-3 bg-muted/40 rounded-lg">
+                    <span className="text-xl font-semibold">{bedrooms}</span>
+                    <span className="text-sm text-muted-foreground">Beds</span>
+                  </div>
+                  <div className="flex flex-col items-center justify-center p-3 bg-muted/40 rounded-lg">
+                    <span className="text-xl font-semibold">{bathrooms}</span>
+                    <span className="text-sm text-muted-foreground">Baths</span>
+                  </div>
+                  <div className="flex flex-col items-center justify-center p-3 bg-muted/40 rounded-lg">
+                    <span className="text-xl font-semibold">{squareFeet}</span>
+                    <span className="text-sm text-muted-foreground">Sq.ft</span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          {/* Basic Details Section */}
+          <BasicDetailsSection basicDetails={basicDetailsData} />
+          
+          {/* Sale Details Section - Only shown for Sale properties */}
+          {isSaleProperty && property.sale && (
+            <Card className="overflow-hidden">
+              <CardContent className="p-6">
+                <h3 className="text-lg font-semibold mb-4">Sale Details</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Expected Price:</p>
+                    <p className="font-medium">
+                      {property.sale.expectedPrice 
+                        ? formatCurrency(property.sale.expectedPrice) 
+                        : '-'}
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <p className="text-sm text-muted-foreground">Maintenance Cost:</p>
+                    <p className="font-medium">
+                      {property.sale.maintenanceCost 
+                        ? formatCurrency(property.sale.maintenanceCost) 
+                        : '-'}
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <p className="text-sm text-muted-foreground">Kitchen Type:</p>
+                    <p className="font-medium">{property.sale.kitchenType || '-'}</p>
+                  </div>
+                  
+                  <div>
+                    <p className="text-sm text-muted-foreground">Available From:</p>
+                    <p className="font-medium">
+                      {property.sale.possessionDate 
+                        ? formatDate(property.sale.possessionDate) 
+                        : 'Not specified'}
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <p className="text-sm text-muted-foreground">Price Negotiable:</p>
+                    <p className="font-medium">
+                      {property.sale.priceNegotiable === true ? 'Yes' : 'No'}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          
+          {/* Rental Details Section - Only shown for Rental properties */}
+          {!isSaleProperty && property.rental && (
+            <Card className="overflow-hidden">
+              <CardContent className="p-6">
+                <h3 className="text-lg font-semibold mb-4">Rental Details</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Monthly Rent:</p>
+                    <p className="font-medium">
+                      {property.rental.rentAmount 
+                        ? formatCurrency(property.rental.rentAmount) 
+                        : '-'}
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <p className="text-sm text-muted-foreground">Security Deposit:</p>
+                    <p className="font-medium">
+                      {property.rental.securityDeposit 
+                        ? formatCurrency(property.rental.securityDeposit) 
+                        : '-'}
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <p className="text-sm text-muted-foreground">Maintenance Charges:</p>
+                    <p className="font-medium">
+                      {property.rental.maintenanceCharges 
+                        ? formatCurrency(property.rental.maintenanceCharges) 
+                        : '-'}
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <p className="text-sm text-muted-foreground">Available From:</p>
+                    <p className="font-medium">
+                      {property.rental.availableFrom 
+                        ? formatDate(property.rental.availableFrom) 
+                        : 'Not specified'}
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <p className="text-sm text-muted-foreground">Furnishing Status:</p>
+                    <p className="font-medium">{property.rental.furnishingStatus || '-'}</p>
+                  </div>
+                  
+                  <div>
+                    <p className="text-sm text-muted-foreground">Lease Duration:</p>
+                    <p className="font-medium">{property.rental.leaseDuration || '-'}</p>
+                  </div>
+                  
+                  <div>
+                    <p className="text-sm text-muted-foreground">Rent Negotiable:</p>
+                    <p className="font-medium">
+                      {property.rental.rentNegotiable === true ? 'Yes' : 'No'}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          
+          {/* Features & Amenities Section */}
+          <Card className="overflow-hidden">
+            <CardContent className="p-6">
+              <h3 className="text-lg font-semibold mb-4">Features & Amenities</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Furnishing:</p>
+                  <p className="font-medium">{property.features?.furnishing || '-'}</p>
+                </div>
+                
+                <div>
+                  <p className="text-sm text-muted-foreground">Parking:</p>
+                  <p className="font-medium">{property.features?.parking || '-'}</p>
+                </div>
+                
+                <div>
+                  <p className="text-sm text-muted-foreground">Property Show Option:</p>
+                  <p className="font-medium">{property.features?.propertyShowOption || '-'}</p>
+                </div>
+                
+                <div>
+                  <p className="text-sm text-muted-foreground">Gated Security:</p>
+                  <p className="font-medium">
+                    {property.features?.gatedSecurity === true ? 'Yes' : 'No'}
+                  </p>
+                </div>
+                
+                <div>
+                  <p className="text-sm text-muted-foreground">Non-Veg Allowed:</p>
+                  <p className="font-medium">
+                    {property.features?.nonVegAllowed === true ? 'Yes' : 'No'}
+                  </p>
+                </div>
+                
+                <div>
+                  <p className="text-sm text-muted-foreground">Gym Available:</p>
+                  <p className="font-medium">
+                    {property.features?.hasGym === true ? 'Yes' : 'No'}
+                  </p>
+                </div>
+                
+                <div className="col-span-2">
+                  <p className="text-sm text-muted-foreground">Amenities:</p>
+                  <p className="font-medium">
+                    {amenities && amenities.length > 0 
+                      ? amenities.join(', ') 
+                      : 'No amenities specified'}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
           
           {/* About this property */}
           <PropertyDescriptionSection description={description} />
-          
-          {/* Property Type and Features */}
-          <PropertyFeaturesSection propertyDetails={propertyDetails} />
-          
-          {/* Amenities */}
-          {amenities.length > 0 && (
-            <PropertyAmenitiesSection amenities={amenities} />
-          )}
           
           {/* Property Location Map */}
           <PropertyLocationSection
@@ -377,9 +577,9 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
             ownerInfo={property.ownerInfo}
           />
           
-          {propertyDetails.highlights && (
+          {property.property_details?.highlights && (
             <PropertyHighlightsCard 
-              highlights={propertyDetails.highlights} 
+              highlights={property.property_details.highlights} 
             />
           )}
           
