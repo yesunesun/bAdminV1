@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/constants/common.ts
-// Version: 2.4.0
-// Last Modified: 12-04-2025 15:30 IST
-// Purpose: Updated 'Flatmate Preferences' to 'Flatmate Details'
+// Version: 2.5.0
+// Last Modified: 02-05-2025 16:30 IST
+// Purpose: Updated coworking_basic_details to match UI navigation
 
 import { 
   Home, 
@@ -87,6 +87,13 @@ export const STEP_DEFINITIONS = {
     icon: Store,  // Changed from Shop to Store
     description: 'Commercial sale details'
   },
+  // New step definition for Commercial Co-working Basic Details (updated ID)
+  basic_details: {
+    id: 'basic_details',
+    title: 'Basic Details',
+    icon: Briefcase,
+    description: 'Co-working space basic information'
+  },
   // New step definitions for Commercial Co-working flow
   coworking: {
     id: 'coworking',
@@ -165,6 +172,12 @@ export const STEPS = [
     title: 'Sale Details',
     icon: Store,  // Changed from Shop to Store
     description: 'Commercial sale details'
+  },
+  {
+    id: 'basic_details',
+    title: 'Basic Details',
+    icon: Briefcase,
+    description: 'Co-working space basic information'
   },
   {
     id: 'coworking',

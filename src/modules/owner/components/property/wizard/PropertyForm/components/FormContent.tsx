@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/PropertyForm/components/FormContent.tsx
-// Version: 4.5.0
-// Last Modified: 16-04-2025 16:15 IST
-// Purpose: Fixed Photos tab loading issue and improved error handling
+// Version: 4.7.0
+// Last Modified: 02-05-2025 19:00 IST
+// Purpose: Fixed coworking basic details step rendering
 
 import React, { useEffect, useState } from 'react';
 import { UseFormReturn } from 'react-hook-form';
@@ -25,6 +25,7 @@ import CommercialDetails from '../../sections/CommercialDetails';
 // Import new components for the new flows
 import CommercialSaleDetails from '../../sections/CommercialSaleDetails';
 import CoworkingDetails from '../../sections/CoworkingDetails';
+import CoworkingBasicDetails from '../../sections/CoworkingBasicDetails'; // New import
 import LandDetails from '../../sections/LandDetails';
 import LandFeaturesDetails from '../../sections/LandFeaturesDetails';
 import FlatmateDetails from '../../sections/FlatmateDetails';
@@ -90,6 +91,19 @@ const FormContent = ({
     ? STEPS[formStep - 1]?.id 
     : null;
   
+  // Enhanced debugging logs
+  useEffect(() => {
+    console.log('FormContent Debugging:');
+    console.log('- Current Step ID:', currentStepId);
+    console.log('- First Step ID in STEPS:', STEPS[0]?.id);
+    console.log('- Mode:', mode);
+    console.log('- Category:', effectiveCategory);
+    console.log('- Ad Type:', effectiveAdType);
+    console.log('- Is Coworking Mode:', isCoworkingMode);
+    console.log('- Current STEPS array:', STEPS);
+    console.log('- Current formStep:', formStep);
+  }, [currentStepId, effectiveCategory, effectiveAdType, isCoworkingMode, STEPS, formStep, mode]);
+  
   // Effect to log savedPropertyId when on photos step
   useEffect(() => {
     if (currentStepId === 'photos') {
@@ -117,7 +131,25 @@ const FormContent = ({
   }, [currentStepId, savedPropertyId, mode, photoLoadRetries, handleSaveAsDraft]);
   
   // Render content based on the current step
-  if (currentStepId === 'details') {
+  
+  // Special case for coworking properties - regardless of step ID
+  // Always show CoworkingBasicDetails for the first step in coworking flow
+  if (isCoworkingMode && formStep === 1) {
+    console.log('Rendering CoworkingBasicDetails for coworking mode, first step');
+    return (
+      <CoworkingBasicDetails 
+        form={form} 
+        mode={mode} 
+        category={effectiveCategory}
+        adType={effectiveAdType}
+      />
+    );
+  }
+  
+  // For all other flows or steps, proceed with normal step ID based rendering
+  if (currentStepId === 'details' || currentStepId === 'basic_details') {
+    console.log('Entering basic details condition check');
+    
     // Skip details for Land/Plot flow
     if (isLandSaleMode) {
       return (
@@ -127,6 +159,7 @@ const FormContent = ({
       );
     }
     
+    // For all other flows, show the standard PropertyDetails
     return (
       <PropertyDetails 
         form={form} 
@@ -148,7 +181,6 @@ const FormContent = ({
   
   if (currentStepId === 'rental') {
     // Show rental details for both residential and commercial rent properties
-    // This is the critical change - explicitly check if this is a rent flow including commercial rent
     const isRentFlow = !isSaleMode && !isPGHostelMode && !isCommercialSaleMode && 
                       !isCoworkingMode && !isLandSaleMode && !isFlatmatesMode;
     

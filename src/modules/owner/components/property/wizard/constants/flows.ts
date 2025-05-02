@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/constants/flows.ts
-// Version: 2.3.0
-// Last Modified: 01-05-2025 13:15 IST
-// Purpose: Removed Photos step from all property flows
+// Version: 2.5.0
+// Last Modified: 02-05-2025 19:00 IST
+// Purpose: Updated Co-working flow to use dedicated basic details step
 
 import { STEP_DEFINITIONS } from './common';
 
@@ -57,9 +57,9 @@ export const FLOW_STEPS = {
     // Photos step removed
   ],
   
-  // New Flow 2: Commercial Co-working flow
+  // New Flow 2: Commercial Co-working flow - UPDATED to use details
   COMMERCIAL_COWORKING: [
-    STEP_DEFINITIONS.details,
+    STEP_DEFINITIONS.details, // Just use the standard details ID for simplicity
     STEP_DEFINITIONS.location,
     STEP_DEFINITIONS.coworking,
     STEP_DEFINITIONS.features,
