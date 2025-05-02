@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/LocationDetails/hooks/useMapInteractions.ts
-// Version: 3.0.0
-// Last Modified: 07-03-2025 21:45 IST
-// Purpose: Completely simplified implementation to avoid DOM errors
+// Version: 3.1.0
+// Last Modified: 03-05-2025 16:30 IST
+// Purpose: Updated to extract and set city and area fields when using current location
 
 import { useState, useEffect, useRef, RefObject } from 'react';
 import { UseFormReturn } from 'react-hook-form';
@@ -158,14 +158,50 @@ export function useMapInteractions({
           const address = results[0].formatted_address;
           setValue('address', address);
           
-          // Extract PIN code if available
+          // Extract components from address
           const addressComponents = results[0].address_components || [];
+          
+          // Extract PIN code
           const postalCodeComponent = addressComponents.find(
             (component: any) => component.types.includes('postal_code')
           );
           
           if (postalCodeComponent && postalCodeComponent.long_name) {
             setValue('pinCode', postalCodeComponent.long_name);
+          }
+          
+          // Extract city
+          const cityComponent = addressComponents.find(
+            (component: any) => 
+              component.types.includes('locality') || 
+              component.types.includes('administrative_area_level_2')
+          );
+          
+          if (cityComponent && cityComponent.long_name) {
+            setValue('city', cityComponent.long_name);
+          }
+          
+          // Extract area/neighborhood
+          const areaComponent = addressComponents.find(
+            (component: any) => 
+              component.types.includes('sublocality_level_1') || 
+              component.types.includes('sublocality') ||
+              component.types.includes('neighborhood')
+          );
+          
+          if (areaComponent && areaComponent.long_name) {
+            setValue('area', areaComponent.long_name);
+          }
+          
+          // Extract locality
+          const localityComponent = addressComponents.find(
+            (component: any) => 
+              component.types.includes('sublocality_level_2') || 
+              component.types.includes('political')
+          );
+          
+          if (localityComponent && localityComponent.long_name) {
+            setValue('locality', localityComponent.long_name);
           }
         }
       });
@@ -209,14 +245,50 @@ export function useMapInteractions({
           setValue('latitude', location.lat());
           setValue('longitude', location.lng());
           
-          // Extract PIN code if available
+          // Extract address components and update form fields
           const addressComponents = results[0].address_components || [];
+          
+          // Extract PIN code
           const postalCodeComponent = addressComponents.find(
             (component: any) => component.types.includes('postal_code')
           );
           
           if (postalCodeComponent && postalCodeComponent.long_name) {
             setValue('pinCode', postalCodeComponent.long_name);
+          }
+          
+          // Extract city
+          const cityComponent = addressComponents.find(
+            (component: any) => 
+              component.types.includes('locality') || 
+              component.types.includes('administrative_area_level_2')
+          );
+          
+          if (cityComponent && cityComponent.long_name) {
+            setValue('city', cityComponent.long_name);
+          }
+          
+          // Extract area/neighborhood
+          const areaComponent = addressComponents.find(
+            (component: any) => 
+              component.types.includes('sublocality_level_1') || 
+              component.types.includes('sublocality') ||
+              component.types.includes('neighborhood')
+          );
+          
+          if (areaComponent && areaComponent.long_name) {
+            setValue('area', areaComponent.long_name);
+          }
+          
+          // Extract locality
+          const localityComponent = addressComponents.find(
+            (component: any) => 
+              component.types.includes('sublocality_level_2') || 
+              component.types.includes('political')
+          );
+          
+          if (localityComponent && localityComponent.long_name) {
+            setValue('locality', localityComponent.long_name);
           }
           
           // Update map with new location
@@ -270,7 +342,7 @@ export function useMapInteractions({
           lng: longitude
         });
         
-        // Perform reverse geocoding
+        // Perform reverse geocoding to get address and location details
         performReverseGeocoding({
           lat: latitude,
           lng: longitude

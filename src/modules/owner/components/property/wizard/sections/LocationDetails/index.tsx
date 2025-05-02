@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/LocationDetails/index.tsx
-// Version: 4.1.0
-// Last Modified: 02-05-2025 14:45 IST
-// Purpose: Fixed Google Maps initialization and controlled input issues
+// Version: 4.2.0
+// Last Modified: 03-05-2025 16:30 IST
+// Purpose: Updated reverseGeocoding to populate city and area fields when using current location
 
 import React, { useEffect, useRef, useState } from 'react';
 import { FormSection } from '@/components/FormSection';
@@ -192,14 +192,50 @@ export function LocationDetails({ form }: FormSectionProps) {
           const address = results[0].formatted_address;
           setValue('address', address);
           
-          // Extract PIN code if available
+          // Extract components from address
           const addressComponents = results[0].address_components || [];
+          
+          // Extract PIN code
           const postalCodeComponent = addressComponents.find(
             (component: any) => component.types.includes('postal_code')
           );
           
           if (postalCodeComponent && postalCodeComponent.long_name) {
             setValue('pinCode', postalCodeComponent.long_name);
+          }
+          
+          // Extract city
+          const cityComponent = addressComponents.find(
+            (component: any) => 
+              component.types.includes('locality') || 
+              component.types.includes('administrative_area_level_2')
+          );
+          
+          if (cityComponent && cityComponent.long_name) {
+            setValue('city', cityComponent.long_name);
+          }
+          
+          // Extract area/neighborhood
+          const areaComponent = addressComponents.find(
+            (component: any) => 
+              component.types.includes('sublocality_level_1') || 
+              component.types.includes('sublocality') ||
+              component.types.includes('neighborhood')
+          );
+          
+          if (areaComponent && areaComponent.long_name) {
+            setValue('area', areaComponent.long_name);
+          }
+          
+          // Extract locality
+          const localityComponent = addressComponents.find(
+            (component: any) => 
+              component.types.includes('sublocality_level_2') || 
+              component.types.includes('political')
+          );
+          
+          if (localityComponent && localityComponent.long_name) {
+            setValue('locality', localityComponent.long_name);
           }
         }
       });
