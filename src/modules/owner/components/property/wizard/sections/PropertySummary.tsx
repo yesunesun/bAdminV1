@@ -1,9 +1,9 @@
 // src/modules/owner/components/property/wizard/sections/PropertySummary.tsx
-// Version: 4.5.0
-// Last Modified: 02-05-2025 17:30 IST
-// Purpose: Added editable property title in the Review tab
+// Version: 4.6.0
+// Last Modified: 03-05-2025 16:30 IST
+// Purpose: Added auto-generated property title based on flow type
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { FormSection } from '@/components/FormSection';
 import { cn } from '@/lib/utils';
 import { FormData } from '../types';
@@ -78,6 +78,66 @@ const formatArea = (area?: string, unit?: string) => {
   return `${area} ${displayUnit}`;
 };
 
+/**
+ * Generates an appropriate property title based on the flow type
+ * @param formData The property form data
+ * @param flowPropertyType Property type from URL or form data
+ * @param flowListingType Listing type from URL or form data
+ * @returns A generated property title
+ */
+const generatePropertyTitle = (
+  formData: FormData,
+  flowPropertyType: string,
+  flowListingType: string
+): string => {
+  // Extract necessary data for title
+  const bhk = formData.bhkType || '';
+  const propertyType = formData.propertyType || '';
+  
+  // Determine area from various possible fields
+  let area = '';
+  if (formData.city) {
+    area = formData.city;
+  } else if (formData.locality) {
+    area = formData.locality;
+  } else if ('location' in formData && formData.location && typeof formData.location === 'object') {
+    area = formData.location.city || formData.location.locality || '';
+  }
+  
+  // If no area is found, use a default
+  if (!area) {
+    area = 'Hyderabad';
+  }
+  
+  // For PG/Hostel flow
+  if (flowListingType === 'pghostel') {
+    let roomType = '';
+    let capacity = '';
+    
+    // Extract PG-specific details
+    if ('pghostel' in formData && formData.pghostel) {
+      roomType = formData.pghostel.roomType || '';
+      capacity = formData.pghostel.roomCapacity ? String(formData.pghostel.roomCapacity) : '';
+    } else {
+      roomType = formData.roomType || 'Single Sharing';
+      capacity = formData.roomCapacity || '1';
+    }
+    
+    return `PG/Hostel ${roomType} for ${capacity} in ${area}`;
+  }
+  
+  // For Flatmates flow
+  else if (flowListingType === 'flatmates') {
+    return `${bhk} ${propertyType} for Flatmates in ${area}`;
+  }
+  
+  // For Sale/Rent flows (standard residential properties)
+  else {
+    const listingTypeName = flowListingType === 'sale' ? 'Sale' : 'Rent';
+    return `${bhk} ${propertyType} in ${area} for ${listingTypeName}`;
+  }
+};
+
 export function PropertySummary({
   formData,
   onPrevious,
@@ -94,6 +154,25 @@ export function PropertySummary({
   // State to manage the editable property title
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editedTitle, setEditedTitle] = useState(formData.title || '');
+  
+  // Extract flow information from URL path for display
+  const pathParts = useMemo(() => window.location.pathname.split('/'), []);
+  const urlPropertyType = useMemo(() => 
+    pathParts.length > 2 ? pathParts[pathParts.length - 3] : '', 
+  [pathParts]);
+  
+  const urlListingType = useMemo(() => 
+    pathParts.length > 2 ? pathParts[pathParts.length - 2] : '',
+  [pathParts]);
+  
+  // Get flow information from URL or form data
+  const flowPropertyType = useMemo(() => 
+    urlPropertyType || formData.flow_property_type || '',
+  [urlPropertyType, formData.flow_property_type]);
+  
+  const flowListingType = useMemo(() => 
+    urlListingType || formData.flow_listing_type || '',
+  [urlListingType, formData.flow_listing_type]);
   
   // Function to handle title edit completion
   const handleTitleEditComplete = () => {
@@ -120,7 +199,7 @@ export function PropertySummary({
   };
   
   // Before rendering, prepare form data
-  React.useEffect(() => {
+  useEffect(() => {
     // Set flow information from URL path
     const pathParts = window.location.pathname.split('/');
     const urlPropertyType = pathParts.length > 2 ? pathParts[pathParts.length - 3] : '';
@@ -134,12 +213,14 @@ export function PropertySummary({
       formData.flow_listing_type = urlListingType;
     }
     
-    // Make sure we have a title
-    if (!formData.title) {
-      if (formData.propertyType) {
-        formData.title = `${capitalize(formData.propertyType)} Property`;
-      } else {
-        formData.title = "New Property";
+    // Generate an appropriate title based on flow type if no title exists or if we're in a new listing
+    if (!formData.title || formData.title === "New Property" || formData.title === `${capitalize(formData.propertyType)} Property`) {
+      const generatedTitle = generatePropertyTitle(formData, flowPropertyType, flowListingType);
+      formData.title = generatedTitle;
+      
+      // If using v2 format, update the nested structure too
+      if ('basicDetails' in formData && formData.basicDetails) {
+        formData.basicDetails.title = generatedTitle;
       }
     }
     
@@ -163,26 +244,7 @@ export function PropertySummary({
         listing_type: formData.flow_listing_type
       }
     });
-  }, [formData]);
-  
-  // Extract flow information from URL path for display
-  const pathParts = useMemo(() => window.location.pathname.split('/'), []);
-  const urlPropertyType = useMemo(() => 
-    pathParts.length > 2 ? pathParts[pathParts.length - 3] : '', 
-  [pathParts]);
-  
-  const urlListingType = useMemo(() => 
-    pathParts.length > 2 ? pathParts[pathParts.length - 2] : '',
-  [pathParts]);
-  
-  // Get flow information from URL or form data
-  const flowPropertyType = useMemo(() => 
-    capitalize(urlPropertyType || formData.flow_property_type || ''),
-  [urlPropertyType, formData.flow_property_type]);
-  
-  const flowListingType = useMemo(() => 
-    capitalize(urlListingType || formData.flow_listing_type || ''),
-  [urlListingType, formData.flow_listing_type]);
+  }, [formData, flowPropertyType, flowListingType]);
   
   // Improved logic to detect if this is a sale property
   const isSaleProperty = useMemo(() => {
@@ -283,8 +345,8 @@ export function PropertySummary({
           title="Listing Information"
           icon={<Info className="h-4 w-4" />}
           items={[
-            { label: 'Property Type', value: flowPropertyType || capitalize(formData.propertyType) },
-            { label: 'Listing Type', value: flowListingType || capitalize(formData.listingType) }
+            { label: 'Property Type', value: flowPropertyType ? capitalize(flowPropertyType) : capitalize(formData.propertyType) },
+            { label: 'Listing Type', value: flowListingType ? capitalize(flowListingType) : capitalize(formData.listingType) }
           ]}
         />
         
