@@ -1,14 +1,16 @@
 // src/modules/owner/components/property/wizard/sections/PropertySummary.tsx
-// Version: 4.4.0
-// Last Modified: 02-05-2025 20:00 IST
-// Purpose: Removed direct save button and simplified UI
+// Version: 4.5.0
+// Last Modified: 02-05-2025 17:30 IST
+// Purpose: Added editable property title in the Review tab
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { FormSection } from '@/components/FormSection';
 import { cn } from '@/lib/utils';
 import { FormData } from '../types';
-import { MapPin, Home, SquareStack, Sparkles, IndianRupee, Building, Info } from 'lucide-react';
+import { MapPin, Home, SquareStack, Sparkles, IndianRupee, Building, Info, Edit, Check } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 
 interface PropertySummaryProps {
   formData: FormData;
@@ -89,6 +91,34 @@ export function PropertySummary({
   const isPublished = status === 'published';
   const isNewListing = !propertyId;
   
+  // State to manage the editable property title
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [editedTitle, setEditedTitle] = useState(formData.title || '');
+  
+  // Function to handle title edit completion
+  const handleTitleEditComplete = () => {
+    if (editedTitle.trim()) {
+      // Update the form data with the new title
+      formData.title = editedTitle.trim();
+      
+      // If using v2 format, update the nested structure too
+      if ('basicDetails' in formData && formData.basicDetails) {
+        formData.basicDetails.title = editedTitle.trim();
+      }
+    }
+    setIsEditingTitle(false);
+  };
+  
+  // Function to handle title edit cancellation on Escape key
+  const handleTitleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleTitleEditComplete();
+    } else if (e.key === 'Escape') {
+      setEditedTitle(formData.title || '');
+      setIsEditingTitle(false);
+    }
+  };
+  
   // Before rendering, prepare form data
   React.useEffect(() => {
     // Set flow information from URL path
@@ -112,6 +142,9 @@ export function PropertySummary({
         formData.title = "New Property";
       }
     }
+    
+    // Set initial edited title state
+    setEditedTitle(formData.title || '');
     
     // Ensure location data is set if missing
     if (!formData.city && !formData.locality) {
@@ -204,9 +237,44 @@ export function PropertySummary({
       description="Review all details before saving or publishing"
     >
       <div className="space-y-6">
-        {/* Property title preview */}
+        {/* Property title preview with edit functionality */}
         <div className="mb-6">
-          <h2 className="text-xl font-semibold text-foreground">{formData.title || "Unnamed Property"}</h2>
+          {isEditingTitle ? (
+            <div className="flex items-center gap-2">
+              <Input
+                type="text"
+                value={editedTitle}
+                onChange={(e) => setEditedTitle(e.target.value)}
+                onKeyDown={handleTitleKeyDown}
+                autoFocus
+                className="text-lg font-semibold h-10"
+                placeholder="Enter property title"
+              />
+              <Button 
+                size="sm" 
+                variant="ghost" 
+                onClick={handleTitleEditComplete}
+                className="p-2 h-10 w-10"
+              >
+                <Check className="h-5 w-5" />
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <h2 className="text-xl font-semibold text-foreground">
+                {formData.title || "Unnamed Property"}
+              </h2>
+              <Button 
+                size="sm" 
+                variant="ghost" 
+                onClick={() => setIsEditingTitle(true)}
+                className="p-1 h-8 w-8 ml-1"
+                title="Edit property title"
+              >
+                <Edit className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
           <p className="text-muted-foreground text-sm mt-1">{fullAddress}</p>
         </div>
         
