@@ -1,14 +1,13 @@
 // src/modules/seeker/components/CompactSearchBar.tsx
-// Version: 1.4.0
-// Last Modified: 07-04-2025 16:45 IST
-// Purpose: Added Property Age and Furnished/Unfurnished filters
+// Version: 3.1.0
+// Last Modified: 02-05-2025 17:00 IST
+// Purpose: Ultra-compact search interface without popover components
 
-import React, { forwardRef, useState, useEffect } from 'react';
+import React, { forwardRef, useState, useEffect, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search, X, Sliders, Check } from 'lucide-react';
+import { Search, X, ChevronDown, ChevronUp, Home, Building, Briefcase, Maximize } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger, SheetClose } from '@/components/ui/sheet';
 import { Slider } from '@/components/ui/slider';
 import { propertyTypeOptions } from '../services/seekerService';
 import { PropertyFilters } from '../services/seekerService';
@@ -46,39 +45,10 @@ const CompactSearchBar = forwardRef<HTMLInputElement, CompactSearchBarProps>(({
   const [localPropertyType, setLocalPropertyType] = useState<string>(selectedPropertyType);
   const [furnishing, setFurnishing] = useState<string>(filters.furnishing || '');
   const [propertyAge, setPropertyAge] = useState<string>(filters.propertyAge || '');
-  const [isSheetOpen, setIsSheetOpen] = useState(false);
   
-  // Sync local state with filters when they change externally
-  useEffect(() => {
-    setMinPrice(filters.minPrice || 0);
-    setMaxPrice(filters.maxPrice || 10000000);
-    setBedrooms(filters.bedrooms);
-    setBathrooms(filters.bathrooms);
-    setLocalPropertyType(selectedPropertyType);
-    setFurnishing(filters.furnishing || '');
-    setPropertyAge(filters.propertyAge || '');
-  }, [filters, selectedPropertyType]);
-  
-  // Handle filter changes 
-  const applyFilters = () => {
-    // Apply property type from local state
-    if (localPropertyType !== selectedPropertyType) {
-      handlePropertyTypeChange(localPropertyType);
-    }
-    
-    setFilters({
-      ...filters,
-      minPrice,
-      maxPrice,
-      bedrooms,
-      bathrooms,
-      propertyType: localPropertyType === 'all' ? undefined : localPropertyType,
-      furnishing: furnishing || undefined,
-      propertyAge: propertyAge || undefined
-    });
-    
-    setIsSheetOpen(false);
-  };
+  // State for expanded filter sections
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [openFilter, setOpenFilter] = useState<string | null>(null);
   
   // Count active filters
   const activeFilterCount = [
@@ -91,6 +61,22 @@ const CompactSearchBar = forwardRef<HTMLInputElement, CompactSearchBarProps>(({
     !!propertyAge
   ].filter(Boolean).length;
   
+  // Apply filters immediately when selections change
+  const applyFilters = () => {
+    setFilters({
+      ...filters,
+      minPrice,
+      maxPrice,
+      bedrooms,
+      bathrooms,
+      propertyType: localPropertyType === 'all' ? undefined : localPropertyType,
+      furnishing: furnishing || undefined,
+      propertyAge: propertyAge || undefined
+    });
+    // Close any open filter
+    setOpenFilter(null);
+  };
+  
   // Format price to Indian format
   const formatPrice = (price: number) => {
     if (price >= 10000000) {
@@ -102,375 +88,382 @@ const CompactSearchBar = forwardRef<HTMLInputElement, CompactSearchBarProps>(({
     }
   };
 
-  // Property type options for the filters panel
+  // Filter options
   const propertyTypeFilters = [
-    { id: 'all', label: 'All Types' },
-    { id: 'apartment', label: 'Apartment' },
-    { id: 'house', label: 'House' },
-    { id: 'commercial', label: 'Commercial' },
-    { id: 'land', label: 'Land' }
-  ];
-
-  // Furnishing options
-  const furnishingOptions = [
-    { id: '', label: 'Any' },
-    { id: 'furnished', label: 'Furnished' },
-    { id: 'semi-furnished', label: 'Semi-Furnished' },
-    { id: 'unfurnished', label: 'Unfurnished' }
-  ];
-
-  // Property Age options
-  const propertyAgeOptions = [
-    { id: '', label: 'Any' },
-    { id: 'new', label: 'New Construction' },
-    { id: 'less-than-5', label: 'Less than 5 years' },
-    { id: '5-10', label: '5-10 years' },
-    { id: 'more-than-10', label: 'More than 10 years' }
+    { id: 'all', label: 'Any', icon: Home },
+    { id: 'apartment', label: 'Apartment', icon: Building },
+    { id: 'house', label: 'House', icon: Home },
+    { id: 'commercial', label: 'Commercial', icon: Briefcase }
   ];
   
+  const roomOptions = ["Any", "1+", "2+", "3+", "4+", "5+"];
+  
+  const bedroomLabel = bedrooms 
+    ? `${bedrooms}+ Bed` 
+    : "Beds";
+  
+  const bathroomLabel = bathrooms 
+    ? `${bathrooms}+ Bath` 
+    : "Baths";
+  
+  const propertyTypeLabel = propertyTypeFilters.find(t => t.id === localPropertyType)?.label || "Type";
+  
+  const priceLabel = (minPrice > 0 || maxPrice < 10000000)
+    ? `${formatPrice(minPrice)} - ${formatPrice(maxPrice)}`
+    : "Price";
+    
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (openFilter) {
+        setOpenFilter(null);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [openFilter]);
+
+  // Toggle filter dropdown
+  const toggleFilter = (filter: string) => {
+    if (openFilter === filter) {
+      setOpenFilter(null);
+    } else {
+      setOpenFilter(filter);
+    }
+  };
+
   return (
-    <div className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 py-3">
-      <div className="container flex flex-col space-y-4">
-        {/* Search Bar */}
-        <div className="flex gap-2 items-center">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              ref={ref}
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by location, property name or keyword"
-              className="pl-9 pr-4 h-11"
-              onFocus={onFocus}
-              onBlur={onBlur}
-            />
-            {searchQuery && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 text-muted-foreground hover:text-foreground"
-                onClick={() => setSearchQuery('')}
+    <div className="w-full bg-white dark:bg-slate-900 py-4 border-b">
+      <div className="container px-4 mx-auto">
+        {/* Main Search Row */}
+        <div className="flex flex-col md:flex-row gap-2">
+          {/* Search Bar */}
+          <div className="relative flex-grow">
+            <div className="relative flex shadow-sm rounded-md overflow-hidden">
+              <div className="relative flex-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-l-md">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-blue-500" />
+                <Input
+                  ref={ref}
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search by location, property name or keyword"
+                  className="pl-9 pr-4 h-10 text-sm border-0 focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none"
+                  onFocus={onFocus}
+                  onBlur={onBlur}
+                />
+                {searchQuery && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 text-muted-foreground hover:text-foreground"
+                    onClick={() => setSearchQuery('')}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                )}
+              </div>
+              <Button 
+                className="h-10 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-none rounded-r-md"
+                onClick={applyFilters}
               >
-                <X className="h-4 w-4" />
+                Search
               </Button>
-            )}
+            </div>
           </div>
           
-          {/* Advanced Filters Button */}
-          <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-            <SheetTrigger asChild>
-              <Button variant="outline" className="h-11 relative">
-                <Sliders className="h-4 w-4 mr-2" />
-                <span>Filters</span>
-                {activeFilterCount > 0 && (
-                  <Badge variant="secondary" className="ml-2 h-5 w-5 p-0 flex items-center justify-center rounded-full">
-                    {activeFilterCount}
-                  </Badge>
-                )}
+          {/* Filter Buttons */}
+          <div className="flex items-center space-x-1 md:space-x-2">
+            {/* Property Type Filter */}
+            <div className="relative">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="h-10 px-3 text-xs"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleFilter('type');
+                }}
+              >
+                <Home className="h-3.5 w-3.5 mr-1.5" />
+                {propertyTypeLabel}
+                <ChevronDown className="h-3 w-3 ml-1.5 opacity-70" />
               </Button>
-            </SheetTrigger>
-            <SheetContent side="right" className="w-full max-w-md sm:max-w-lg overflow-y-auto">
-              <SheetHeader className="mb-4">
-                <SheetTitle className="text-xl">Filters</SheetTitle>
-                <SheetDescription>
-                  Refine your search with specific criteria
-                </SheetDescription>
-              </SheetHeader>
               
-              <div className="mt-4 space-y-6">
-                {/* Property Types */}
-                <div className="space-y-3">
-                  <h3 className="font-medium text-lg">Property Type</h3>
-                  <div className="grid grid-cols-2 gap-3">
-                    {propertyTypeFilters.map((option) => (
+              {openFilter === 'type' && (
+                <div className="absolute z-10 mt-1 w-48 bg-white dark:bg-slate-800 rounded-md shadow-lg border border-slate-200 dark:border-slate-700 py-1">
+                  {propertyTypeFilters.map((type) => {
+                    const Icon = type.icon;
+                    return (
                       <div
-                        key={option.id}
-                        onClick={() => setLocalPropertyType(option.id)}
+                        key={type.id}
                         className={cn(
-                          "px-3 py-2.5 rounded-md border cursor-pointer flex items-center justify-between",
-                          localPropertyType === option.id
-                            ? "bg-primary/10 border-primary"
-                            : "bg-background hover:bg-muted/50 border-input"
+                          "flex items-center px-3 py-2 cursor-pointer",
+                          localPropertyType === type.id 
+                            ? "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" 
+                            : "hover:bg-slate-50 dark:hover:bg-slate-800/70"
                         )}
+                        onClick={() => {
+                          setLocalPropertyType(type.id);
+                          handlePropertyTypeChange(type.id);
+                          setOpenFilter(null);
+                        }}
                       >
-                        <span>{option.label}</span>
-                        {localPropertyType === option.id && (
-                          <Check className="h-4 w-4 text-primary" />
-                        )}
+                        <Icon className="h-3.5 w-3.5 mr-2" />
+                        <span className="text-sm">{type.label}</span>
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })}
                 </div>
-                
-                {/* Price Range */}
-                <div className="space-y-3">
-                  <h3 className="font-medium text-lg">Price Range</h3>
-                  <div className="flex items-center justify-between text-sm text-muted-foreground">
-                    <span>₹0</span>
-                    <span>₹1.0Cr</span>
-                  </div>
-                  <Slider
-                    defaultValue={[minPrice, maxPrice]}
-                    value={[minPrice, maxPrice]}
-                    min={0}
-                    max={10000000}
-                    step={100000}
-                    onValueChange={(values) => {
-                      setMinPrice(values[0]);
-                      setMaxPrice(values[1]);
-                    }}
-                    className="mt-2"
-                  />
-                </div>
-                
-                {/* Bedrooms */}
-                <div className="space-y-3">
-                  <h3 className="font-medium text-lg">Bedrooms</h3>
-                  <div className="grid grid-cols-6 gap-2">
-                    {["Any", "1+", "2+", "3+", "4+", "5+"].map((num, index) => (
-                      <Button
-                        key={num}
-                        variant={
-                          (index === 0 && bedrooms === undefined) || 
-                          (index > 0 && bedrooms === index) 
-                            ? "default" 
-                            : "outline"
-                        }
-                        size="sm"
-                        onClick={() => setBedrooms(index === 0 ? undefined : index)}
-                        className="text-center"
+              )}
+            </div>
+            
+            {/* Bedrooms Filter */}
+            <div className="relative">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="h-10 px-3 text-xs"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleFilter('bedrooms');
+                }}
+              >
+                {bedroomLabel}
+                <ChevronDown className="h-3 w-3 ml-1.5 opacity-70" />
+              </Button>
+              
+              {openFilter === 'bedrooms' && (
+                <div className="absolute z-10 mt-1 w-32 bg-white dark:bg-slate-800 rounded-md shadow-lg border border-slate-200 dark:border-slate-700 py-1">
+                  <div className="grid grid-cols-2 gap-1 p-1">
+                    {roomOptions.map((num, index) => (
+                      <div
+                        key={`bed-${num}`}
+                        className={cn(
+                          "flex justify-center px-2 py-1.5 rounded-md cursor-pointer text-sm",
+                          (index === 0 && bedrooms === undefined) || (index > 0 && bedrooms === index)
+                            ? "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" 
+                            : "hover:bg-slate-50 dark:hover:bg-slate-800/70"
+                        )}
+                        onClick={() => {
+                          const newValue = index === 0 ? undefined : index;
+                          setBedrooms(newValue);
+                          setFilters({...filters, bedrooms: newValue});
+                          setOpenFilter(null);
+                        }}
                       >
                         {num}
-                      </Button>
+                      </div>
                     ))}
                   </div>
                 </div>
-                
-                {/* Bathrooms */}
-                <div className="space-y-3">
-                  <h3 className="font-medium text-lg">Bathrooms</h3>
-                  <div className="grid grid-cols-6 gap-2">
-                    {["Any", "1+", "2+", "3+", "4+", "5+"].map((num, index) => (
-                      <Button
-                        key={num}
-                        variant={
-                          (index === 0 && bathrooms === undefined) || 
-                          (index > 0 && bathrooms === index) 
-                            ? "default" 
-                            : "outline"
-                        }
-                        size="sm"
-                        onClick={() => setBathrooms(index === 0 ? undefined : index)}
-                        className="text-center"
+              )}
+            </div>
+            
+            {/* Bathrooms Filter */}
+            <div className="relative">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="h-10 px-3 text-xs"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleFilter('bathrooms');
+                }}
+              >
+                {bathroomLabel}
+                <ChevronDown className="h-3 w-3 ml-1.5 opacity-70" />
+              </Button>
+              
+              {openFilter === 'bathrooms' && (
+                <div className="absolute z-10 mt-1 w-32 bg-white dark:bg-slate-800 rounded-md shadow-lg border border-slate-200 dark:border-slate-700 py-1">
+                  <div className="grid grid-cols-2 gap-1 p-1">
+                    {roomOptions.map((num, index) => (
+                      <div
+                        key={`bath-${num}`}
+                        className={cn(
+                          "flex justify-center px-2 py-1.5 rounded-md cursor-pointer text-sm",
+                          (index === 0 && bathrooms === undefined) || (index > 0 && bathrooms === index)
+                            ? "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" 
+                            : "hover:bg-slate-50 dark:hover:bg-slate-800/70"
+                        )}
+                        onClick={() => {
+                          const newValue = index === 0 ? undefined : index;
+                          setBathrooms(newValue);
+                          setFilters({...filters, bathrooms: newValue});
+                          setOpenFilter(null);
+                        }}
                       >
                         {num}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            {/* Price Range Filter */}
+            <div className="relative">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="h-10 px-3 text-xs"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleFilter('price');
+                }}
+              >
+                {priceLabel}
+                <ChevronDown className="h-3 w-3 ml-1.5 opacity-70" />
+              </Button>
+              
+              {openFilter === 'price' && (
+                <div className="absolute z-10 mt-1 w-64 bg-white dark:bg-slate-800 rounded-md shadow-lg border border-slate-200 dark:border-slate-700 p-3">
+                  <div className="space-y-4">
+                    <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400 mb-1 px-1">
+                      <span>{formatPrice(minPrice)}</span>
+                      <span>{formatPrice(maxPrice)}</span>
+                    </div>
+                    <Slider
+                      value={[minPrice, maxPrice]}
+                      min={0}
+                      max={10000000}
+                      step={100000}
+                      onValueChange={(values) => {
+                        setMinPrice(values[0]);
+                        setMaxPrice(values[1]);
+                      }}
+                    />
+                    
+                    <div className="grid grid-cols-2 gap-2 mt-3">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => {
+                          setMinPrice(0);
+                          setMaxPrice(10000000);
+                          setFilters({...filters, minPrice: 0, maxPrice: 10000000});
+                          setOpenFilter(null);
+                        }}
+                      >
+                        Reset
                       </Button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Furnished Status */}
-                <div className="space-y-3">
-                  <h3 className="font-medium text-lg">Furnishing</h3>
-                  <div className="grid grid-cols-2 gap-3">
-                    {furnishingOptions.map((option) => (
-                      <div
-                        key={option.id}
-                        onClick={() => setFurnishing(option.id)}
-                        className={cn(
-                          "px-3 py-2.5 rounded-md border cursor-pointer flex items-center justify-between",
-                          furnishing === option.id
-                            ? "bg-primary/10 border-primary"
-                            : "bg-background hover:bg-muted/50 border-input"
-                        )}
+                      <Button 
+                        size="sm"
+                        onClick={() => {
+                          setFilters({...filters, minPrice, maxPrice});
+                          setOpenFilter(null);
+                        }}
                       >
-                        <span>{option.label}</span>
-                        {furnishing === option.id && (
-                          <Check className="h-4 w-4 text-primary" />
-                        )}
-                      </div>
-                    ))}
+                        Apply
+                      </Button>
+                    </div>
                   </div>
                 </div>
-
-                {/* Property Age */}
-                <div className="space-y-3">
-                  <h3 className="font-medium text-lg">Property Age</h3>
-                  <div className="grid grid-cols-2 gap-3">
-                    {propertyAgeOptions.map((option) => (
-                      <div
-                        key={option.id}
-                        onClick={() => setPropertyAge(option.id)}
-                        className={cn(
-                          "px-3 py-2.5 rounded-md border cursor-pointer flex items-center justify-between",
-                          propertyAge === option.id
-                            ? "bg-primary/10 border-primary"
-                            : "bg-background hover:bg-muted/50 border-input"
-                        )}
-                      >
-                        <span>{option.label}</span>
-                        {propertyAge === option.id && (
-                          <Check className="h-4 w-4 text-primary" />
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                
-                {/* Action buttons */}
-                <div className="flex justify-between pt-6 sticky bottom-0 bg-background pb-4">
-                  <Button 
-                    variant="outline" 
-                    onClick={() => {
-                      handleResetFilters();
-                      setLocalPropertyType('all');
-                      setBedrooms(undefined);
-                      setBathrooms(undefined);
-                      setMinPrice(0);
-                      setMaxPrice(10000000);
-                      setFurnishing('');
-                      setPropertyAge('');
-                    }}
-                  >
-                    Reset Filters
-                  </Button>
-                  <Button 
-                    onClick={applyFilters}
-                    className="bg-primary text-primary-foreground hover:bg-primary/90"
-                  >
-                    Apply Filters
-                  </Button>
-                </div>
-              </div>
-            </SheetContent>
-          </Sheet>
+              )}
+            </div>
+            
+            {/* More Filters Button */}
+            <Button
+              variant={activeFilterCount > 0 ? "default" : "outline"}
+              size="sm"
+              className={cn(
+                "h-10 px-3 text-xs",
+                activeFilterCount > 0 ? "bg-blue-600 text-white" : ""
+              )}
+              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+            >
+              More
+              {activeFilterCount > 0 && (
+                <Badge className="ml-1 h-5 w-5 p-0 bg-white text-blue-600 flex items-center justify-center text-xs rounded-full">
+                  {activeFilterCount}
+                </Badge>
+              )}
+              {showAdvancedFilters ? 
+                <ChevronUp className="h-3 w-3 ml-1.5 opacity-70" /> : 
+                <ChevronDown className="h-3 w-3 ml-1.5 opacity-70" />
+              }
+            </Button>
+          </div>
         </div>
         
-        {/* Active Filters / Tags */}
-        {activeFilterCount > 0 && (
-          <div className="flex flex-wrap gap-2 items-center">
-            <span className="text-sm text-muted-foreground">Active Filters:</span>
+        {/* Advanced Filters (toggleable) */}
+        {showAdvancedFilters && (
+          <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800 grid grid-cols-2 md:grid-cols-4 gap-4 animate-in fade-in slide-in-from-top-2 duration-200">
+            {/* Furnishing Options */}
+            <div className="space-y-2">
+              <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Furnishing</span>
+              <div className="flex flex-wrap gap-1">
+                {["Any", "Furnished", "Semi-Furnished", "Unfurnished"].map((option, i) => {
+                  const value = i === 0 ? "" : option.toLowerCase();
+                  return (
+                    <Button
+                      key={value}
+                      variant={furnishing === value ? "default" : "outline"}
+                      size="sm"
+                      className={cn(
+                        "h-7 text-xs px-2",
+                        furnishing === value 
+                          ? "bg-blue-600 hover:bg-blue-700 text-white" 
+                          : ""
+                      )}
+                      onClick={() => {
+                        setFurnishing(value);
+                        setFilters({...filters, furnishing: value || undefined});
+                      }}
+                    >
+                      {option}
+                    </Button>
+                  );
+                })}
+              </div>
+            </div>
             
-            {selectedPropertyType !== 'all' && (
-              <Badge variant="secondary" className="flex items-center gap-1">
-                {propertyTypeOptions.find(o => o.id === selectedPropertyType)?.label || selectedPropertyType}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-4 w-4 p-0 ml-1"
-                  onClick={() => handlePropertyTypeChange('all')}
-                >
-                  <X className="h-3 w-3" />
-                </Button>
-              </Badge>
-            )}
+            {/* Property Age */}
+            <div className="space-y-2">
+              <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Property Age</span>
+              <div className="flex flex-wrap gap-1">
+                {[
+                  { id: "", label: "Any" },
+                  { id: "new", label: "New" },
+                  { id: "less-than-5", label: "< 5 years" },
+                  { id: "5-10", label: "5-10 years" }
+                ].map((option) => (
+                  <Button
+                    key={option.id}
+                    variant={propertyAge === option.id ? "default" : "outline"}
+                    size="sm"
+                    className={cn(
+                      "h-7 text-xs px-2",
+                      propertyAge === option.id 
+                        ? "bg-blue-600 hover:bg-blue-700 text-white" 
+                        : ""
+                    )}
+                    onClick={() => {
+                      setPropertyAge(option.id);
+                      setFilters({...filters, propertyAge: option.id || undefined});
+                    }}
+                  >
+                    {option.label}
+                  </Button>
+                ))}
+              </div>
+            </div>
             
-            {minPrice > 0 && (
-              <Badge variant="secondary" className="flex items-center gap-1">
-                Min: {formatPrice(minPrice)}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-4 w-4 p-0 ml-1"
-                  onClick={() => {
-                    setMinPrice(0);
-                    setFilters({...filters, minPrice: 0});
-                  }}
-                >
-                  <X className="h-3 w-3" />
-                </Button>
-              </Badge>
-            )}
-            
-            {maxPrice < 10000000 && (
-              <Badge variant="secondary" className="flex items-center gap-1">
-                Max: {formatPrice(maxPrice)}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-4 w-4 p-0 ml-1"
-                  onClick={() => {
-                    setMaxPrice(10000000);
-                    setFilters({...filters, maxPrice: 10000000});
-                  }}
-                >
-                  <X className="h-3 w-3" />
-                </Button>
-              </Badge>
-            )}
-            
-            {bedrooms !== undefined && (
-              <Badge variant="secondary" className="flex items-center gap-1">
-                {bedrooms}+ Bed
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-4 w-4 p-0 ml-1"
-                  onClick={() => {
-                    setBedrooms(undefined);
-                    setFilters({...filters, bedrooms: undefined});
-                  }}
-                >
-                  <X className="h-3 w-3" />
-                </Button>
-              </Badge>
-            )}
-            
-            {bathrooms !== undefined && (
-              <Badge variant="secondary" className="flex items-center gap-1">
-                {bathrooms}+ Bath
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-4 w-4 p-0 ml-1"
-                  onClick={() => {
-                    setBathrooms(undefined);
-                    setFilters({...filters, bathrooms: undefined});
-                  }}
-                >
-                  <X className="h-3 w-3" />
-                </Button>
-              </Badge>
-            )}
-
-            {furnishing && (
-              <Badge variant="secondary" className="flex items-center gap-1">
-                {furnishingOptions.find(o => o.id === furnishing)?.label || furnishing}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-4 w-4 p-0 ml-1"
-                  onClick={() => {
-                    setFurnishing('');
-                    setFilters({...filters, furnishing: undefined});
-                  }}
-                >
-                  <X className="h-3 w-3" />
-                </Button>
-              </Badge>
-            )}
-
-            {propertyAge && (
-              <Badge variant="secondary" className="flex items-center gap-1">
-                {propertyAgeOptions.find(o => o.id === propertyAge)?.label || propertyAge}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-4 w-4 p-0 ml-1"
-                  onClick={() => {
-                    setPropertyAge('');
-                    setFilters({...filters, propertyAge: undefined});
-                  }}
-                >
-                  <X className="h-3 w-3" />
-                </Button>
-              </Badge>
-            )}
-            
-            <Button variant="ghost" size="sm" className="h-7 px-2" onClick={handleResetFilters}>
-              Clear All
-            </Button>
+            {/* Clear All Button */}
+            <div className="col-span-2 flex justify-end items-end">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs text-blue-600 hover:text-blue-800"
+                onClick={handleResetFilters}
+              >
+                Clear All Filters
+              </Button>
+            </div>
           </div>
         )}
       </div>
