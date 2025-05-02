@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/PropertyForm/index.tsx
-// Version: 6.3.0
-// Last Modified: 01-05-2025 16:45 IST
-// Purpose: Enhanced property saving and navigation logic
+// Version: 6.4.0
+// Last Modified: 02-05-2025 20:30 IST
+// Purpose: Improved property saving and navigation logic
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -279,6 +279,34 @@ export function PropertyForm({
    setSaveInProgress(true);
    
    try {
+     // Ensure minimal required data
+     const formData = form.getValues();
+     
+     // Set flow information from URL if available
+     const pathParts = window.location.pathname.split('/');
+     const urlPropertyType = pathParts.length > 2 ? pathParts[pathParts.length - 3] : '';
+     const urlListingType = pathParts.length > 2 ? pathParts[pathParts.length - 2] : '';
+     
+     if (urlPropertyType && !formData.flow_property_type) {
+       formData.flow_property_type = urlPropertyType;
+     }
+     
+     if (urlListingType && !formData.flow_listing_type) {
+       formData.flow_listing_type = urlListingType;
+     }
+     
+     // Make sure we have a title
+     if (!formData.title) {
+       if (formData.propertyType) {
+         formData.title = `${formData.propertyType} Property`;
+       } else {
+         formData.title = "New Property";
+       }
+     }
+     
+     // Apply the form changes
+     form.reset(formData);
+     
      // Call the original save function
      await handleSaveAsDraft();
      
@@ -297,20 +325,65 @@ export function PropertyForm({
      setSaveInProgress(false);
    }
  };
-
- // Custom save and navigate function
- const handleSaveAndNavigate = async () => {
+ 
+ // Direct save and navigate function with no popups
+ const handleDirectSaveAndPublish = async (): Promise<string> => {
    try {
-     const effectivePropertyId = await enhancedSaveFunction();
+     setSaveInProgress(true);
      
-     if (effectivePropertyId) {
-       navigate(`/seeker/property/${effectivePropertyId}`);
-     } else {
-       alert("Unable to get property ID. Please try saving as draft first.");
+     // Ensure minimal required data
+     const formData = form.getValues();
+     
+     // Set flow information from URL if available
+     const pathParts = window.location.pathname.split('/');
+     const urlPropertyType = pathParts.length > 2 ? pathParts[pathParts.length - 3] : '';
+     const urlListingType = pathParts.length > 2 ? pathParts[pathParts.length - 2] : '';
+     
+     if (urlPropertyType && !formData.flow_property_type) {
+       formData.flow_property_type = urlPropertyType;
      }
+     
+     if (urlListingType && !formData.flow_listing_type) {
+       formData.flow_listing_type = urlListingType;
+     }
+     
+     // Make sure we have a title
+     if (!formData.title) {
+       if (formData.propertyType) {
+         formData.title = `${formData.propertyType} Property`;
+       } else {
+         formData.title = "New Property";
+       }
+     }
+     
+     // Ensure we have a city
+     if (!formData.city && !formData.locality) {
+       formData.city = "Hyderabad";
+     }
+     
+     // Make sure there's a description
+     if (!formData.description) {
+       formData.description = `${formData.title} - A quality property listing.`;
+     }
+     
+     // Apply the form changes
+     form.reset(formData);
+     
+     // Directly use handleSaveAndPublish
+     const publishedPropertyId = await handleSaveAndPublish();
+     
+     console.log("Property published successfully with ID:", publishedPropertyId);
+     
+     if (!publishedPropertyId) {
+       throw new Error("No property ID returned after publishing");
+     }
+     
+     return publishedPropertyId;
    } catch (error) {
-     console.error("Error in save and navigate:", error);
-     alert("Error saving property. Please try again.");
+     console.error("Error in direct save and publish:", error);
+     throw error;
+   } finally {
+     setSaveInProgress(false);
    }
  };
 
@@ -374,6 +447,9 @@ export function PropertyForm({
  
  // Determine the effective property ID for use in the UI
  const effectivePropertyId = savedPropertyId || propertyId || propertyIdAfterSave;
+ 
+ // Check if current step is the review step
+ const isReviewStep = flowSteps[formStep - 1]?.id === 'review';
 
  return (
    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -445,7 +521,9 @@ export function PropertyForm({
              handleNextStep={handleNextStep}
              savedPropertyId={effectivePropertyId}
              onSave={enhancedSaveFunction}
-             onPublish={handleSaveAndPublish}
+             onPublish={handleDirectSaveAndPublish} // Use our direct save function
+             isLastStep={isReviewStep} // Flag to indicate this is the review step
+             disablePrevious={saving || saveInProgress}
            />
          </div>
        </div>

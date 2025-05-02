@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/hooks/usePropertyForm.ts
-// Version: 4.0.0
-// Last Modified: 16-04-2025 14:55 IST
-// Purpose: Added support for v2 data structure
+// Version: 4.5.0
+// Last Modified: 03-05-2025 19:30 IST
+// Purpose: Added direct auto-fill function implementation
 
 import { usePropertyFormState } from './usePropertyFormState';
 import { usePropertyFormNavigation } from './usePropertyFormNavigation';
@@ -14,6 +14,7 @@ import {
   DATA_VERSION_V2,
   CURRENT_DATA_VERSION 
 } from '../utils/propertyDataAdapter';
+import { AutoFillService } from '../services/autoFillService';
 
 interface UsePropertyFormProps {
   initialData?: FormData;
@@ -84,7 +85,6 @@ export function usePropertyForm({
     handleSaveAsDraft,
     handleSaveAndPublish,
     handleUpdate,
-    handleAutoFill,
     detectDataVersion: detectPropertyVersion,
     CURRENT_DATA_VERSION: currentVersion
   } = usePropertyFormOperations({
@@ -109,6 +109,41 @@ export function usePropertyForm({
   
   // Check if form is using v2 structure
   const isV2Structure = dataVersion === DATA_VERSION_V2;
+  
+  /**
+   * Function to auto-fill the form with test data for the current step
+   * Only available in development mode
+   */
+  const handleAutoFill = () => {
+    try {
+      console.log("Auto Fill requested");
+      
+      if (process.env.NODE_ENV !== 'development') {
+        console.warn("Auto Fill is only available in development mode");
+        return;
+      }
+      
+      // Get current step ID from URL or default to 'details'
+      const currentUrlPath = window.location.pathname;
+      const pathParts = currentUrlPath.split('/');
+      const lastPathSegment = pathParts[pathParts.length - 1];
+      
+      // Attempt to determine the current step ID
+      let currentStepId = 'details';
+      
+      if (lastPathSegment && !lastPathSegment.includes('.')) {
+        // If last path segment is not a file extension, use it as step ID
+        currentStepId = lastPathSegment;
+      }
+      
+      // Auto-fill based on current step using our new service
+      AutoFillService.autoFillCurrentStep(form, currentStepId, currentStep);
+      
+    } catch (error) {
+      console.error("Error in handleAutoFill:", error);
+      setError("Error auto-filling form. Please check console for details.");
+    }
+  };
 
   return {
     form,

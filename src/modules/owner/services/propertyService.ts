@@ -1,7 +1,7 @@
 // src/modules/owner/services/propertyService.ts
-// Version: 5.0.0
-// Last Modified: 16-04-2025 14:50 IST
-// Purpose: Added support for v2 data structure with conversion utilities
+// Version: 5.1.0
+// Last Modified: 02-05-2025 18:15 IST
+// Purpose: Fixed database schema mismatch when saving properties
 
 import { supabase } from '@/lib/supabase';
 import { Property, FormData, FormDataV1, FormDataV2 } from '../components/property/PropertyFormTypes';
@@ -218,7 +218,7 @@ export const propertyService = {
       
       if (CURRENT_DATA_VERSION === DATA_VERSION_V2) {
         const v2Data = processedData as FormDataV2;
-        if (v2Data.flow.listingType === 'sale' && v2Data.sale) {
+        if (v2Data.flow?.listingType === 'sale' && v2Data.sale) {
           price = v2Data.sale.expectedPrice || 0;
         } else if (v2Data.rental) {
           price = v2Data.rental.rentAmount || 0;
@@ -234,50 +234,49 @@ export const propertyService = {
           : parseFloat(v1Data.rentAmount || '0');
       }
       
-      // Create the database record
+      // Create the database record - removing location as it's not in the schema
       const dbPropertyData = {
         owner_id: userId,
         title: CURRENT_DATA_VERSION === DATA_VERSION_V2 
-          ? (processedData as FormDataV2).basicDetails.title || 'New Property'
+          ? (processedData as FormDataV2).basicDetails?.title || 'New Property'
           : (processedData as FormDataV1).title || 'New Property',
         description: CURRENT_DATA_VERSION === DATA_VERSION_V2 
-          ? (processedData as FormDataV2).features.description || ''
+          ? (processedData as FormDataV2).features?.description || ''
           : (processedData as FormDataV1).description || '',
         price: price,
         bedrooms: CURRENT_DATA_VERSION === DATA_VERSION_V2
-          ? ((processedData as FormDataV2).basicDetails.bhkType 
+          ? ((processedData as FormDataV2).basicDetails?.bhkType 
              ? parseInt((processedData as FormDataV2).basicDetails.bhkType.split(' ')[0]) 
              : 0)
           : ((processedData as FormDataV1).bhkType 
              ? parseInt((processedData as FormDataV1).bhkType.split(' ')[0]) 
              : 0),
         bathrooms: CURRENT_DATA_VERSION === DATA_VERSION_V2
-          ? (processedData as FormDataV2).basicDetails.bathrooms || 0
+          ? (processedData as FormDataV2).basicDetails?.bathrooms || 0
           : ((processedData as FormDataV1).bathrooms 
              ? parseInt((processedData as FormDataV1).bathrooms) 
              : 0),
         square_feet: CURRENT_DATA_VERSION === DATA_VERSION_V2
-          ? (processedData as FormDataV2).basicDetails.builtUpArea || 0
+          ? (processedData as FormDataV2).basicDetails?.builtUpArea || 0
           : ((processedData as FormDataV1).builtUpArea 
              ? parseFloat((processedData as FormDataV1).builtUpArea) 
              : 0),
         address: CURRENT_DATA_VERSION === DATA_VERSION_V2
-          ? (processedData as FormDataV2).location.address || ''
+          ? (processedData as FormDataV2).location?.address || ''
           : (processedData as FormDataV1).address || '',
         city: CURRENT_DATA_VERSION === DATA_VERSION_V2
-          ? (processedData as FormDataV2).location.city || ''
+          ? (processedData as FormDataV2).location?.city || ''
           : (processedData as FormDataV1).city || (processedData as FormDataV1).locality || '',
         state: CURRENT_DATA_VERSION === DATA_VERSION_V2
-          ? (processedData as FormDataV2).location.state || 'Telangana'
+          ? (processedData as FormDataV2).location?.state || 'Telangana'
           : (processedData as FormDataV1).state || 'Telangana',
         zip_code: CURRENT_DATA_VERSION === DATA_VERSION_V2
-          ? (processedData as FormDataV2).location.pinCode || ''
+          ? (processedData as FormDataV2).location?.pinCode || ''
           : (processedData as FormDataV1).pinCode || '',
         status,
         property_details: processedData,
         tags: status === 'published' ? ['public'] : []
       };
-// src/modules/owner/services/propertyService.ts (continued)
 
       console.log('Property database payload:', dbPropertyData);
       
@@ -286,7 +285,16 @@ export const propertyService = {
         .insert([dbPropertyData])
         .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error("Database error creating property:", error);
+        throw error;
+      }
+      
+      if (!data || data.length === 0) {
+        throw new Error("No data returned after property creation");
+      }
+      
+      console.log('Property created successfully, returned data:', data[0]);
       
       // Clear cache for this user
       propertiesCache.delete(userId);
@@ -340,7 +348,7 @@ export const propertyService = {
       
       if (CURRENT_DATA_VERSION === DATA_VERSION_V2) {
         const v2Data = processedData as FormDataV2;
-        if (v2Data.flow.listingType === 'sale' && v2Data.sale) {
+        if (v2Data.flow?.listingType === 'sale' && v2Data.sale) {
           price = v2Data.sale.expectedPrice || 0;
         } else if (v2Data.rental) {
           price = v2Data.rental.rentAmount || 0;
@@ -356,45 +364,46 @@ export const propertyService = {
           : parseFloat(v1Data.rentAmount || '0');
       }
       
-      // Create the update object
+      // Create the update object - removing location as it's not in the schema
       const updateData: any = {
         title: CURRENT_DATA_VERSION === DATA_VERSION_V2 
-          ? (processedData as FormDataV2).basicDetails.title || 'Updated Property'
+          ? (processedData as FormDataV2).basicDetails?.title || 'Updated Property'
           : (processedData as FormDataV1).title || 'Updated Property',
         description: CURRENT_DATA_VERSION === DATA_VERSION_V2 
-          ? (processedData as FormDataV2).features.description || ''
+          ? (processedData as FormDataV2).features?.description || ''
           : (processedData as FormDataV1).description || '',
         price: price,
         bedrooms: CURRENT_DATA_VERSION === DATA_VERSION_V2
-          ? ((processedData as FormDataV2).basicDetails.bhkType 
+          ? ((processedData as FormDataV2).basicDetails?.bhkType 
              ? parseInt((processedData as FormDataV2).basicDetails.bhkType.split(' ')[0]) 
              : 0)
           : ((processedData as FormDataV1).bhkType 
              ? parseInt((processedData as FormDataV1).bhkType.split(' ')[0]) 
              : 0),
         bathrooms: CURRENT_DATA_VERSION === DATA_VERSION_V2
-          ? (processedData as FormDataV2).basicDetails.bathrooms || 0
+          ? (processedData as FormDataV2).basicDetails?.bathrooms || 0
           : ((processedData as FormDataV1).bathrooms 
              ? parseInt((processedData as FormDataV1).bathrooms) 
              : 0),
         square_feet: CURRENT_DATA_VERSION === DATA_VERSION_V2
-          ? (processedData as FormDataV2).basicDetails.builtUpArea || 0
+          ? (processedData as FormDataV2).basicDetails?.builtUpArea || 0
           : ((processedData as FormDataV1).builtUpArea 
              ? parseFloat((processedData as FormDataV1).builtUpArea) 
              : 0),
         address: CURRENT_DATA_VERSION === DATA_VERSION_V2
-          ? (processedData as FormDataV2).location.address || ''
+          ? (processedData as FormDataV2).location?.address || ''
           : (processedData as FormDataV1).address || '',
         city: CURRENT_DATA_VERSION === DATA_VERSION_V2
-          ? (processedData as FormDataV2).location.city || ''
+          ? (processedData as FormDataV2).location?.city || ''
           : (processedData as FormDataV1).city || (processedData as FormDataV1).locality || '',
         state: CURRENT_DATA_VERSION === DATA_VERSION_V2
-          ? (processedData as FormDataV2).location.state || 'Telangana'
+          ? (processedData as FormDataV2).location?.state || 'Telangana'
           : (processedData as FormDataV1).state || 'Telangana',
         zip_code: CURRENT_DATA_VERSION === DATA_VERSION_V2
-          ? (processedData as FormDataV2).location.pinCode || ''
+          ? (processedData as FormDataV2).location?.pinCode || ''
           : (processedData as FormDataV1).pinCode || '',
-        property_details: processedData
+        property_details: processedData,
+        updated_at: new Date().toISOString()
       };
 
       // Only update status if provided
@@ -416,7 +425,10 @@ export const propertyService = {
         `)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error("Database error updating property:", error);
+        throw error;
+      }
       
       // Process the images
       const images = data.property_images
@@ -441,7 +453,7 @@ export const propertyService = {
     }
   },
 
-  // Update property status
+  // The rest of the functions remain the same
   async updatePropertyStatus(
     propertyId: string,
     status: 'draft' | 'published',
@@ -518,8 +530,6 @@ export const propertyService = {
     }
   },
 
-  // The remaining methods (deleteProperty, adminDeleteProperty, isUserAdmin) 
-  // don't need changes since they don't interact with the property data structure directly
   async deleteProperty(propertyId: string, userId: string): Promise<void> {
     try {
       console.log('=========== DEBUG: DELETE PROPERTY START ===========');

@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/utils/propertyDataAdapter.ts
-// Version: 1.1.0
-// Last Modified: 16-04-2025 15:30 IST
-// Purpose: Enhanced utility functions for handling property data structure conversion with specialized property types
+// Version: 1.2.0
+// Last Modified: 02-05-2025 16:45 IST
+// Purpose: Added adapDataToFormats function to enable property data conversion for database operations
 
 // Version constants
 export const DATA_VERSION_V1 = 'v1';
@@ -42,6 +42,183 @@ export const detectDataVersion = (propertyData: any): string => {
   
   // No version information - assume it's legacy data
   return 'legacy';
+};
+
+/**
+ * Adapts property data to different formats needed for various operations
+ * @param formData The form data to adapt
+ * @param dataVersion The current data version (v1 or v2)
+ * @param flowType Optional flow type to override detection
+ * @returns Object with different formats for database, API, UI
+ */
+export const adapDataToFormats = (formData: any, dataVersion: string = DATA_VERSION_V2, flowType?: string): any => {
+  try {
+    // Determine which structural version we're dealing with
+    if (!dataVersion) {
+      dataVersion = detectDataVersion(formData);
+    }
+    
+    // Clean or convert data as needed
+    let cleanData: any;
+    if (dataVersion === DATA_VERSION_V2) {
+      // For V2, clean the structure to ensure all fields are in the right place
+      cleanData = cleanV2Structure(formData);
+    } else {
+      // For V1 or legacy, convert to V2
+      cleanData = convertV1ToV2(formData);
+    }
+    
+    // If a specific flow type was provided, override the flow
+    if (flowType) {
+      // Parse the flow type to determine category and listing type
+      let category = 'residential';
+      let listingType = 'rent';
+      
+      if (flowType.includes('commercial')) {
+        category = 'commercial';
+        if (flowType.includes('sale')) {
+          listingType = 'sale';
+        } else if (flowType.includes('coworking')) {
+          listingType = 'coworking';
+        } else {
+          listingType = 'rent';
+        }
+      } else if (flowType.includes('land')) {
+        category = 'land';
+        listingType = 'sale';
+      } else if (flowType.includes('flatmates')) {
+        category = 'residential';
+        listingType = 'flatmates';
+      } else if (flowType.includes('pghostel')) {
+        category = 'residential';
+        listingType = 'pghostel';
+      } else if (flowType.includes('sale')) {
+        category = 'residential';
+        listingType = 'sale';
+      }
+      
+      // Set the flow in the clean data
+      cleanData.flow = {
+        category,
+        listingType
+      };
+    }
+    
+    // Convert the clean V2 data to a database-friendly format (flat structure)
+    const dbFormat = convertV2ToDbFormat(cleanData);
+    
+    // Also convert to V1 for legacy API compatibility
+    const v1Format = convertV2ToV1(cleanData);
+    
+    // Return all formats
+    return {
+      v2Format: cleanData, // Structured format for UI and internal processing
+      v1Format,            // For legacy API compatibility
+      dbFormat             // Flattened format for database operations
+    };
+  } catch (error) {
+    console.error("Error in adapDataToFormats:", error);
+    // Return empty formats to avoid breakage
+    return { 
+      v2Format: {}, 
+      v1Format: {}, 
+      dbFormat: {} 
+    };
+  }
+};
+
+/**
+ * Converts property data from v2 structure to a database-friendly flat format
+ * @param v2Data Property data in v2 format
+ * @returns Flattened data suitable for database storage
+ */
+const convertV2ToDbFormat = (v2Data: any): any => {
+  if (!v2Data) return {};
+  
+  // Start with basic metadata
+  const dbFormat: any = {
+    id: v2Data.id,
+    owner_id: v2Data.owner_id,
+    created_at: v2Data.created_at,
+    updated_at: v2Data.updated_at,
+    status: v2Data.status,
+    
+    // Store the full property data structure as JSON in property_details
+    property_details: {
+      ...v2Data
+    }
+  };
+  
+  // Extract essential information for direct database columns
+  if (v2Data.basicDetails) {
+    dbFormat.title = v2Data.basicDetails.title || '';
+    
+    // Extract tags from amenities if any
+    if (v2Data.features && v2Data.features.amenities && Array.isArray(v2Data.features.amenities)) {
+      dbFormat.tags = v2Data.features.amenities;
+    }
+    
+    // Extract basic numeric values
+    if (v2Data.basicDetails.builtUpArea) {
+      dbFormat.square_feet = parseFloat(v2Data.basicDetails.builtUpArea);
+    }
+    
+    if (v2Data.basicDetails.bathrooms) {
+      dbFormat.bathrooms = parseFloat(v2Data.basicDetails.bathrooms);
+    }
+    
+    if (v2Data.basicDetails.bhkType && v2Data.basicDetails.bhkType.includes('BHK')) {
+      // Extract number from strings like "2 BHK" or "3BHK"
+      const bhkMatch = v2Data.basicDetails.bhkType.match(/(\d+)/);
+      if (bhkMatch && bhkMatch[1]) {
+        dbFormat.bedrooms = parseInt(bhkMatch[1]);
+      }
+    }
+  }
+  
+  // Extract price information based on property type
+  if (v2Data.rental && v2Data.rental.rentAmount) {
+    dbFormat.price = parseFloat(v2Data.rental.rentAmount);
+  } else if (v2Data.sale && v2Data.sale.expectedPrice) {
+    dbFormat.price = parseFloat(v2Data.sale.expectedPrice);
+  } else if (v2Data.pghostel && v2Data.pghostel.rentAmount) {
+    dbFormat.price = parseFloat(v2Data.pghostel.rentAmount);
+  } else if (v2Data.flatmate && v2Data.flatmate.rentAmount) {
+    dbFormat.price = parseFloat(v2Data.flatmate.rentAmount);
+  } else if (v2Data.coworking && v2Data.coworking.rentPrice) {
+    dbFormat.price = parseFloat(v2Data.coworking.rentPrice);
+  } else if (v2Data.land && v2Data.land.expectedPrice) {
+    dbFormat.price = parseFloat(v2Data.land.expectedPrice);
+  }
+  
+  // Extract location information
+  if (v2Data.location) {
+    dbFormat.address = v2Data.location.address || '';
+    dbFormat.city = v2Data.location.city || '';
+    dbFormat.state = v2Data.location.state || '';
+    dbFormat.zip_code = v2Data.location.pinCode || '';
+    
+    // Add a general location field that can be used for searches
+    const locationParts = [
+      v2Data.location.flatPlotNo,
+      v2Data.location.address,
+      v2Data.location.landmark,
+      v2Data.location.locality,
+      v2Data.location.city,
+      v2Data.location.state
+    ].filter(Boolean);
+    
+    if (locationParts.length > 0) {
+      dbFormat.location = locationParts.join(', ');
+    }
+  }
+  
+  // Extract description
+  if (v2Data.features && v2Data.features.description) {
+    dbFormat.description = v2Data.features.description;
+  }
+  
+  return dbFormat;
 };
 
 /**
