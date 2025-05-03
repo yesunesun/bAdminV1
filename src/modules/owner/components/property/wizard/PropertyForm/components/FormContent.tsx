@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/PropertyForm/components/FormContent.tsx
-// Version: 4.7.0
-// Last Modified: 02-05-2025 19:00 IST
-// Purpose: Fixed coworking basic details step rendering
+// Version: 4.12.0
+// Last Modified: 04-05-2025 17:30 IST
+// Purpose: Direct fix for Commercial Rent flow by forcing CommercialBasicDetails component rendering
 
 import React, { useEffect, useState } from 'react';
 import { UseFormReturn } from 'react-hook-form';
@@ -32,6 +32,9 @@ import FlatmateDetails from '../../sections/FlatmateDetails';
 
 // Import specialized Commercial Features component
 import CommercialFeatures from '../../sections/CommercialFeatures';
+
+// Import new CommercialBasicDetails component
+import { CommercialBasicDetails } from '../../sections/CommercialBasicDetails';
 
 interface FormContentProps {
   form: UseFormReturn<FormData>;
@@ -95,45 +98,60 @@ const FormContent = ({
   useEffect(() => {
     console.log('FormContent Debugging:');
     console.log('- Current Step ID:', currentStepId);
-    console.log('- First Step ID in STEPS:', STEPS[0]?.id);
-    console.log('- Mode:', mode);
-    console.log('- Category:', effectiveCategory);
-    console.log('- Ad Type:', effectiveAdType);
-    console.log('- Is Coworking Mode:', isCoworkingMode);
-    console.log('- Current STEPS array:', STEPS);
-    console.log('- Current formStep:', formStep);
-  }, [currentStepId, effectiveCategory, effectiveAdType, isCoworkingMode, STEPS, formStep, mode]);
+    console.log('- Is Commercial Rent Mode:', isCommercialRentMode);
+    console.log('- Current form step:', formStep);
+    console.log('- Flow steps:', STEPS.map(s => s.id));
+    
+    // Debug form data related to commercial properties
+    const formValues = form.getValues();
+    console.log('- Property category:', formValues.propertyCategory);
+    console.log('- Listing type:', formValues.listingType);
+    console.log('- Property type:', formValues.propertyType);
+    
+    // Check URL for debug information
+    console.log('- Current URL:', window.location.pathname);
+  }, [currentStepId, isCommercialRentMode, formStep, STEPS, form]);
   
-  // Effect to log savedPropertyId when on photos step
-  useEffect(() => {
-    if (currentStepId === 'photos') {
-      console.log('Photos step - savedPropertyId:', savedPropertyId);
-      console.log('Current mode:', mode);
-      
-      if (!savedPropertyId && mode === 'edit') {
-        // In edit mode, we should always have a propertyId
-        setPhotoLoadError('Unable to load property details. Please try again or contact support.');
-      } else if (!savedPropertyId && photoLoadRetries === 0) {
-        // In create mode, try to trigger a save if we don't have an ID
-        const attemptSave = async () => {
-          try {
-            await handleSaveAsDraft();
-            setPhotoLoadRetries(prev => prev + 1);
-          } catch (error) {
-            console.error('Error saving property before photos:', error);
-            setPhotoLoadError('Failed to save property details. Please try going back and clicking Save Draft first.');
-          }
-        };
-        
-        attemptSave();
-      }
-    }
-  }, [currentStepId, savedPropertyId, mode, photoLoadRetries, handleSaveAsDraft]);
+  // DIRECT FIX: Force check for commercial rent + basic details step
+  const shouldUseCommercialBasicDetails = () => {
+    // Hard check for commercial rent mode + basic details step
+    if (!isCommercialRentMode) return false;
+    
+    // Check URL path for strong evidence we're in commercial rent flow
+    const urlPath = window.location.pathname.toLowerCase();
+    const isCommercialRentPath = urlPath.includes('commercial') && 
+                              (urlPath.includes('rent') || urlPath.includes('lease'));
+    
+    // Check for breadcrumb indicators - should be active on second step 
+    // in the sequence which should show the CommercialBasicDetails
+    const isBreadcrumbsShowingBasicDetails = 
+      document.querySelector('.breadcrumb-item:nth-child(3)')?.textContent?.includes('Basic Details');
+    
+    // If we're on "Basic Details" tab but in Commercial Rent flow
+    const isBasicDetailsTabActive = 
+      document.querySelector('.tab.active')?.textContent?.includes('Basic Details');
+
+    // Multiple checks to ensure we're in the right context
+    return (isCommercialRentMode && formStep === 1) || // First step
+           (isCommercialRentPath && isBasicDetailsTabActive) || // Basic Details tab is active
+           (isCommercialRentMode && currentStepId === 'details') || // Step ID is 'details'
+           (isCommercialRentMode && isBreadcrumbsShowingBasicDetails); // Breadcrumbs show Basic Details
+  };
   
-  // Render content based on the current step
+  // Check if we should force the CommercialBasicDetails component
+  if (shouldUseCommercialBasicDetails()) {
+    console.log('OVERRIDING: Forcing CommercialBasicDetails component for Commercial Rent flow');
+    return (
+      <CommercialBasicDetails 
+        form={form} 
+        mode={mode} 
+        category={effectiveCategory}
+        adType={effectiveAdType}
+      />
+    );
+  }
   
   // Special case for coworking properties - regardless of step ID
-  // Always show CoworkingBasicDetails for the first step in coworking flow
   if (isCoworkingMode && formStep === 1) {
     console.log('Rendering CoworkingBasicDetails for coworking mode, first step');
     return (
@@ -146,7 +164,19 @@ const FormContent = ({
     );
   }
   
-  // For all other flows or steps, proceed with normal step ID based rendering
+  // Handle step by step ID
+  if (currentStepId === 'commercial_basics') {
+    console.log('Rendering CommercialBasicDetails for commercial_basics step ID');
+    return (
+      <CommercialBasicDetails 
+        form={form} 
+        mode={mode} 
+        category={effectiveCategory}
+        adType={effectiveAdType}
+      />
+    );
+  }
+  
   if (currentStepId === 'details' || currentStepId === 'basic_details') {
     console.log('Entering basic details condition check');
     
@@ -159,7 +189,21 @@ const FormContent = ({
       );
     }
     
-    // For all other flows, show the standard PropertyDetails
+    // ADDITIONAL CHECK: For Commercial Rent, first step should actually still show PropertyDetails 
+    // for initial property selection, but second step should show CommercialBasicDetails
+    if (isCommercialRentMode && formStep > 1) {
+      console.log('Commercial Rent flow - forcing CommercialBasicDetails for step > 1');
+      return (
+        <CommercialBasicDetails 
+          form={form} 
+          mode={mode} 
+          category={effectiveCategory}
+          adType={effectiveAdType}
+        />
+      );
+    }
+    
+    // For all flows, show the standard PropertyDetails
     return (
       <PropertyDetails 
         form={form} 

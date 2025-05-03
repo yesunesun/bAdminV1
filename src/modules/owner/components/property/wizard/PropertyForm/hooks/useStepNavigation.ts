@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/PropertyForm/hooks/useStepNavigation.ts
-// Version: 8.3.0
-// Last Modified: 01-05-2025 19:00 IST
-// Purpose: Fixed navigation issue where clicking next on first step redirects to root
+// Version: 8.5.0
+// Last Modified: 03-05-2025 16:15 IST
+// Purpose: Updated commercialRent sequence to include initial property selection step
 
 import { useMemo, useCallback, useEffect } from 'react';
 import { UseFormReturn } from 'react-hook-form';
@@ -105,7 +105,6 @@ export function useStepNavigation({
     }
   }, [form]);
   
-  // Other mode detection functions remain the same...
   // Commercial Sale mode detection
   const isCommercialSaleMode = useMemo(() => {
     try {
@@ -215,6 +214,7 @@ export function useStepNavigation({
       'room_details': 'room_details',
       'pg_details': 'pg_details',
       'commercial': 'commercial',
+      'commercial_basics': 'commercial_basics', // Add mapping for new step
       'commercial_sale': 'commercial_sale',
       'coworking': 'coworking',
       'land_details': 'land_details',
@@ -272,8 +272,8 @@ export function useStepNavigation({
     // Sale sequence
     sale: ['details', 'location', 'sale', 'features', 'review', 'photos'],
     
-    // Commercial Rent sequence
-    commercialRent: ['details', 'location', 'rental', 'features', 'review', 'photos'],
+    // Commercial Rent sequence - UPDATED to include initial details step before commercial_basics
+    commercialRent: ['details', 'commercial_basics', 'location', 'rental', 'features', 'review', 'photos'],
     
     // Commercial Sale sequence
     commercialSale: ['details', 'location', 'commercial_sale', 'features', 'review', 'photos'],
@@ -585,21 +585,24 @@ export function useStepNavigation({
     return indices;
   }, [STEPS]);
 
-  // Visible steps function
+  // Visible steps function - updated to allow 'details' step for Commercial Rent
   const getVisibleSteps = useCallback(() => {
     return STEPS.map(step => ({
       ...step,
       hidden: 
         // Rental step hidden for non-rental flows
         (step.id === 'rental' && (isSaleMode || isPGHostelMode || 
-                                 isCommercialSaleMode || isCoworkingMode || isLandSaleMode || 
-                                 isFlatmatesMode)) || 
+                               isCommercialSaleMode || isCoworkingMode || isLandSaleMode || 
+                               isFlatmatesMode)) || 
         // Sale step hidden for non-sale flows
         (step.id === 'sale' && (!isSaleMode || isPGHostelMode || isCommercialRentMode || 
                                isCommercialSaleMode || isCoworkingMode || isLandSaleMode || 
                                isFlatmatesMode)) ||
         // Details step hidden for PG/Hostel and Land/Plot flows
+        // Removed isCommercialRentMode from this condition to allow details step for Commercial Rent
         (step.id === 'details' && (isPGHostelMode || isLandSaleMode)) ||
+        // Commercial basics step hidden for non-Commercial Rent flows
+        (step.id === 'commercial_basics' && !isCommercialRentMode) ||
         // PG/Hostel steps hidden for non-PG/Hostel flows
         (step.id === 'room_details' && !isPGHostelMode) ||
         (step.id === 'pg_details' && !isPGHostelMode) ||

@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/constants/common.ts
-// Version: 2.5.0
-// Last Modified: 02-05-2025 16:30 IST
-// Purpose: Updated coworking_basic_details to match UI navigation
+// Version: 2.6.1
+// Last Modified: 03-05-2025 15:30 IST
+// Purpose: Fixed duplicate exports and added commercial_basics step definition
 
 import { 
   Home, 
@@ -80,6 +80,13 @@ export const STEP_DEFINITIONS = {
     icon: ClipboardCheck,
     description: 'Review and publish'
   },
+  // New step definition for Commercial Rent Basic Details
+  commercial_basics: {
+    id: 'commercial_basics',
+    title: 'Basic Details',
+    icon: Building,
+    description: 'Commercial property basic details'
+  },
   // New step definitions for Commercial Sale flow
   commercial_sale: {
     id: 'commercial_sale',
@@ -124,7 +131,8 @@ export const STEP_DEFINITIONS = {
 };
 
 // Legacy STEPS array - kept for backward compatibility
-export const STEPS = [
+// Changed from export const STEPS to const _STEPS to avoid duplicate export
+const _STEPS = [
   {
     id: 'details',
     title: 'Basic Details',
@@ -166,6 +174,12 @@ export const STEPS = [
     title: 'PG Details',
     icon: Building,
     description: 'PG/Hostel facility details'
+  },
+  {
+    id: 'commercial_basics',
+    title: 'Basic Details',
+    icon: Building,
+    description: 'Commercial property basic details'
   },
   {
     id: 'commercial_sale',
@@ -221,7 +235,10 @@ export const STEPS = [
     icon: ImagePlus,
     description: 'Property photos'
   }
-] as const;
+];
+
+// Export the legacy STEPS array for backwards compatibility
+export const STEPS = _STEPS;
 
 // Shared constants used across different sections
 export const FURNISHING_OPTIONS = [
