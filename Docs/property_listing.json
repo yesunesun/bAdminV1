@@ -1,0 +1,87 @@
+{
+  "meta": {
+    "_version": "v3",
+    "id": "property_123",
+    "owner_id": "user_456",
+    "created_at": "2025-05-01T10:00:00Z",
+    "updated_at": "2025-05-03T12:00:00Z",
+    "status": "draft"
+  },
+  "flow": {
+    "category": "residential",
+    "listingType": "rent"
+  },
+  "details": {
+    "basicDetails": {
+      "title": "Spacious 2BHK Apartment",
+      "propertyType": "Apartment",
+      "bhkType": "2BHK",
+      "floor": 3,
+      "totalFloors": 5,
+      "builtUpArea": 1200,
+      "builtUpAreaUnit": "sqft",
+      "bathrooms": 2,
+      "balconies": 1,
+      "facing": "East",
+      "propertyAge": "5-10 years"
+    },
+    "location": {
+      "address": "123 MG Road",
+      "flatPlotNo": "B-204",
+      "landmark": "Near Central Mall",
+      "locality": "Indiranagar",
+      "city": "Bengaluru",
+      "state": "Karnataka",
+      "pinCode": "560038",
+      "coordinates": {
+        "latitude": 12.9716,
+        "longitude": 77.5946
+      }
+    },
+    "rentalInfo": {
+      "rentAmount": 30000,
+      "securityDeposit": 90000,
+      "maintenanceCharges": 2500,
+      "rentNegotiable": true,
+      "availableFrom": "2025-06-01",
+      "preferredTenants": [
+        "Family",
+        "Working Professionals"
+      ],
+      "leaseDuration": "11 months",
+      "furnishingStatus": "Semi-Furnished"
+    },
+    "features": {
+      "amenities": [
+        "Lift",
+        "Gym",
+        "Swimming Pool"
+      ],
+      "parking": "Covered",
+      "petFriendly": true,
+      "nonVegAllowed": true,
+      "waterSupply": "24x7",
+      "powerBackup": "Full",
+      "gatedSecurity": true,
+      "description": "Well-maintained apartment with good ventilation and natural light."
+    }
+  },
+  "media": {
+    "photos": {
+      "images": [
+        {
+          "id": "img_1",
+          "url": "https://example.com/image1.jpg",
+          "isPrimary": true,
+          "displayOrder": 1
+        },
+        {
+          "id": "img_2",
+          "url": "https://example.com/image2.jpg",
+          "isPrimary": false,
+          "displayOrder": 2
+        }
+      ]
+    }
+  }
+}
