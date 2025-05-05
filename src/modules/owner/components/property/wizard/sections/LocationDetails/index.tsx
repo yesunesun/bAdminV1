@@ -1,9 +1,9 @@
 // src/modules/owner/components/property/wizard/sections/LocationDetails/index.tsx
-// Version: 4.2.0
-// Last Modified: 03-05-2025 16:30 IST
-// Purpose: Updated reverseGeocoding to populate city and area fields when using current location
+// Version: 4.8.1
+// Last Modified: 08-03-2025 15:00 IST
+// Purpose: Fix JSX syntax error in error message objects
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { FormSection } from '@/components/FormSection';
 import { FormSectionProps } from '../../../types';
 import { useGoogleMaps } from './hooks/useGoogleMaps';
@@ -23,10 +23,9 @@ export function LocationDetails({ form }: FormSectionProps) {
   const [mapInstance, setMapInstance] = useState<any>(null);
   const [markerInstance, setMarkerInstance] = useState<any>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
-
+  
   // Get form values
   const address = watch('address') || '';
-  const flatPlotNo = watch('flatPlotNo') || '';
   const latitude = watch('latitude') || '';
   const longitude = watch('longitude') || '';
   
@@ -39,6 +38,21 @@ export function LocationDetails({ form }: FormSectionProps) {
   // Combined error message
   const mapErrorMessage = mapError || locationError;
   
+  // Helper function to detect browser
+  const detectBrowser = () => {
+    const userAgent = window.navigator.userAgent;
+    if (userAgent.indexOf('Edg') > -1) return 'Edge';
+    if (userAgent.indexOf('Firefox') > -1) return 'Firefox';
+    if (userAgent.indexOf('Chrome') > -1) return 'Chrome';
+    if (userAgent.indexOf('Safari') > -1) return 'Safari';
+    return 'Unknown';
+  };
+
+  // Helper function to check if HTTPS is used
+  const isHTTPS = () => {
+    return window.location.protocol === 'https:';
+  };
+
   // Initialize map once when component mounts and maps API is loaded
   useEffect(() => {
     if (!mapLoaded || !mapContainerRef.current || mapInstance) return;
@@ -254,8 +268,8 @@ export function LocationDetails({ form }: FormSectionProps) {
     geocodeAddress(address);
   };
   
-  // Function to get user's current location
-  const getUserCurrentLocation = () => {
+  // Function to get user's current location - Edge browser compatible
+  const getUserCurrentLocation = async () => {
     if (!mapLoaded || !window.google || !window.google.maps) {
       setLocationError('Google Maps is not yet loaded');
       return;
@@ -266,11 +280,55 @@ export function LocationDetails({ form }: FormSectionProps) {
       return;
     }
     
+    const browser = detectBrowser();
+    const isSecure = isHTTPS();
+    
+    // Check Edge browser and HTTPS requirements
+    if (browser === 'Edge' && !isSecure) {
+      setLocationError('Edge browser requires HTTPS to access location services. Please use a secure connection.');
+      return;
+    }
+    
     setIsGeolocating(true);
     setLocationError(null);
     
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
+    try {
+      // Use promise-based approach for better error handling
+      const getCurrentPosition = (options: PositionOptions) => {
+        return new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, options);
+        });
+      };
+      
+      // Attempt to get position with different settings for Edge
+      let position: GeolocationPosition | null = null;
+      
+      try {
+        // First attempt with high accuracy
+        position = await getCurrentPosition({
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0
+        });
+      } catch (err: any) {
+        // If high accuracy fails on Edge, try with low accuracy
+        if (browser === 'Edge' && err.code === 2) {
+          console.log('Retrying with low accuracy for Edge...');
+          try {
+            position = await getCurrentPosition({
+              enableHighAccuracy: false,
+              timeout: 15000,
+              maximumAge: 60000
+            });
+          } catch (retryErr: any) {
+            throw retryErr;
+          }
+        } else {
+          throw err;
+        }
+      }
+      
+      if (position) {
         const { latitude, longitude } = position.coords;
         
         // Update form
@@ -288,26 +346,50 @@ export function LocationDetails({ form }: FormSectionProps) {
         reverseGeocode(latlng);
         
         setIsGeolocating(false);
-      },
-      (error) => {
-        setIsGeolocating(false);
-        
+      }
+    } catch (error: any) {
+      setIsGeolocating(false);
+      console.error('Geolocation error:', error);
+      
+      let errorMessage = 'Could not get your location.';
+      
+      // Browser-specific error messages
+      if (browser === 'Edge') {
         switch(error.code) {
-          case error.PERMISSION_DENIED:
-            setLocationError('Location permission denied');
+          case 1:
+            errorMessage = 'Location access denied. In Edge, click the lock icon in the address bar and allow location access.';
             break;
-          case error.POSITION_UNAVAILABLE:
-            setLocationError('Location unavailable');
+          case 2:
+            errorMessage = 'Edge is having trouble accessing location services. Try restarting Edge browser and ensure Windows Location services are enabled.';
             break;
-          case error.TIMEOUT:
-            setLocationError('Location request timed out');
+          case 3:
+            errorMessage = 'Location request timed out. Edge may be taking longer than usual. Please try again.';
             break;
-          default:
-            setLocationError('Error getting location');
+        }
+      } else {
+        switch(error.code) {
+          case 1:
+            errorMessage = 'Location access denied. Please allow location access in your browser settings.';
+            break;
+          case 2:
+            errorMessage = 'Location service is temporarily unavailable. Please try again in a moment.';
+            break;
+          case 3:
+            errorMessage = 'Location request timed out. Please try again.';
             break;
         }
       }
-    );
+      
+      setLocationError(errorMessage);
+      
+      // Offer manual input option
+      if (confirm('Would you like to enter the address manually instead?')) {
+        const addressInput = document.querySelector('textarea[placeholder="Building name, street, area"]') as HTMLTextAreaElement;
+        if (addressInput) {
+          addressInput.focus();
+        }
+      }
+    }
   };
   
   // Reset marker and map view
@@ -424,7 +506,12 @@ export function LocationDetails({ form }: FormSectionProps) {
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                           </svg>
-                          <p className="text-sm">{isGeocoding ? 'Finding location...' : 'Getting your location...'}</p>
+                          <p className="text-sm">
+                            {isGeocoding 
+                              ? 'Finding location...' 
+                              : 'Getting your location...'
+                            }
+                          </p>
                         </div>
                       </div>
                     )}
@@ -445,6 +532,26 @@ export function LocationDetails({ form }: FormSectionProps) {
                 </button>
               </div>
             </div>
+            
+            {/* Location help/error message */}
+            {locationError && (
+              <div className="text-xs text-orange-600 mt-1">
+                <p>{locationError}</p>
+                {detectBrowser() === 'Edge' && (
+                  <p className="mt-1">
+                    Edge troubleshooting steps:
+                    <br />
+                    1. Click the lock/location icon in your address bar
+                    <br />
+                    2. Allow location access for this site
+                    <br />
+                    3. Ensure Windows Location services are ON (Settings &gt; Privacy &gt; Location)
+                    <br />
+                    4. Try restarting Edge if issues persist
+                  </p>
+                )}
+              </div>
+            )}
             
             {/* Display selected coordinates if any */}
             {latitude && longitude && (
@@ -480,12 +587,4 @@ export function LocationDetails({ form }: FormSectionProps) {
       </div>
     </FormSection>
   );
-}
-
-// Add this globally for TypeScript
-declare global {
-  interface Window {
-    google: any;
-    initGoogleMaps: () => void;
-  }
 }

@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/PropertyFormTypes.ts
-// Version: 2.0.0
-// Last Modified: 01-05-2025 12:45 IST
-// Purpose: Added support for v2 property data structure
+// Version: 3.0.0
+// Last Modified: 04-05-2025 15:15 IST
+// Purpose: Updated to only support v3 data structure
 
 import { UseFormReturn } from 'react-hook-form';
 import { PropertyValidationSchema } from './validationSchemas';
@@ -10,9 +10,8 @@ import { PropertyValidationSchema } from './validationSchemas';
 export interface PropertyImage {
   id: string;
   url: string;
-  is_primary?: boolean;
-  display_order?: number;
-  type?: 'primary' | 'additional';
+  isPrimary: boolean;
+  displayOrder: number;
 }
 
 // Core Property Type
@@ -35,145 +34,100 @@ export type PropertyType = {
   
   // Comprehensive image handling
   property_images?: PropertyImage[];
-  image?: string; // Legacy support for single image
 
-  // Detailed property information
-  property_details?: {
-    propertyType?: string;
-    rentalFrequency?: string;
-    latitude?: number;
-    longitude?: number;
-    [key: string]: any; // Allow for additional dynamic properties
-  };
-  
-  // V2 format properties
-  _version?: string;
-  flow?: {
-    category: string;
-    listingType: string;
-  };
-  rental?: {
-    rentAmount: number;
-    availableFrom: string;
-    leaseDuration: string;
-    rentNegotiable: boolean;
-    securityDeposit: number;
-    furnishingStatus: string;
-    preferredTenants: string[];
-    maintenanceCharges: number | null;
-  };
-  features?: {
-    hasGym: boolean;
-    parking: string;
-    amenities: string[];
-    direction: string;
-    description: string;
-    petFriendly: boolean;
-    powerBackup: string;
-    waterSupply: string;
-    gatedSecurity: boolean;
-    nonVegAllowed: boolean;
-    hasSimilarUnits: boolean;
-    secondaryNumber: string;
-    propertyCondition: string;
-    propertyShowOption: string;
-  };
-  location?: {
-    area: string;
-    city: string;
-    state: string;
-    address: string;
-    pinCode: string;
-    district: string;
-    landmark: string;
-    locality: string;
-    flatPlotNo: string;
-    coordinates: {
-      latitude: number;
-      longitude: number;
-    };
-  };
-  basicDetails?: {
-    floor: number;
-    title: string;
-    facing: string;
-    bhkType: string;
-    balconies: string;
-    bathrooms: string;
-    builtUpArea: number;
-    propertyAge: string;
-    totalFloors: number;
-    propertyType: string;
-    possessionDate: string;
-    builtUpAreaUnit: string;
-  };
-  photos?: {
-    images: PropertyImage[];
-  };
-}
+  // Detailed property information stored as JSON
+  property_details?: any;
+};
 
 // Form Data Type for Property Submission
 export type FormData = {
-  // Existing fields from previous implementation
-  propertyType: string;
-  listingType: string;
+  // Metadata
+  meta: {
+    _version: string;
+    id?: string;
+    owner_id?: string;
+    created_at: string;
+    updated_at: string;
+    status: 'draft' | 'published' | 'archived';
+  };
   
-  // Core fields
-  title: string;
-  bhkType: string;
-  floor: string;
-  totalFloors: string;
-  propertyAge: string;
-  facing: string;
-  builtUpArea: string;
-  builtUpAreaUnit: 'sqft' | 'sqyd';
-  possessionDate: string;
-  zone: string;
-  locality: string;
-  landmark: string;
-  address: string;
-  flatPlotNo: string;
-  pinCode: string;
+  // Flow information
+  flow: {
+    category: "residential" | "commercial" | "land";
+    listingType: string;
+  };
   
-  // Rental/Sale Details
-  rentalType: 'rent' | 'lease';
-  rentAmount: string;
-  securityDeposit: string;
-  rentNegotiable: boolean;
-  maintenance: string;
-  availableFrom: string;
-  preferredTenants: string[];
-  
-  // Property Characteristics
-  furnishing: string;
-  parking: string;
-  description: string;
-  amenities: string[];
-  
-  // Additional Fields
-  bathrooms: string;
-  balconies: string;
-  hasGym: boolean;
-  nonVegAllowed: boolean;
-  gatedSecurity: boolean;
-  propertyShowOption: string;
-  propertyCondition: string;
-  secondaryNumber: string;
-  hasSimilarUnits: boolean;
-  direction: string;
-  
-  // Mapping and Location
-  latitude?: number;
-  longitude?: number;
-  
-  // Enhanced Image Handling
-  images?: PropertyImage[];
-  primaryImage?: string;
-  
-  // V2 Format Support
-  _version?: 'v1' | 'v2';
-  dataFormat?: 'v1' | 'v2';
-}
+  // Details section
+  details: {
+    // Basic property details
+    basicDetails: {
+      title: string;
+      propertyType: string;
+      bhkType: string;
+      floor: number | null;
+      totalFloors: number | null;
+      builtUpArea: number | null;
+      builtUpAreaUnit: 'sqft' | 'sqyd';
+      bathrooms: number | null;
+      balconies: number | null;
+      facing: string;
+      propertyAge: string;
+    };
+    
+    // Location details
+    location: {
+      address: string;
+      flatPlotNo: string;
+      landmark: string;
+      locality: string;
+      city: string;
+      state: string;
+      pinCode: string;
+      coordinates: {
+        latitude: number | null;
+        longitude: number | null;
+      };
+    };
+    
+    // Rental details (only relevant for rental properties)
+    rentalInfo?: {
+      rentAmount: number | null;
+      securityDeposit: number | null;
+      maintenanceCharges: number | null;
+      rentNegotiable: boolean;
+      availableFrom: string;
+      preferredTenants: string[];
+      leaseDuration: string;
+      furnishingStatus: string;
+    };
+    
+    // Sale details (only relevant for sale properties)
+    saleInfo?: {
+      expectedPrice: number | null;
+      priceNegotiable: boolean;
+      possessionDate: string;
+    };
+    
+    // Features and amenities
+    features: {
+      amenities: string[];
+      parking: string;
+      petFriendly: boolean;
+      nonVegAllowed: boolean;
+      waterSupply: string;
+      powerBackup: string;
+      gatedSecurity: boolean;
+      description: string;
+    };
+    
+    // Media
+    media: {
+      photos: {
+        images: PropertyImage[];
+      };
+    };
+  };
+};
 
 // Interfaces for Form Steps and Validation
 export interface FormStepProps extends FormSectionProps {
@@ -258,77 +212,6 @@ export interface HowItWorksProps {
   className?: string;
 }
 
-// V2 Format specific interfaces
-export interface PropertyV2 {
-  id: string;
-  owner_id: string;
-  status: 'draft' | 'published' | 'archived';
-  _version: 'v2';
-  title: string;
-  flow: {
-    category: 'residential' | 'commercial' | 'land';
-    listingType: 'rent' | 'sale';
-  };
-  basicDetails: {
-    title: string;
-    propertyType: string;
-    bhkType: string;
-    floor: number;
-    totalFloors: number;
-    propertyAge: string;
-    facing: string;
-    builtUpArea: number;
-    builtUpAreaUnit: string;
-    possessionDate: string;
-    bathrooms: string;
-    balconies: string;
-  };
-  location: {
-    address: string;
-    city: string;
-    state: string;
-    pinCode: string;
-    district: string;
-    landmark: string;
-    locality: string;
-    flatPlotNo: string;
-    area: string;
-    coordinates: {
-      latitude: number;
-      longitude: number;
-    };
-  };
-  rental?: {
-    rentAmount: number;
-    securityDeposit: number;
-    rentNegotiable: boolean;
-    availableFrom: string;
-    leaseDuration: string;
-    furnishingStatus: string;
-    preferredTenants: string[];
-    maintenanceCharges: number | null;
-  };
-  features: {
-    description: string;
-    amenities: string[];
-    parking: string;
-    direction: string;
-    hasGym: boolean;
-    nonVegAllowed: boolean;
-    gatedSecurity: boolean;
-    petFriendly: boolean;
-    propertyShowOption: string;
-    propertyCondition: string;
-    secondaryNumber: string;
-    hasSimilarUnits: boolean;
-    powerBackup: string;
-    waterSupply: string;
-  };
-  photos: {
-    images: PropertyImage[];
-  };
-}
-
 // Export the types for use in other components
 export default {
   PropertyType,
@@ -337,6 +220,5 @@ export default {
   PropertyFilter,
   PropertyStats,
   PropertyTypeFormData,
-  PropertyCategoryOption,
-  PropertyV2
+  PropertyCategoryOption
 };

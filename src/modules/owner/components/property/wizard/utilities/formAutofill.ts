@@ -1,323 +1,302 @@
 // src/modules/owner/components/property/wizard/utilities/formAutofill.ts
-// Version: 5.2.0
-// Last Modified: 16-04-2025 15:45 IST
-// Purpose: Removed initial autofill tools popup alert
+// Version: 2.0.0
+// Last Modified: 05-05-2025 15:15 IST
+// Purpose: Updated to use v3 data structure only and restored missing exports
 
-import { TEST_DATA } from '../test-data';
-import { detectDataVersion, DATA_VERSION_V1, DATA_VERSION_V2 } from '../utils/propertyDataAdapter';
+import { FormData } from '../types';
+import { DATA_VERSION_V3 } from '../utils/propertyDataAdapter';
+import { UseFormReturn } from 'react-hook-form';
 
-// Helper function to fill form with test data for a specific section
-export const fillFormSection = (form: any, section: keyof typeof TEST_DATA) => {
-  if (!form || typeof form.setValue !== 'function') {
-    console.error('Invalid form object');
-    alert(`⚠️ Autofill Error: Invalid form object`);
-    return false;
+// Import test data for sample properties
+import { 
+  samplePropertyData,
+  sampleSalePropertyData,
+  testPGHostelProperty,
+  testFlatmateProperty,
+  testCommercialRental,
+  testCommercialSale,
+  testLandSale
+} from '../test-data';
+
+// Helper to get test data based on the property and listing type
+export const getTestDataByType = (
+  propertyType: string = 'residential', 
+  listingType: string = 'rent'
+): FormData => {
+  const propertyTypeLower = propertyType.toLowerCase();
+  const listingTypeLower = listingType.toLowerCase();
+  
+  if (propertyTypeLower === 'residential') {
+    if (listingTypeLower === 'rent') {
+      return samplePropertyData;
+    } else if (listingTypeLower === 'sale') {
+      return sampleSalePropertyData;
+    } else if (listingTypeLower === 'pghostel') {
+      return testPGHostelProperty;
+    } else if (listingTypeLower === 'flatmates') {
+      return testFlatmateProperty;
+    }
+  } else if (propertyTypeLower === 'commercial') {
+    if (listingTypeLower === 'rent') {
+      return testCommercialRental;
+    } else if (listingTypeLower === 'sale') {
+      return testCommercialSale;
+    }
+  } else if (propertyTypeLower === 'land') {
+    return testLandSale;
   }
   
-  const sectionData = TEST_DATA[section];
-  if (!sectionData) {
-    console.error(`No test data found for section: ${section}`);
-    alert(`⚠️ Autofill Error: No test data found for section: ${section}`);
-    return false;
-  }
+  // Default to residential rental
+  return samplePropertyData;
+};
+
+// Auto-fill form data for a property
+export const autoFillPropertyForm = (
+  propertyType: string = 'residential', 
+  listingType: string = 'rent'
+): FormData => {
+  const testData = getTestDataByType(propertyType, listingType);
   
-  // Log to console instead of showing alert
-  console.log(`🔄 Filling data for "${section}" section`);
+  // Create a fresh copy to avoid modifying the original
+  const formData = JSON.parse(JSON.stringify(testData));
   
-  try {
-    // Detect which data structure the form is currently using
-    const formData = form.getValues();
-    const dataVersion = detectDataVersion(formData);
-    console.log(`Detected data version: ${dataVersion}`);
-    
-    // Special handling for basic details section
-    if (section === 'basic') {
-      console.log('Auto-filling basic details section...');
-      
-      // Common field values
-      const basicValues = {
-        propertyType: 'Apartment',
-        bhkType: '2 BHK',
-        floor: '3',
-        totalFloors: '10',
-        propertyAge: '1 - 3 years',
-        facing: 'East',
-        builtUpArea: '1200',
-        builtUpAreaUnit: 'sqft',
-        possessionDate: '2025-06-01',
-        title: 'Modern 2BHK Apartment in Indiranagar'
-      };
-      
-      // Set values in the UI-facing flat structure (for immediate form display)
-      Object.entries(basicValues).forEach(([field, value]) => {
-        console.log(`Setting flat field ${field} = ${value}`);
-        form.setValue(field, value, { shouldValidate: true });
-      });
-      
-      // If using v2 structure, also set nested structure
-      if (dataVersion === DATA_VERSION_V2) {
-        console.log('Setting v2 nested structure for basicDetails');
-        form.setValue('basicDetails', {
-          title: basicValues.title,
-          propertyType: basicValues.propertyType,
-          bhkType: basicValues.bhkType,
-          floor: parseInt(basicValues.floor),
-          totalFloors: parseInt(basicValues.totalFloors),
-          builtUpArea: parseInt(basicValues.builtUpArea),
-          builtUpAreaUnit: basicValues.builtUpAreaUnit,
-          bathrooms: 2,
-          balconies: 1,
-          facing: basicValues.facing,
-          propertyAge: basicValues.propertyAge
-        }, { shouldValidate: false });
-        
-        // Set the flow information for v2 structure if not already set
-        const flow = form.getValues('flow');
-        if (!flow) {
-          form.setValue('flow', {
-            category: 'residential',
-            listingType: 'rent'
-          }, { shouldValidate: false });
+  // Ensure metadata is set correctly
+  formData.meta = {
+    _version: DATA_VERSION_V3,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    status: 'draft'
+  };
+  
+  // Ensure flow is set correctly
+  formData.flow = {
+    category: propertyType.toLowerCase(),
+    listingType: listingType.toLowerCase()
+  };
+  
+  return formData;
+};
+
+// Map of step IDs to auto-fill functions
+const autoFillFunctionsByStep: Record<string, (data: FormData) => Partial<FormData>> = {
+  'details': (data: FormData) => ({
+    details: {
+      ...data.details,
+      basicDetails: {
+        title: "Auto-filled Property",
+        propertyType: data.flow.category === 'residential' ? "Apartment" : 
+                      data.flow.category === 'commercial' ? "Office Space" : "Plot",
+        bhkType: data.flow.category === 'residential' ? "2BHK" : "",
+        floor: 3,
+        totalFloors: 5,
+        builtUpArea: 1200,
+        builtUpAreaUnit: "sqft",
+        bathrooms: 2,
+        balconies: 1,
+        facing: "East",
+        propertyAge: "5-10 years"
+      }
+    }
+  }),
+  
+  'location': (data: FormData) => ({
+    details: {
+      ...data.details,
+      location: {
+        address: "123 Auto Street",
+        flatPlotNo: "A-101",
+        landmark: "Near Shopping Mall",
+        locality: "Central Area",
+        city: "Hyderabad",
+        state: "Telangana",
+        pinCode: "500001",
+        coordinates: {
+          latitude: 17.385044,
+          longitude: 78.486671
         }
       }
-      
-      console.log('Basic details set successfully');
-      
-      // Trigger validation after a short delay to ensure all fields are processed
-      setTimeout(() => {
-        form.trigger();
-        console.log('Form validation triggered');
-        
-        // Log the form values after update to verify
-        console.log('Form values after basic details update:', form.getValues());
-        
-        // Force a UI refresh by setting the values again
-        Object.entries(basicValues).forEach(([field, value]) => {
-          form.setValue(field, value, { shouldValidate: true });
-        });
-        
-        // Show success alert
-        alert(`✅ Autofill Complete: Basic details have been populated`);
-      }, 100);
-      
-      return true;
     }
-    
-    // Special handling for rental details section
-    if (section === 'rental') {
-      console.log('Auto-filling rental details section...');
-      
-      // Common rental values
-      const rentalValues = {
-        rentalType: 'rent',
-        rentAmount: '25000',
-        securityDeposit: '50000',
+  }),
+  
+  'rental': (data: FormData) => ({
+    details: {
+      ...data.details,
+      rentalInfo: {
+        rentAmount: 25000,
+        securityDeposit: 50000,
+        maintenanceCharges: 2000,
         rentNegotiable: true,
-        maintenance: '2000',
-        availableFrom: '2025-05-15',
-        furnishing: 'Semi-Furnished',
-        parking: 'Car & Bike',
-        preferredTenants: ['Family', 'Working Professionals'],
-        nonVegAllowed: true,
-        petsAllowed: false,
-        hasLockInPeriod: true,
-        lockInPeriod: '11'
-      };
-      
-      // Set values in the UI-facing flat structure
-      Object.entries(rentalValues).forEach(([field, value]) => {
-        console.log(`Setting flat rental field ${field} = ${value}`);
-        form.setValue(field, value, { shouldValidate: true });
-      });
-      
-      // If using v2 structure, also set nested structure
-      if (dataVersion === DATA_VERSION_V2) {
-        console.log('Setting v2 nested structure for rental');
-        form.setValue('rental', {
-          rentAmount: parseInt(rentalValues.rentAmount),
-          securityDeposit: parseInt(rentalValues.securityDeposit),
-          maintenanceCharges: parseInt(rentalValues.maintenance),
-          rentNegotiable: rentalValues.rentNegotiable,
-          availableFrom: rentalValues.availableFrom,
-          preferredTenants: rentalValues.preferredTenants,
-          leaseDuration: "11 months",
-          furnishingStatus: rentalValues.furnishing
-        }, { shouldValidate: false });
+        availableFrom: "2025-06-01",
+        preferredTenants: ["Family", "Working Professionals"],
+        leaseDuration: "11 months",
+        furnishingStatus: "Semi-Furnished"
       }
-      
-      console.log('Rental details set successfully');
-      
-      // Trigger validation
-      setTimeout(() => {
-        form.trigger();
-        
-        // Force a UI refresh by setting the values again
-        Object.entries(rentalValues).forEach(([field, value]) => {
-          form.setValue(field, value, { shouldValidate: true });
-        });
-        
-        // Show success alert
-        alert(`✅ Autofill Complete: Rental details have been populated`);
-      }, 100);
-      
-      return true;
     }
-    
-    // For other sections, use the default approach
-    console.log('Using default approach for section:', section);
-    Object.entries(sectionData).forEach(([field, value]) => {
-      try {
-        console.log(`Setting ${field} = `, value);
-        form.setValue(field, value, { shouldValidate: true });
-        
-        // If using v2 structure, check if this field should be in a nested object
-        if (dataVersion === DATA_VERSION_V2) {
-          // Map fields to their nested locations
-          const nestedMap: Record<string, string> = {
-            // Location fields
-            'address': 'location.address',
-            'flatPlotNo': 'location.flatPlotNo',
-            'landmark': 'location.landmark',
-            'locality': 'location.locality',
-            'city': 'location.city',
-            'state': 'location.state',
-            'pinCode': 'location.pinCode',
-            'latitude': 'location.coordinates.latitude',
-            'longitude': 'location.coordinates.longitude',
-            
-            // Features fields
-            'amenities': 'features.amenities',
-            'parking': 'features.parking',
-            'nonVegAllowed': 'features.nonVegAllowed',
-            'gatedSecurity': 'features.gatedSecurity',
-            'description': 'features.description',
-            'propertyShowOption': 'features.propertyShowOption',
-            'propertyCondition': 'features.propertyCondition',
-            'hasGym': 'features.hasGym',
-            'secondaryNumber': 'features.secondaryNumber',
-            'hasSimilarUnits': 'features.hasSimilarUnits',
-            'direction': 'features.direction'
-          };
-          
-          // If this field has a nested path, set it there too
-          if (field in nestedMap) {
-            const nestedPath = nestedMap[field];
-            console.log(`Also setting nested path ${nestedPath} = `, value);
-            const [section, prop, subprop] = nestedPath.split('.');
-            
-            if (subprop) {
-              // Path like location.coordinates.latitude
-              const parentObj = form.getValues(section) || {};
-              const subObj = parentObj[prop] || {};
-              subObj[subprop] = value;
-              parentObj[prop] = subObj;
-              form.setValue(section, parentObj, { shouldValidate: false });
-            } else {
-              // Path like location.address
-              const parentObj = form.getValues(section) || {};
-              parentObj[prop] = value;
-              form.setValue(section, parentObj, { shouldValidate: false });
-            }
-          }
-        }
-      } catch (e) {
-        console.warn(`Failed to set ${field}:`, e);
+  }),
+  
+  'sale': (data: FormData) => ({
+    details: {
+      ...data.details,
+      saleInfo: {
+        expectedPrice: 7500000,
+        priceNegotiable: true,
+        possessionDate: "2025-07-01"
       }
+    }
+  }),
+  
+  'features': (data: FormData) => ({
+    details: {
+      ...data.details,
+      features: {
+        amenities: [
+          "Lift",
+          "Gym",
+          "Swimming Pool",
+          "Power Backup",
+          "Security"
+        ],
+        parking: "Covered",
+        petFriendly: true,
+        nonVegAllowed: true,
+        waterSupply: "24x7",
+        powerBackup: "Full",
+        gatedSecurity: true,
+        description: "This is an auto-filled property description with all amenities and features."
+      }
+    }
+  }),
+  
+  'images': (data: FormData) => ({
+    details: {
+      ...data.details,
+      media: {
+        photos: {
+          images: [
+            {
+              id: "auto_img_1",
+              url: "https://example.com/auto_image1.jpg",
+              isPrimary: true,
+              displayOrder: 1
+            },
+            {
+              id: "auto_img_2",
+              url: "https://example.com/auto_image2.jpg",
+              isPrimary: false,
+              displayOrder: 2
+            }
+          ]
+        }
+      }
+    }
+  }),
+  
+  'review': (data: FormData) => data // No changes for review step
+};
+
+// Function to auto-fill form data for a specific step
+export const autoFillStep = (
+  currentData: FormData,
+  stepId: string
+): Partial<FormData> => {
+  // If step has a dedicated auto-fill function, use it
+  if (autoFillFunctionsByStep[stepId]) {
+    return autoFillFunctionsByStep[stepId](currentData);
+  }
+  
+  // Default case: return current data unchanged
+  return currentData;
+};
+
+/**
+ * Fills a specific form section with test data
+ * @param form The form instance
+ * @param sectionName The name of the section to fill
+ */
+export const fillFormSection = (
+  form: UseFormReturn<FormData>,
+  sectionName: string
+): void => {
+  try {
+    // Get current values
+    const currentValues = form.getValues();
+    
+    // Determine property and listing type
+    const propertyType = currentValues.flow?.category || 'residential';
+    const listingType = currentValues.flow?.listingType || 'rent';
+    
+    // Generate test data
+    const testData = getTestDataByType(propertyType, listingType);
+    
+    // Create a map of section names to their corresponding step IDs
+    const sectionToStepMap: Record<string, string> = {
+      'basicDetails': 'details',
+      'location': 'location',
+      'rental': 'rental',
+      'sale': 'sale',
+      'features': 'features',
+      'media': 'images'
+    };
+    
+    // Get the corresponding step ID
+    const stepId = sectionToStepMap[sectionName] || sectionName;
+    
+    // Get the auto-fill data for this step
+    const stepData = autoFillStep(testData, stepId);
+    
+    // Merge with current values and update the form
+    form.reset({
+      ...currentValues,
+      ...stepData
     });
     
-    // Trigger validation and show success alert
-    setTimeout(() => {
-      form.trigger();
-      alert(`✅ Autofill Complete: ${section} data has been populated`);
-    }, 100);
-    
-    return true;
+    console.log(`Form section '${sectionName}' filled successfully`);
   } catch (error) {
-    console.error(`Error filling data for ${section}:`, error);
-    alert(`❌ Autofill Error: ${error.message || "Unknown error"}`);
-    return false;
+    console.error(`Error filling form section '${sectionName}':`, error);
   }
 };
 
-// Function to add global autofill helpers
-export const addFormAutofillHelpers = (form: any) => {
+/**
+ * Adds autofill helpers to the form
+ * This function is used to add helpers for testing and development
+ * @param form The form instance
+ * @param isSaleMode Whether the form is in sale mode
+ */
+export const addFormAutofillHelpers = (
+  form: UseFormReturn<FormData>,
+  isSaleMode: boolean = false
+) => {
+  // Add the auto-fill function to the window object for debugging
   try {
-    (window as any).autoFill = {
-      // Section-specific autofill functions
-      roomDetails: () => fillFormSection(form, 'room_details'),
-      pgDetails: () => fillFormSection(form, 'pg_details'),
-      location: () => fillFormSection(form, 'location'),
-      basic: () => fillFormSection(form, 'basic'),
-      rental: () => fillFormSection(form, 'rental'),
-      sale: () => fillFormSection(form, 'sale'),
-      all: () => {
-        // Log to console instead of showing alert
-        console.log(`🚀 Starting Complete Autofill: This will populate all sections`);
+    if (typeof window !== 'undefined') {
+      (window as any).__autoFillPropertyForm = (stepId?: string) => {
+        // Get current values
+        const currentValues = form.getValues();
+        const propertyType = currentValues.flow?.category || 'residential';
+        const listingType = isSaleMode ? 'sale' : 'rent';
         
-        // First fill basic
-        fillFormSection(form, 'basic');
+        // Create a new auto-filled form
+        const autoFilledData = autoFillPropertyForm(propertyType, listingType);
         
-        // Then other sections after a delay
-        setTimeout(() => {
-          Object.keys(TEST_DATA).forEach(section => {
-            if (section !== 'basic') {
-              fillFormSection(form, section as keyof typeof TEST_DATA);
-            }
+        // If a specific step is provided, only fill that step
+        if (stepId && autoFillFunctionsByStep[stepId]) {
+          const stepData = autoFillFunctionsByStep[stepId](autoFilledData);
+          form.reset({
+            ...currentValues,
+            ...stepData
           });
-        }, 200);
-      },
-      
-      // Debugging helpers
-      getForm: () => form,
-      getValues: () => form?.getValues(),
-      basicValues: () => {
-        const values = form?.getValues();
-        return {
-          propertyType: values.propertyType,
-          bhkType: values.bhkType,
-          floor: values.floor,
-          totalFloors: values.totalFloors,
-          propertyAge: values.propertyAge,
-          facing: values.facing,
-          builtUpArea: values.builtUpArea,
-          builtUpAreaUnit: values.builtUpAreaUnit,
-          possessionDate: values.possessionDate,
-          title: values.title,
-          basicDetails: values.basicDetails,
-          flow: values.flow
-        };
-      },
-      forceRefresh: () => {
-        // Log to console instead of showing alert
-        console.log(`🔄 Force Refreshing Form Fields`);
+        } else {
+          // Otherwise, fill the entire form
+          form.reset(autoFilledData);
+        }
         
-        // Force refresh values by setting them again
-        const values = form?.getValues();
-        form.setValue('propertyType', values.propertyType, { shouldValidate: true });
-        form.setValue('bhkType', values.bhkType, { shouldValidate: true });
-        form.setValue('floor', values.floor, { shouldValidate: true });
-        form.setValue('totalFloors', values.totalFloors, { shouldValidate: true });
-        form.setValue('propertyAge', values.propertyAge, { shouldValidate: true });
-        form.setValue('facing', values.facing, { shouldValidate: true });
-        form.setValue('builtUpArea', values.builtUpArea, { shouldValidate: true });
-        form.setValue('builtUpAreaUnit', values.builtUpAreaUnit, { shouldValidate: true });
-        form.setValue('possessionDate', values.possessionDate, { shouldValidate: true });
-        form.setValue('title', values.title, { shouldValidate: true });
-        form.trigger();
-      },
-      detectVersion: () => {
-        const formData = form.getValues();
-        const version = detectDataVersion(formData);
-        console.log(`📊 Form Data Version: ${version}`);
-        return version;
-      }
-    };
-    
-    console.log('Form autofill helpers added to window.autoFill (without initial popup)');
-    // Removed the alert that was showing when the page loads
+        console.log('Form auto-filled successfully:', form.getValues());
+      };
+      
+      // Log a message to notify that auto-fill is available
+      console.log('Form auto-fill helper added. Use window.__autoFillPropertyForm() to fill the form.');
+    }
   } catch (error) {
-    console.error('Error setting up autofill helpers:', error);
-    // Keep this alert as it's for actual errors
-    alert(`❌ Error setting up autofill helpers: ${error.message || "Unknown error"}`);
+    console.error('Error adding form auto-fill helpers:', error);
   }
 };

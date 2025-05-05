@@ -1,23 +1,19 @@
 // src/modules/owner/components/property/wizard/hooks/usePropertyFormState.ts
-// Version: 3.1.0
-// Last Modified: 16-04-2025 17:45 IST
-// Purpose: Enhanced initialization for specialized property types
+// Version: 4.0.0
+// Last Modified: 04-05-2025 17:45 IST
+// Purpose: Updated to only support v3 data structure
 
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { useParams } from 'react-router-dom';
-import { FormData, FormDataV1, FormDataV2 } from '../types';
+import { FormData } from '../types';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { 
   detectDataVersion, 
   detectSpecializedPropertyType,
-  DATA_VERSION_V1, 
-  DATA_VERSION_V2, 
-  CURRENT_DATA_VERSION,
-  convertV1ToV2,
-  convertV2ToV1,
-  cleanV2Structure,
+  DATA_VERSION_V3,
+  ensureV3Structure,
   createNewPropertyData
 } from '../utils/propertyDataAdapter';
 
@@ -68,12 +64,9 @@ export function usePropertyFormState({
     adType?.toLowerCase() === 'sale' || 
     type?.toLowerCase() === 'sale' || 
     urlListingType?.toLowerCase() === 'sale' ||
-    (initialData && detectDataVersion(initialData) === DATA_VERSION_V2
-      ? (initialData as FormDataV2).flow?.listingType === 'sale'
-      : (initialData as FormDataV1)?.listingType?.toLowerCase() === 'sale' ||
-        (initialData as FormDataV1)?.listingType?.toLowerCase() === 'sell' ||
-        (initialData as FormDataV1)?.isSaleProperty === true ||
-        (initialData as FormDataV1)?.propertyPriceType === 'sale');
+    (initialData && 
+     detectDataVersion(initialData) === DATA_VERSION_V3 &&
+     initialData.flow?.listingType === 'sale');
   
   // Determine if we're in PG/Hostel mode
   const isURLPGHostelMode = urlListingType?.toLowerCase() === 'pghostel';
@@ -135,87 +128,17 @@ export function usePropertyFormState({
     return { propertyTypeToUse, listingTypeToUse };
   };
 
-  // Function to create basic form values based on current version
+  // Function to create basic form values 
   const getBasicFormValues = () => {
     const { propertyTypeToUse, listingTypeToUse } = determinePropertyTypeAndListingType();
     
-    // For brand new forms, create a default structure based on current version
+    // For brand new forms, create a default structure
     if (!initialData) {
-      // Use the enhanced createNewPropertyData function that creates specialized structures
       return createNewPropertyData(propertyTypeToUse, listingTypeToUse);
     }
     
-    // If we have initialData, check its version and convert if needed
-    const dataVersion = detectDataVersion(initialData);
-    
-    // If initialData version matches current version, use it directly
-    if (dataVersion === CURRENT_DATA_VERSION) {
-      // For V2 data, make sure the flow values are correct
-      if (dataVersion === DATA_VERSION_V2) {
-        const v2Data = { ...(initialData as FormDataV2) };
-        
-        // Update flow if URL or props specify different values
-        if ((urlPropertyType && v2Data.flow.category !== propertyTypeToUse) ||
-            (urlListingType && v2Data.flow.listingType !== listingTypeToUse)) {
-          
-          console.log(`Updating flow values from URL/props: ${propertyTypeToUse}/${listingTypeToUse}`);
-          v2Data.flow = {
-            category: propertyTypeToUse as "residential" | "commercial" | "land",
-            listingType: listingTypeToUse
-          };
-          
-          // Make sure the data structure matches the new flow
-          return cleanV2Structure(v2Data);
-        }
-        
-        return initialData;
-      }
-      
-      return initialData;
-    }
-    
-    // If initialData is V1 but we need V2
-    if (dataVersion === DATA_VERSION_V1 && CURRENT_DATA_VERSION === DATA_VERSION_V2) {
-      console.log("Converting initialData from V1 to V2");
-      const v2Data = convertV1ToV2(initialData as FormDataV1);
-      
-      // Update flow if URL or props specify different values
-      if ((urlPropertyType && v2Data.flow.category !== propertyTypeToUse) ||
-          (urlListingType && v2Data.flow.listingType !== listingTypeToUse)) {
-        
-        console.log(`Updating flow values from URL/props: ${propertyTypeToUse}/${listingTypeToUse}`);
-        v2Data.flow = {
-          category: propertyTypeToUse as "residential" | "commercial" | "land",
-          listingType: listingTypeToUse
-        };
-        
-        // Make sure the data structure matches the new flow
-        return cleanV2Structure(v2Data);
-      }
-      
-      return v2Data;
-    }
-    
-    // If initialData is V2 but we need V1
-    if (dataVersion === DATA_VERSION_V2 && CURRENT_DATA_VERSION === DATA_VERSION_V1) {
-      console.log("Converting initialData from V2 to V1");
-      const v1Data = convertV2ToV1(initialData as FormDataV2);
-      
-      // Update flow tracking fields if URL or props specify different values
-      if (urlPropertyType || urlListingType) {
-        v1Data.flow_property_type = propertyTypeToUse;
-        v1Data.flow_listing_type = listingTypeToUse;
-        v1Data.propertyCategory = propertyTypeToUse;
-        v1Data.listingType = listingTypeToUse;
-        v1Data.isSaleProperty = listingTypeToUse === 'sale';
-        v1Data.propertyPriceType = listingTypeToUse === 'sale' ? 'sale' : 'rental';
-      }
-      
-      return v1Data;
-    }
-    
-    // Fallback to original data
-    return initialData;
+    // If we have initialData, ensure it's in v3 format
+    return ensureV3Structure(initialData);
   };
 
   // Initialize form with processed values
@@ -251,99 +174,21 @@ export function usePropertyFormState({
         console.log('Direct database query result:', data);
         
         if (data) {
-          // Get the property details and detect version
+          // Get the property details and ensure v3 structure
           let propertyDetails = data.property_details;
-          const dataVersion = detectDataVersion(propertyDetails);
-          console.log(`Property data version: ${dataVersion}`);
           
           // Detect specialized property types
-          const { isCoworking, isPGHostel, isFlatmate, isLand } = 
-            detectSpecializedPropertyType(propertyDetails);
+          const { isPGHostel } = detectSpecializedPropertyType(propertyDetails);
           
           // Update PG/Hostel mode flag
           setIsPGHostelMode(isPGHostel);
           
-          // Convert to current version if needed
-          let formData: FormData;
+          // Convert to v3 format if needed
+          const formData = ensureV3Structure(propertyDetails);
           
-          if (dataVersion === DATA_VERSION_V1 && CURRENT_DATA_VERSION === DATA_VERSION_V2) {
-            console.log("Converting database data from V1 to V2");
-            formData = convertV1ToV2(propertyDetails as FormDataV1);
-            // Clean the structure to ensure all fields are properly categorized
-            formData = cleanV2Structure(formData as FormDataV2);
-          } else if (dataVersion === DATA_VERSION_V2 && CURRENT_DATA_VERSION === DATA_VERSION_V1) {
-            console.log("Converting database data from V2 to V1");
-            formData = convertV2ToV1(propertyDetails as FormDataV2);
-          } else if (dataVersion === DATA_VERSION_V2) {
-            // Same version, but need to ensure proper structure
-            formData = cleanV2Structure(propertyDetails as FormDataV2);
-            
-            // Make sure the specialized section matches the flow
-            if (isCoworking && !formData.coworking) {
-              console.log("Adding missing coworking section");
-              (formData as FormDataV2).coworking = {
-                rentPrice: null,
-                securityDeposit: null,
-                workstations: null,
-                availableFrom: "",
-                meetingRooms: false,
-                conferenceRooms: false,
-                cabins: false,
-                receptionServices: false,
-                internetSpeed: "",
-                workingHours: "",
-                facilities: []
-              };
-            } else if (isPGHostel && !formData.pghostel) {
-              console.log("Adding missing pghostel section");
-              (formData as FormDataV2).pghostel = {
-                rentAmount: null,
-                securityDeposit: null,
-                mealOption: "",
-                roomType: "",
-                roomCapacity: null,
-                availableRooms: null,
-                totalRooms: null,
-                bathroomType: "",
-                gender: "",
-                availableFrom: "",
-                noticePeriod: "",
-                rules: "",
-                roomFeatures: {
-                  hasAC: false,
-                  hasFan: false,
-                  hasFurniture: false,
-                  hasTV: false,
-                  hasWifi: false,
-                  hasGeyser: false
-                }
-              };
-            } else if (isFlatmate && !formData.flatmate) {
-              console.log("Adding missing flatmate section");
-              (formData as FormDataV2).flatmate = {
-                rentAmount: null,
-                securityDeposit: null,
-                occupancy: null,
-                availableFrom: "",
-                gender: "",
-                preferredTenants: [],
-                furnishingStatus: ""
-              };
-            } else if (isLand && !formData.land) {
-              console.log("Adding missing land section");
-              (formData as FormDataV2).land = {
-                expectedPrice: null,
-                priceNegotiable: false,
-                landArea: (formData as FormDataV2).basicDetails.builtUpArea,
-                landAreaUnit: (formData as FormDataV2).basicDetails.builtUpAreaUnit || "sqft",
-                landType: "",
-                isApproved: false,
-                availableFrom: ""
-              };
-            }
-          } else {
-            // Same version (V1), use directly
-            formData = propertyDetails;
+          // Make sure city is set if we have one from props
+          if (city && formData.details?.location && !formData.details.location.city) {
+            formData.details.location.city = city;
           }
           
           // Update all form fields
@@ -358,7 +203,7 @@ export function usePropertyFormState({
     };
 
     fetchPropertyDetails();
-  }, [existingPropertyId, mode, form, isSaleMode]);
+  }, [existingPropertyId, mode, form, isSaleMode, city]);
 
   return {
     form,

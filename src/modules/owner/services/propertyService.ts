@@ -1,17 +1,15 @@
 // src/modules/owner/services/propertyService.ts
-// Version: 5.1.0
-// Last Modified: 02-05-2025 18:15 IST
-// Purpose: Fixed database schema mismatch when saving properties
+// Version: 6.0.0
+// Last Modified: 05-05-2025 17:30 IST
+// Purpose: Updated to only support v3 data structure
 
 import { supabase } from '@/lib/supabase';
-import { Property, FormData, FormDataV1, FormDataV2 } from '../components/property/PropertyFormTypes';
+import { Property, FormData } from '../components/property/PropertyFormTypes';
 import { 
   detectDataVersion, 
-  DATA_VERSION_V1, 
-  DATA_VERSION_V2, 
-  CURRENT_DATA_VERSION,
-  convertV1ToV2,
-  convertV2ToV1 
+  DATA_VERSION_V3,
+  ensureV3Structure,
+  convertToDbFormat
 } from '../components/property/wizard/utils/propertyDataAdapter';
 
 // Cache for properties to avoid redundant fetches
@@ -54,7 +52,8 @@ export const propertyService = {
           ? property.property_images.map((img: any) => ({
               id: img.id,
               url: img.url,
-              type: img.is_primary ? 'primary' : 'additional',
+              isPrimary: img.is_primary,
+              displayOrder: img.display_order || 0
             }))
           : [];
         
@@ -63,25 +62,21 @@ export const propertyService = {
           property.property_details = {};
         }
         
-        // Detect data version to handle backward compatibility
+        // Detect data version 
         const dataVersion = detectDataVersion(property.property_details);
         console.log(`Property ${property.id} has data version: ${dataVersion}`);
         
-        // Add version information if missing
-        if (dataVersion === 'legacy') {
-          console.log(`Adding version information to legacy property ${property.id}`);
-          property.property_details._version = DATA_VERSION_V1;
-        }
+        // Normalize to v3 structure
+        const normalizedDetails = ensureV3Structure(property.property_details);
         
-        // If needed, normalize data structure to the current version
-        let normalizedDetails = property.property_details;
+        // Always make sure ID is in the meta section
+        normalizedDetails.meta.id = property.id;
         
-        if (dataVersion === DATA_VERSION_V1 && CURRENT_DATA_VERSION === DATA_VERSION_V2) {
-          console.log(`Converting property ${property.id} from V1 to V2`);
-          normalizedDetails = convertV1ToV2(property.property_details);
-        } else if (dataVersion === DATA_VERSION_V2 && CURRENT_DATA_VERSION === DATA_VERSION_V1) {
-          console.log(`Converting property ${property.id} from V2 to V1`);
-          normalizedDetails = convertV2ToV1(property.property_details);
+        // If this is a newly converted property, update it in the database
+        if (dataVersion !== DATA_VERSION_V3) {
+          // Update in background, don't wait
+          this.updatePropertyDetails(property.id, normalizedDetails)
+            .catch(err => console.error('Error updating converted property:', err));
         }
         
         return {
@@ -107,7 +102,6 @@ export const propertyService = {
   // Fetch a single property by ID
   async getPropertyById(id: string): Promise<Property> {
     try {
-      console.log('=========== DEBUG: LOADING PROPERTY ===========');
       console.log('Fetching property with ID:', id);
       
       const { data, error } = await supabase
@@ -129,20 +123,13 @@ export const propertyService = {
         throw new Error('Property not found');
       }
       
-      console.log('Property data found:', {
-        id: data.id,
-        title: data.title,
-        status: data.status,
-        price: data.price,
-        imageCount: data.property_images?.length || 0
-      });
-
       // Process the images
       const images = data.property_images
         ? data.property_images.map((img: any) => ({
             id: img.id,
             url: img.url,
-            type: img.is_primary ? 'primary' : 'additional',
+            isPrimary: img.is_primary,
+            displayOrder: img.display_order || 0
           }))
         : [];
       
@@ -152,28 +139,23 @@ export const propertyService = {
         data.property_details = {};
       }
       
-      // Detect data version to handle backward compatibility
+      // Detect data version
       const dataVersion = detectDataVersion(data.property_details);
       console.log(`Property ${data.id} has data version: ${dataVersion}`);
       
-      // Add version information if missing
-      if (dataVersion === 'legacy') {
-        console.log(`Adding version information to legacy property ${data.id}`);
-        data.property_details._version = DATA_VERSION_V1;
+      // Normalize to v3 structure
+      const normalizedDetails = ensureV3Structure(data.property_details);
+      
+      // Always make sure ID is in the meta section
+      normalizedDetails.meta.id = data.id;
+      
+      // If this is a newly converted property, update it in the database
+      if (dataVersion !== DATA_VERSION_V3) {
+        // Update in background, don't wait
+        this.updatePropertyDetails(data.id, normalizedDetails)
+          .catch(err => console.error('Error updating converted property:', err));
       }
       
-      // Normalize data structure to the current version if needed
-      let normalizedDetails = data.property_details;
-      
-      if (dataVersion === DATA_VERSION_V1 && CURRENT_DATA_VERSION === DATA_VERSION_V2) {
-        console.log(`Converting property ${data.id} from V1 to V2`);
-        normalizedDetails = convertV1ToV2(data.property_details);
-      } else if (dataVersion === DATA_VERSION_V2 && CURRENT_DATA_VERSION === DATA_VERSION_V1) {
-        console.log(`Converting property ${data.id} from V2 to V1`);
-        normalizedDetails = convertV2ToV1(data.property_details);
-      }
-      
-      console.log('=========== DEBUG: LOADING PROPERTY END ===========');
       return {
         ...data,
         property_details: normalizedDetails,
@@ -185,99 +167,38 @@ export const propertyService = {
     }
   },
 
-  // Create a new property - Always use current version
+  // Create a new property
   async createProperty(propertyData: FormData, userId: string, status: 'draft' | 'published' = 'draft'): Promise<Property> {
     try {
-      console.log('=========== DEBUG: CREATE PROPERTY START ===========');
       console.log('Creating property with status:', status);
       
-      // Detect data version
-      const dataVersion = detectDataVersion(propertyData);
-      console.log(`Form data version: ${dataVersion}`);
+      // Ensure data is in v3 format
+      const v3Data = ensureV3Structure(propertyData);
       
-      // Convert to current version if needed
-      let processedData = propertyData;
-      
-      if (dataVersion === DATA_VERSION_V1 && CURRENT_DATA_VERSION === DATA_VERSION_V2) {
-        console.log('Converting form data from V1 to V2');
-        processedData = convertV1ToV2(propertyData as FormDataV1);
-      } else if (dataVersion === DATA_VERSION_V2 && CURRENT_DATA_VERSION === DATA_VERSION_V1) {
-        console.log('Converting form data from V2 to V1');
-        processedData = convertV2ToV1(propertyData as FormDataV2);
-      }
-      
-      // Ensure version information is set
-      if (CURRENT_DATA_VERSION === DATA_VERSION_V2) {
-        (processedData as FormDataV2)._version = CURRENT_DATA_VERSION;
-      } else {
-        (processedData as FormDataV1)._version = CURRENT_DATA_VERSION;
-      }
-      
-      // Determine price based on data version and property type
-      let price = 0;
-      
-      if (CURRENT_DATA_VERSION === DATA_VERSION_V2) {
-        const v2Data = processedData as FormDataV2;
-        if (v2Data.flow?.listingType === 'sale' && v2Data.sale) {
-          price = v2Data.sale.expectedPrice || 0;
-        } else if (v2Data.rental) {
-          price = v2Data.rental.rentAmount || 0;
-        }
-      } else {
-        const v1Data = processedData as FormDataV1;
-        const isSaleProperty = v1Data.isSaleProperty || 
-                              v1Data.listingType?.toLowerCase() === 'sale' || 
-                              v1Data.propertyPriceType === 'sale';
-        
-        price = isSaleProperty 
-          ? parseFloat(v1Data.expectedPrice || '0') 
-          : parseFloat(v1Data.rentAmount || '0');
-      }
-      
-      // Create the database record - removing location as it's not in the schema
-      const dbPropertyData = {
-        owner_id: userId,
-        title: CURRENT_DATA_VERSION === DATA_VERSION_V2 
-          ? (processedData as FormDataV2).basicDetails?.title || 'New Property'
-          : (processedData as FormDataV1).title || 'New Property',
-        description: CURRENT_DATA_VERSION === DATA_VERSION_V2 
-          ? (processedData as FormDataV2).features?.description || ''
-          : (processedData as FormDataV1).description || '',
-        price: price,
-        bedrooms: CURRENT_DATA_VERSION === DATA_VERSION_V2
-          ? ((processedData as FormDataV2).basicDetails?.bhkType 
-             ? parseInt((processedData as FormDataV2).basicDetails.bhkType.split(' ')[0]) 
-             : 0)
-          : ((processedData as FormDataV1).bhkType 
-             ? parseInt((processedData as FormDataV1).bhkType.split(' ')[0]) 
-             : 0),
-        bathrooms: CURRENT_DATA_VERSION === DATA_VERSION_V2
-          ? (processedData as FormDataV2).basicDetails?.bathrooms || 0
-          : ((processedData as FormDataV1).bathrooms 
-             ? parseInt((processedData as FormDataV1).bathrooms) 
-             : 0),
-        square_feet: CURRENT_DATA_VERSION === DATA_VERSION_V2
-          ? (processedData as FormDataV2).basicDetails?.builtUpArea || 0
-          : ((processedData as FormDataV1).builtUpArea 
-             ? parseFloat((processedData as FormDataV1).builtUpArea) 
-             : 0),
-        address: CURRENT_DATA_VERSION === DATA_VERSION_V2
-          ? (processedData as FormDataV2).location?.address || ''
-          : (processedData as FormDataV1).address || '',
-        city: CURRENT_DATA_VERSION === DATA_VERSION_V2
-          ? (processedData as FormDataV2).location?.city || ''
-          : (processedData as FormDataV1).city || (processedData as FormDataV1).locality || '',
-        state: CURRENT_DATA_VERSION === DATA_VERSION_V2
-          ? (processedData as FormDataV2).location?.state || 'Telangana'
-          : (processedData as FormDataV1).state || 'Telangana',
-        zip_code: CURRENT_DATA_VERSION === DATA_VERSION_V2
-          ? (processedData as FormDataV2).location?.pinCode || ''
-          : (processedData as FormDataV1).pinCode || '',
-        status,
-        property_details: processedData,
-        tags: status === 'published' ? ['public'] : []
+      // Add metadata
+      v3Data.meta = v3Data.meta || {
+        _version: DATA_VERSION_V3,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        status: status
       };
-
+      
+      v3Data.meta.owner_id = userId;
+      v3Data.meta.status = status;
+      
+      // Convert to database format
+      const dbPropertyData = convertToDbFormat(v3Data);
+      
+      // Make sure owner_id is set
+      dbPropertyData.owner_id = userId;
+      dbPropertyData.status = status;
+      dbPropertyData.tags = status === 'published' ? ['public'] : [];
+      
+      // Explicitly remove id if it's undefined to let the database generate it
+      if (dbPropertyData.id === undefined) {
+        delete dbPropertyData.id;
+      }
+      
       console.log('Property database payload:', dbPropertyData);
       
       const { data, error } = await supabase
@@ -296,12 +217,18 @@ export const propertyService = {
       
       console.log('Property created successfully, returned data:', data[0]);
       
+      // Update the ID in the original v3 data
+      v3Data.meta.id = data[0].id;
+      
+      // Update the full property details in the database
+      await this.updatePropertyDetails(data[0].id, v3Data);
+      
       // Clear cache for this user
       propertiesCache.delete(userId);
       
-      console.log('=========== DEBUG: CREATE PROPERTY END ===========');
       return {
         ...data[0],
+        property_details: v3Data,
         images: []
       };
     } catch (error) {
@@ -318,105 +245,42 @@ export const propertyService = {
     status?: 'draft' | 'published'
   ): Promise<Property> {
     try {
-      console.log('=========== DEBUG: UPDATE PROPERTY START ===========');
       console.log('Updating property:', propertyId);
       
-      // Detect data version
-      const dataVersion = detectDataVersion(propertyData);
-      console.log(`Form data version: ${dataVersion}`);
+      // Ensure data is in v3 format
+      const v3Data = ensureV3Structure(propertyData);
       
-      // Convert to current version if needed
-      let processedData = propertyData;
-      
-      if (dataVersion === DATA_VERSION_V1 && CURRENT_DATA_VERSION === DATA_VERSION_V2) {
-        console.log('Converting form data from V1 to V2');
-        processedData = convertV1ToV2(propertyData as FormDataV1);
-      } else if (dataVersion === DATA_VERSION_V2 && CURRENT_DATA_VERSION === DATA_VERSION_V1) {
-        console.log('Converting form data from V2 to V1');
-        processedData = convertV2ToV1(propertyData as FormDataV2);
-      }
-      
-      // Ensure version information is set
-      if (CURRENT_DATA_VERSION === DATA_VERSION_V2) {
-        (processedData as FormDataV2)._version = CURRENT_DATA_VERSION;
-      } else {
-        (processedData as FormDataV1)._version = CURRENT_DATA_VERSION;
-      }
-      
-      // Determine price based on data version and property type
-      let price = 0;
-      
-      if (CURRENT_DATA_VERSION === DATA_VERSION_V2) {
-        const v2Data = processedData as FormDataV2;
-        if (v2Data.flow?.listingType === 'sale' && v2Data.sale) {
-          price = v2Data.sale.expectedPrice || 0;
-        } else if (v2Data.rental) {
-          price = v2Data.rental.rentAmount || 0;
-        }
-      } else {
-        const v1Data = processedData as FormDataV1;
-        const isSaleProperty = v1Data.isSaleProperty || 
-                              v1Data.listingType?.toLowerCase() === 'sale' || 
-                              v1Data.propertyPriceType === 'sale';
-        
-        price = isSaleProperty 
-          ? parseFloat(v1Data.expectedPrice || '0') 
-          : parseFloat(v1Data.rentAmount || '0');
-      }
-      
-      // Create the update object - removing location as it's not in the schema
-      const updateData: any = {
-        title: CURRENT_DATA_VERSION === DATA_VERSION_V2 
-          ? (processedData as FormDataV2).basicDetails?.title || 'Updated Property'
-          : (processedData as FormDataV1).title || 'Updated Property',
-        description: CURRENT_DATA_VERSION === DATA_VERSION_V2 
-          ? (processedData as FormDataV2).features?.description || ''
-          : (processedData as FormDataV1).description || '',
-        price: price,
-        bedrooms: CURRENT_DATA_VERSION === DATA_VERSION_V2
-          ? ((processedData as FormDataV2).basicDetails?.bhkType 
-             ? parseInt((processedData as FormDataV2).basicDetails.bhkType.split(' ')[0]) 
-             : 0)
-          : ((processedData as FormDataV1).bhkType 
-             ? parseInt((processedData as FormDataV1).bhkType.split(' ')[0]) 
-             : 0),
-        bathrooms: CURRENT_DATA_VERSION === DATA_VERSION_V2
-          ? (processedData as FormDataV2).basicDetails?.bathrooms || 0
-          : ((processedData as FormDataV1).bathrooms 
-             ? parseInt((processedData as FormDataV1).bathrooms) 
-             : 0),
-        square_feet: CURRENT_DATA_VERSION === DATA_VERSION_V2
-          ? (processedData as FormDataV2).basicDetails?.builtUpArea || 0
-          : ((processedData as FormDataV1).builtUpArea 
-             ? parseFloat((processedData as FormDataV1).builtUpArea) 
-             : 0),
-        address: CURRENT_DATA_VERSION === DATA_VERSION_V2
-          ? (processedData as FormDataV2).location?.address || ''
-          : (processedData as FormDataV1).address || '',
-        city: CURRENT_DATA_VERSION === DATA_VERSION_V2
-          ? (processedData as FormDataV2).location?.city || ''
-          : (processedData as FormDataV1).city || (processedData as FormDataV1).locality || '',
-        state: CURRENT_DATA_VERSION === DATA_VERSION_V2
-          ? (processedData as FormDataV2).location?.state || 'Telangana'
-          : (processedData as FormDataV1).state || 'Telangana',
-        zip_code: CURRENT_DATA_VERSION === DATA_VERSION_V2
-          ? (processedData as FormDataV2).location?.pinCode || ''
-          : (processedData as FormDataV1).pinCode || '',
-        property_details: processedData,
-        updated_at: new Date().toISOString()
+      // Update metadata
+      v3Data.meta = v3Data.meta || {
+        _version: DATA_VERSION_V3,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        status: status || 'draft'
       };
-
-      // Only update status if provided
+      
+      v3Data.meta.id = propertyId;
+      v3Data.meta.updated_at = new Date().toISOString();
       if (status) {
-        updateData.status = status;
-        updateData.tags = status === 'published' ? ['public'] : [];
+        v3Data.meta.status = status;
       }
       
-      console.log('Property update payload:', updateData);
+      // Convert to database format
+      const dbUpdateData = convertToDbFormat(v3Data);
+      
+      // Ensure owner_id is not overwritten
+      delete dbUpdateData.owner_id;
+      
+      // If status is provided, include it in the update
+      if (status) {
+        dbUpdateData.status = status;
+        dbUpdateData.tags = status === 'published' ? ['public'] : [];
+      }
+      
+      console.log('Property update payload:', dbUpdateData);
 
       const { data, error } = await supabase
         .from('properties')
-        .update(updateData)
+        .update(dbUpdateData)
         .eq('id', propertyId)
         .eq('owner_id', userId) // Security check
         .select(`
@@ -435,16 +299,17 @@ export const propertyService = {
         ? data.property_images.map((img: any) => ({
             id: img.id,
             url: img.url,
-            type: img.is_primary ? 'primary' : 'additional',
+            isPrimary: img.is_primary,
+            displayOrder: img.display_order || 0
           }))
         : [];
       
       // Clear cache for this user
       propertiesCache.delete(userId);
       
-      console.log('=========== DEBUG: UPDATE PROPERTY END ===========');
       return {
         ...data,
+        property_details: v3Data,
         images
       };
     } catch (error) {
@@ -453,7 +318,43 @@ export const propertyService = {
     }
   },
 
-  // The rest of the functions remain the same
+  // Update just the property_details field
+  async updatePropertyDetails(
+    propertyId: string,
+    propertyDetails: any
+  ): Promise<void> {
+    try {
+      console.log(`Updating property_details for property ${propertyId}`);
+      
+      // Ensure we're using v3 structure
+      const v3Data = ensureV3Structure(propertyDetails);
+      
+      // Update the meta data
+      v3Data.meta = v3Data.meta || {};
+      v3Data.meta._version = DATA_VERSION_V3;
+      v3Data.meta.id = propertyId;
+      v3Data.meta.updated_at = new Date().toISOString();
+      
+      const { error } = await supabase
+        .from('properties')
+        .update({ 
+          property_details: v3Data,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', propertyId);
+      
+      if (error) throw error;
+      
+      // Clear all caches since we don't know which user owns this property
+      propertiesCache.clear();
+      
+    } catch (error) {
+      console.error('Error in updatePropertyDetails:', error);
+      throw error;
+    }
+  },
+
+  // Update property status
   async updatePropertyStatus(
     propertyId: string,
     status: 'draft' | 'published',
@@ -462,7 +363,7 @@ export const propertyService = {
     try {
       console.log(`Updating property ${propertyId} status to ${status}`);
       
-      // Get current property data to ensure version info exists
+      // Get current property data
       const { data: currentProperty, error: fetchError } = await supabase
         .from('properties')
         .select('property_details')
@@ -470,32 +371,20 @@ export const propertyService = {
         .single();
         
       if (!fetchError && currentProperty) {
-        // Detect data version
-        const dataVersion = detectDataVersion(currentProperty.property_details);
+        // Ensure property data is in v3 format
+        const v3Data = ensureV3Structure(currentProperty.property_details);
         
-        // If data is not in current version, convert it
-        let processedData = currentProperty.property_details;
-        
-        if (dataVersion === DATA_VERSION_V1 && CURRENT_DATA_VERSION === DATA_VERSION_V2) {
-          console.log('Converting property data from V1 to V2');
-          processedData = convertV1ToV2(currentProperty.property_details as FormDataV1);
-        } else if (dataVersion === DATA_VERSION_V2 && CURRENT_DATA_VERSION === DATA_VERSION_V1) {
-          console.log('Converting property data from V2 to V1');
-          processedData = convertV2ToV1(currentProperty.property_details as FormDataV2);
-        }
-        
-        // Add version info
-        if (CURRENT_DATA_VERSION === DATA_VERSION_V2) {
-          (processedData as FormDataV2)._version = CURRENT_DATA_VERSION;
-        } else {
-          (processedData as FormDataV1)._version = CURRENT_DATA_VERSION;
-        }
+        // Update status in meta section
+        v3Data.meta.id = propertyId;
+        v3Data.meta.status = status;
+        v3Data.meta.updated_at = new Date().toISOString();
         
         // Update property with version info and status
         const updateData = {
           status,
           tags: status === 'published' ? ['public'] : [],
-          property_details: processedData
+          property_details: v3Data,
+          updated_at: new Date().toISOString()
         };
         
         const { error } = await supabase
@@ -509,7 +398,8 @@ export const propertyService = {
         // Fallback if can't get current property
         const updateData = {
           status,
-          tags: status === 'published' ? ['public'] : []
+          tags: status === 'published' ? ['public'] : [],
+          updated_at: new Date().toISOString()
         };
         
         const { error } = await supabase
@@ -530,9 +420,9 @@ export const propertyService = {
     }
   },
 
+  // Delete property
   async deleteProperty(propertyId: string, userId: string): Promise<void> {
     try {
-      console.log('=========== DEBUG: DELETE PROPERTY START ===========');
       console.log(`Deleting property ${propertyId} for user ${userId}`);
       
       // First, delete all property images (this handles the foreign key constraint)
@@ -551,7 +441,7 @@ export const propertyService = {
         .from('properties')
         .delete()
         .eq('id', propertyId)
-        .eq('owner_id', userId); // Security check - owner can only delete their own properties
+        .eq('owner_id', userId); // Security check
       
       if (error) {
         console.error('Error deleting property:', error);
@@ -562,16 +452,15 @@ export const propertyService = {
       propertiesCache.delete(userId);
       
       console.log(`Property ${propertyId} successfully deleted`);
-      console.log('=========== DEBUG: DELETE PROPERTY END ===========');
     } catch (error) {
       console.error('Error in deleteProperty:', error);
       throw error;
     }
   },
 
+  // Admin property deletion
   async adminDeleteProperty(propertyId: string): Promise<void> {
     try {
-      console.log('=========== DEBUG: ADMIN DELETE PROPERTY START ===========');
       console.log(`Admin deleting property ${propertyId}`);
       
       // First, delete all property images (this handles the foreign key constraint)
@@ -601,13 +490,13 @@ export const propertyService = {
       propertiesCache.clear();
       
       console.log(`Property ${propertyId} successfully deleted by admin`);
-      console.log('=========== DEBUG: ADMIN DELETE PROPERTY END ===========');
     } catch (error) {
       console.error('Error in adminDeleteProperty:', error);
       throw error;
     }
   },
 
+  // Check if user is admin
   async isUserAdmin(userId: string): Promise<boolean> {
     try {
       if (!userId) return false;

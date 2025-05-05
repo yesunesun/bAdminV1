@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/hooks/usePropertyForm.ts
-// Version: 4.5.0
-// Last Modified: 03-05-2025 19:30 IST
-// Purpose: Added direct auto-fill function implementation
+// Version: 5.0.0
+// Last Modified: 04-05-2025 19:30 IST
+// Purpose: Updated to only support v3 data structure
 
 import { usePropertyFormState } from './usePropertyFormState';
 import { usePropertyFormNavigation } from './usePropertyFormNavigation';
@@ -10,9 +10,7 @@ import { usePropertyFormValidation } from './usePropertyFormValidation';
 import { FormData } from '../types';
 import { 
   detectDataVersion, 
-  DATA_VERSION_V1, 
-  DATA_VERSION_V2,
-  CURRENT_DATA_VERSION 
+  DATA_VERSION_V3
 } from '../utils/propertyDataAdapter';
 import { AutoFillService } from '../services/autoFillService';
 
@@ -84,9 +82,7 @@ export function usePropertyForm({
   const {
     handleSaveAsDraft,
     handleSaveAndPublish,
-    handleUpdate,
-    detectDataVersion: detectPropertyVersion,
-    CURRENT_DATA_VERSION: currentVersion
+    handleUpdate
   } = usePropertyFormOperations({
     form,
     user,
@@ -106,9 +102,6 @@ export function usePropertyForm({
   // Get the current data version of the form
   const formData = form.getValues();
   const dataVersion = detectDataVersion(formData);
-  
-  // Check if form is using v2 structure
-  const isV2Structure = dataVersion === DATA_VERSION_V2;
   
   /**
    * Function to auto-fill the form with test data for the current step
@@ -155,9 +148,7 @@ export function usePropertyForm({
     status,
     isSaleMode,
     isPGHostelMode,
-    isV2Structure,
     dataVersion,
-    currentVersion,
     handleAutoFill,
     handleNextStep,
     handlePreviousStep,
