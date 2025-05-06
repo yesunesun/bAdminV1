@@ -1,89 +1,376 @@
 // src/modules/owner/components/property/wizard/constants/flows.ts
-// Version: 2.7.0
-// Last Modified: 03-05-2025 16:15 IST
-// Purpose: Fixed missing first step in Commercial Rent flow
+// Version: 5.0.0
+// Last Modified: 07-05-2025 21:30 IST
+// Purpose: Updated flow definitions to match correct step sequences
 
-import { STEP_DEFINITIONS } from './common';
+/**
+ * Available flow types
+ */
+export const FLOW_TYPES = {
+  // Residential flows
+  RESIDENTIAL_RENT: 'residential_rent',
+  RESIDENTIAL_SALE: 'residential_sale',
+  RESIDENTIAL_FLATMATES: 'residential_flatmates',
+  RESIDENTIAL_PGHOSTEL: 'residential_pghostel',
+  
+  // Commercial flows
+  COMMERCIAL_RENT: 'commercial_rent',
+  COMMERCIAL_SALE: 'commercial_sale',
+  COMMERCIAL_COWORKING: 'commercial_coworking',
+  
+  // Land flows
+  LAND_SALE: 'land_sale',
+  
+  // Default flow (fallback)
+  DEFAULT: 'residential_rent'
+};
 
-// Flow-specific step sequences
+/**
+ * Step definitions for each flow type
+ * These define the exact JSON object keys that will be used in the database
+ */
 export const FLOW_STEPS = {
-  // Residential Rent flow (default)
-  RESIDENTIAL_RENT: [
-    STEP_DEFINITIONS.details,
-    STEP_DEFINITIONS.location,
-    STEP_DEFINITIONS.rental,
-    STEP_DEFINITIONS.features,
-    STEP_DEFINITIONS.review
-    // Photos step removed
+  // Residential flows
+  residential_rent: [
+    'details',
+    'location',
+    'rental',
+    'features',
+    'review'
   ],
   
-  // Residential Sale flow
-  RESIDENTIAL_SALE: [
-    STEP_DEFINITIONS.details,
-    STEP_DEFINITIONS.location,
-    STEP_DEFINITIONS.sale,
-    STEP_DEFINITIONS.features,
-    STEP_DEFINITIONS.review
-    // Photos step removed
+  residential_sale: [
+    'details',
+    'location',
+    'sale',
+    'features',
+    'review'
   ],
   
-  // Residential PG/Hostel flow
-  RESIDENTIAL_PGHOSTEL: [
-    STEP_DEFINITIONS.room_details,
-    STEP_DEFINITIONS.location,
-    STEP_DEFINITIONS.pg_details,
-    STEP_DEFINITIONS.features,
-    STEP_DEFINITIONS.review
-    // Photos step removed
+  residential_flatmates: [
+    'room_details',
+    'location',
+    'flatmate_details',
+    'features',
+    'review'
   ],
   
-  // Commercial Rent flow - FIXED: Added property selection step before commercial_basics
-  COMMERCIAL_RENT: [
-    STEP_DEFINITIONS.details, // Keep the standard details step for initial property selection
-    STEP_DEFINITIONS.commercial_basics, // Then use our specialized commercial details step
-    STEP_DEFINITIONS.location,
-    STEP_DEFINITIONS.rental,
-    STEP_DEFINITIONS.features,
-    STEP_DEFINITIONS.review
-    // Photos step removed
+  residential_pghostel: [
+    'room_details',
+    'location',
+    'pg_details',
+    'features',
+    'review'
   ],
   
-  // Commercial Sale flow
-  COMMERCIAL_SALE: [
-    STEP_DEFINITIONS.details,
-    STEP_DEFINITIONS.location,
-    STEP_DEFINITIONS.commercial_sale,
-    STEP_DEFINITIONS.features,
-    STEP_DEFINITIONS.review
-    // Photos step removed
+  // Commercial flows
+  commercial_rent: [
+    'commercial_basics',
+    'location',
+    'rental',
+    'features',
+    'review'
   ],
   
-  // Commercial Co-working flow
-  COMMERCIAL_COWORKING: [
-    STEP_DEFINITIONS.details, // Just use the standard details ID for simplicity
-    STEP_DEFINITIONS.location,
-    STEP_DEFINITIONS.coworking,
-    STEP_DEFINITIONS.features,
-    STEP_DEFINITIONS.review
-    // Photos step removed
+  commercial_sale: [
+    'commercial_basics',
+    'location',
+    'commercial_sale',
+    'features',
+    'review'
   ],
   
-  // Land/Plot Sale flow
-  LAND_SALE: [
-    STEP_DEFINITIONS.land_details,
-    STEP_DEFINITIONS.location,
-    STEP_DEFINITIONS.land_features,
-    STEP_DEFINITIONS.review
-    // Photos step removed
+  commercial_coworking: [
+    'details',
+    'location',
+    'coworking',
+    'features',
+    'review'
   ],
   
-  // Residential Flatmates flow
-  RESIDENTIAL_FLATMATES: [
-    STEP_DEFINITIONS.details,
-    STEP_DEFINITIONS.location,
-    STEP_DEFINITIONS.flatmate_details,
-    STEP_DEFINITIONS.features,
-    STEP_DEFINITIONS.review
-    // Photos step removed
+  // Land flows
+  land_sale: [
+    'land_details',
+    'location',
+    'land_features',
+    'review'
+  ],
+  
+  // Default flow (fallback)
+  default: [
+    'details',
+    'location',
+    'rental',
+    'features',
+    'review'
   ]
+};
+
+/**
+ * Field mappings for each step
+ * These define which fields belong to which step
+ */
+export const STEP_FIELD_MAPPINGS = {
+  // Basic property details
+  details: [
+    'title',
+    'propertyType',
+    'bhkType',
+    'floor',
+    'totalFloors',
+    'builtUpArea',
+    'builtUpAreaUnit',
+    'bathrooms',
+    'balconies',
+    'facing',
+    'propertyAge',
+    'propertyCondition',
+    'hasBalcony',
+    'hasAC'
+  ],
+  
+  // Commercial basics
+  commercial_basics: [
+    'title',
+    'propertyType',
+    'commercialType',
+    'floor',
+    'totalFloors',
+    'builtUpArea',
+    'builtUpAreaUnit',
+    'facing',
+    'propertyAge',
+    'propertyCondition'
+  ],
+  
+  // Room details for PG/Hostel
+  room_details: [
+    'title',
+    'propertyType',
+    'roomType',
+    'occupancy',
+    'floor',
+    'totalFloors',
+    'builtUpArea',
+    'builtUpAreaUnit',
+    'bathrooms',
+    'facing'
+  ],
+  
+  // Land details
+  land_details: [
+    'title',
+    'landType',
+    'plotArea',
+    'plotAreaUnit',
+    'plotFrontage',
+    'plotFrontageUnit',
+    'plotLength',
+    'plotLengthUnit'
+  ],
+  
+  // Location details
+  location: [
+    'address',
+    'flatPlotNo',
+    'landmark',
+    'locality',
+    'area',
+    'city',
+    'district',
+    'state',
+    'pinCode',
+    'latitude',
+    'longitude',
+    'coordinates'
+  ],
+  
+  // Features and amenities
+  features: [
+    'amenities',
+    'parking',
+    'petFriendly',
+    'hasGym',
+    'nonVegAllowed',
+    'isNonVegAllowed',
+    'waterSupply',
+    'powerBackup',
+    'gatedSecurity',
+    'description',
+    'isSmokingAllowed',
+    'isDrinkingAllowed',
+    'hasAttachedBathroom'
+  ],
+  
+  // Rental details
+  rental: [
+    'rentAmount',
+    'securityDeposit',
+    'maintenanceCharges',
+    'rentNegotiable',
+    'availableFrom',
+    'preferredTenants',
+    'leaseDuration',
+    'furnishingStatus',
+    'hasSimilarUnits',
+    'propertyShowOption',
+    'propertyShowPerson',
+    'secondaryNumber',
+    'secondaryContactNumber'
+  ],
+  
+  // Sale details
+  sale: [
+    'expectedPrice',
+    'priceNegotiable',
+    'possessionDate',
+    'hasSimilarUnits',
+    'propertyShowOption',
+    'propertyShowPerson',
+    'secondaryNumber',
+    'secondaryContactNumber'
+  ],
+  
+  // Flatmate details
+  flatmate_details: [
+    'preferredGender',
+    'occupancy',
+    'foodPreference',
+    'tenantType',
+    'roomSharing',
+    'maxFlatmates',
+    'currentFlatmates',
+    'about'
+  ],
+  
+  // PG/Hostel details
+  pg_details: [
+    'pgType',
+    'mealOptions',
+    'roomTypes',
+    'occupancyTypes',
+    'genderPreference',
+    'rules',
+    'facilities',
+    'noticePolicy'
+  ],
+  
+  // Commercial sale details
+  commercial_sale: [
+    'expectedPrice',
+    'priceNegotiable',
+    'possessionDate',
+    'hasSimilarUnits',
+    'propertyShowOption',
+    'propertyShowPerson',
+    'cabins',
+    'meetingRooms',
+    'washrooms',
+    'cornerProperty',
+    'mainRoadFacing'
+  ],
+  
+  // Coworking details
+  coworking: [
+    'spaceType',
+    'capacity',
+    'operatingHours',
+    'amenities',
+    'securityDeposit',
+    'minimumCommitment',
+    'discounts',
+    'availableFrom'
+  ],
+  
+  // Land features
+  land_features: [
+    'approvals',
+    'boundaryStatus',
+    'cornerPlot',
+    'landUseZone',
+    'description'
+  ],
+  
+  // Review step
+  review: [
+    'finalCheck',
+    'termsAgreed',
+    'readyToPublish',
+    'additionalNotes'
+  ]
+};
+
+/**
+ * Convert existing step sequences to step objects for compatibility with the useStepNavigation hook
+ * This bridges the existing step sequence format with our new flow structure
+ */
+export const createStepObjectsFromFlow = (flowType: string) => {
+  // Get the steps for this flow
+  const steps = FLOW_STEPS[flowType] || FLOW_STEPS.default;
+  
+  // Step icon mappings
+  const stepIcons = {
+    details: 'Home',
+    commercial_basics: 'Building',
+    room_details: 'Bed',
+    land_details: 'Map',
+    location: 'MapPin',
+    rental: 'DollarSign',
+    sale: 'DollarSign',
+    commercial_sale: 'Building',
+    flatmate_details: 'Users',
+    pg_details: 'Building',
+    coworking: 'Briefcase',
+    land_features: 'Settings',
+    features: 'Settings',
+    review: 'FileText'
+  };
+  
+  // Step title mappings
+  const stepTitles = {
+    details: 'Basic Details',
+    commercial_basics: 'Basic Details',
+    room_details: 'Room Details',
+    land_details: 'Land Details',
+    location: 'Location',
+    rental: 'Rental Details',
+    sale: 'Sale Details',
+    commercial_sale: 'Sale Details',
+    flatmate_details: 'Flatmate Details',
+    pg_details: 'PG Details',
+    coworking: 'Co-working',
+    land_features: 'Land Features',
+    features: 'Features',
+    review: 'Review'
+  };
+  
+  // Convert to step objects format expected by useStepNavigation
+  return steps.map(stepId => ({
+    id: stepId,
+    title: stepTitles[stepId] || stepId.charAt(0).toUpperCase() + stepId.slice(1).replace(/([A-Z])/g, ' $1'),
+    icon: stepIcons[stepId] || 'Settings'
+  }));
+};
+
+/**
+ * Map between flow types and step sequences from the existing useStepNavigation
+ */
+export const FLOW_STEP_SEQUENCES = {
+  residential_rent: createStepObjectsFromFlow('residential_rent'),
+  residential_sale: createStepObjectsFromFlow('residential_sale'),
+  residential_pghostel: createStepObjectsFromFlow('residential_pghostel'),
+  residential_flatmates: createStepObjectsFromFlow('residential_flatmates'),
+  commercial_rent: createStepObjectsFromFlow('commercial_rent'),
+  commercial_sale: createStepObjectsFromFlow('commercial_sale'),
+  commercial_coworking: createStepObjectsFromFlow('commercial_coworking'),
+  land_sale: createStepObjectsFromFlow('land_sale')
+};
+
+// Export for use in other files
+export default {
+  FLOW_TYPES,
+  FLOW_STEPS,
+  FLOW_STEP_SEQUENCES,
+  STEP_FIELD_MAPPINGS,
+  createStepObjectsFromFlow
 };

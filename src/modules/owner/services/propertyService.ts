@@ -1,23 +1,144 @@
 // src/modules/owner/services/propertyService.ts
-// Version: 6.0.0
-// Last Modified: 05-05-2025 17:30 IST
-// Purpose: Updated to only support v3 data structure
+// Version: 8.0.0
+// Last Modified: 06-05-2025 21:00 IST
+// Purpose: Updated to support properties_v2 table with JSONB storage using flow-based steps
 
 import { supabase } from '@/lib/supabase';
 import { Property, FormData } from '../components/property/PropertyFormTypes';
 import { 
-  detectDataVersion, 
-  DATA_VERSION_V3,
-  ensureV3Structure,
-  convertToDbFormat
-} from '../components/property/wizard/utils/propertyDataAdapter';
+  FLOW_TYPES,
+  FLOW_STEPS,
+  STEP_FIELD_MAPPINGS
+} from '../components/property/wizard/constants/flows';
 
 // Cache for properties to avoid redundant fetches
 const propertiesCache = new Map<string, {data: Property[], timestamp: number}>();
 const CACHE_EXPIRY = 60000; // 1 minute cache expiry
 
+// Constants
+const DATA_VERSION = 'v3';
+
+/**
+ * Creates a clean property data structure based on flow type
+ * @param flowCategory Category of the property (residential, commercial, land)
+ * @param flowListingType Type of listing (rent, sale, flatmates, etc.)
+ */
+const createEmptyPropertyStructure = (
+  flowCategory: string = 'residential',
+  flowListingType: string = 'rent'
+): any => {
+  // Set current timestamp
+  const now = new Date().toISOString();
+  
+  // Create base structure
+  const structure: any = {
+    meta: {
+      _version: DATA_VERSION,
+      created_at: now,
+      updated_at: now,
+      status: 'draft'
+    },
+    flow: {
+      category: flowCategory,
+      listingType: flowListingType
+    },
+    media: {
+      photos: {
+        images: []
+      }
+    }
+  };
+  
+  // Get steps for this flow type
+  const flowKey = `${flowCategory}_${flowListingType}`;
+  const steps = FLOW_STEPS[flowKey] || FLOW_STEPS.default;
+  
+  // Create step objects
+  steps.forEach(step => {
+    if (step !== 'media') { // media is already at root level
+      structure[step] = {};
+    }
+  });
+  
+  return structure;
+};
+
+/**
+ * Organizes property data into the correct structure based on flow type
+ * @param propertyData Raw property data to organize
+ */
+const organizePropertyData = (propertyData: any): any => {
+  if (!propertyData) return createEmptyPropertyStructure();
+  
+  // Determine flow type
+  let flowCategory = 'residential';
+  let flowListingType = 'rent';
+  
+  // Get flow info from existing data if available
+  if (propertyData.flow) {
+    flowCategory = propertyData.flow.category || 'residential';
+    flowListingType = propertyData.flow.listingType || 'rent';
+  }
+  
+  // Create clean structure based on flow type
+  const organizedData = createEmptyPropertyStructure(flowCategory, flowListingType);
+  
+  // Preserve meta data if exists
+  if (propertyData.meta) {
+    organizedData.meta = { ...propertyData.meta };
+    // Ensure version is set
+    organizedData.meta._version = DATA_VERSION;
+  }
+  
+  // Preserve flow data if exists
+  if (propertyData.flow) {
+    organizedData.flow = { ...propertyData.flow };
+  }
+  
+  // Preserve media if exists
+  if (propertyData.media) {
+    organizedData.media = { ...propertyData.media };
+  }
+  
+  // Get flow steps
+  const flowKey = `${flowCategory}_${flowListingType}`;
+  const steps = FLOW_STEPS[flowKey] || FLOW_STEPS.default;
+  
+  // Process each step
+  steps.forEach(step => {
+    if (step === 'media') return; // Skip media as it's handled separately
+    
+    // Copy step data if it exists
+    if (propertyData[step]) {
+      organizedData[step] = { ...propertyData[step] };
+    }
+    
+    // Get field mappings for this step
+    const fieldMappings = STEP_FIELD_MAPPINGS[step] || [];
+    
+    // Move fields from root to correct step
+    fieldMappings.forEach(field => {
+      if (propertyData[field] !== undefined) {
+        organizedData[step][field] = propertyData[field];
+      }
+    });
+  });
+  
+  // Clean up by removing empty objects
+  Object.keys(organizedData).forEach(key => {
+    if (key !== 'meta' && key !== 'flow' && key !== 'media' && 
+        Object.keys(organizedData[key]).length === 0) {
+      delete organizedData[key];
+    }
+  });
+  
+  return organizedData;
+};
+
 export const propertyService = {
-  // Fetch a user's properties with caching
+  /**
+   * Fetches all properties for a user with caching
+   */
   async getUserProperties(userId: string, forceRefresh = false): Promise<Property[]> {
     // Check cache first if not forcing refresh
     const now = Date.now();
@@ -31,57 +152,36 @@ export const propertyService = {
     try {
       console.log('Fetching properties for user:', userId);
       
-      // Fetch properties and images in a single query using inner join
+      // Fetch from properties_v2 table
       const { data, error } = await supabase
-        .from('properties')
-        .select(`
-          *,
-          property_images(*)
-        `)
+        .from('properties_v2')
+        .select('*')
         .eq('owner_id', userId)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
       
-      console.log('Found properties:', data?.length || 0);
+      console.log('Found properties in properties_v2:', data?.length || 0);
       
       // Format the properties data
       const formattedProperties = (data || []).map(property => {
-        // Process images
-        const images = property.property_images
-          ? property.property_images.map((img: any) => ({
-              id: img.id,
-              url: img.url,
-              isPrimary: img.is_primary,
-              displayOrder: img.display_order || 0
-            }))
-          : [];
+        // Organize property data
+        const organizedData = organizePropertyData(property.property_details);
         
-        // Ensure property_details exists
-        if (!property.property_details) {
-          property.property_details = {};
-        }
+        // Ensure IDs are set
+        organizedData.meta.id = property.id;
+        organizedData.meta.owner_id = property.owner_id;
         
-        // Detect data version 
-        const dataVersion = detectDataVersion(property.property_details);
-        console.log(`Property ${property.id} has data version: ${dataVersion}`);
-        
-        // Normalize to v3 structure
-        const normalizedDetails = ensureV3Structure(property.property_details);
-        
-        // Always make sure ID is in the meta section
-        normalizedDetails.meta.id = property.id;
-        
-        // If this is a newly converted property, update it in the database
-        if (dataVersion !== DATA_VERSION_V3) {
-          // Update in background, don't wait
-          this.updatePropertyDetails(property.id, normalizedDetails)
-            .catch(err => console.error('Error updating converted property:', err));
-        }
+        // Get images
+        const images = organizedData.media?.photos?.images || [];
         
         return {
-          ...property,
-          property_details: normalizedDetails,
+          id: property.id,
+          owner_id: property.owner_id,
+          created_at: property.created_at,
+          updated_at: property.updated_at,
+          status: property.status || 'draft',
+          property_details: organizedData,
           images
         };
       });
@@ -99,17 +199,16 @@ export const propertyService = {
     }
   },
 
-  // Fetch a single property by ID
+  /**
+   * Fetches a single property by ID
+   */
   async getPropertyById(id: string): Promise<Property> {
     try {
       console.log('Fetching property with ID:', id);
       
       const { data, error } = await supabase
-        .from('properties')
-        .select(`
-          *,
-          property_images(*)
-        `)
+        .from('properties_v2')
+        .select('*')
         .eq('id', id)
         .single();
 
@@ -123,42 +222,23 @@ export const propertyService = {
         throw new Error('Property not found');
       }
       
-      // Process the images
-      const images = data.property_images
-        ? data.property_images.map((img: any) => ({
-            id: img.id,
-            url: img.url,
-            isPrimary: img.is_primary,
-            displayOrder: img.display_order || 0
-          }))
-        : [];
+      // Organize property data
+      const organizedData = organizePropertyData(data.property_details);
       
-      // Make sure property_details exists
-      if (!data.property_details) {
-        console.warn('Property has no property_details, creating empty object');
-        data.property_details = {};
-      }
+      // Ensure IDs are set
+      organizedData.meta.id = data.id;
+      organizedData.meta.owner_id = data.owner_id;
       
-      // Detect data version
-      const dataVersion = detectDataVersion(data.property_details);
-      console.log(`Property ${data.id} has data version: ${dataVersion}`);
-      
-      // Normalize to v3 structure
-      const normalizedDetails = ensureV3Structure(data.property_details);
-      
-      // Always make sure ID is in the meta section
-      normalizedDetails.meta.id = data.id;
-      
-      // If this is a newly converted property, update it in the database
-      if (dataVersion !== DATA_VERSION_V3) {
-        // Update in background, don't wait
-        this.updatePropertyDetails(data.id, normalizedDetails)
-          .catch(err => console.error('Error updating converted property:', err));
-      }
+      // Get images
+      const images = organizedData.media?.photos?.images || [];
       
       return {
-        ...data,
-        property_details: normalizedDetails,
+        id: data.id,
+        owner_id: data.owner_id,
+        created_at: data.created_at,
+        updated_at: data.updated_at,
+        status: data.status || 'draft',
+        property_details: organizedData,
         images
       };
     } catch (error) {
@@ -167,43 +247,34 @@ export const propertyService = {
     }
   },
 
-  // Create a new property
+  /**
+   * Creates a new property
+   */
   async createProperty(propertyData: FormData, userId: string, status: 'draft' | 'published' = 'draft'): Promise<Property> {
     try {
       console.log('Creating property with status:', status);
       
-      // Ensure data is in v3 format
-      const v3Data = ensureV3Structure(propertyData);
+      // Organize property data
+      const organizedData = organizePropertyData(propertyData);
       
-      // Add metadata
-      v3Data.meta = v3Data.meta || {
-        _version: DATA_VERSION_V3,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        status: status
+      // Set metadata
+      organizedData.meta.owner_id = userId;
+      organizedData.meta.status = status;
+      
+      // Create in properties_v2 table
+      const now = new Date().toISOString();
+      
+      const propertyRecord = {
+        owner_id: userId,
+        created_at: now,
+        updated_at: now,
+        status: status,
+        property_details: organizedData
       };
       
-      v3Data.meta.owner_id = userId;
-      v3Data.meta.status = status;
-      
-      // Convert to database format
-      const dbPropertyData = convertToDbFormat(v3Data);
-      
-      // Make sure owner_id is set
-      dbPropertyData.owner_id = userId;
-      dbPropertyData.status = status;
-      dbPropertyData.tags = status === 'published' ? ['public'] : [];
-      
-      // Explicitly remove id if it's undefined to let the database generate it
-      if (dbPropertyData.id === undefined) {
-        delete dbPropertyData.id;
-      }
-      
-      console.log('Property database payload:', dbPropertyData);
-      
       const { data, error } = await supabase
-        .from('properties')
-        .insert([dbPropertyData])
+        .from('properties_v2')
+        .insert([propertyRecord])
         .select();
 
       if (error) {
@@ -215,21 +286,33 @@ export const propertyService = {
         throw new Error("No data returned after property creation");
       }
       
-      console.log('Property created successfully, returned data:', data[0]);
+      console.log('Property created successfully in properties_v2, returned data:', data[0]);
       
-      // Update the ID in the original v3 data
-      v3Data.meta.id = data[0].id;
+      // Update the ID in the property details
+      organizedData.meta.id = data[0].id;
       
-      // Update the full property details in the database
-      await this.updatePropertyDetails(data[0].id, v3Data);
+      // Update the property details to include the ID
+      await supabase
+        .from('properties_v2')
+        .update({
+          property_details: organizedData,
+        })
+        .eq('id', data[0].id);
       
       // Clear cache for this user
       propertiesCache.delete(userId);
       
+      // Get images
+      const images = organizedData.media?.photos?.images || [];
+      
       return {
-        ...data[0],
-        property_details: v3Data,
-        images: []
+        id: data[0].id,
+        owner_id: userId,
+        created_at: now,
+        updated_at: now,
+        status: status,
+        property_details: organizedData,
+        images
       };
     } catch (error) {
       console.error('Error in createProperty:', error);
@@ -237,7 +320,9 @@ export const propertyService = {
     }
   },
 
-  // Update an existing property
+  /**
+   * Updates an existing property
+   */
   async updateProperty(
     propertyId: string,
     propertyData: FormData,
@@ -247,46 +332,50 @@ export const propertyService = {
     try {
       console.log('Updating property:', propertyId);
       
-      // Ensure data is in v3 format
-      const v3Data = ensureV3Structure(propertyData);
+      // Get current property data to merge with updates
+      const { data: currentProperty, error: fetchError } = await supabase
+        .from('properties_v2')
+        .select('property_details')
+        .eq('id', propertyId)
+        .eq('owner_id', userId)
+        .single();
       
-      // Update metadata
-      v3Data.meta = v3Data.meta || {
-        _version: DATA_VERSION_V3,
-        created_at: new Date().toISOString(),
+      // Start with clean data
+      let mergedData = propertyData;
+      
+      // If we have current property data, merge it with new data
+      if (!fetchError && currentProperty && currentProperty.property_details) {
+        // Deep merge current and new data
+        mergedData = this.mergePropertyData(currentProperty.property_details, propertyData);
+      }
+      
+      // Organize the merged data
+      const organizedData = organizePropertyData(mergedData);
+      
+      // Ensure metadata is set correctly
+      organizedData.meta.id = propertyId;
+      organizedData.meta.owner_id = userId;
+      organizedData.meta.updated_at = new Date().toISOString();
+      if (status) {
+        organizedData.meta.status = status;
+      }
+      
+      // Update in properties_v2 table
+      const updateData = {
         updated_at: new Date().toISOString(),
-        status: status || 'draft'
+        property_details: organizedData
       };
       
-      v3Data.meta.id = propertyId;
-      v3Data.meta.updated_at = new Date().toISOString();
       if (status) {
-        v3Data.meta.status = status;
+        updateData.status = status;
       }
       
-      // Convert to database format
-      const dbUpdateData = convertToDbFormat(v3Data);
-      
-      // Ensure owner_id is not overwritten
-      delete dbUpdateData.owner_id;
-      
-      // If status is provided, include it in the update
-      if (status) {
-        dbUpdateData.status = status;
-        dbUpdateData.tags = status === 'published' ? ['public'] : [];
-      }
-      
-      console.log('Property update payload:', dbUpdateData);
-
       const { data, error } = await supabase
-        .from('properties')
-        .update(dbUpdateData)
+        .from('properties_v2')
+        .update(updateData)
         .eq('id', propertyId)
         .eq('owner_id', userId) // Security check
-        .select(`
-          *,
-          property_images(*)
-        `)
+        .select()
         .single();
 
       if (error) {
@@ -294,22 +383,19 @@ export const propertyService = {
         throw error;
       }
       
-      // Process the images
-      const images = data.property_images
-        ? data.property_images.map((img: any) => ({
-            id: img.id,
-            url: img.url,
-            isPrimary: img.is_primary,
-            displayOrder: img.display_order || 0
-          }))
-        : [];
-      
       // Clear cache for this user
       propertiesCache.delete(userId);
       
+      // Get images
+      const images = organizedData.media?.photos?.images || [];
+      
       return {
-        ...data,
-        property_details: v3Data,
+        id: data.id,
+        owner_id: data.owner_id,
+        created_at: data.created_at,
+        updated_at: data.updated_at,
+        status: data.status,
+        property_details: organizedData,
         images
       };
     } catch (error) {
@@ -318,7 +404,9 @@ export const propertyService = {
     }
   },
 
-  // Update just the property_details field
+  /**
+   * Updates just the property details
+   */
   async updatePropertyDetails(
     propertyId: string,
     propertyDetails: any
@@ -326,19 +414,17 @@ export const propertyService = {
     try {
       console.log(`Updating property_details for property ${propertyId}`);
       
-      // Ensure we're using v3 structure
-      const v3Data = ensureV3Structure(propertyDetails);
+      // Organize property data
+      const organizedData = organizePropertyData(propertyDetails);
       
-      // Update the meta data
-      v3Data.meta = v3Data.meta || {};
-      v3Data.meta._version = DATA_VERSION_V3;
-      v3Data.meta.id = propertyId;
-      v3Data.meta.updated_at = new Date().toISOString();
+      // Ensure metadata is set
+      organizedData.meta.id = propertyId;
+      organizedData.meta.updated_at = new Date().toISOString();
       
       const { error } = await supabase
-        .from('properties')
+        .from('properties_v2')
         .update({ 
-          property_details: v3Data,
+          property_details: organizedData,
           updated_at: new Date().toISOString()
         })
         .eq('id', propertyId);
@@ -354,7 +440,9 @@ export const propertyService = {
     }
   },
 
-  // Update property status
+  /**
+   * Updates property status
+   */
   async updatePropertyStatus(
     propertyId: string,
     status: 'draft' | 'published',
@@ -365,30 +453,30 @@ export const propertyService = {
       
       // Get current property data
       const { data: currentProperty, error: fetchError } = await supabase
-        .from('properties')
+        .from('properties_v2')
         .select('property_details')
         .eq('id', propertyId)
+        .eq('owner_id', userId)
         .single();
         
       if (!fetchError && currentProperty) {
-        // Ensure property data is in v3 format
-        const v3Data = ensureV3Structure(currentProperty.property_details);
+        // Organize property data
+        const organizedData = organizePropertyData(currentProperty.property_details);
         
         // Update status in meta section
-        v3Data.meta.id = propertyId;
-        v3Data.meta.status = status;
-        v3Data.meta.updated_at = new Date().toISOString();
+        organizedData.meta.id = propertyId;
+        organizedData.meta.status = status;
+        organizedData.meta.updated_at = new Date().toISOString();
         
         // Update property with version info and status
         const updateData = {
           status,
-          tags: status === 'published' ? ['public'] : [],
-          property_details: v3Data,
+          property_details: organizedData,
           updated_at: new Date().toISOString()
         };
         
         const { error } = await supabase
-          .from('properties')
+          .from('properties_v2')
           .update(updateData)
           .eq('id', propertyId)
           .eq('owner_id', userId);
@@ -398,12 +486,11 @@ export const propertyService = {
         // Fallback if can't get current property
         const updateData = {
           status,
-          tags: status === 'published' ? ['public'] : [],
           updated_at: new Date().toISOString()
         };
         
         const { error } = await supabase
-          .from('properties')
+          .from('properties_v2')
           .update(updateData)
           .eq('id', propertyId)
           .eq('owner_id', userId);
@@ -420,64 +507,42 @@ export const propertyService = {
     }
   },
 
-  // Delete property
+  /**
+   * Deletes a property
+   */
   async deleteProperty(propertyId: string, userId: string): Promise<void> {
     try {
       console.log(`Deleting property ${propertyId} for user ${userId}`);
       
-      // First, delete all property images (this handles the foreign key constraint)
-      const { error: imagesError } = await supabase
-        .from('property_images')
-        .delete()
-        .eq('property_id', propertyId);
-      
-      if (imagesError) {
-        console.error('Error deleting property images:', imagesError);
-        throw imagesError;
-      }
-      
-      // Then delete the property
       const { error } = await supabase
-        .from('properties')
+        .from('properties_v2')
         .delete()
         .eq('id', propertyId)
-        .eq('owner_id', userId); // Security check
+        .eq('owner_id', userId);
       
       if (error) {
         console.error('Error deleting property:', error);
         throw error;
       }
       
-      // Clear cache for this user
+      console.log(`Property ${propertyId} successfully deleted from properties_v2`);
       propertiesCache.delete(userId);
       
-      console.log(`Property ${propertyId} successfully deleted`);
     } catch (error) {
       console.error('Error in deleteProperty:', error);
       throw error;
     }
   },
 
-  // Admin property deletion
+  /**
+   * Admin property deletion
+   */
   async adminDeleteProperty(propertyId: string): Promise<void> {
     try {
       console.log(`Admin deleting property ${propertyId}`);
       
-      // First, delete all property images (this handles the foreign key constraint)
-      const { error: imagesError } = await supabase
-        .from('property_images')
-        .delete()
-        .eq('property_id', propertyId);
-      
-      if (imagesError) {
-        console.error('Error deleting property images:', imagesError);
-        throw imagesError;
-      }
-      
-      // Then delete the property without the owner_id check
-      // The database policy will ensure only admins can do this
       const { error } = await supabase
-        .from('properties')
+        .from('properties_v2')
         .delete()
         .eq('id', propertyId);
       
@@ -486,17 +551,18 @@ export const propertyService = {
         throw error;
       }
       
-      // Clear all user caches since we don't know which user owned this property
+      console.log(`Property ${propertyId} successfully deleted from properties_v2 by admin`);
       propertiesCache.clear();
       
-      console.log(`Property ${propertyId} successfully deleted by admin`);
     } catch (error) {
       console.error('Error in adminDeleteProperty:', error);
       throw error;
     }
   },
 
-  // Check if user is admin
+  /**
+   * Check if user is admin
+   */
   async isUserAdmin(userId: string): Promise<boolean> {
     try {
       if (!userId) return false;
@@ -518,5 +584,52 @@ export const propertyService = {
       console.error('Error checking admin status:', error);
       return false;
     }
+  },
+
+  /**
+   * Helper method to deep merge property data
+   */
+  mergePropertyData(oldData: any, newData: any): any {
+    // Start with a clone of old data
+    const result = JSON.parse(JSON.stringify(oldData));
+    
+    // Helper function for deep merging
+    const deepMerge = (target: any, source: any) => {
+      if (!source) return target;
+      
+      Object.keys(source).forEach(key => {
+        // Skip if undefined
+        if (source[key] === undefined) return;
+        
+        // If both are objects and not arrays, recursively merge
+        if (
+          source[key] && 
+          typeof source[key] === 'object' && 
+          !Array.isArray(source[key]) &&
+          target[key] && 
+          typeof target[key] === 'object' && 
+          !Array.isArray(target[key])
+        ) {
+          deepMerge(target[key], source[key]);
+        }
+        // Otherwise replace with source value
+        else {
+          target[key] = source[key];
+        }
+      });
+    };
+    
+    // Merge at top level
+    deepMerge(result, newData);
+    
+    // Special handling for meta section
+    if (newData.meta) {
+      if (!result.meta) result.meta = {};
+      result.meta = { ...result.meta, ...newData.meta };
+      result.meta._version = DATA_VERSION;
+      result.meta.updated_at = new Date().toISOString();
+    }
+    
+    return result;
   }
 };

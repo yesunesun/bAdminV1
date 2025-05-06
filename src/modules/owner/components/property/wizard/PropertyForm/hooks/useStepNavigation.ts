@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/PropertyForm/hooks/useStepNavigation.ts
-// Version: 8.5.0
-// Last Modified: 03-05-2025 16:15 IST
-// Purpose: Updated commercialRent sequence to include initial property selection step
+// Version: 9.0.0
+// Last Modified: 06-05-2025 18:15 IST
+// Purpose: Fixed import paths to match exact project structure
 
 import { useMemo, useCallback, useEffect } from 'react';
 import { UseFormReturn } from 'react-hook-form';
@@ -9,13 +9,24 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { FormData } from '../../../types';
 import { addFormAutofillHelpers, fillFormSection } from '../../utilities/formAutofill';
 
+// Update imports to use the correct paths
+// The constants are in src/modules/owner/components/property/wizard/constants/
+import { 
+  FLOW_TYPES, 
+  FLOW_STEP_SEQUENCES, 
+  STEP_FIELD_MAPPINGS,
+  createStepObjectsFromFlow 
+} from '../../constants/flows';
+
+import { STEP_DEFINITIONS } from '../../constants/common';
+
 interface UseStepNavigationProps {
   form: UseFormReturn<FormData>;
   formStep: number;
   formIsSaleMode?: boolean;
   originalHandleNextStep: () => void;
   setCurrentStep: (step: number) => void;
-  STEPS: any[]; 
+  STEPS?: any[]; // Made optional since we'll use flows.ts instead
 }
 
 export function useStepNavigation({
@@ -24,10 +35,89 @@ export function useStepNavigation({
   formIsSaleMode,
   originalHandleNextStep,
   setCurrentStep,
-  STEPS
+  STEPS = [] // Provide default empty array to prevent undefined errors
 }: UseStepNavigationProps) {
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Generate steps array from flow-based step definitions if STEPS is empty
+  const computedSteps = useMemo(() => {
+    if (STEPS && STEPS.length > 0) {
+      return STEPS; // Use provided STEPS if available
+    }
+    
+    // Otherwise, generate from our flow-based system
+    // Determine which flow type to use based on form data and URL
+    const flowType = determineFlowType();
+    
+    // Get step sequence for this flow
+    const stepSequence = FLOW_STEP_SEQUENCES[flowType] || FLOW_STEP_SEQUENCES.residential_rent;
+    
+    // Convert to the format expected by the existing code
+    return stepSequence.map(step => {
+      // Find the step definition
+      const stepDef = STEP_DEFINITIONS[step.id] || {
+        id: step.id,
+        title: step.label,
+        icon: null,
+        description: step.label
+      };
+      
+      return {
+        id: step.id,
+        title: stepDef.title || step.label,
+        icon: stepDef.icon,
+        description: stepDef.description || step.label
+      };
+    });
+  }, [STEPS]);
+  
+  // Determine the flow type based on form data and URL
+  function determineFlowType() {
+    try {
+      // Get form data
+      const formData = form.getValues();
+      const urlPath = window.location.pathname.toLowerCase();
+      
+      // Check for explicit flow info in form data
+      const category = (formData.flow?.category || 'residential').toLowerCase();
+      const listingType = (formData.flow?.listingType || 'rent').toLowerCase();
+      
+      // Detect specific flow types from URL and form data
+      const isPGMode = urlPath.includes('pghostel') || urlPath.includes('/pg/') || 
+                      (category === 'residential' && listingType === 'pghostel');
+                      
+      const isFlatmatesMode = urlPath.includes('flatmate') || 
+                            (category === 'residential' && listingType === 'flatmates');
+                            
+      const isCoworkingMode = urlPath.includes('coworking') || urlPath.includes('co-working') || 
+                            (category === 'commercial' && (listingType === 'coworking' || listingType === 'co-working'));
+      
+      const isLandMode = urlPath.includes('land') || urlPath.includes('plot') || 
+                        category === 'land';
+                        
+      const isCommercialMode = category === 'commercial' || urlPath.includes('commercial');
+      
+      const isSaleMode = formIsSaleMode !== undefined ? formIsSaleMode : 
+                        urlPath.includes('sale') || urlPath.includes('sell') || 
+                        listingType === 'sale' || listingType === 'sell';
+      
+      // Determine flow type based on these checks
+      if (isPGMode) return FLOW_TYPES.RESIDENTIAL_PGHOSTEL;
+      if (isFlatmatesMode) return FLOW_TYPES.RESIDENTIAL_FLATMATES;
+      if (isLandMode) return FLOW_TYPES.LAND_SALE;
+      
+      if (isCommercialMode) {
+        if (isCoworkingMode) return FLOW_TYPES.COMMERCIAL_COWORKING;
+        return isSaleMode ? FLOW_TYPES.COMMERCIAL_SALE : FLOW_TYPES.COMMERCIAL_RENT;
+      }
+      
+      return isSaleMode ? FLOW_TYPES.RESIDENTIAL_SALE : FLOW_TYPES.RESIDENTIAL_RENT;
+    } catch (error) {
+      console.error('Error determining flow type:', error);
+      return FLOW_TYPES.DEFAULT;
+    }
+  }
 
   // Improved sale mode detection logic
   const isSaleMode = useMemo(() => {
@@ -39,7 +129,13 @@ export function useStepNavigation({
     // Get current form values
     const formValues = form.getValues();
     
-    // Check listing type - primary indicator
+    // Check flow data first
+    if (formValues.flow?.listingType) {
+      const listingType = formValues.flow.listingType.toLowerCase();
+      return listingType === 'sale' || listingType === 'sell';
+    }
+    
+    // Check legacy listingType - secondary indicator
     const listingType = formValues.listingType?.toLowerCase() || '';
     const isSaleFromListingType = listingType === 'sale' || listingType === 'sell';
     
@@ -58,6 +154,13 @@ export function useStepNavigation({
     try {
       // Check form values
       const formValues = form.getValues();
+      
+      // Check flow data first
+      if (formValues.flow?.category === 'residential' && formValues.flow?.listingType === 'pghostel') {
+        return true;
+      }
+      
+      // Check legacy fields
       const listingType = (formValues.listingType || '').toLowerCase();
       const propertyType = (formValues.propertyType || '').toLowerCase();
       
@@ -67,8 +170,8 @@ export function useStepNavigation({
       
       // Combined check
       const result = listingType === 'pghostel' || 
-                     propertyType === 'pghostel' || 
-                     isPGFromUrl;
+                    propertyType === 'pghostel' || 
+                    isPGFromUrl;
       
       return result;
     } catch (error) {
@@ -82,6 +185,13 @@ export function useStepNavigation({
     try {
       // Check form values
       const formValues = form.getValues();
+      
+      // Check flow data first
+      if (formValues.flow?.category === 'commercial' && formValues.flow?.listingType === 'rent') {
+        return true;
+      }
+      
+      // Check legacy fields
       const category = (formValues.propertyCategory || '').toLowerCase();
       const listingType = (formValues.listingType || '').toLowerCase();
       
@@ -110,6 +220,14 @@ export function useStepNavigation({
     try {
       // Check form values
       const formValues = form.getValues();
+      
+      // Check flow data first
+      if (formValues.flow?.category === 'commercial' && 
+          (formValues.flow?.listingType === 'sale' || formValues.flow?.listingType === 'sell')) {
+        return true;
+      }
+      
+      // Check legacy fields
       const category = (formValues.propertyCategory || '').toLowerCase();
       const listingType = (formValues.listingType || '').toLowerCase();
       
@@ -134,6 +252,13 @@ export function useStepNavigation({
     try {
       // Check form values
       const formValues = form.getValues();
+      
+      // Check flow data first
+      if (formValues.flow?.category === 'commercial' && formValues.flow?.listingType === 'coworking') {
+        return true;
+      }
+      
+      // Check legacy fields
       const category = (formValues.propertyCategory || '').toLowerCase();
       const listingType = (formValues.listingType || '').toLowerCase();
       
@@ -157,6 +282,13 @@ export function useStepNavigation({
     try {
       // Check form values
       const formValues = form.getValues();
+      
+      // Check flow data first
+      if (formValues.flow?.category === 'land') {
+        return true;
+      }
+      
+      // Check legacy fields
       const category = (formValues.propertyCategory || '').toLowerCase();
       
       // Check URL for Land/Plot indicators
@@ -178,6 +310,13 @@ export function useStepNavigation({
     try {
       // Check form values
       const formValues = form.getValues();
+      
+      // Check flow data first
+      if (formValues.flow?.category === 'residential' && formValues.flow?.listingType === 'flatmates') {
+        return true;
+      }
+      
+      // Check legacy fields
       const category = (formValues.propertyCategory || '').toLowerCase();
       const listingType = (formValues.listingType || '').toLowerCase();
       
@@ -198,11 +337,11 @@ export function useStepNavigation({
 
   // Get current step ID
   const getCurrentStepId = useCallback(() => {
-    if (formStep <= 0 || formStep > STEPS.length) return null;
-    return STEPS[formStep - 1]?.id || null;
-  }, [formStep, STEPS]);
+    if (formStep <= 0 || formStep > computedSteps.length) return null;
+    return computedSteps[formStep - 1]?.id || null;
+  }, [formStep, computedSteps]);
   
-  // Existing form auto-fill functions...
+  // Auto-fill the form with test data for the current step
   const fillDemoData = useCallback(() => {
     const currentStepId = getCurrentStepId();
     console.log(`Auto-fill requested for step: ${currentStepId}`);
@@ -214,7 +353,7 @@ export function useStepNavigation({
       'room_details': 'room_details',
       'pg_details': 'pg_details',
       'commercial': 'commercial',
-      'commercial_basics': 'commercial_basics', // Add mapping for new step
+      'commercial_basics': 'commercial_basics',
       'commercial_sale': 'commercial_sale',
       'coworking': 'coworking',
       'land_details': 'land_details',
@@ -224,7 +363,10 @@ export function useStepNavigation({
       'details': 'basic',
       'rental': 'rental',
       'sale': 'sale',
-      'features': 'amenities'
+      'features': 'amenities',
+      'basicDetails': 'basic',
+      'rentalDetails': 'rental',
+      'saleDetails': 'sale'
     };
     
     const section = sectionMap[currentStepId];
@@ -261,7 +403,7 @@ export function useStepNavigation({
     };
   }, [form, fillDemoData]);
 
-  // Step sequences definition
+  // Map flow types to step sequences
   const stepSequences = useMemo(() => ({
     // PG/Hostel sequence
     pgHostel: ['room_details', 'location', 'pg_details', 'features', 'review', 'photos'],
@@ -359,8 +501,13 @@ export function useStepNavigation({
       
       // Extract necessary values from form as fallback
       const formValues = form.getValues();
-      const formCategory = (formValues.propertyCategory || formValues.category || 'residential').toLowerCase();
-      let formType = (formValues.listingType || formValues.type || 'rent').toLowerCase();
+      
+      // Use flow information from v3 data structure if available
+      const formCategory = formValues.flow?.category || 
+                          (formValues.propertyCategory || formValues.category || 'residential').toLowerCase();
+                          
+      let formType = formValues.flow?.listingType || 
+                    (formValues.listingType || formValues.type || 'rent').toLowerCase();
       
       // Use URL values if they exist, otherwise fall back to form values
       const effectiveCategory = category || formCategory;
@@ -431,7 +578,7 @@ export function useStepNavigation({
       const currentStepId = getCurrentStepId();
       
       // Enhanced debug information for navigation troubleshooting
-      console.log(`Navigation - Current step: ${currentStepId} (${formStep}/${STEPS.length})`);
+      console.log(`Navigation - Current step: ${currentStepId} (${formStep}/${computedSteps.length})`);
       console.log(`Next button clicked - Property mode:`, {
         isPGHostelMode,
         isCommercialRentMode,
@@ -454,8 +601,8 @@ export function useStepNavigation({
         if (currentIndex !== -1 && currentIndex < activeSequence.length - 1) {
           const nextStepId = activeSequence[currentIndex + 1];
           
-          // Find index in STEPS array
-          const nextStepIndex = STEPS.findIndex(step => step.id === nextStepId);
+          // Find index in computedSteps array
+          const nextStepIndex = computedSteps.findIndex(step => step.id === nextStepId);
           
           console.log(`Flow Navigation - Next step ID: ${nextStepId}, Index: ${nextStepIndex}`);
           
@@ -474,8 +621,8 @@ export function useStepNavigation({
       }
       
       // For other flows, determine the next step
-      const nextStepIndex = Math.min(formStep + 1, STEPS.length);
-      const nextStepId = STEPS[nextStepIndex - 1]?.id;
+      const nextStepIndex = Math.min(formStep + 1, computedSteps.length);
+      const nextStepId = computedSteps[nextStepIndex - 1]?.id;
       
       if (nextStepId) {
         // First update the URL
@@ -493,7 +640,7 @@ export function useStepNavigation({
   }, [
     getCurrentStepId, 
     formStep, 
-    STEPS, 
+    computedSteps, 
     isPGHostelMode, 
     isCommercialRentMode, 
     isCommercialSaleMode, 
@@ -512,7 +659,7 @@ export function useStepNavigation({
     try {
       const currentStepId = getCurrentStepId();
       
-      console.log(`Navigation - Current step: ${currentStepId} (${formStep}/${STEPS.length})`);
+      console.log(`Navigation - Current step: ${currentStepId} (${formStep}/${computedSteps.length})`);
       
       // For specific flows, use explicit sequence
       if (isPGHostelMode || isCommercialRentMode || isCommercialSaleMode || 
@@ -526,8 +673,8 @@ export function useStepNavigation({
         if (currentIndex > 0) {
           const prevStepId = activeSequence[currentIndex - 1];
           
-          // Find index in STEPS array
-          const prevStepIndex = STEPS.findIndex(step => step.id === prevStepId);
+          // Find index in computedSteps array
+          const prevStepIndex = computedSteps.findIndex(step => step.id === prevStepId);
           
           console.log(`Flow Navigation - Previous step ID: ${prevStepId}, Index: ${prevStepIndex}`);
           
@@ -545,7 +692,7 @@ export function useStepNavigation({
       
       // For other flows, directly calculate the previous step
       const prevStepIndex = Math.max(formStep - 1, 1);
-      const prevStepId = STEPS[prevStepIndex - 1]?.id;
+      const prevStepId = computedSteps[prevStepIndex - 1]?.id;
       
       if (prevStepId) {
         // First update the URL
@@ -564,7 +711,7 @@ export function useStepNavigation({
   }, [
     getCurrentStepId, 
     formStep, 
-    STEPS, 
+    computedSteps, 
     isPGHostelMode, 
     isCommercialRentMode, 
     isCommercialSaleMode, 
@@ -579,15 +726,15 @@ export function useStepNavigation({
   // Create step indices for lookup
   const stepIndices = useMemo(() => {
     const indices: Record<string, number> = {};
-    STEPS.forEach((step, index) => {
+    computedSteps.forEach((step, index) => {
       indices[step.id] = index + 1; // 1-based index to match formStep
     });
     return indices;
-  }, [STEPS]);
+  }, [computedSteps]);
 
   // Visible steps function - updated to allow 'details' step for Commercial Rent
   const getVisibleSteps = useCallback(() => {
-    return STEPS.map(step => ({
+    return computedSteps.map(step => ({
       ...step,
       hidden: 
         // Rental step hidden for non-rental flows
@@ -619,7 +766,7 @@ export function useStepNavigation({
         (step.id === 'flatmate_details' && !isFlatmatesMode)
     }));
   }, [
-    STEPS, 
+    computedSteps, 
     isSaleMode, 
     isPGHostelMode, 
     isCommercialRentMode, 
@@ -641,6 +788,8 @@ export function useStepNavigation({
     handleNextStep,
     handlePreviousStep,
     fillDemoData,
-    updateUrlForStep
+    updateUrlForStep,
+    stepIndices,
+    computedSteps
   };
 }

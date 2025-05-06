@@ -1,15 +1,16 @@
 // src/modules/owner/components/property/wizard/PropertyForm/index.tsx
-// Version: 6.4.0
-// Last Modified: 02-05-2025 20:30 IST
-// Purpose: Improved property saving and navigation logic
+// Version: 6.5.0
+// Last Modified: 07-05-2025 15:45 IST
+// Purpose: Fixed flowSteps is undefined error when initializing form
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-// Fix hook and utility imports
+// Import FLOW_TYPES directly from the flows module
 import { usePropertyForm } from '../hooks/usePropertyForm';
 import { FormData } from '../types'
-import { STEPS, FLOW_STEPS } from '../constants'
+import { STEPS } from '../constants'
+import { FLOW_TYPES, FLOW_STEP_SEQUENCES } from '../constants/flows';
 
 // Components
 import FormHeader from './components/FormHeader';
@@ -163,21 +164,21 @@ export function PropertyForm({
  // Determine which flow steps to use based on property type
  const flowSteps = useMemo(() => {
    if (isPGHostelMode) {
-     return FLOW_STEPS.RESIDENTIAL_PGHOSTEL;
+     return FLOW_STEP_SEQUENCES.residential_pghostel;
    } else if (isCommercialRentMode) {
-     return FLOW_STEPS.COMMERCIAL_RENT;
+     return FLOW_STEP_SEQUENCES.commercial_rent;
    } else if (isCommercialSaleMode) {
-     return FLOW_STEPS.COMMERCIAL_SALE;
+     return FLOW_STEP_SEQUENCES.commercial_sale;
    } else if (isCoworkingMode) {
-     return FLOW_STEPS.COMMERCIAL_COWORKING;
+     return FLOW_STEP_SEQUENCES.commercial_coworking;
    } else if (isLandSaleMode) {
-     return FLOW_STEPS.LAND_SALE;
+     return FLOW_STEP_SEQUENCES.land_sale;
    } else if (isFlatmatesMode) {
-     return FLOW_STEPS.RESIDENTIAL_FLATMATES;
+     return FLOW_STEP_SEQUENCES.residential_flatmates;
    } else if (derivedAdType?.toLowerCase() === 'sale' || derivedAdType?.toLowerCase() === 'sell') {
-     return FLOW_STEPS.RESIDENTIAL_SALE;
+     return FLOW_STEP_SEQUENCES.residential_sale;
    } else {
-     return FLOW_STEPS.RESIDENTIAL_RENT;
+     return FLOW_STEP_SEQUENCES.residential_rent;
    }
  }, [
    derivedAdType, 
@@ -191,7 +192,7 @@ export function PropertyForm({
 
  // Determine initial step from URL or default to 1
  const initialStep = useMemo(() => {
-   if (urlStep) {
+   if (urlStep && flowSteps) {
      const stepIndex = flowSteps.findIndex(s => s.id === urlStep) + 1;
      return stepIndex > 0 ? stepIndex : 1;
    }
@@ -448,8 +449,8 @@ export function PropertyForm({
  // Determine the effective property ID for use in the UI
  const effectivePropertyId = savedPropertyId || propertyId || propertyIdAfterSave;
  
- // Check if current step is the review step
- const isReviewStep = flowSteps[formStep - 1]?.id === 'review';
+ // Check if current step is the review step - safely access flowSteps array
+ const isReviewStep = flowSteps && flowSteps[formStep - 1] ? flowSteps[formStep - 1].id === 'review' : false;
 
  return (
    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -465,7 +466,7 @@ export function PropertyForm({
          <WizardBreadcrumbs
            category={effectiveCategory}
            adType={effectiveAdType}
-           currentStep={flowSteps[formStep - 1]?.title || ''}
+           currentStep={flowSteps && flowSteps[formStep - 1] ? flowSteps[formStep - 1].label : ''}
          />
        </div>
 
@@ -491,7 +492,7 @@ export function PropertyForm({
            <FormContent 
              form={form}
              formStep={formStep}
-             STEPS={flowSteps}
+             STEPS={flowSteps || STEPS}
              effectiveCategory={effectiveCategory}
              effectiveAdType={effectiveAdType}
              mode={mode}
@@ -516,7 +517,7 @@ export function PropertyForm({
            {/* Step Navigation (Previous/Next buttons) */}
            <StepNavigation 
              formStep={formStep}
-             STEPS={flowSteps}
+             STEPS={flowSteps || STEPS}
              handlePreviousStep={safePreviousStep}
              handleNextStep={handleNextStep}
              savedPropertyId={effectivePropertyId}

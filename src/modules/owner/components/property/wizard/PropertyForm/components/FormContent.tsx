@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/PropertyForm/components/FormContent.tsx
-// Version: 4.12.0
-// Last Modified: 04-05-2025 17:30 IST
-// Purpose: Direct fix for Commercial Rent flow by forcing CommercialBasicDetails component rendering
+// Version: 4.14.0
+// Last Modified: 07-05-2025 19:30 IST
+// Purpose: Fixed "Section not available" for rentalDetails step
 
 import React, { useEffect, useState } from 'react';
 import { UseFormReturn } from 'react-hook-form';
@@ -177,8 +177,9 @@ const FormContent = ({
     );
   }
   
-  if (currentStepId === 'details' || currentStepId === 'basic_details') {
-    console.log('Entering basic details condition check');
+  // FIX: Map "basicDetails" step ID to PropertyDetails component
+  if (currentStepId === 'basicDetails' || currentStepId === 'details' || currentStepId === 'basic_details') {
+    console.log('Entering basic details condition check with ID:', currentStepId);
     
     // Skip details for Land/Plot flow
     if (isLandSaleMode) {
@@ -223,7 +224,10 @@ const FormContent = ({
     );
   }
   
-  if (currentStepId === 'rental') {
+  // FIX: Add rentalDetails mapping to rental section
+  if (currentStepId === 'rental' || currentStepId === 'rentalDetails') {
+    console.log('Entering rental details with ID:', currentStepId);
+    
     // Show rental details for both residential and commercial rent properties
     const isRentFlow = !isSaleMode && !isPGHostelMode && !isCommercialSaleMode && 
                       !isCoworkingMode && !isLandSaleMode && !isFlatmatesMode;
@@ -443,7 +447,7 @@ const FormContent = ({
     );
   }
   
-  if (currentStepId === 'photos') {
+  if (currentStepId === 'photos' || currentStepId === 'media') {
     // Check if there's a loading error
     if (photoLoadError) {
       return (
@@ -515,10 +519,18 @@ const FormContent = ({
     );
   }
   
+  // Debug output to help identify missing step mappings
+  console.error('FormContent received unknown step ID:', currentStepId);
+  console.error('Available steps:', STEPS.map(s => s.id));
+  
   // Default fallback
   return (
     <div className="py-6 text-center">
       <p className="text-muted-foreground">Section not available</p>
+      <p className="text-muted-foreground text-sm mt-2">Step ID: {currentStepId || 'undefined'}</p>
+      <p className="text-muted-foreground text-sm mt-1">
+        Flow configuration may be missing this step mapping
+      </p>
     </div>
   );
 };
