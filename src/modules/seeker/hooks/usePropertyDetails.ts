@@ -1,7 +1,7 @@
 // src/modules/seeker/hooks/usePropertyDetails.ts
-// Version: 5.5.0
-// Last Modified: 01-05-2025 23:00 IST
-// Purpose: Extract data from property_details JSON field
+// Version: 5.6.0
+// Last Modified: 07-05-2025 16:30 IST
+// Purpose: Updated to fetch data from properties_v2 table with fallback to original properties table
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useLocation } from 'react-router-dom';
@@ -149,11 +149,24 @@ export const usePropertyDetails = (refreshDependency = 0) => {
     try {
       console.log(`[usePropertyDetails] Fetching property with ID: ${propertyId}, refresh: ${refreshDependency}`);
 
-      // Make a direct query to get property data
-      const { data, error: fetchError } = await supabase
-        .from('properties')
+      // First, try to fetch from properties_v2 table
+      let { data, error: fetchError } = await supabase
+        .from('properties_v2')
         .select('*')
         .eq('id', propertyId);
+
+      // If not found or table doesn't exist, fall back to original properties table
+      if (fetchError || !data || data.length === 0) {
+        console.log('[usePropertyDetails] Property not found in properties_v2 table or table does not exist. Falling back to properties table.');
+        
+        const result = await supabase
+          .from('properties')
+          .select('*')
+          .eq('id', propertyId);
+          
+        data = result.data;
+        fetchError = result.error;
+      }
 
       if (fetchError) {
         console.error('[usePropertyDetails] Error fetching property:', fetchError);
@@ -209,7 +222,7 @@ export const usePropertyDetails = (refreshDependency = 0) => {
       console.log('=========================================================');
 
       if (!data || data.length === 0) {
-        console.error('[usePropertyDetails] Property not found');
+        console.error('[usePropertyDetails] Property not found in either properties_v2 or properties tables');
         throw new Error('Property not found');
       }
 
