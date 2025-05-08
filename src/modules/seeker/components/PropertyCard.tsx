@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyCard.tsx
-// Version: 4.0.0
-// Last Modified: 10-05-2025 12:00 IST
-// Purpose: Optimized PropertyCard with balanced modularity
+// Version: 4.1.0
+// Last Modified: 10-05-2025 14:30 IST
+// Purpose: Fixed favorite functionality for properties_v2 table
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -90,15 +90,15 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
     setIsLikeLoading(true);
     
     try {
+      // Update local state first for immediate UI feedback
+      setIsLiked(newLikedState);
+      
       // Use the global context functions
       const success = newLikedState 
         ? await addFavorite(property.id)
         : await removeFavorite(property.id);
       
       if (success) {
-        // Update local state
-        setIsLiked(newLikedState);
-        
         // Notify parent component if callback provided
         onLikeToggle?.(property.id, newLikedState);
         
@@ -125,7 +125,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
       // Provide feedback to the user
       toast({
         title: "Action failed",
-        description: "There was a problem updating your favorites. This property may not be compatible with the favorites system.",
+        description: "There was a problem updating your favorites. Please try again later.",
         variant: "destructive",
         duration: 5000,
       });
