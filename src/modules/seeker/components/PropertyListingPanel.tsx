@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyListingPanel.tsx
-// Version: 2.2.0
-// Last Modified: 07-04-2025 15:00 IST
-// Purpose: Made property listing panel fully responsive for mobile view
+// Version: 2.3.0
+// Last Modified: 09-05-2025 15:30 IST
+// Purpose: Enhanced image selection logic to properly display property images
 
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
@@ -104,6 +104,73 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
     }
     
     return success;
+  };
+
+  // Enhanced image selection logic
+  const getPropertyImage = (property: PropertyType): string => {
+    // First try to find images in property_images array
+    if (property.property_images && property.property_images.length > 0) {
+      // Try to find primary image first
+      const primaryImage = property.property_images.find(img => img.is_primary);
+      if (primaryImage?.url) {
+        return primaryImage.url;
+      }
+      
+      // Fall back to first image if no primary image
+      if (property.property_images[0].url) {
+        return property.property_images[0].url;
+      }
+    }
+    
+    // If no images in property_images, try to extract from property_details
+    try {
+      const details = typeof property.property_details === 'string'
+        ? JSON.parse(property.property_details)
+        : property.property_details;
+        
+      // Look for images in various possible locations within property_details
+      if (details?.images && Array.isArray(details.images)) {
+        // Check if images are in dataUrl format
+        const primaryImage = details.images.find((img: any) => img.isPrimary || img.is_primary);
+        if (primaryImage?.dataUrl) {
+          return primaryImage.dataUrl;
+        } else if (primaryImage?.url) {
+          return primaryImage.url;
+        }
+        
+        // Fall back to first image
+        if (details.images.length > 0) {
+          const firstImage = details.images[0];
+          return firstImage.dataUrl || firstImage.url;
+        }
+      }
+      
+      // Check for images in photos.images
+      if (details?.photos?.images && Array.isArray(details.photos.images)) {
+        const primaryImage = details.photos.images.find((img: any) => img.isPrimary || img.is_primary);
+        if (primaryImage?.dataUrl) {
+          return primaryImage.dataUrl;
+        } else if (primaryImage?.url) {
+          return primaryImage.url;
+        }
+        
+        // Fall back to first image
+        if (details.photos.images.length > 0) {
+          const firstImage = details.photos.images[0];
+          return firstImage.dataUrl || firstImage.url;
+        }
+      }
+    } catch (error) {
+      console.error('Error extracting images from property_details:', error);
+    }
+    
+    // Fall back to the legacy image property if available
+    if (property.image) {
+      return property.image;
+    }
+    
+    // Final fallback to default image
+    return '/noimage.png';
   };
 
   // Handle share action
@@ -221,9 +288,8 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
       return (
         <div className="divide-y">
           {properties.map((property) => {
-            // Get primary image with fallback
-            const primaryImage = property.property_images?.find(img => img.is_primary)?.url || 
-                                (property.property_images && property.property_images.length > 0 ? property.property_images[0].url : '/apartment.jpg');
+            // Get property image using the enhanced logic
+            const propertyImage = getPropertyImage(property);
             
             const isHovered = hoveredProperty === property.id;
             
@@ -285,8 +351,8 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
                     {/* Property image */}
                     <div className="relative h-20 w-24 flex-shrink-0 overflow-hidden rounded-lg">
                       <img
-                        src={primaryImage}
-                        alt={property.title}
+                        src={propertyImage}
+                        alt={property.title || 'Property'}
                         className="h-full w-full object-cover"
                         onError={(e) => {
                           const target = e.target as HTMLImageElement;
@@ -315,7 +381,8 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
                       <div className="flex items-center gap-2 text-xs text-gray-500">
                         {property.bedrooms && (
                           <span className="flex items-center">
-                            <span className="mr-1">{property.bedrooms}</span>
+                            <Bed className="h-3 w-3 mr-1" />
+                            <span>{property.bedrooms}</span>
                           </span>
                         )}
                         
