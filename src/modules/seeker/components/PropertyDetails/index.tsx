@@ -1,9 +1,9 @@
 // src/modules/seeker/components/PropertyDetails/index.tsx
-// Version: 7.6.0
-// Last Modified: 08-05-2025 20:30 IST
-// Purpose: Fixed map location display with proper coordinate extraction
+// Version: 9.0.0
+// Last Modified: 09-05-2025 21:15 IST
+// Purpose: Fixed image extraction and display with enhanced debugging
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PropertyDetails as PropertyDetailsType } from '../../hooks/usePropertyDetails';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -160,6 +160,129 @@ const getPropertyData = (property: any) => {
     images: property.property_images || [],
     description: property.features?.description || property.description || "No description provided for this property."
   };
+};
+
+// CRITICALLY IMPORTANT: Fixed function for image extraction
+const extractImagesFromJson = (property: any): any[] => {
+  if (!property) return [];
+
+  console.log('[PropertyDetails] Starting image extraction from property data');
+  console.log('[PropertyDetails] Property data structure:', Object.keys(property));
+  
+  // CRITICAL DEBUG: Log the entire property data structure
+  try {
+    console.log('[DEEP DEBUG] Property details type:', typeof property.property_details);
+    
+    // Parse property_details if it's a string
+    let details = property.property_details;
+    if (typeof details === 'string') {
+      try {
+        details = JSON.parse(details);
+        console.log('[PropertyDetails] Successfully parsed property_details from string');
+      } catch (e) {
+        console.error('[PropertyDetails] Error parsing property_details string:', e);
+      }
+    }
+    
+    // DEBUG: Log info about the images array to understand what's available
+    console.log('[CRITICAL] Property has images field on property_details?', !!(details && details.images));
+    if (details && details.images && Array.isArray(details.images)) {
+      console.log('[CRITICAL] Images array length:', details.images.length);
+      console.log('[CRITICAL] First image in array:', details.images.length > 0 ? JSON.stringify(details.images[0]) : 'No images');
+    }
+    
+    // Direct extraction from property_details.images - handling DataUrl format
+    if (details && details.images && Array.isArray(details.images) && details.images.length > 0) {
+      const firstImg = details.images[0];
+      
+      // Check if images use dataUrl format (from PropertyImageUpload)
+      if (firstImg.dataUrl) {
+        console.log('[MATCH FOUND] Image array with dataUrl format detected, count:', details.images.length);
+        const processedImages = details.images.map((img: any, idx: number) => ({
+          id: img.id || `img-${idx}`,
+          url: img.dataUrl, // Map dataUrl to url for standard components
+          is_primary: !!img.isPrimary,
+          display_order: idx
+        }));
+        
+        console.log('[CRITICAL SUCCESS] Processed images from dataUrl format, count:', processedImages.length);
+        if (processedImages.length > 0) {
+          console.log('[DEBUG] First processed image:', JSON.stringify(processedImages[0]));
+        }
+        
+        return processedImages;
+      }
+      
+      // Handle standard image format if not dataUrl
+      console.log('[STANDARD FORMAT] Processing standard image format, count:', details.images.length);
+      const processedImages = details.images.map((img: any, idx: number) => ({
+        id: img.id || `img-${idx}`,
+        url: img.url || (typeof img === 'string' ? img : ''),
+        is_primary: !!img.is_primary,
+        display_order: img.display_order || idx
+      }));
+      
+      console.log('[DEBUG] Processed standard format images, count:', processedImages.length);
+      return processedImages;
+    }
+    
+    // Try other known paths where images might be stored
+    let foundImages: any[] = [];
+    
+    // Path: details.media.photos.images
+    if (details?.media?.photos?.images) {
+      foundImages = details.media.photos.images;
+      console.log('[PATH FOUND] Found images in details.media.photos.images:', foundImages.length);
+    }
+    // Path: property.property_images
+    else if (property.property_images && Array.isArray(property.property_images)) {
+      foundImages = property.property_images;
+      console.log('[PATH FOUND] Found images in property.property_images:', foundImages.length);
+    }
+    
+    // If we found images in an alternative path, process them
+    if (foundImages.length > 0) {
+      const processedImages = foundImages.map((img, idx) => ({
+        id: img.id || `img-${idx}`,
+        url: img.url || (typeof img === 'string' ? img : ''),
+        is_primary: !!img.is_primary,
+        display_order: img.display_order || idx
+      }));
+      
+      console.log('[SUCCESS] Processed images from alternative path, count:', processedImages.length);
+      return processedImages;
+    }
+    
+    // CRITICAL ADDITION: Check property information string for image info
+    const propertyInfo = property.property_details?.information || property.information;
+    if (propertyInfo && typeof propertyInfo === 'string' && propertyInfo.includes('images')) {
+      console.log('[DEEP SEARCH] Finding images in property information string');
+      try {
+        // Try to extract JSON data from the information field
+        const matches = propertyInfo.match(/{[^{}]*"images"[^{}]*}/g);
+        if (matches && matches.length > 0) {
+          const jsonData = JSON.parse(matches[0]);
+          if (jsonData.images && Array.isArray(jsonData.images)) {
+            console.log('[DEEP SEARCH] Found images in information string:', jsonData.images.length);
+            return jsonData.images.map((img: any, idx: number) => ({
+              id: img.id || `img-${idx}`,
+              url: img.dataUrl || img.url || '',
+              is_primary: !!img.isPrimary || !!img.is_primary,
+              display_order: idx
+            }));
+          }
+        }
+      } catch (e) {
+        console.error('[DEEP SEARCH] Error extracting images from information string:', e);
+      }
+    }
+    
+  } catch (error) {
+    console.error('[PropertyDetails] Error in image extraction:', error);
+  }
+  
+  console.log('[PropertyDetails] No images found using any extraction method');
+  return [];
 };
 
 // Feature details card component
@@ -442,12 +565,63 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
 }) => {
   const { toast } = useToast();
   const [visitDialogOpen, setVisitDialogOpen] = useState(false);
+  const [propertyImages, setPropertyImages] = useState<any[]>([]);
   
-  // Handle image upload completed and trigger refresh
+  // Use effect to extract and process images
+  useEffect(() => {
+    if (!property) return;
+    
+    // Extract images from the property JSON structure
+    const extractedImages = extractImagesFromJson(property);
+    console.log('[PropertyDetails] Total valid images found:', extractedImages.length);
+    
+    if (extractedImages.length > 0) {
+      // Log each image for debugging
+      extractedImages.forEach((img, idx) => {
+        console.log(`[PropertyDetails] Image ${idx + 1}:`, {
+          id: img.id,
+          url: img.url,
+          is_primary: img.is_primary,
+          display_order: img.display_order
+        });
+      });
+      
+      // Use setState to trigger re-render with images
+      setPropertyImages(extractedImages);
+    } else {
+      // If no images found, check if we can show the popup image upload component
+      console.log('[PropertyDetails] No images found, checking for upload component');
+    }
+  }, [property]);
+  
+  // NEW! Update image count in debug info to match actual property_details
+  useEffect(() => {
+    if (property && property.property_details && property.property_details.images) {
+      console.log('[PropertyDetails] Setting image count from property_details.images:', 
+        Array.isArray(property.property_details.images) ? property.property_details.images.length : 0);
+      
+      // Update propertyImages state with correct data from property_details.images
+      if (Array.isArray(property.property_details.images) && property.property_details.images.length > 0) {
+        // Use the data directly from property_details.images
+        const directImages = property.property_details.images.map((img: any, idx: number) => ({
+          id: img.id || `img-${idx}`,
+          url: img.dataUrl || img.url || '',
+          is_primary: !!img.isPrimary || !!img.is_primary,
+          display_order: idx
+        }));
+        
+        console.log('[PropertyDetails] Directly using images from property_details:', directImages.length);
+        setPropertyImages(directImages);
+      }
+    }
+  }, [property]);
+  
+  // Handle image upload completion
   const handleImageUploaded = () => {
     if (onRefresh) {
       onRefresh();
       
+      // After refresh, re-extract images from updated property data
       setTimeout(() => {
         toast({
           title: "Images Updated",
@@ -495,7 +669,6 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
     location,
     rentalInfo,
     saleInfo,
-    images,
     description
   } = propertyData;
   
@@ -534,7 +707,7 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
     .filter(Boolean)
     .join(", ") || "Location not specified";
   
-  // Extract coordinates with proper null checks - completely rewritten for safety
+  // Extract coordinates with proper null checks
   const propertyCoordinates = (() => {
     console.log("Extracting coordinates from property data");
     
@@ -610,323 +783,342 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
             
             if (!isNaN(lat) && !isNaN(lng)) {
               console.log("Using property_details.coordinates latitude/longitude:", lat, lng);
-              return { lat, lng };
-            }
-          } catch (e) {
-            console.error("Error parsing property_details.coordinates latitude/longitude:", e);
-          }
-        }
-        
-        // Try lat/lng format
-        if (coords.lat && coords.lng) {
-          try {
-            const lat = parseFloat(String(coords.lat));
-            const lng = parseFloat(String(coords.lng));
-            
-            if (!isNaN(lat) && !isNaN(lng)) {
-              console.log("Using property_details.coordinates lat/lng:", lat, lng);
-              return { lat, lng };
-            }
-          } catch (e) {
-            console.error("Error parsing property_details.coordinates lat/lng:", e);
-          }
-        }
-      }
-      
-      // Try direct lat/lng or latitude/longitude properties in property_details
-      if (details.latitude && details.longitude) {
-        try {
-          const lat = parseFloat(String(details.latitude));
-          const lng = parseFloat(String(details.longitude));
-          
-          if (!isNaN(lat) && !isNaN(lng)) {
-            console.log("Using property_details latitude/longitude:", lat, lng);
-            return { lat, lng };
-          }
-        } catch (e) {
-          console.error("Error parsing property_details latitude/longitude:", e);
-        }
-      }
-      
-      if (details.lat && details.lng) {
-        try {
-          const lat = parseFloat(String(details.lat));
-          const lng = parseFloat(String(details.lng));
-          
-          if (!isNaN(lat) && !isNaN(lng)) {
-            console.log("Using property_details lat/lng:", lat, lng);
-            return { lat, lng };
-          }
-        } catch (e) {
-          console.error("Error parsing property_details lat/lng:", e);
-        }
-      }
-      
-      // Try nested location.coordinates
-      if (details.location && details.location.coordinates) {
-        const coords = details.location.coordinates;
-        
-        // Try latitude/longitude format
-        if (coords.latitude && coords.longitude) {
-          try {
-            const lat = parseFloat(String(coords.latitude));
-            const lng = parseFloat(String(coords.longitude));
-            
-            if (!isNaN(lat) && !isNaN(lng)) {
-              console.log("Using property_details.location.coordinates latitude/longitude:", lat, lng);
-              return { lat, lng };
-            }
-          } catch (e) {
-            console.error("Error parsing property_details.location.coordinates latitude/longitude:", e);
-          }
-        }
-        
-        // Try lat/lng format
-        if (coords.lat && coords.lng) {
-          try {
-            const lat = parseFloat(String(coords.lat));
-            const lng = parseFloat(String(coords.lng));
-            
-            if (!isNaN(lat) && !isNaN(lng)) {
-              console.log("Using property_details.location.coordinates lat/lng:", lat, lng);
-              return { lat, lng };
-            }
-          } catch (e) {
-            console.error("Error parsing property_details.location.coordinates lat/lng:", e);
-          }
-        }
-      }
-    }
-    
-    console.log("No valid coordinates found in property data");
-    return null;
-  })();
+             return { lat, lng };
+           }
+         } catch (e) {
+           console.error("Error parsing property_details.coordinates latitude/longitude:", e);
+         }
+       }
+       
+       // Try lat/lng format
+       if (coords.lat && coords.lng) {
+         try {
+           const lat = parseFloat(String(coords.lat));
+           const lng = parseFloat(String(coords.lng));
+           
+           if (!isNaN(lat) && !isNaN(lng)) {
+             console.log("Using property_details.coordinates lat/lng:", lat, lng);
+             return { lat, lng };
+           }
+         } catch (e) {
+           console.error("Error parsing property_details.coordinates lat/lng:", e);
+         }
+       }
+     }
+     
+     // Try direct lat/lng or latitude/longitude properties in property_details
+     if (details.latitude && details.longitude) {
+       try {
+         const lat = parseFloat(String(details.latitude));
+         const lng = parseFloat(String(details.longitude));
+         
+         if (!isNaN(lat) && !isNaN(lng)) {
+           console.log("Using property_details latitude/longitude:", lat, lng);
+           return { lat, lng };
+         }
+       } catch (e) {
+         console.error("Error parsing property_details latitude/longitude:", e);
+       }
+     }
+     
+     if (details.lat && details.lng) {
+       try {
+         const lat = parseFloat(String(details.lat));
+         const lng = parseFloat(String(details.lng));
+         
+         if (!isNaN(lat) && !isNaN(lng)) {
+           console.log("Using property_details lat/lng:", lat, lng);
+           return { lat, lng };
+         }
+       } catch (e) {
+         console.error("Error parsing property_details lat/lng:", e);
+       }
+     }
+     
+     // Try nested location.coordinates
+     if (details.location && details.location.coordinates) {
+       const coords = details.location.coordinates;
+       
+       // Try latitude/longitude format
+       if (coords.latitude && coords.longitude) {
+         try {
+           const lat = parseFloat(String(coords.latitude));
+           const lng = parseFloat(String(coords.longitude));
+           
+           if (!isNaN(lat) && !isNaN(lng)) {
+             console.log("Using property_details.location.coordinates latitude/longitude:", lat, lng);
+             return { lat, lng };
+           }
+         } catch (e) {
+           console.error("Error parsing property_details.location.coordinates latitude/longitude:", e);
+         }
+       }
+       
+       // Try lat/lng format
+       if (coords.lat && coords.lng) {
+         try {
+           const lat = parseFloat(String(coords.lat));
+           const lng = parseFloat(String(coords.lng));
+           
+           if (!isNaN(lat) && !isNaN(lng)) {
+             console.log("Using property_details.location.coordinates lat/lng:", lat, lng);
+             return { lat, lng };
+           }
+         } catch (e) {
+           console.error("Error parsing property_details.location.coordinates lat/lng:", e);
+         }
+       }
+     }
+   }
+   
+   console.log("No valid coordinates found in property data");
+   return null;
+ })();
 
-  // Log coordinate extraction result
-  console.log("Final coordinates:", propertyCoordinates);
+ // Log coordinate extraction result
+ console.log("Final coordinates:", propertyCoordinates);
 
-  // Handle share functionality
-  const handleShare = () => {
-    if (navigator.share) {
-      navigator.share({
-        title: propertyTitle,
-        url: window.location.href
-      }).catch(console.error);
-    } else {
-      navigator.clipboard.writeText(window.location.href);
-      toast({
-        title: "Link Copied",
-        description: "Property link copied to clipboard",
-        variant: "default"
-      });
-    }
-  };
-  
-  return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-      {/* Property Title Section with Listing Type Badge */}
-      <div className="mb-6">
-        <div className="flex flex-wrap items-center gap-3 mb-2">
-          <h1 className="text-2xl sm:text-3xl font-bold">{propertyTitle}</h1>
-          <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-            isSaleProperty ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
-          }`}>
-            {isSaleProperty ? 'For Sale' : 'For Rent'}
-          </span>
-          <span className="px-3 py-1 rounded-full bg-purple-100 text-purple-800 text-sm font-medium capitalize">
-            {propertyCategory}
-          </span>
-        </div>
-        <p className="text-muted-foreground">{locationString}</p>
-      </div>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main Content Column */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Image Gallery */}
-          <PropertyGalleryCard images={images} />
-          
-          {/* Image Upload Component (only shown to authorized users) */}
-          <PropertyImageUpload 
-            property={property} 
-            onImageUploaded={handleImageUploaded} 
-          />
-          
-          {/* Quick Actions */}
-          <PropertyActionButtons
-            isLiked={isLiked}
-            onToggleLike={onToggleLike}
-            onShare={handleShare}
-            onScheduleVisit={() => setVisitDialogOpen(true)}
-          />
-          
-          {/* Property Overview Card with Price Label */}
-          <PropertyOverview 
-            propertyData={propertyData}
-            listingType={listingType}
-            bedrooms={bedrooms}
-            bathrooms={bathrooms}
-            squareFeet={squareFeet}
-          />
-          
-          {/* Basic Details Section */}
-          <BasicDetailsSection basicDetails={basicDetails} />
-          
-          {/* Sale Details Section - Only shown for Sale properties */}
-          {isSaleProperty && <SaleDetailsCard saleInfo={saleInfo} />}
-          
-          {/* Rental Details Section - Only shown for Rental properties */}
-          {!isSaleProperty && <RentalDetailsCard rentalInfo={rentalInfo} />}
-          
-          {/* Features & Amenities Section */}
-          <FeatureDetailsCard features={features} />
-          
-          {/* About this property */}
-          <PropertyDescriptionSection description={description} />
-          
-          {/* Property Location Map */}
-          <PropertyLocationSection
-            address={locationAddress}
-            city={locationCity}
-            state={locationState}
-            zipCode={locationZipCode}
-            coordinates={propertyCoordinates}
-          />
-          
-          {/* Debug info for coordinates in development */}
-          {import.meta.env.DEV && (
-            <div className="p-3 bg-muted/30 text-xs text-muted-foreground rounded">
-              <p>Coordinates Debug:</p>
-              <p>Direct lat/lng: {property.latitude}, {property.longitude}</p>
-              <p>Extracted: {propertyCoordinates ? `${propertyCoordinates.lat}, ${propertyCoordinates.lng}` : 'None'}</p>
-            </div>
-          )}
-        </div>
-        
-        {/* Sidebar Column */}
-        <div className="space-y-6">
-          <ContactOwnerCard
-            propertyTitle={propertyTitle}
-            propertyId={id}
-            ownerId={owner_id}
-            ownerInfo={property.ownerInfo}
-          />
-          
-          {property.property_details?.highlights && (
-            <PropertyHighlightsCard 
-              highlights={property.property_details.highlights} 
-            />
-          )}
-          
-          <SimilarProperties 
-            properties={similarPropertiesData.map(prop => ({
-              id: prop.id,
-              title: prop.title,
-              city: prop.city,
-              state: prop.state,
-              price: prop.price,
-              bedrooms: prop.bedrooms,
-              bathrooms: prop.bathrooms,
-              square_feet: prop.square_feet
-            }))} 
-          />
-          
-          <NearbyAmenities
-            address={locationAddress}
-            city={locationCity}
-            state={locationState}
-            coordinates={propertyCoordinates}
-            radius={1500}
-          />
-        </div>
-      </div>
-      
-      {/* Visit Request Dialog */}
-      <VisitRequestDialog
-        propertyId={id}
-        open={visitDialogOpen}
-        onOpenChange={setVisitDialogOpen}
-      />
-    </div>
-  );
+ // Handle share functionality
+ const handleShare = () => {
+   if (navigator.share) {
+     navigator.share({
+       title: propertyTitle,
+       url: window.location.href
+     }).catch(console.error);
+   } else {
+     navigator.clipboard.writeText(window.location.href);
+     toast({
+       title: "Link Copied",
+       description: "Property link copied to clipboard",
+       variant: "default"
+     });
+   }
+ };
+ 
+ return (
+   <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+     {/* Property Title Section with Listing Type Badge */}
+     <div className="mb-6">
+       <div className="flex flex-wrap items-center gap-3 mb-2">
+         <h1 className="text-2xl sm:text-3xl font-bold">{propertyTitle}</h1>
+         <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+           isSaleProperty ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
+         }`}>
+           {isSaleProperty ? 'For Sale' : 'For Rent'}
+         </span>
+         <span className="px-3 py-1 rounded-full bg-purple-100 text-purple-800 text-sm font-medium capitalize">
+           {propertyCategory}
+         </span>
+       </div>
+       <p className="text-muted-foreground">{locationString}</p>
+     </div>
+     
+     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+       {/* Main Content Column */}
+       <div className="lg:col-span-2 space-y-6">
+         {/* Image Gallery - Using propertyImages state */}
+         <PropertyGalleryCard images={propertyImages} />
+         
+         {/* Debug info */}
+         <div className="p-3 bg-muted/30 text-xs text-muted-foreground rounded">
+           <p>Images Debug:</p>
+           <p>Images count: {propertyImages.length}</p>
+           {propertyImages.length > 0 ? (
+             <div>
+               <p>First image:</p>
+               <p>- URL: {propertyImages[0].url || propertyImages[0].dataUrl || 'No URL found'}</p>
+               <p>- ID: {propertyImages[0].id || 'No ID'}</p>
+               <p>- Is primary: {propertyImages[0].is_primary || propertyImages[0].isPrimary ? 'Yes' : 'No'}</p>
+               <p>- Display order: {propertyImages[0].display_order || 0}</p>
+               {(propertyImages[0].url || propertyImages[0].dataUrl) && (
+                 <img 
+                   src={propertyImages[0].url || propertyImages[0].dataUrl} 
+                   alt="Debug image" 
+                   className="mt-2 w-20 h-20 object-cover rounded" 
+                   onError={(e) => {
+                     console.log('[PropertyDetails] Image failed to load');
+                     e.currentTarget.src = '/noimage.png';
+                   }}
+                 />
+               )}
+             </div>
+           ) : (
+             <p>No images found in property data</p>
+           )}
+         </div>
+         
+         {/* Image Upload Component (only shown to authorized users) */}
+         <PropertyImageUpload 
+           property={property} 
+           onImageUploaded={handleImageUploaded} 
+         />
+         
+         {/* Quick Actions */}
+         <PropertyActionButtons
+           isLiked={isLiked}
+           onToggleLike={onToggleLike}
+           onShare={handleShare}
+           onScheduleVisit={() => setVisitDialogOpen(true)}
+         />
+         
+         {/* Property Overview Card with Price Label */}
+         <PropertyOverview 
+           propertyData={propertyData}
+           listingType={listingType}
+           bedrooms={bedrooms}
+           bathrooms={bathrooms}
+           squareFeet={squareFeet}
+         />
+         
+         {/* Basic Details Section */}
+         <BasicDetailsSection basicDetails={basicDetails} />
+         
+         {/* Sale Details Section - Only shown for Sale properties */}
+         {isSaleProperty && <SaleDetailsCard saleInfo={saleInfo} />}
+         
+         {/* Rental Details Section - Only shown for Rental properties */}
+         {!isSaleProperty && <RentalDetailsCard rentalInfo={rentalInfo} />}
+         
+         {/* Features & Amenities Section */}
+         <FeatureDetailsCard features={features} />
+         
+         {/* About this property */}
+         <PropertyDescriptionSection description={description} />
+         
+         {/* Property Location Map */}
+         <PropertyLocationSection
+           address={locationAddress}
+           city={locationCity}
+           state={locationState}
+           zipCode={locationZipCode}
+           coordinates={propertyCoordinates}
+         />
+       </div>
+       
+       {/* Sidebar Column */}
+       <div className="space-y-6">
+         <ContactOwnerCard
+           propertyTitle={propertyTitle}
+           propertyId={id}
+           ownerId={owner_id}
+           ownerInfo={property.ownerInfo}
+         />
+         
+         {property.property_details?.highlights && (
+           <PropertyHighlightsCard 
+             highlights={property.property_details.highlights} 
+           />
+         )}
+         
+         <SimilarProperties 
+           properties={similarPropertiesData.map(prop => ({
+             id: prop.id,
+             title: prop.title,
+             city: prop.city,
+             state: prop.state,
+             price: prop.price,
+             bedrooms: prop.bedrooms,
+             bathrooms: prop.bathrooms,
+             square_feet: prop.square_feet
+           }))} 
+         />
+         
+         <NearbyAmenities
+           address={locationAddress}
+           city={locationCity}
+           state={locationState}
+           coordinates={propertyCoordinates}
+           radius={1500}
+         />
+       </div>
+     </div>
+     
+     {/* Visit Request Dialog */}
+     <VisitRequestDialog
+       propertyId={id}
+       open={visitDialogOpen}
+       onOpenChange={setVisitDialogOpen}
+     />
+   </div>
+ );
 };
 
 // Loading state skeleton
 const PropertyDetailsSkeleton: React.FC = () => {
-  return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-      {/* Title skeleton */}
-      <div className="mb-6">
-        <Skeleton className="h-8 w-3/4 mb-2" />
-        <Skeleton className="h-4 w-1/2" />
-      </div>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          {/* Gallery skeleton */}
-          <Skeleton className="w-full aspect-[16/9] rounded-xl" />
-          
-          {/* Actions skeleton */}
-          <div className="flex gap-3">
-            <Skeleton className="h-10 w-24" />
-            <Skeleton className="h-10 w-24" />
-            <Skeleton className="h-10 w-24" />
-          </div>
-          
-          {/* Details skeleton */}
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex flex-col md:flex-row md:justify-between mb-6">
-                <Skeleton className="h-8 w-36 mb-2" />
-                <div className="grid grid-cols-3 gap-4 w-full md:w-auto">
-                  <Skeleton className="h-16 w-full" />
-                  <Skeleton className="h-16 w-full" />
-                  <Skeleton className="h-16 w-full" />
-                </div>
-              </div>
-              
-              <Skeleton className="h-6 w-48 mb-3" />
-              <Skeleton className="h-4 w-full mb-2" />
-              <Skeleton className="h-4 w-full mb-2" />
-              <Skeleton className="h-4 w-3/4" />
-            </CardContent>
-          </Card>
-          
-          {/* Map skeleton */}
-          <Card>
-            <CardContent className="p-6">
-              <Skeleton className="h-6 w-48 mb-3" />
-              <Skeleton className="h-80 w-full rounded-lg" />
-            </CardContent>
-          </Card>
-        </div>
-        
-        <div className="space-y-6">
-          {/* Contact card skeleton */}
-          <Card>
-            <CardContent className="p-6">
-              <Skeleton className="h-6 w-40 mb-4" />
-              <Skeleton className="h-4 w-full mb-2" />
-              <Skeleton className="h-4 w-1/2 mb-4" />
-              <Skeleton className="h-10 w-full" />
-            </CardContent>
-          </Card>
-          
-          {/* Similar properties skeleton */}
-          <Card>
-            <CardContent className="p-6">
-              <Skeleton className="h-6 w-40 mb-4" />
-              <div className="space-y-2">
-                <Skeleton className="h-16 w-full" />
-                <Skeleton className="h-16 w-full" />
-                <Skeleton className="h-16 w-full" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    </div>
-  );
+ return (
+   <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+     {/* Title skeleton */}
+     <div className="mb-6">
+       <Skeleton className="h-8 w-3/4 mb-2" />
+       <Skeleton className="h-4 w-1/2" />
+     </div>
+     
+     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+       <div className="lg:col-span-2 space-y-6">
+         {/* Gallery skeleton */}
+         <Skeleton className="w-full aspect-[16/9] rounded-xl" />
+         
+         {/* Actions skeleton */}
+         <div className="flex gap-3">
+           <Skeleton className="h-10 w-24" />
+           <Skeleton className="h-10 w-24" />
+           <Skeleton className="h-10 w-24" />
+         </div>
+         
+         {/* Details skeleton */}
+         <Card>
+           <CardContent className="p-6">
+             <div className="flex flex-col md:flex-row md:justify-between mb-6">
+               <Skeleton className="h-8 w-36 mb-2" />
+               <div className="grid grid-cols-3 gap-4 w-full md:w-auto">
+                 <Skeleton className="h-16 w-full" />
+                 <Skeleton className="h-16 w-full" />
+                 <Skeleton className="h-16 w-full" />
+               </div>
+             </div>
+             
+             <Skeleton className="h-6 w-48 mb-3" />
+             <Skeleton className="h-4 w-full mb-2" />
+             <Skeleton className="h-4 w-full mb-2" />
+             <Skeleton className="h-4 w-3/4" />
+           </CardContent>
+         </Card>
+         
+         {/* Map skeleton */}
+         <Card>
+           <CardContent className="p-6">
+             <Skeleton className="h-6 w-48 mb-3" />
+             <Skeleton className="h-80 w-full rounded-lg" />
+           </CardContent>
+         </Card>
+       </div>
+       
+       <div className="space-y-6">
+         {/* Contact card skeleton */}
+         <Card>
+           <CardContent className="p-6">
+             <Skeleton className="h-6 w-40 mb-4" />
+             <Skeleton className="h-4 w-full mb-2" />
+             <Skeleton className="h-4 w-1/2 mb-4" />
+             <Skeleton className="h-10 w-full" />
+           </CardContent>
+         </Card>
+         
+         {/* Similar properties skeleton */}
+         <Card>
+           <CardContent className="p-6">
+             <Skeleton className="h-6 w-40 mb-4" />
+             <div className="space-y-2">
+               <Skeleton className="h-16 w-full" />
+               <Skeleton className="h-16 w-full" />
+               <Skeleton className="h-16 w-full" />
+             </div>
+           </CardContent>
+         </Card>
+       </div>
+     </div>
+   </div>
+ );
 };
 
 export default PropertyDetails;

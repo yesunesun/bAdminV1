@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyDetails/PropertyGallery.tsx
-// Version: 3.0.0
-// Last Modified: 06-04-2025 12:15 IST
-// Purpose: Enhanced image gallery with better error handling and fallbacks
+// Version: 5.0.0
+// Last Modified: 09-05-2025 20:30 IST
+// Purpose: Fixed syntax error and enhanced flexibility for handling both image formats
 
 import React, { useState, useEffect } from 'react';
 import { ChevronLeftIcon, ChevronRightIcon, ImageIcon, ExpandIcon, XIcon } from 'lucide-react';
@@ -18,39 +18,85 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({ images }) => {
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
   const [fullscreenIndex, setFullscreenIndex] = useState(0);
   const [displayImages, setDisplayImages] = useState<PropertyImage[]>([]);
+  const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
+  
+  // Get image source - handles both dataUrl and url formats
+  const getImageSource = (image: PropertyImage): string => {
+    // First try dataUrl (newer format)
+    if (image.dataUrl && typeof image.dataUrl === 'string') {
+      return image.dataUrl;
+    }
+    
+    // Then try url (standard format)
+    if (image.url && typeof image.url === 'string') {
+      return image.url;
+    }
+    
+    // Fallback to placeholder
+    return '/noimage.png';
+  };
   
   // Process images when they change
   useEffect(() => {
-    // Log received images for debugging
-    console.log('[PropertyGallery] Received images:', images);
+    console.log('[PropertyGallery] Received images:', images?.length || 0);
     
     if (!images || images.length === 0) {
-      // Use a placeholder if no images are available
+      console.log('[PropertyGallery] No images received, using placeholder');
       setDisplayImages([{
         id: 'placeholder',
-        url: '/noimage.png'
+        url: '/noimage.png',
+        is_primary: true,
+        display_order: 0
       }]);
       return;
     }
+
+    // Ensure all images have valid URLs or dataUrls
+    const validImages = images
+      .filter(img => img && (img.url || img.dataUrl))
+      .map((img, index) => ({
+        id: img.id || `img-${index}`,
+        url: img.url,
+        dataUrl: img.dataUrl,
+        is_primary: !!(img.is_primary || img.isPrimary),
+        isPrimary: !!(img.isPrimary || img.is_primary),
+        display_order: img.display_order || index
+      }));
     
-    // Ensure all images have valid URLs
-    const validImages = images.filter(img => img && img.url);
+    // Log images to debug
+    console.log('[PropertyGallery] Valid images count:', validImages.length);
+    if (validImages.length > 0) {
+      const firstImg = validImages[0];
+      console.log('[PropertyGallery] First image details:', {
+        id: firstImg.id,
+        hasUrl: !!firstImg.url,
+        hasDataUrl: !!firstImg.dataUrl,
+        is_primary: firstImg.is_primary,
+        isPrimary: firstImg.isPrimary
+      });
+    }
     
     if (validImages.length === 0) {
+      console.log('[PropertyGallery] No valid images found, using placeholder');
       setDisplayImages([{
         id: 'placeholder',
-        url: '/noimage.png'
+        url: '/noimage.png',
+        is_primary: true,
+        display_order: 0
       }]);
       return;
     }
+    
+    // Reset image errors when images change
+    setImageErrors({});
     
     // Sort images: primary first, then by display order
     const sortedImages = [...validImages].sort((a, b) => {
-      if (a.is_primary && !b.is_primary) return -1;
-      if (!a.is_primary && b.is_primary) return 1;
-      return (a.display_order || 999) - (b.display_order || 999);
+      if ((a.is_primary || a.isPrimary) && !(b.is_primary || b.isPrimary)) return -1;
+      if (!(a.is_primary || a.isPrimary) && (b.is_primary || b.isPrimary)) return 1;
+      return (a.display_order || 0) - (b.display_order || 0);
     });
-    
+
     setDisplayImages(sortedImages);
     setCurrentIndex(0); // Reset to first image when images change
   }, [images]);
@@ -99,8 +145,19 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({ images }) => {
   };
   
   // Handle image load errors
-  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
+  const handleImageError = (imageId: string, e: React.SyntheticEvent<HTMLImageElement>) => {
+    console.log(`[PropertyGallery] Image load error for ID: ${imageId}`);
     e.currentTarget.src = '/noimage.png';
+    
+    // Track which images failed to load
+    setImageErrors(prev => ({ ...prev, [imageId]: true }));
+    
+    // If current image failed, try next one
+    if (imageId === displayImages[currentIndex].id && !imageErrors[imageId]) {
+      setTimeout(() => {
+        goToNextSlide();
+      }, 500);
+    }
   };
   
   return (
@@ -109,10 +166,10 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({ images }) => {
       <div className="relative rounded-xl overflow-hidden bg-muted group">
         <div className="aspect-[16/9] md:aspect-[21/9] overflow-hidden">
           <img
-            src={displayImages[currentIndex].url}
+            src={getImageSource(displayImages[currentIndex])}
             alt={`Property view ${currentIndex + 1}`}
             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-            onError={handleImageError}
+            onError={(e) => handleImageError(displayImages[currentIndex].id, e)}
           />
         </div>
         
@@ -178,10 +235,10 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({ images }) => {
               }`}
             >
               <img
-                src={image.url}
+                src={getImageSource(image)}
                 alt={`Thumbnail ${index + 1}`}
                 className="w-full h-full object-cover"
-                onError={handleImageError}
+                onError={(e) => handleImageError(image.id, e)}
               />
             </button>
           ))}
@@ -205,10 +262,10 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({ images }) => {
             {/* Main image container */}
             <div className="flex-1 flex items-center justify-center p-4">
               <img
-                src={displayImages[fullscreenIndex].url}
+                src={getImageSource(displayImages[fullscreenIndex])}
                 alt={`Property view ${fullscreenIndex + 1}`}
                 className="max-h-full max-w-full object-contain"
-                onError={handleImageError}
+                onError={(e) => handleImageError(displayImages[fullscreenIndex].id, e)}
               />
             </div>
             
@@ -254,10 +311,10 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({ images }) => {
                         }`}
                       >
                         <img
-                          src={image.url}
+                          src={getImageSource(image)}
                           alt={`Thumbnail ${index + 1}`}
                           className="w-full h-full object-cover"
-                          onError={handleImageError}
+                          onError={(e) => handleImageError(image.id, e)}
                         />
                       </button>
                     ))}

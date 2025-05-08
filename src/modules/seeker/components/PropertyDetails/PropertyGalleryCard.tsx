@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyDetails/PropertyGalleryCard.tsx
-// Version: 1.0.0
-// Last Modified: 30-04-2025 11:00 IST
-// Purpose: Wrapper for property gallery to handle image display
+// Version: 4.0.0
+// Last Modified: 09-05-2025 20:30 IST
+// Purpose: Fixed syntax error in PropertyGalleryCard
 
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -13,6 +13,15 @@ interface PropertyGalleryCardProps {
 }
 
 const PropertyGalleryCard: React.FC<PropertyGalleryCardProps> = ({ images }) => {
+  // Log received images for debugging
+  console.log('[PropertyGalleryCard] Received images count:', images?.length || 0);
+  
+  if (images && images.length > 0) {
+    const firstImage = images[0];
+    console.log('[PropertyGalleryCard] First image has dataUrl:', !!firstImage.dataUrl);
+    console.log('[PropertyGalleryCard] First image has url:', !!firstImage.url);
+  }
+  
   return (
     <Card className="overflow-hidden">
       <CardContent className="p-0">

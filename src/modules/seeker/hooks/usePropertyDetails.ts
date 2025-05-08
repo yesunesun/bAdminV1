@@ -1,7 +1,7 @@
 // src/modules/seeker/hooks/usePropertyDetails.ts
-// Version: 5.6.0
-// Last Modified: 07-05-2025 16:30 IST
-// Purpose: Updated to fetch data from properties_v2 table with fallback to original properties table
+// Version: 7.0.0
+// Last Modified: 09-05-2025 20:30 IST
+// Purpose: Complete fix for image loading inconsistencies between popup and main page
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useLocation } from 'react-router-dom';
@@ -10,8 +10,10 @@ import { useAuth } from '@/contexts/AuthContext';
 
 export interface PropertyImage {
   id: string;
-  url: string;
+  url?: string;
+  dataUrl?: string;
   is_primary?: boolean;
+  isPrimary?: boolean;
   display_order?: number;
   created_at?: string;
 }
@@ -135,6 +137,123 @@ export const usePropertyDetails = (refreshDependency = 0) => {
     return 0;
   };
 
+  // Helper function to extract images from nested property_details structure
+  const extractImagesFromPropertyDetails = (propertyData: any): PropertyImage[] => {
+    console.log('[usePropertyDetails] Attempting to extract images from property_details');
+    
+    // Debug the raw property_details if available
+    if (propertyData.property_details) {
+      console.log('[DEBUG] Raw property_details structure type:', typeof propertyData.property_details);
+      if (typeof propertyData.property_details === 'object') {
+        console.log('[DEBUG] property_details has direct images array:', !!propertyData.property_details.images);
+        if (propertyData.property_details.images && propertyData.property_details.images.length > 0) {
+          console.log('[DEBUG] First image in property_details.images:', JSON.stringify(propertyData.property_details.images[0]));
+        }
+      }
+    }
+    
+    const timestamp = new Date().getTime();
+    let extractedImages: PropertyImage[] = [];
+    
+    try {
+      // Parse property_details if it's a string
+      let details = propertyData.property_details;
+      if (typeof details === 'string') {
+        try {
+          details = JSON.parse(details);
+          console.log('[usePropertyDetails] Successfully parsed property_details string to object');
+        } catch (e) {
+          console.error('[usePropertyDetails] Failed to parse property_details as string:', e);
+        }
+      }
+      
+      // CRITICAL FIX: Check directly for dataUrl images array (from PropertyImageUpload)
+      if (details && details.images && Array.isArray(details.images)) {
+        const firstImage = details.images[0];
+        console.log('[DEBUG] Checking first image format:', firstImage && JSON.stringify(firstImage));
+        
+        // Check if images are in dataUrl format (from PropertyImageUpload)
+        if (firstImage && firstImage.dataUrl) {
+          console.log('[SUCCESS] Found images in dataUrl format:', details.images.length);
+          
+          // These images are in dataUrl format with isPrimary (camelCase)
+          // Need to transform to standard format with url property and is_primary (snake_case)
+          return details.images.map((img: any, idx: number) => ({
+            id: img.id || `img-${idx}`,
+            url: img.dataUrl, // Map dataUrl to url for compatibility
+            dataUrl: img.dataUrl, // Keep original dataUrl
+            is_primary: !!img.isPrimary, // Add standard is_primary for compatibility
+            isPrimary: !!img.isPrimary, // Keep original isPrimary
+            display_order: idx
+          }));
+        }
+      }
+      
+      // Try various paths to find images in order of likelihood
+      if (details?.details?.media?.photos?.images) {
+        console.log('[usePropertyDetails] Found images in details.media.photos.images');
+        extractedImages = details.details.media.photos.images;
+      } else if (details?.details?.media?.images) {
+        console.log('[usePropertyDetails] Found images in details.media.images');
+        extractedImages = details.details.media.images;
+      } else if (details?.media?.photos?.images) {
+        console.log('[usePropertyDetails] Found images in media.photos.images');
+        extractedImages = details.media.photos.images;
+      } else if (details?.media?.images) {
+        console.log('[usePropertyDetails] Found images in media.images');
+        extractedImages = details.media.images;
+      } else if (details?.photos?.images) {
+        console.log('[usePropertyDetails] Found images in photos.images');
+        extractedImages = details.photos.images;
+      } else if (details?.images && Array.isArray(details.images)) {
+        console.log('[usePropertyDetails] Found direct images array');
+        extractedImages = details.images;
+      } else if (propertyData.photos?.images) {
+        console.log('[usePropertyDetails] Found images in top-level photos.images');
+        extractedImages = propertyData.photos.images;
+      } else if (propertyData.property_images && Array.isArray(propertyData.property_images)) {
+        console.log('[usePropertyDetails] Using property_images array directly, count:', propertyData.property_images.length);
+        extractedImages = propertyData.property_images;
+      }
+      
+      // Process standard image formats
+      if (extractedImages && Array.isArray(extractedImages) && extractedImages.length > 0) {
+        console.log('[usePropertyDetails] Processing standard image format, count:', extractedImages.length);
+        console.log('[DEBUG] First extracted image:', JSON.stringify(extractedImages[0]));
+        
+        // Filter and transform image objects to a consistent format
+        const processedImages = extractedImages
+          .filter(img => img && (img.url || img.dataUrl)) // Keep only images with url or dataUrl
+          .map((img, idx) => {
+            // Handle different image formats and ensure consistent properties
+            const imageSource = img.dataUrl || img.url || (typeof img === 'string' ? img : '');
+            
+            // Create standardized image object with both formats of properties
+            return {
+              id: img.id || `img-${idx}`,
+              url: imageSource, // Standard property expected by most components
+              dataUrl: img.dataUrl || imageSource, // Keep dataUrl if available
+              is_primary: !!(img.is_primary || img.isPrimary), // Standard snake_case format
+              isPrimary: !!(img.isPrimary || img.is_primary), // CamelCase format for newer code
+              display_order: img.display_order || idx
+            };
+          });
+        
+        console.log('[DEBUG] Processed images count:', processedImages.length);
+        if (processedImages.length > 0) {
+          console.log('[DEBUG] First processed image:', JSON.stringify(processedImages[0]));
+        }
+        
+        return processedImages;
+      }
+    } catch (error) {
+      console.error('[usePropertyDetails] Error extracting images:', error);
+    }
+    
+    console.log('[usePropertyDetails] No images found in property_details');
+    return [];
+  };
+
   // The main data fetching function
   const fetchPropertyDetails = useCallback(async () => {
     if (!propertyId) {
@@ -173,54 +292,6 @@ export const usePropertyDetails = (refreshDependency = 0) => {
         throw new Error(`Failed to load property: ${fetchError.message}`);
       }
 
-      // Add this for debugging - log raw DB results
-      console.log('=================== DB QUERY RESULTS ===================');
-      console.log('RAW DB RESULT:', data);
-      if (data && data.length > 0) {
-        console.log('FIRST RECORD FROM DB:', {
-          id: data[0].id,
-          hasData: !!data[0],
-          keys: Object.keys(data[0]),
-          dataType: typeof data[0]
-        });
-        
-        // Log complete stringified JSON
-        console.log('COMPLETE DB RECORD AS JSON:', JSON.stringify(data[0], null, 2));
-        
-        // Check if property_details contains nested JSON
-        if (data[0].property_details) {
-          console.log('PROPERTY_DETAILS FIELD TYPE:', typeof data[0].property_details);
-          
-          // Log property_details content
-          if (typeof data[0].property_details === 'object') {
-            console.log('PROPERTY_DETAILS CONTENT:', data[0].property_details);
-            console.log('PROPERTY_DETAILS KEYS:', Object.keys(data[0].property_details));
-            
-            // Check for basic details inside property_details
-            if (data[0].property_details.basicDetails) {
-              console.log('BASIC DETAILS FOUND IN PROPERTY_DETAILS:', 
-                data[0].property_details.basicDetails);
-            }
-          } else if (typeof data[0].property_details === 'string') {
-            // Attempt to parse if it's a JSON string
-            try {
-              const parsedDetails = JSON.parse(data[0].property_details);
-              console.log('PARSED PROPERTY_DETAILS:', parsedDetails);
-              
-              if (parsedDetails.basicDetails) {
-                console.log('BASIC DETAILS FOUND IN PARSED PROPERTY_DETAILS:',
-                  parsedDetails.basicDetails);
-              }
-            } catch (parseError) {
-              console.error('ERROR PARSING PROPERTY_DETAILS STRING:', parseError);
-            }
-          }
-        }
-      } else {
-        console.error('[usePropertyDetails] No data returned from database query');
-      }
-      console.log('=========================================================');
-
       if (!data || data.length === 0) {
         console.error('[usePropertyDetails] Property not found in either properties_v2 or properties tables');
         throw new Error('Property not found');
@@ -228,6 +299,7 @@ export const usePropertyDetails = (refreshDependency = 0) => {
 
       // Get the property data (first result)
       const propertyData = data[0];
+      console.log('[DEBUG] Raw property data fetched successfully');
       
       // Extract the nested data from property_details if it exists
       let extractedData: any = { ...propertyData };
@@ -244,14 +316,10 @@ export const usePropertyDetails = (refreshDependency = 0) => {
         
         keysToExtract.forEach(key => {
           if (details[key]) {
-            console.log(`[usePropertyDetails] Found ${key} in property_details:`, details[key]);
+            console.log(`[usePropertyDetails] Found ${key} in property_details`);
             extractedData[key] = details[key];
           }
         });
-        
-        // Log the extracted data
-        console.log('[usePropertyDetails] Extracted data from property_details:', 
-          JSON.stringify(extractedData, null, 2));
       }
       // If property_details is a string, try to parse it
       else if (propertyData.property_details && typeof propertyData.property_details === 'string') {
@@ -265,165 +333,180 @@ export const usePropertyDetails = (refreshDependency = 0) => {
           
           keysToExtract.forEach(key => {
             if (parsedDetails[key]) {
-              console.log(`[usePropertyDetails] Found ${key} in parsed property_details:`, parsedDetails[key]);
+              console.log(`[usePropertyDetails] Found ${key} in parsed property_details`);
               extractedData[key] = parsedDetails[key];
             }
           });
-          
-          console.log('[usePropertyDetails] Extracted data from parsed property_details:', 
-            JSON.stringify(extractedData, null, 2));
         } catch (parseError) {
           console.error('[usePropertyDetails] Error parsing property_details string:', parseError);
         }
       }
       
-      // Fetch images in a separate query with timestamp to avoid caching issues
+      // 1. Try to extract images from property_details structure first
+      const extractedImages = extractImagesFromPropertyDetails(propertyData);
+      console.log('[usePropertyDetails] Images extracted from property_details:', extractedImages.length);
+      
+      // 2. As a fallback, fetch images from property_images table
       const timestamp = new Date().getTime();
-      const { data: imagesData, error: imagesError } = await supabase
-        .from('property_images')
-        .select('*')
-        .eq('property_id', propertyId)
-        .order('created_at', { ascending: false }) // Newest images first
-        .then(result => {
-          // Add a cache-busting query param to image URLs
-          if (result.data) {
-            return {
-              ...result,
-              data: result.data.map(img => ({
-                ...img,
-                url: img.url.includes('?')
-                  ? `${img.url}&_t=${timestamp}`
-                  : `${img.url}?_t=${timestamp}`
-              }))
-            };
-          }
-          return result;
-        });
-
-      if (imagesError) {
-        console.error('[usePropertyDetails] Error fetching images:', imagesError);
-      }
-
-      console.log('[usePropertyDetails] Images found:', imagesData?.length || 0);
-
-      // Fetch owner info
-      let ownerInfo = null;
-      if (propertyData.owner_id) {
-        const { data: ownerData } = await supabase
-          .from('profiles')
-          .select('id, email, phone')
-          .eq('id', propertyData.owner_id)
-          .maybeSingle();
-
-        ownerInfo = ownerData;
-      }
-
-      // Check if the user has liked this property
-      if (user) {
-        const { data: likeData } = await supabase
-          .from('property_likes')
-          .select('id')
-          .eq('property_id', propertyId)
-          .eq('user_id', user.id)
-          .maybeSingle();
-
-        setIsLiked(!!likeData);
-      }
-
-      // Ensure we have a basicDetails object 
-      if (!extractedData.basicDetails) {
-        console.log('[usePropertyDetails] Creating default basicDetails object');
+      let dbImages: PropertyImage[] = [];
+      
+      if (extractedImages.length === 0) {
+        console.log('[usePropertyDetails] No images found in property_details, falling back to property_images table');
         
-        // Create a default basicDetails object
-        extractedData.basicDetails = {
-          propertyType: 'Residential',
-          bhkType: extractedData.bedrooms ? `${extractedData.bedrooms} BHK` : '',
-          bathrooms: extractedData.bathrooms || '',
-          builtUpArea: extractedData.square_feet || 0,
-          builtUpAreaUnit: 'sqft',
-          floor: 0,
-          totalFloors: 0,
-          facing: '',
-          propertyAge: '',
-          possessionDate: ''
-        };
-      }
-      
-      // Add images to the final property object
-      extractedData.property_images = imagesData || [];
-      extractedData.ownerInfo = ownerInfo;
-      
-      // Log the final property data
-      console.log('[usePropertyDetails] Final property data with basicDetails:', 
-        JSON.stringify(extractedData.basicDetails, null, 2));
-
-      setProperty(extractedData);
-      setError(null);
-
-    } catch (err) {
-      console.error('[usePropertyDetails] Error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load property details');
-      setProperty(null);
-    } finally {
-      setLoading(false);
-    }
-  }, [propertyId, user, refreshDependency]);
-
-  // Function to manually refresh data
-  const refreshData = useCallback(async () => {
-    console.log('[usePropertyDetails] Manual refresh requested');
-    await fetchPropertyDetails();
-  }, [fetchPropertyDetails]);
-
-  // Fetch property details when component mounts or propertyId/user/refreshDependency changes
-  useEffect(() => {
-    console.log('[usePropertyDetails] Refresh dependency changed, value:', refreshDependency);
-    fetchPropertyDetails();
-  }, [propertyId, user, refreshDependency, fetchPropertyDetails]);
-
-  // Toggle property like function
-  const toggleLike = async () => {
-    if (!propertyId || !user) {
-      return { success: false, message: 'You need to be logged in to save properties' };
-    }
-
-    try {
-      if (isLiked) {
-        await supabase
-          .from('property_likes')
-          .delete()
+        const { data: imagesData, error: imagesError } = await supabase
+          .from('property_images')
+          .select('*')
           .eq('property_id', propertyId)
-          .eq('user_id', user.id);
-      } else {
-        await supabase
-          .from('property_likes')
-          .insert({
-            property_id: propertyId,
-            user_id: user.id,
-            created_at: new Date().toISOString()
-          });
+          .order('created_at', { ascending: false }); // Newest images first
+        
+        if (imagesError) {
+          console.error('[usePropertyDetails] Error fetching images from table:', imagesError);
+        } else if (imagesData && imagesData.length > 0) {
+          console.log('[usePropertyDetails] Found images in property_images table:', imagesData.length);
+          
+          // Add cache-busting to image URLs and transform to consistent format
+          dbImages = imagesData.map(img => ({
+            id: img.id,
+            url: img.url.includes('?')
+              ? `${img.url}&_t=${timestamp}`
+              : `${img.url}?_t=${timestamp}`,
+            is_primary: !!img.is_primary,
+            isPrimary: !!img.is_primary, // Add camelCase version for newer code
+            display_order: img.display_order || 999
+          }));
+        }
       }
+      
+      // Merge images, preferring JSON-extracted ones if available
+      const allImages = extractedImages.length > 0 ? extractedImages : dbImages;
+      console.log('[usePropertyDetails] Final combined image count:', allImages.length);
+      
+      // Debug - log image URLs for inspection
+      if (allImages.length > 0) {
+        console.log('[DEBUG] First image details:', {
+          id: allImages[0].id,
+          url: allImages[0].url ? allImages[0].url.substring(0, 30) + '...' : 'No URL',
+          dataUrl: allImages[0].dataUrl ? allImages[0].dataUrl.substring(0, 30) + '...' : 'No dataUrl',
+          is_primary: allImages[0].is_primary,
+         isPrimary: allImages[0].isPrimary,
+         display_order: allImages[0].display_order
+       });
+     }
 
-      setIsLiked(!isLiked);
-      return {
-        success: true,
-        message: isLiked ? 'Property removed from saved items' : 'Property saved successfully'
-      };
-    } catch (err) {
-      console.error('[usePropertyDetails] Toggle like error:', err);
-      return {
-        success: false,
-        message: 'Failed to update saved status. Please try again.'
-      };
-    }
-  };
+     // Fetch owner info
+     let ownerInfo = null;
+     if (propertyData.owner_id) {
+       const { data: ownerData } = await supabase
+         .from('profiles')
+         .select('id, email, phone')
+         .eq('id', propertyData.owner_id)
+         .maybeSingle();
 
-  return {
-    property,
-    loading,
-    error,
-    isLiked,
-    toggleLike,
-    refreshData
-  };
+       ownerInfo = ownerData;
+     }
+
+     // Check if the user has liked this property
+     if (user) {
+       const { data: likeData } = await supabase
+         .from('property_likes')
+         .select('id')
+         .eq('property_id', propertyId)
+         .eq('user_id', user.id)
+         .maybeSingle();
+
+       setIsLiked(!!likeData);
+     }
+
+     // Ensure we have a basicDetails object 
+     if (!extractedData.basicDetails) {
+       console.log('[usePropertyDetails] Creating default basicDetails object');
+       
+       // Create a default basicDetails object
+       extractedData.basicDetails = {
+         propertyType: 'Residential',
+         bhkType: extractedData.bedrooms ? `${extractedData.bedrooms} BHK` : '',
+         bathrooms: extractedData.bathrooms || '',
+         builtUpArea: extractedData.square_feet || 0,
+         builtUpAreaUnit: 'sqft',
+         floor: 0,
+         totalFloors: 0,
+         facing: '',
+         propertyAge: '',
+         possessionDate: ''
+       };
+     }
+     
+     // Add images and owner info to the final property object
+     extractedData.property_images = allImages;
+     extractedData.ownerInfo = ownerInfo;
+
+     setProperty(extractedData);
+     setError(null);
+
+   } catch (err) {
+     console.error('[usePropertyDetails] Error:', err);
+     setError(err instanceof Error ? err.message : 'Failed to load property details');
+     setProperty(null);
+   } finally {
+     setLoading(false);
+   }
+ }, [propertyId, user, refreshDependency]);
+
+ // Function to manually refresh data
+ const refreshData = useCallback(async () => {
+   console.log('[usePropertyDetails] Manual refresh requested');
+   await fetchPropertyDetails();
+ }, [fetchPropertyDetails]);
+
+ // Fetch property details when component mounts or propertyId/user/refreshDependency changes
+ useEffect(() => {
+   console.log('[usePropertyDetails] Refresh dependency changed, value:', refreshDependency);
+   fetchPropertyDetails();
+ }, [propertyId, user, refreshDependency, fetchPropertyDetails]);
+
+ // Toggle property like function
+ const toggleLike = async () => {
+   if (!propertyId || !user) {
+     return { success: false, message: 'You need to be logged in to save properties' };
+   }
+
+   try {
+     if (isLiked) {
+       await supabase
+         .from('property_likes')
+         .delete()
+         .eq('property_id', propertyId)
+         .eq('user_id', user.id);
+     } else {
+       await supabase
+         .from('property_likes')
+         .insert({
+           property_id: propertyId,
+           user_id: user.id,
+           created_at: new Date().toISOString()
+         });
+     }
+
+     setIsLiked(!isLiked);
+     return {
+       success: true,
+       message: isLiked ? 'Property removed from saved items' : 'Property saved successfully'
+     };
+   } catch (err) {
+     console.error('[usePropertyDetails] Toggle like error:', err);
+     return {
+       success: false,
+       message: 'Failed to update saved status. Please try again.'
+     };
+   }
+ };
+
+ return {
+   property,
+   loading,
+   error,
+   isLiked,
+   toggleLike,
+   refreshData
+ };
 };
