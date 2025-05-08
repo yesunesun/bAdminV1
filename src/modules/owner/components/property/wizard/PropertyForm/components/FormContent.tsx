@@ -1,56 +1,47 @@
 // src/modules/owner/components/property/wizard/PropertyForm/components/FormContent.tsx
-// Version: 4.14.0
-// Last Modified: 07-05-2025 19:30 IST
-// Purpose: Fixed "Section not available" for rentalDetails step
+// Version: 5.1.0
+// Last Modified: 09-05-2025 13:45 IST
+// Purpose: Updated to use new step names and fix import issues for named exports
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { UseFormReturn } from 'react-hook-form';
-import { FormData } from '../../types';
+import { FormData } from '../../../types';
 
-// Use corrected relative import paths
+// Import all sections - with correct named imports for components that use named exports
 import { PropertyDetails } from '../../sections/PropertyDetails';
-import { LocationDetails } from '../../sections/LocationDetails';
-import { RentalDetails } from '../../sections/RentalDetails';
+import { CommercialBasicDetails } from '../../sections/CommercialBasicDetails';
+import CoworkingBasicDetails from '../../sections/CoworkingBasicDetails';
+import { LocationDetails } from '../../sections/LocationDetails'; 
+import RentalDetails from '../../sections/RentalDetails';
 import { SaleDetails } from '../../sections/SaleDetails';
 import { AmenitiesSection } from '../../sections/AmenitiesSection';
-import { PropertySummary } from '../../sections/PropertySummary';
+import PropertySummary from '../../sections/PropertySummary';
 import { ImageUploadSection } from '../../sections/ImageUploadSection';
-import { Loader2, AlertCircle } from 'lucide-react';
-
-// Import existing specific components
-import RoomDetails from '../../sections/RoomDetails';
-import PGDetails from '../../sections/PGDetails';
-import CommercialDetails from '../../sections/CommercialDetails';
-
-// Import new components for the new flows
-import CommercialSaleDetails from '../../sections/CommercialSaleDetails';
-import CoworkingDetails from '../../sections/CoworkingDetails';
-import CoworkingBasicDetails from '../../sections/CoworkingBasicDetails'; // New import
 import LandDetails from '../../sections/LandDetails';
 import LandFeaturesDetails from '../../sections/LandFeaturesDetails';
 import FlatmateDetails from '../../sections/FlatmateDetails';
-
-// Import specialized Commercial Features component
+import PGDetails from '../../sections/PGDetails';
+import CommercialDetails from '../../sections/CommercialDetails';
 import CommercialFeatures from '../../sections/CommercialFeatures';
-
-// Import new CommercialBasicDetails component
-import { CommercialBasicDetails } from '../../sections/CommercialBasicDetails';
+import CommercialSaleDetails from '../../sections/CommercialSaleDetails';
+import CoworkingDetails from '../../sections/CoworkingDetails';
+import RoomDetails from '../../sections/RoomDetails';
 
 interface FormContentProps {
   form: UseFormReturn<FormData>;
   formStep: number;
-  STEPS: any[]; // Using any to match the original import type
+  STEPS: any[];
   effectiveCategory: string;
   effectiveAdType: string;
   mode: 'create' | 'edit';
   selectedCity: string;
   isSaleMode: boolean;
-  isPGHostelMode: boolean; // Prop for PG/Hostel flow
-  isCommercialRentMode?: boolean; // Prop for Commercial Rent flow
-  isCommercialSaleMode?: boolean; // Prop for Commercial Sale flow
-  isCoworkingMode?: boolean; // Prop for Commercial Co-working flow
-  isLandSaleMode?: boolean; // Prop for Land/Plot Sale flow
-  isFlatmatesMode?: boolean; // Prop for Residential Flatmates flow
+  isPGHostelMode: boolean;
+  isCommercialRentMode: boolean;
+  isCommercialSaleMode: boolean;
+  isCoworkingMode: boolean;
+  isLandSaleMode: boolean;
+  isFlatmatesMode: boolean;
   handlePreviousStep: () => void;
   handleSaveAsDraft: () => Promise<void>;
   handleSaveAndPublish: () => Promise<void>;
@@ -58,7 +49,7 @@ interface FormContentProps {
   saving: boolean;
   status: 'draft' | 'published';
   savedPropertyId?: string;
-  handleImageUploadComplete: () => void;
+  handleImageUploadComplete?: () => void;
 }
 
 const FormContent = ({
@@ -70,12 +61,12 @@ const FormContent = ({
   mode,
   selectedCity,
   isSaleMode,
-  isPGHostelMode, // Prop for PG/Hostel flow
-  isCommercialRentMode = false, // Prop for Commercial Rent flow
-  isCommercialSaleMode = false, // Prop for Commercial Sale flow
-  isCoworkingMode = false, // Prop for Commercial Co-working flow
-  isLandSaleMode = false, // Prop for Land/Plot Sale flow
-  isFlatmatesMode = false, // Prop for Residential Flatmates flow
+  isPGHostelMode,
+  isCommercialRentMode,
+  isCommercialSaleMode,
+  isCoworkingMode,
+  isLandSaleMode,
+  isFlatmatesMode,
   handlePreviousStep,
   handleSaveAsDraft,
   handleSaveAndPublish,
@@ -85,454 +76,112 @@ const FormContent = ({
   savedPropertyId,
   handleImageUploadComplete
 }: FormContentProps) => {
-  // State to track loading retries for photos section
-  const [photoLoadRetries, setPhotoLoadRetries] = useState(0);
-  const [photoLoadError, setPhotoLoadError] = useState<string | null>(null);
+  // Get current step ID
+  const currentStep = STEPS[formStep - 1]?.id || '';
   
-  // Get the current step ID safely
-  const currentStepId = formStep > 0 && formStep <= STEPS.length 
-    ? STEPS[formStep - 1]?.id 
-    : null;
-  
-  // Enhanced debugging logs
-  useEffect(() => {
-    console.log('FormContent Debugging:');
-    console.log('- Current Step ID:', currentStepId);
-    console.log('- Is Commercial Rent Mode:', isCommercialRentMode);
-    console.log('- Current form step:', formStep);
-    console.log('- Flow steps:', STEPS.map(s => s.id));
-    
-    // Debug form data related to commercial properties
-    const formValues = form.getValues();
-    console.log('- Property category:', formValues.propertyCategory);
-    console.log('- Listing type:', formValues.listingType);
-    console.log('- Property type:', formValues.propertyType);
-    
-    // Check URL for debug information
-    console.log('- Current URL:', window.location.pathname);
-  }, [currentStepId, isCommercialRentMode, formStep, STEPS, form]);
-  
-  // DIRECT FIX: Force check for commercial rent + basic details step
-  const shouldUseCommercialBasicDetails = () => {
-    // Hard check for commercial rent mode + basic details step
-    if (!isCommercialRentMode) return false;
-    
-    // Check URL path for strong evidence we're in commercial rent flow
-    const urlPath = window.location.pathname.toLowerCase();
-    const isCommercialRentPath = urlPath.includes('commercial') && 
-                              (urlPath.includes('rent') || urlPath.includes('lease'));
-    
-    // Check for breadcrumb indicators - should be active on second step 
-    // in the sequence which should show the CommercialBasicDetails
-    const isBreadcrumbsShowingBasicDetails = 
-      document.querySelector('.breadcrumb-item:nth-child(3)')?.textContent?.includes('Basic Details');
-    
-    // If we're on "Basic Details" tab but in Commercial Rent flow
-    const isBasicDetailsTabActive = 
-      document.querySelector('.tab.active')?.textContent?.includes('Basic Details');
-
-    // Multiple checks to ensure we're in the right context
-    return (isCommercialRentMode && formStep === 1) || // First step
-           (isCommercialRentPath && isBasicDetailsTabActive) || // Basic Details tab is active
-           (isCommercialRentMode && currentStepId === 'details') || // Step ID is 'details'
-           (isCommercialRentMode && isBreadcrumbsShowingBasicDetails); // Breadcrumbs show Basic Details
+  // Determine which form section to display based on the current step
+  const renderFormSection = () => {
+    // Map step to component
+    switch (currentStep) {
+      // Basic details section - different components based on property type
+      case 'basic_details':
+        if (isCommercialRentMode || isCommercialSaleMode) {
+          return <CommercialBasicDetails form={form} mode={mode} category={effectiveCategory} adType={effectiveAdType} />;
+        } else if (isCoworkingMode) {
+          return <CoworkingBasicDetails form={form} mode={mode} category={effectiveCategory} adType={effectiveAdType} />;
+        } else if (isLandSaleMode) {
+          return <LandDetails form={form} mode={mode} category={effectiveCategory} adType={effectiveAdType} />;
+        } else if (isPGHostelMode || isFlatmatesMode) {
+          return <RoomDetails form={form} mode={mode} category={effectiveCategory} adType={effectiveAdType} />;
+        } else {
+          return <PropertyDetails form={form} mode={mode} category={effectiveCategory} adType={effectiveAdType} />;
+        }
+        
+      // Location details section - same for all property types
+      case 'location':
+        return <LocationDetails form={form} mode={mode} category={effectiveCategory} adType={effectiveAdType} />;
+        
+      // Rental details section
+      case 'rental':
+        return <RentalDetails form={form} mode={mode} category={effectiveCategory} adType={effectiveAdType} />;
+        
+      // Sale details section
+      case 'sale':
+        if (isCommercialSaleMode) {
+          return <CommercialSaleDetails form={form} mode={mode} category={effectiveCategory} adType={effectiveAdType} />;
+        } else {
+          return <SaleDetails form={form} mode={mode} category={effectiveCategory} adType={effectiveAdType} />;
+        }
+        
+      // PG/Hostel details section
+      case 'pg_details':
+        return <PGDetails form={form} mode={mode} category={effectiveCategory} adType={effectiveAdType} />;
+        
+      // Flatmate details section
+      case 'flatmate_details':
+        return <FlatmateDetails form={form} mode={mode} category={effectiveCategory} adType={effectiveAdType} />;
+        
+      // Coworking details section
+      case 'coworking':
+        return <CoworkingDetails form={form} mode={mode} category={effectiveCategory} adType={effectiveAdType} />;
+        
+      // Commercial features section
+      case 'commercial_details':
+        return <CommercialDetails form={form} mode={mode} category={effectiveCategory} adType={effectiveAdType} />;
+        
+      // Land features section
+      case 'land_features':
+        return <LandFeaturesDetails form={form} mode={mode} category={effectiveCategory} adType={effectiveAdType} />;
+        
+      // Features section
+      case 'features':
+        if (isCommercialRentMode || isCommercialSaleMode) {
+          return <CommercialFeatures form={form} mode={mode} category={effectiveCategory} adType={effectiveAdType} />;
+        } else {
+          return <AmenitiesSection form={form} mode={mode} category={effectiveCategory} adType={effectiveAdType} />;
+        }
+        
+      // Image upload section
+      case 'photos':
+        return savedPropertyId ? (
+          <ImageUploadSection 
+            propertyId={savedPropertyId} 
+            onUploadComplete={handleImageUploadComplete} 
+            onPrevious={handlePreviousStep} 
+          />
+        ) : (
+          <div className="text-center p-8">
+            <p className="text-primary text-lg">Please save your property first to upload images</p>
+          </div>
+        );
+        
+      // Review section
+      case 'review':
+        const formData = form.getValues();
+        return (
+          <PropertySummary
+            formData={formData}
+            onPrevious={handlePreviousStep}
+            onSaveAsDraft={handleSaveAsDraft}
+            onSaveAndPublish={handleSaveAndPublish}
+            onUpdate={handleUpdate}
+            saving={saving}
+            status={status}
+            propertyId={savedPropertyId}
+          />
+        );
+        
+      // Default fallback
+      default:
+        return (
+          <div className="text-center p-8">
+            <p className="text-primary text-lg">Section not found: {currentStep}</p>
+          </div>
+        );
+    }
   };
   
-  // Check if we should force the CommercialBasicDetails component
-  if (shouldUseCommercialBasicDetails()) {
-    console.log('OVERRIDING: Forcing CommercialBasicDetails component for Commercial Rent flow');
-    return (
-      <CommercialBasicDetails 
-        form={form} 
-        mode={mode} 
-        category={effectiveCategory}
-        adType={effectiveAdType}
-      />
-    );
-  }
-  
-  // Special case for coworking properties - regardless of step ID
-  if (isCoworkingMode && formStep === 1) {
-    console.log('Rendering CoworkingBasicDetails for coworking mode, first step');
-    return (
-      <CoworkingBasicDetails 
-        form={form} 
-        mode={mode} 
-        category={effectiveCategory}
-        adType={effectiveAdType}
-      />
-    );
-  }
-  
-  // Handle step by step ID
-  if (currentStepId === 'commercial_basics') {
-    console.log('Rendering CommercialBasicDetails for commercial_basics step ID');
-    return (
-      <CommercialBasicDetails 
-        form={form} 
-        mode={mode} 
-        category={effectiveCategory}
-        adType={effectiveAdType}
-      />
-    );
-  }
-  
-  // FIX: Map "basicDetails" step ID to PropertyDetails component
-  if (currentStepId === 'basicDetails' || currentStepId === 'details' || currentStepId === 'basic_details') {
-    console.log('Entering basic details condition check with ID:', currentStepId);
-    
-    // Skip details for Land/Plot flow
-    if (isLandSaleMode) {
-      return (
-        <div className="py-6 text-center">
-          <p className="text-muted-foreground">This section is not applicable for Land/Plot properties.</p>
-        </div>
-      );
-    }
-    
-    // ADDITIONAL CHECK: For Commercial Rent, first step should actually still show PropertyDetails 
-    // for initial property selection, but second step should show CommercialBasicDetails
-    if (isCommercialRentMode && formStep > 1) {
-      console.log('Commercial Rent flow - forcing CommercialBasicDetails for step > 1');
-      return (
-        <CommercialBasicDetails 
-          form={form} 
-          mode={mode} 
-          category={effectiveCategory}
-          adType={effectiveAdType}
-        />
-      );
-    }
-    
-    // For all flows, show the standard PropertyDetails
-    return (
-      <PropertyDetails 
-        form={form} 
-        mode={mode} 
-        category={effectiveCategory}
-        adType={effectiveAdType}
-      />
-    );
-  }
-  
-  if (currentStepId === 'location') {
-    return (
-      <LocationDetails 
-        form={form} 
-        selectedCity={selectedCity}
-      />
-    );
-  }
-  
-  // FIX: Add rentalDetails mapping to rental section
-  if (currentStepId === 'rental' || currentStepId === 'rentalDetails') {
-    console.log('Entering rental details with ID:', currentStepId);
-    
-    // Show rental details for both residential and commercial rent properties
-    const isRentFlow = !isSaleMode && !isPGHostelMode && !isCommercialSaleMode && 
-                      !isCoworkingMode && !isLandSaleMode && !isFlatmatesMode;
-    
-    // Display rental details for both normal rent and commercial rent
-    if (isRentFlow || isCommercialRentMode) {
-      return (
-        <RentalDetails 
-          form={form}
-          adType={effectiveAdType}
-        />
-      );
-    }
-    
-    // For all other property types, show not applicable message
-    return (
-      <div className="py-6 text-center">
-        <p className="text-muted-foreground">This section is not applicable for this property type.</p>
-      </div>
-    );
-  }
-  
-  if (currentStepId === 'sale') {
-    // Only show sale details for residential sale properties
-    if (!isSaleMode || isPGHostelMode || isCommercialRentMode || 
-        isCommercialSaleMode || isCoworkingMode || isLandSaleMode || 
-        isFlatmatesMode) {
-      return (
-        <div className="py-6 text-center">
-          <p className="text-muted-foreground">This section is not applicable for this property type.</p>
-        </div>
-      );
-    }
-    
-    return (
-      <SaleDetails 
-        form={form}
-        adType={effectiveAdType}
-      />
-    );
-  }
-  
-  // PG/Hostel specific sections
-  if (currentStepId === 'room_details') {
-    // Only show room details for PG/Hostel properties
-    if (!isPGHostelMode) {
-      return (
-        <div className="py-6 text-center">
-          <p className="text-muted-foreground">This section is not applicable for this property type.</p>
-        </div>
-      );
-    }
-    
-    return (
-      <RoomDetails 
-        form={form}
-        adType={effectiveAdType}
-      />
-    );
-  }
-  
-  if (currentStepId === 'pg_details') {
-    // Only show PG details for PG/Hostel properties
-    if (!isPGHostelMode) {
-      return (
-        <div className="py-6 text-center">
-          <p className="text-muted-foreground">This section is not applicable for this property type.</p>
-        </div>
-      );
-    }
-    
-    return (
-      <PGDetails 
-        form={form}
-        adType={effectiveAdType}
-      />
-    );
-  }
-  
-  // Commercial Rent specific section - REMOVED from flow, but keeping component for backward compatibility
-  if (currentStepId === 'commercial') {
-    // This section is now not used in any flow
-    return (
-      <div className="py-6 text-center">
-        <p className="text-muted-foreground">This section is not applicable for this property type.</p>
-      </div>
-    );
-  }
-  
-  // Commercial Sale specific section
-  if (currentStepId === 'commercial_sale') {
-    // Only show Commercial Sale details for Commercial Sale properties
-    if (!isCommercialSaleMode) {
-      return (
-        <div className="py-6 text-center">
-          <p className="text-muted-foreground">This section is not applicable for this property type.</p>
-        </div>
-      );
-    }
-    
-    return (
-      <CommercialSaleDetails 
-        form={form}
-        adType={effectiveAdType}
-      />
-    );
-  }
-  
-  // Co-working specific section
-  if (currentStepId === 'coworking') {
-    // Only show Co-working details for Co-working properties
-    if (!isCoworkingMode) {
-      return (
-        <div className="py-6 text-center">
-          <p className="text-muted-foreground">This section is not applicable for this property type.</p>
-        </div>
-      );
-    }
-    
-    return (
-      <CoworkingDetails 
-        form={form}
-        adType={effectiveAdType}
-      />
-    );
-  }
-  
-  // Land/Plot specific sections
-  if (currentStepId === 'land_details') {
-    // Only show Land details for Land/Plot properties
-    if (!isLandSaleMode) {
-      return (
-        <div className="py-6 text-center">
-          <p className="text-muted-foreground">This section is not applicable for this property type.</p>
-        </div>
-      );
-    }
-    
-    return (
-      <LandDetails 
-        form={form}
-        adType={effectiveAdType}
-      />
-    );
-  }
-  
-  if (currentStepId === 'land_features') {
-    // Only show Land features for Land/Plot properties
-    if (!isLandSaleMode) {
-      return (
-        <div className="py-6 text-center">
-          <p className="text-muted-foreground">This section is not applicable for this property type.</p>
-        </div>
-      );
-    }
-    
-    return (
-      <LandFeaturesDetails 
-        form={form}
-        adType={effectiveAdType}
-      />
-    );
-  }
-  
-  // Flatmates specific section
-  if (currentStepId === 'flatmate_details') {
-    // Only show Flatmate details for Flatmates properties
-    if (!isFlatmatesMode) {
-      return (
-        <div className="py-6 text-center">
-          <p className="text-muted-foreground">This section is not applicable for this property type.</p>
-        </div>
-      );
-    }
-    
-    return (
-      <FlatmateDetails 
-        form={form}
-        adType={effectiveAdType}
-      />
-    );
-  }
-  
-  // Common sections for all property types
-  if (currentStepId === 'features') {
-    // For Commercial Rent properties, use specialized Commercial Features component
-    if (isCommercialRentMode) {
-      return (
-        <CommercialFeatures
-          form={form}
-          adType={effectiveAdType}
-        />
-      );
-    }
-    
-    // For all other property types, use standard Amenities section
-    return (
-      <AmenitiesSection 
-        form={form}
-        category={effectiveCategory}
-      />
-    );
-  }
-  
-  if (currentStepId === 'review') {
-    return (
-      <PropertySummary
-        formData={form.watch()}
-        onPrevious={handlePreviousStep}
-        onSaveAsDraft={handleSaveAsDraft}
-        onSaveAndPublish={handleSaveAndPublish}
-        onUpdate={handleUpdate}
-        saving={saving}
-        status={status}
-        propertyId={savedPropertyId}
-      />
-    );
-  }
-  
-  if (currentStepId === 'photos' || currentStepId === 'media') {
-    // Check if there's a loading error
-    if (photoLoadError) {
-      return (
-        <div className="flex flex-col items-center justify-center py-16">
-          <div className="flex items-center text-destructive mb-4">
-            <AlertCircle className="h-6 w-6 mr-2" />
-            <h3 className="text-lg font-medium">Error Loading Photos</h3>
-          </div>
-          
-          <p className="text-muted-foreground text-center max-w-md mb-4">
-            {photoLoadError}
-          </p>
-          
-          <div className="flex gap-3 mt-4">
-            <button
-              type="button"
-              onClick={handlePreviousStep}
-              className="px-6 py-3 text-sm font-medium rounded-lg bg-secondary text-secondary-foreground"
-            >
-              Return to Previous Step
-            </button>
-            
-            <button
-              type="button"
-              onClick={() => {
-                setPhotoLoadError(null);
-                setPhotoLoadRetries(0);
-              }}
-              className="px-6 py-3 text-sm font-medium rounded-lg bg-primary text-primary-foreground"
-            >
-              Try Again
-            </button>
-          </div>
-        </div>
-      );
-    }
-    
-    // Check if we have a property ID before rendering the image upload section
-    if (!savedPropertyId) {
-      return (
-        <div className="flex flex-col items-center justify-center py-16">
-          <Loader2 className="h-8 w-8 text-primary animate-spin mb-4" />
-          <p className="text-muted-foreground">
-            {photoLoadRetries === 0 
-              ? "Preparing property for photos..." 
-              : "Loading property details..."}
-          </p>
-          <p className="text-xs text-muted-foreground mt-2">
-            This may take a few moments
-          </p>
-          <button
-            type="button"
-            onClick={handlePreviousStep}
-            className="mt-6 px-6 py-3 text-sm font-medium rounded-lg bg-secondary text-secondary-foreground"
-          >
-            Return to Previous Step
-          </button>
-        </div>
-      );
-    }
-    
-    // We have a property ID, render the image upload section
-    return (
-      <ImageUploadSection
-        propertyId={savedPropertyId}
-        onUploadComplete={handleImageUploadComplete}
-        onPrevious={handlePreviousStep}
-      />
-    );
-  }
-  
-  // Debug output to help identify missing step mappings
-  console.error('FormContent received unknown step ID:', currentStepId);
-  console.error('Available steps:', STEPS.map(s => s.id));
-  
-  // Default fallback
-  return (
-    <div className="py-6 text-center">
-      <p className="text-muted-foreground">Section not available</p>
-      <p className="text-muted-foreground text-sm mt-2">Step ID: {currentStepId || 'undefined'}</p>
-      <p className="text-muted-foreground text-sm mt-1">
-        Flow configuration may be missing this step mapping
-      </p>
-    </div>
-  );
+  return <div className="space-y-6">{renderFormSection()}</div>;
 };
 
 export default FormContent;

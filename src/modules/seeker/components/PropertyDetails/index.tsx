@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyDetails/index.tsx
-// Version: 7.5.0
-// Last Modified: 06-05-2025 20:30 IST
-// Purpose: Refactored to support v3 JSON structure and modularized code
+// Version: 7.6.0
+// Last Modified: 08-05-2025 20:30 IST
+// Purpose: Fixed map location display with proper coordinate extraction
 
 import React, { useState } from 'react';
 import { PropertyDetails as PropertyDetailsType } from '../../hooks/usePropertyDetails';
@@ -534,27 +534,176 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
     .filter(Boolean)
     .join(", ") || "Location not specified";
   
-  // Get coordinates
+  // Extract coordinates with proper null checks - completely rewritten for safety
   const propertyCoordinates = (() => {
-    if (location?.coordinates) {
-      const lat = location.coordinates.latitude;
-      const lng = location.coordinates.longitude;
-      
-      if (!isNaN(lat) && !isNaN(lng) && (lat !== 0 || lng !== 0)) {
-        return { lat, lng };
+    console.log("Extracting coordinates from property data");
+    
+    // Try direct latitude/longitude properties first (top-level)
+    if (typeof property.latitude === 'number' && typeof property.longitude === 'number') {
+      console.log("Found direct lat/lng properties:", property.latitude, property.longitude);
+      return { lat: property.latitude, lng: property.longitude };
+    }
+    
+    // Try string latitude/longitude and parse them
+    if (property.latitude && property.longitude) {
+      try {
+        const lat = parseFloat(String(property.latitude));
+        const lng = parseFloat(String(property.longitude));
+        
+        if (!isNaN(lat) && !isNaN(lng)) {
+          console.log("Parsed string lat/lng properties:", lat, lng);
+          return { lat, lng };
+        }
+      } catch (e) {
+        console.error("Error parsing lat/lng:", e);
       }
     }
-    if (property.property_details?.coordinates) {
-      const coords = property.property_details.coordinates;
-      const lat = coords.latitude || coords.lat;
-      const lng = coords.longitude || coords.lng;
+    
+    // Check location object if it exists and has coordinates
+    if (location && location.coordinates) {
+      const coords = location.coordinates;
       
-      if (!isNaN(lat) && !isNaN(lng) && (lat !== 0 || lng !== 0)) {
-        return { lat, lng };
+      // Try latitude/longitude format
+      if (coords.latitude && coords.longitude) {
+        try {
+          const lat = parseFloat(String(coords.latitude));
+          const lng = parseFloat(String(coords.longitude));
+          
+          if (!isNaN(lat) && !isNaN(lng)) {
+            console.log("Using location.coordinates latitude/longitude:", lat, lng);
+            return { lat, lng };
+          }
+        } catch (e) {
+          console.error("Error parsing location.coordinates latitude/longitude:", e);
+        }
+      }
+      
+      // Try lat/lng format
+      if (coords.lat && coords.lng) {
+        try {
+          const lat = parseFloat(String(coords.lat));
+          const lng = parseFloat(String(coords.lng));
+          
+          if (!isNaN(lat) && !isNaN(lng)) {
+            console.log("Using location.coordinates lat/lng:", lat, lng);
+            return { lat, lng };
+          }
+        } catch (e) {
+          console.error("Error parsing location.coordinates lat/lng:", e);
+        }
       }
     }
-    return undefined;
+    
+    // Check property_details if it exists
+    if (property.property_details) {
+      const details = property.property_details;
+      
+      // Try direct coordinates object
+      if (details.coordinates) {
+        const coords = details.coordinates;
+        
+        // Try latitude/longitude format
+        if (coords.latitude && coords.longitude) {
+          try {
+            const lat = parseFloat(String(coords.latitude));
+            const lng = parseFloat(String(coords.longitude));
+            
+            if (!isNaN(lat) && !isNaN(lng)) {
+              console.log("Using property_details.coordinates latitude/longitude:", lat, lng);
+              return { lat, lng };
+            }
+          } catch (e) {
+            console.error("Error parsing property_details.coordinates latitude/longitude:", e);
+          }
+        }
+        
+        // Try lat/lng format
+        if (coords.lat && coords.lng) {
+          try {
+            const lat = parseFloat(String(coords.lat));
+            const lng = parseFloat(String(coords.lng));
+            
+            if (!isNaN(lat) && !isNaN(lng)) {
+              console.log("Using property_details.coordinates lat/lng:", lat, lng);
+              return { lat, lng };
+            }
+          } catch (e) {
+            console.error("Error parsing property_details.coordinates lat/lng:", e);
+          }
+        }
+      }
+      
+      // Try direct lat/lng or latitude/longitude properties in property_details
+      if (details.latitude && details.longitude) {
+        try {
+          const lat = parseFloat(String(details.latitude));
+          const lng = parseFloat(String(details.longitude));
+          
+          if (!isNaN(lat) && !isNaN(lng)) {
+            console.log("Using property_details latitude/longitude:", lat, lng);
+            return { lat, lng };
+          }
+        } catch (e) {
+          console.error("Error parsing property_details latitude/longitude:", e);
+        }
+      }
+      
+      if (details.lat && details.lng) {
+        try {
+          const lat = parseFloat(String(details.lat));
+          const lng = parseFloat(String(details.lng));
+          
+          if (!isNaN(lat) && !isNaN(lng)) {
+            console.log("Using property_details lat/lng:", lat, lng);
+            return { lat, lng };
+          }
+        } catch (e) {
+          console.error("Error parsing property_details lat/lng:", e);
+        }
+      }
+      
+      // Try nested location.coordinates
+      if (details.location && details.location.coordinates) {
+        const coords = details.location.coordinates;
+        
+        // Try latitude/longitude format
+        if (coords.latitude && coords.longitude) {
+          try {
+            const lat = parseFloat(String(coords.latitude));
+            const lng = parseFloat(String(coords.longitude));
+            
+            if (!isNaN(lat) && !isNaN(lng)) {
+              console.log("Using property_details.location.coordinates latitude/longitude:", lat, lng);
+              return { lat, lng };
+            }
+          } catch (e) {
+            console.error("Error parsing property_details.location.coordinates latitude/longitude:", e);
+          }
+        }
+        
+        // Try lat/lng format
+        if (coords.lat && coords.lng) {
+          try {
+            const lat = parseFloat(String(coords.lat));
+            const lng = parseFloat(String(coords.lng));
+            
+            if (!isNaN(lat) && !isNaN(lng)) {
+              console.log("Using property_details.location.coordinates lat/lng:", lat, lng);
+              return { lat, lng };
+            }
+          } catch (e) {
+            console.error("Error parsing property_details.location.coordinates lat/lng:", e);
+          }
+        }
+      }
+    }
+    
+    console.log("No valid coordinates found in property data");
+    return null;
   })();
+
+  // Log coordinate extraction result
+  console.log("Final coordinates:", propertyCoordinates);
 
   // Handle share functionality
   const handleShare = () => {
@@ -643,6 +792,15 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
             zipCode={locationZipCode}
             coordinates={propertyCoordinates}
           />
+          
+          {/* Debug info for coordinates in development */}
+          {import.meta.env.DEV && (
+            <div className="p-3 bg-muted/30 text-xs text-muted-foreground rounded">
+              <p>Coordinates Debug:</p>
+              <p>Direct lat/lng: {property.latitude}, {property.longitude}</p>
+              <p>Extracted: {propertyCoordinates ? `${propertyCoordinates.lat}, ${propertyCoordinates.lng}` : 'None'}</p>
+            </div>
+          )}
         </div>
         
         {/* Sidebar Column */}

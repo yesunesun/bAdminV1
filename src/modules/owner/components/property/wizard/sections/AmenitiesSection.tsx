@@ -1,6 +1,7 @@
-// src/components/property/wizard/sections/AmenitiesSection.tsx
-// Version: 1.4.0
-// Last Modified: 2025-03-06T16:45:00+05:30 (IST)
+// src/modules/owner/components/property/wizard/sections/AmenitiesSection.tsx
+// Version: 1.5.0
+// Last Modified: 2025-05-09T14:15:00+05:30 (IST)
+// Purpose: Updated to support structured steps hierarchy
 
 import React from 'react';
 import { FormSection } from '@/components/FormSection';
@@ -52,13 +53,17 @@ import {
 export function AmenitiesSection({ form }: FormSectionProps) {
   const { watch, setValue, register, formState: { errors } } = form;
 
+  // Updated to use steps structure
   const handleNumberChange = (type: 'bathrooms' | 'balconies', action: 'increment' | 'decrement') => {
-    const current = parseInt(watch(type) || '0');
-    if (action === 'increment') {
-      setValue(type, (current + 1).toString());
-    } else if (current > 0) {
-      setValue(type, (current - 1).toString());
-    }
+    // For backward compatibility, keep the original field paths working
+    // while also updating the new structured paths
+    const fieldPath = `steps.basic_details.${type}`;
+    const current = parseInt(watch(type) || watch(fieldPath) || '0');
+    const newValue = (action === 'increment') ? (current + 1) : (current > 0 ? current - 1 : 0);
+    
+    // Update both paths
+    setValue(type, newValue.toString());
+    setValue(fieldPath, newValue);
   };
 
   // Removed "Non-Veg Allowed" from quick amenities
@@ -92,6 +97,17 @@ export function AmenitiesSection({ form }: FormSectionProps) {
     'House Keeping': HomeIcon               // Home icon for house keeping
   };
 
+  // Helper to get value from both old and new structure
+  const getFieldValue = (oldPath: string, newPath: string) => {
+    return watch(oldPath) || watch(newPath);
+  };
+
+  // Helper to set value in both old and new structure
+  const setFieldValue = (oldPath: string, newPath: string, value: any) => {
+    setValue(oldPath, value);
+    setValue(newPath, value);
+  };
+
   return (
     <FormSection
       title="Amenities & Features"
@@ -107,7 +123,7 @@ export function AmenitiesSection({ form }: FormSectionProps) {
               <button
                 type="button"
                 onClick={() => handleNumberChange('bathrooms', 'decrement')}
-                disabled={parseInt(watch('bathrooms') || '0') <= 0}
+                disabled={parseInt(getFieldValue('bathrooms', 'steps.basic_details.bathrooms') || '0') <= 0}
                 className="w-12 flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-50"
               >
                 <Minus className="h-4 w-4" />
@@ -115,7 +131,7 @@ export function AmenitiesSection({ form }: FormSectionProps) {
               <Input
                 type="text"
                 className="flex-1 text-center border-x rounded-none h-full"
-                value={watch('bathrooms') || '0'}
+                value={getFieldValue('bathrooms', 'steps.basic_details.bathrooms') || '0'}
                 readOnly
               />
               <button
@@ -135,7 +151,7 @@ export function AmenitiesSection({ form }: FormSectionProps) {
               <button
                 type="button"
                 onClick={() => handleNumberChange('balconies', 'decrement')}
-                disabled={parseInt(watch('balconies') || '0') <= 0}
+                disabled={parseInt(getFieldValue('balconies', 'steps.basic_details.balconies') || '0') <= 0}
                 className="w-12 flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-50"
               >
                 <Minus className="h-4 w-4" />
@@ -143,7 +159,7 @@ export function AmenitiesSection({ form }: FormSectionProps) {
               <Input
                 type="text"
                 className="flex-1 text-center border-x rounded-none h-full"
-                value={watch('balconies') || '0'}
+                value={getFieldValue('balconies', 'steps.basic_details.balconies') || '0'}
                 readOnly
               />
               <button
@@ -166,8 +182,10 @@ export function AmenitiesSection({ form }: FormSectionProps) {
             >
               <Checkbox
                 id={id}
-                checked={watch(id)}
-                onCheckedChange={(checked) => setValue(id, checked)}
+                checked={getFieldValue(id, `steps.features.${id}`)}
+                onCheckedChange={(checked) => {
+                  setFieldValue(id, `steps.features.${id}`, checked);
+                }}
               />
               <label
                 htmlFor={id}
@@ -185,8 +203,8 @@ export function AmenitiesSection({ form }: FormSectionProps) {
           <div>
             <RequiredLabel required>Who Shows Property?</RequiredLabel>
             <Select 
-              value={watch('propertyShowOption')} 
-              onValueChange={value => setValue('propertyShowOption', value)}
+              value={getFieldValue('propertyShowOption', 'steps.features.propertyShowOption')} 
+              onValueChange={value => setFieldValue('propertyShowOption', 'steps.features.propertyShowOption', value)}
             >
               <SelectTrigger className="h-12">
                 <SelectValue placeholder="Select who shows" />
@@ -197,16 +215,18 @@ export function AmenitiesSection({ form }: FormSectionProps) {
                 ))}
               </SelectContent>
             </Select>
-            {errors.propertyShowOption && (
-              <p className="text-sm text-red-500 mt-1">{errors.propertyShowOption.message}</p>
+            {(errors.propertyShowOption || errors.steps?.features?.propertyShowOption) && (
+              <p className="text-sm text-red-500 mt-1">
+                {errors.propertyShowOption?.message || errors.steps?.features?.propertyShowOption?.message}
+              </p>
             )}
           </div>
 
           <div>
             <RequiredLabel required>Property Condition</RequiredLabel>
             <Select 
-              value={watch('propertyCondition')} 
-              onValueChange={value => setValue('propertyCondition', value)}
+              value={getFieldValue('propertyCondition', 'steps.basic_details.propertyCondition')} 
+              onValueChange={value => setFieldValue('propertyCondition', 'steps.basic_details.propertyCondition', value)}
             >
               <SelectTrigger className="h-12">
                 <SelectValue placeholder="Select condition" />
@@ -217,8 +237,10 @@ export function AmenitiesSection({ form }: FormSectionProps) {
                 ))}
               </SelectContent>
             </Select>
-            {errors.propertyCondition && (
-              <p className="text-sm text-red-500 mt-1">{errors.propertyCondition.message}</p>
+            {(errors.propertyCondition || errors.steps?.basic_details?.propertyCondition) && (
+              <p className="text-sm text-red-500 mt-1">
+                {errors.propertyCondition?.message || errors.steps?.basic_details?.propertyCondition?.message}
+              </p>
             )}
           </div>
         </div>
@@ -238,6 +260,10 @@ export function AmenitiesSection({ form }: FormSectionProps) {
               className="h-12 pl-16"
               maxLength={10}
               {...register('secondaryNumber')}
+              onChange={(e) => {
+                // Also update the new structured path
+                setValue('steps.features.secondaryNumber', e.target.value);
+              }}
               placeholder="Additional contact number"
             />
           </div>
@@ -247,8 +273,8 @@ export function AmenitiesSection({ form }: FormSectionProps) {
         <div className="flex items-center gap-3 p-4 rounded-lg border border-gray-200 bg-white">
           <Checkbox
             id="hasSimilarUnits"
-            checked={watch('hasSimilarUnits')}
-            onCheckedChange={(checked) => setValue('hasSimilarUnits', checked)}
+            checked={getFieldValue('hasSimilarUnits', 'steps.features.hasSimilarUnits')}
+            onCheckedChange={(checked) => setFieldValue('hasSimilarUnits', 'steps.features.hasSimilarUnits', checked)}
           />
           <label
             htmlFor="hasSimilarUnits"
@@ -271,13 +297,19 @@ export function AmenitiesSection({ form }: FormSectionProps) {
                 >
                   <Checkbox
                     id={`amenity-${amenity}`}
-                    checked={watch('amenities')?.includes(amenity)}
+                    checked={(getFieldValue('amenities', 'steps.features.amenities') || []).includes(amenity)}
                     onCheckedChange={(checked) => {
-                      const current = watch('amenities') || [];
+                      // Update old structure
+                      const currentOld = watch('amenities') || [];
+                      // Update new structure
+                      const currentNew = watch('steps.features.amenities') || [];
+                      
                       if (checked) {
-                        setValue('amenities', [...current, amenity]);
+                        setValue('amenities', [...currentOld, amenity]);
+                        setValue('steps.features.amenities', [...currentNew, amenity]);
                       } else {
-                        setValue('amenities', current.filter(a => a !== amenity));
+                        setValue('amenities', currentOld.filter(a => a !== amenity));
+                        setValue('steps.features.amenities', currentNew.filter(a => a !== amenity));
                       }
                     }}
                   />
@@ -292,8 +324,10 @@ export function AmenitiesSection({ form }: FormSectionProps) {
               );
             })}
           </div>
-          {errors.amenities && (
-            <p className="text-sm text-red-500 mt-1">{errors.amenities.message}</p>
+          {(errors.amenities || errors.steps?.features?.amenities) && (
+            <p className="text-sm text-red-500 mt-1">
+              {errors.amenities?.message || errors.steps?.features?.amenities?.message}
+            </p>
           )}
         </div>
       </div>

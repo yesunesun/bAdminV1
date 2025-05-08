@@ -1,10 +1,10 @@
 // src/modules/owner/services/propertyService.ts
-// Version: 8.0.0
-// Last Modified: 06-05-2025 21:00 IST
-// Purpose: Updated to support properties_v2 table with JSONB storage using flow-based steps
+// Version: 8.1.0
+// Last Modified: 09-05-2025 12:00 IST
+// Purpose: Updated to support structured steps hierarchy
 
 import { supabase } from '@/lib/supabase';
-import { Property, FormData } from '../components/property/PropertyFormTypes';
+import { FormData } from '../components/property/wizard/types';
 import { 
   FLOW_TYPES,
   FLOW_STEPS,
@@ -12,10 +12,10 @@ import {
 } from '../components/property/wizard/constants/flows';
 
 // Cache for properties to avoid redundant fetches
-const propertiesCache = new Map<string, {data: Property[], timestamp: number}>();
+const propertiesCache = new Map<string, {data: any[], timestamp: number}>();
 const CACHE_EXPIRY = 60000; // 1 minute cache expiry
 
-// Constants
+// Keep the data version as v3 since it's still in development
 const DATA_VERSION = 'v3';
 
 /**
@@ -30,7 +30,7 @@ const createEmptyPropertyStructure = (
   // Set current timestamp
   const now = new Date().toISOString();
   
-  // Create base structure
+  // Create base structure with new format
   const structure: any = {
     meta: {
       _version: DATA_VERSION,
@@ -42,21 +42,25 @@ const createEmptyPropertyStructure = (
       category: flowCategory,
       listingType: flowListingType
     },
+    steps: {}, // Initialize empty steps object
     media: {
       photos: {
         images: []
+      },
+      videos: {
+        urls: []
       }
     }
   };
   
   // Get steps for this flow type
   const flowKey = `${flowCategory}_${flowListingType}`;
-  const steps = FLOW_STEPS[flowKey] || FLOW_STEPS.default;
+  const stepsArray = FLOW_STEPS[flowKey] || FLOW_STEPS.default;
   
-  // Create step objects
-  steps.forEach(step => {
-    if (step !== 'media') { // media is already at root level
-      structure[step] = {};
+  // Create step objects inside the steps container
+  stepsArray.forEach(step => {
+    if (step !== 'media' && step !== 'review') { // Skip media and review
+      structure.steps[step] = {};
     }
   });
   
@@ -64,82 +68,94 @@ const createEmptyPropertyStructure = (
 };
 
 /**
- * Organizes property data into the correct structure based on flow type
+ * Organizes property data into the correct structure
  * @param propertyData Raw property data to organize
  */
 const organizePropertyData = (propertyData: any): any => {
   if (!propertyData) return createEmptyPropertyStructure();
   
-  // Determine flow type
-  let flowCategory = 'residential';
-  let flowListingType = 'rent';
-  
-  // Get flow info from existing data if available
-  if (propertyData.flow) {
-    flowCategory = propertyData.flow.category || 'residential';
-    flowListingType = propertyData.flow.listingType || 'rent';
+  // Check if the data already has the steps structure
+  if (propertyData.steps) {
+    // Already has steps structure, just ensure complete structure
+    return ensureCompleteStructure(propertyData);
   }
   
-  // Create clean structure based on flow type
-  const organizedData = createEmptyPropertyStructure(flowCategory, flowListingType);
+  // Create a new structure since we don't need backward compatibility
+  const flowCategory = propertyData.flow?.category || 'residential';
+  const flowListingType = propertyData.flow?.listingType || 'rent';
+  return createEmptyPropertyStructure(flowCategory, flowListingType);
+};
+
+/**
+ * Ensures the data structure is complete with all required sections
+ */
+const ensureCompleteStructure = (data: any): any => {
+  if (!data) return createEmptyPropertyStructure();
   
-  // Preserve meta data if exists
-  if (propertyData.meta) {
-    organizedData.meta = { ...propertyData.meta };
+  // Clone the data to avoid mutations
+  const result = JSON.parse(JSON.stringify(data));
+  
+  // Ensure meta section exists
+  if (!result.meta) {
+    result.meta = {
+      _version: DATA_VERSION,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      status: 'draft'
+    };
+  } else {
     // Ensure version is set
-    organizedData.meta._version = DATA_VERSION;
+    result.meta._version = DATA_VERSION;
   }
   
-  // Preserve flow data if exists
-  if (propertyData.flow) {
-    organizedData.flow = { ...propertyData.flow };
+  // Ensure flow section exists
+  if (!result.flow) {
+    result.flow = {
+      category: 'residential',
+      listingType: 'rent'
+    };
   }
   
-  // Preserve media if exists
-  if (propertyData.media) {
-    organizedData.media = { ...propertyData.media };
-  }
-  
-  // Get flow steps
-  const flowKey = `${flowCategory}_${flowListingType}`;
-  const steps = FLOW_STEPS[flowKey] || FLOW_STEPS.default;
-  
-  // Process each step
-  steps.forEach(step => {
-    if (step === 'media') return; // Skip media as it's handled separately
+  // Ensure steps section exists
+  if (!result.steps) {
+    result.steps = {};
     
-    // Copy step data if it exists
-    if (propertyData[step]) {
-      organizedData[step] = { ...propertyData[step] };
-    }
+    // Initialize steps based on flow type
+    const flowCategory = result.flow.category || 'residential';
+    const flowListingType = result.flow.listingType || 'rent';
+    const flowKey = `${flowCategory}_${flowListingType}`;
+    const stepsArray = FLOW_STEPS[flowKey] || FLOW_STEPS.default;
     
-    // Get field mappings for this step
-    const fieldMappings = STEP_FIELD_MAPPINGS[step] || [];
-    
-    // Move fields from root to correct step
-    fieldMappings.forEach(field => {
-      if (propertyData[field] !== undefined) {
-        organizedData[step][field] = propertyData[field];
+    stepsArray.forEach(step => {
+      if (step !== 'media' && step !== 'review') {
+        result.steps[step] = {};
       }
     });
-  });
+  }
   
-  // Clean up by removing empty objects
-  Object.keys(organizedData).forEach(key => {
-    if (key !== 'meta' && key !== 'flow' && key !== 'media' && 
-        Object.keys(organizedData[key]).length === 0) {
-      delete organizedData[key];
+  // Ensure media section exists with photos and videos
+  if (!result.media) {
+    result.media = {
+      photos: { images: [] },
+      videos: { urls: [] }
+    };
+  } else {
+    if (!result.media.photos) {
+      result.media.photos = { images: [] };
     }
-  });
+    if (!result.media.videos) {
+      result.media.videos = { urls: [] };
+    }
+  }
   
-  return organizedData;
+  return result;
 };
 
 export const propertyService = {
   /**
    * Fetches all properties for a user with caching
    */
-  async getUserProperties(userId: string, forceRefresh = false): Promise<Property[]> {
+  async getUserProperties(userId: string, forceRefresh = false): Promise<any[]> {
     // Check cache first if not forcing refresh
     const now = Date.now();
     const cachedData = propertiesCache.get(userId);
@@ -202,7 +218,7 @@ export const propertyService = {
   /**
    * Fetches a single property by ID
    */
-  async getPropertyById(id: string): Promise<Property> {
+  async getPropertyById(id: string): Promise<any> {
     try {
       console.log('Fetching property with ID:', id);
       
@@ -250,7 +266,7 @@ export const propertyService = {
   /**
    * Creates a new property
    */
-  async createProperty(propertyData: FormData, userId: string, status: 'draft' | 'published' = 'draft'): Promise<Property> {
+  async createProperty(propertyData: FormData, userId: string, status: 'draft' | 'published' = 'draft'): Promise<any> {
     try {
       console.log('Creating property with status:', status);
       
@@ -328,7 +344,7 @@ export const propertyService = {
     propertyData: FormData,
     userId: string,
     status?: 'draft' | 'published'
-  ): Promise<Property> {
+  ): Promise<any> {
     try {
       console.log('Updating property:', propertyId);
       
@@ -441,152 +457,6 @@ export const propertyService = {
   },
 
   /**
-   * Updates property status
-   */
-  async updatePropertyStatus(
-    propertyId: string,
-    status: 'draft' | 'published',
-    userId: string
-  ): Promise<void> {
-    try {
-      console.log(`Updating property ${propertyId} status to ${status}`);
-      
-      // Get current property data
-      const { data: currentProperty, error: fetchError } = await supabase
-        .from('properties_v2')
-        .select('property_details')
-        .eq('id', propertyId)
-        .eq('owner_id', userId)
-        .single();
-        
-      if (!fetchError && currentProperty) {
-        // Organize property data
-        const organizedData = organizePropertyData(currentProperty.property_details);
-        
-        // Update status in meta section
-        organizedData.meta.id = propertyId;
-        organizedData.meta.status = status;
-        organizedData.meta.updated_at = new Date().toISOString();
-        
-        // Update property with version info and status
-        const updateData = {
-          status,
-          property_details: organizedData,
-          updated_at: new Date().toISOString()
-        };
-        
-        const { error } = await supabase
-          .from('properties_v2')
-          .update(updateData)
-          .eq('id', propertyId)
-          .eq('owner_id', userId);
-        
-        if (error) throw error;
-      } else {
-        // Fallback if can't get current property
-        const updateData = {
-          status,
-          updated_at: new Date().toISOString()
-        };
-        
-        const { error } = await supabase
-          .from('properties_v2')
-          .update(updateData)
-          .eq('id', propertyId)
-          .eq('owner_id', userId);
-        
-        if (error) throw error;
-      }
-      
-      // Clear cache for this user
-      propertiesCache.delete(userId);
-      
-    } catch (error) {
-      console.error('Error in updatePropertyStatus:', error);
-      throw error;
-    }
-  },
-
-  /**
-   * Deletes a property
-   */
-  async deleteProperty(propertyId: string, userId: string): Promise<void> {
-    try {
-      console.log(`Deleting property ${propertyId} for user ${userId}`);
-      
-      const { error } = await supabase
-        .from('properties_v2')
-        .delete()
-        .eq('id', propertyId)
-        .eq('owner_id', userId);
-      
-      if (error) {
-        console.error('Error deleting property:', error);
-        throw error;
-      }
-      
-      console.log(`Property ${propertyId} successfully deleted from properties_v2`);
-      propertiesCache.delete(userId);
-      
-    } catch (error) {
-      console.error('Error in deleteProperty:', error);
-      throw error;
-    }
-  },
-
-  /**
-   * Admin property deletion
-   */
-  async adminDeleteProperty(propertyId: string): Promise<void> {
-    try {
-      console.log(`Admin deleting property ${propertyId}`);
-      
-      const { error } = await supabase
-        .from('properties_v2')
-        .delete()
-        .eq('id', propertyId);
-      
-      if (error) {
-        console.error('Error in admin property deletion:', error);
-        throw error;
-      }
-      
-      console.log(`Property ${propertyId} successfully deleted from properties_v2 by admin`);
-      propertiesCache.clear();
-      
-    } catch (error) {
-      console.error('Error in adminDeleteProperty:', error);
-      throw error;
-    }
-  },
-
-  /**
-   * Check if user is admin
-   */
-  async isUserAdmin(userId: string): Promise<boolean> {
-    try {
-      if (!userId) return false;
-      
-      const { data, error } = await supabase
-        .from('admin_users')
-        .select('role_id, admin_roles(role_type)')
-        .eq('user_id', userId)
-        .single();
-      
-      if (error || !data) return false;
-      
-      // Check if user has admin role
-      const roleType = data.admin_roles?.role_type;
-      return roleType === 'admin' || 
-             roleType === 'super_admin' || 
-             roleType === 'property_moderator';
-    } catch (error) {
-      console.error('Error checking admin status:', error);
-      return false;
-    }
-  },
-
-  /**
    * Helper method to deep merge property data
    */
   mergePropertyData(oldData: any, newData: any): any {
@@ -621,6 +491,17 @@ export const propertyService = {
     
     // Merge at top level
     deepMerge(result, newData);
+    
+    // Special handling for steps section to ensure full merging
+    if (newData.steps && result.steps) {
+      Object.keys(newData.steps).forEach(stepKey => {
+        if (!result.steps[stepKey]) {
+          result.steps[stepKey] = {};
+        }
+        
+        deepMerge(result.steps[stepKey], newData.steps[stepKey]);
+      });
+    }
     
     // Special handling for meta section
     if (newData.meta) {

@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/types.ts
-// Version: 5.0.0
-// Last Modified: 04-05-2025 14:35 IST
-// Purpose: Updated to only support v3 data structure
+// Version: 5.1.0
+// Last Modified: 09-05-2025 10:45 IST
+// Purpose: Updated to use structured steps hierarchy
 
 import { UseFormReturn } from 'react-hook-form';
 
@@ -13,7 +13,7 @@ export interface PropertyImage {
   displayOrder: number;
 }
 
-// V3 Form Data Structure
+// V3 Form Data Structure with restructured fields
 export interface FormData {
   // Metadata section
   meta: {
@@ -31,74 +31,160 @@ export interface FormData {
     listingType: string;
   };
   
-  // Details section
-  details: {
-    // Basic property details
-    basicDetails: {
-      title: string;
-      propertyType: string;
-      bhkType: string;
-      floor: number | null;
-      totalFloors: number | null;
-      builtUpArea: number | null;
-      builtUpAreaUnit: 'sqft' | 'sqyd';
-      bathrooms: number | null;
-      balconies: number | null;
-      facing: string;
-      propertyAge: string;
+  // Steps container object
+  steps: {
+    // Basic details section
+    basic_details?: {
+      title?: string;
+      propertyType?: string;
+      bhkType?: string;
+      floor?: number | null;
+      totalFloors?: number | null;
+      builtUpArea?: number | null;
+      builtUpAreaUnit?: 'sqft' | 'sqyd';
+      bathrooms?: number | null;
+      balconies?: number | null;
+      facing?: string;
+      propertyAge?: string;
+      propertyCondition?: string;
+      hasBalcony?: boolean;
+      hasAC?: boolean;
+      [key: string]: any; // Allow additional properties based on property type
     };
     
     // Location details
-    location: {
-      address: string;
-      flatPlotNo: string;
-      landmark: string;
-      locality: string;
-      city: string;
-      state: string;
-      pinCode: string;
-      coordinates: {
+    location?: {
+      address?: string;
+      flatPlotNo?: string;
+      landmark?: string;
+      locality?: string;
+      city?: string;
+      state?: string;
+      pinCode?: string;
+      coordinates?: {
         latitude: number | null;
         longitude: number | null;
       };
+      [key: string]: any;
     };
     
     // Rental details (only relevant for rental properties)
-    rentalInfo?: {
-      rentAmount: number | null;
-      securityDeposit: number | null;
-      maintenanceCharges: number | null;
-      rentNegotiable: boolean;
-      availableFrom: string;
-      preferredTenants: string[];
-      leaseDuration: string;
-      furnishingStatus: string;
+    rental?: {
+      rentAmount?: number | null;
+      securityDeposit?: number | null;
+      maintenanceCharges?: number | null;
+      rentNegotiable?: boolean;
+      availableFrom?: string;
+      preferredTenants?: string[];
+      leaseDuration?: string;
+      furnishingStatus?: string;
+      hasSimilarUnits?: boolean;
+      propertyShowOption?: string;
+      propertyShowPerson?: string;
+      secondaryNumber?: string;
+      secondaryContactNumber?: string;
+      [key: string]: any;
     };
     
     // Sale details (only relevant for sale properties)
-    saleInfo?: {
-      expectedPrice: number | null;
-      priceNegotiable: boolean;
-      possessionDate: string;
+    sale?: {
+      expectedPrice?: number | null;
+      priceNegotiable?: boolean;
+      possessionDate?: string;
+      hasSimilarUnits?: boolean;
+      propertyShowOption?: string;
+      propertyShowPerson?: string;
+      secondaryNumber?: string;
+      secondaryContactNumber?: string;
+      [key: string]: any;
     };
     
     // Features and amenities
-    features: {
-      amenities: string[];
-      parking: string;
-      petFriendly: boolean;
-      nonVegAllowed: boolean;
-      waterSupply: string;
-      powerBackup: string;
-      gatedSecurity: boolean;
-      description: string;
+    features?: {
+      amenities?: string[];
+      parking?: string;
+      petFriendly?: boolean;
+      nonVegAllowed?: boolean;
+      waterSupply?: string;
+      powerBackup?: string;
+      gatedSecurity?: boolean;
+      description?: string;
+      isSmokingAllowed?: boolean;
+      isDrinkingAllowed?: boolean;
+      hasAttachedBathroom?: boolean;
+      [key: string]: any;
     };
     
-    // Media
-    media: {
-      photos: {
-        images: PropertyImage[];
-      };
+    // Flatmate details
+    flatmate_details?: {
+      preferredGender?: string;
+      occupancy?: string;
+      foodPreference?: string;
+      tenantType?: string;
+      roomSharing?: boolean;
+      maxFlatmates?: number;
+      currentFlatmates?: number;
+      about?: string;
+      [key: string]: any;
+    };
+    
+    // PG/Hostel details
+    pg_details?: {
+      pgType?: string;
+      mealOptions?: string[];
+      roomTypes?: string[];
+      occupancyTypes?: string[];
+      genderPreference?: string;
+      rules?: string[];
+      facilities?: string[];
+      noticePolicy?: string;
+      [key: string]: any;
+    };
+    
+    // Commercial details
+    commercial_details?: {
+      cabins?: number;
+      meetingRooms?: number;
+      washrooms?: number;
+      cornerProperty?: boolean;
+      mainRoadFacing?: boolean;
+      [key: string]: any;
+    };
+    
+    // Coworking details
+    coworking?: {
+      spaceType?: string;
+      capacity?: number;
+      operatingHours?: string;
+      amenities?: string[];
+      securityDeposit?: number;
+      minimumCommitment?: string;
+      discounts?: string[];
+      availableFrom?: string;
+      [key: string]: any;
+    };
+    
+    // Land features
+    land_features?: {
+      approvals?: string[];
+      boundaryStatus?: string;
+      cornerPlot?: boolean;
+      landUseZone?: string;
+      description?: string;
+      [key: string]: any;
+    };
+    
+    // Add other step types as needed
+    [key: string]: any; // Allow for dynamic step types
+  };
+  
+  // Media section with photos and videos
+  media: {
+    photos: {
+      images: PropertyImage[];
+    };
+    videos?: {
+      urls: string[];
     };
   };
 }

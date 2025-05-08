@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/constants/flows.ts
-// Version: 5.0.0
-// Last Modified: 07-05-2025 21:30 IST
-// Purpose: Updated flow definitions to match correct step sequences
+// Version: 5.1.0
+// Last Modified: 09-05-2025 11:30 IST
+// Purpose: Updated flow definitions for structured step hierarchy
 
 /**
  * Available flow types
@@ -32,7 +32,7 @@ export const FLOW_TYPES = {
 export const FLOW_STEPS = {
   // Residential flows
   residential_rent: [
-    'details',
+    'basic_details',
     'location',
     'rental',
     'features',
@@ -40,7 +40,7 @@ export const FLOW_STEPS = {
   ],
   
   residential_sale: [
-    'details',
+    'basic_details',
     'location',
     'sale',
     'features',
@@ -48,7 +48,7 @@ export const FLOW_STEPS = {
   ],
   
   residential_flatmates: [
-    'room_details',
+    'basic_details',
     'location',
     'flatmate_details',
     'features',
@@ -56,7 +56,7 @@ export const FLOW_STEPS = {
   ],
   
   residential_pghostel: [
-    'room_details',
+    'basic_details',
     'location',
     'pg_details',
     'features',
@@ -65,7 +65,7 @@ export const FLOW_STEPS = {
   
   // Commercial flows
   commercial_rent: [
-    'commercial_basics',
+    'basic_details',
     'location',
     'rental',
     'features',
@@ -73,15 +73,15 @@ export const FLOW_STEPS = {
   ],
   
   commercial_sale: [
-    'commercial_basics',
+    'basic_details',
     'location',
-    'commercial_sale',
+    'sale',
     'features',
     'review'
   ],
   
   commercial_coworking: [
-    'details',
+    'basic_details',
     'location',
     'coworking',
     'features',
@@ -90,7 +90,7 @@ export const FLOW_STEPS = {
   
   // Land flows
   land_sale: [
-    'land_details',
+    'basic_details',
     'location',
     'land_features',
     'review'
@@ -98,7 +98,7 @@ export const FLOW_STEPS = {
   
   // Default flow (fallback)
   default: [
-    'details',
+    'basic_details',
     'location',
     'rental',
     'features',
@@ -111,184 +111,141 @@ export const FLOW_STEPS = {
  * These define which fields belong to which step
  */
 export const STEP_FIELD_MAPPINGS = {
-  // Basic property details
-  details: [
-    'title',
-    'propertyType',
-    'bhkType',
-    'floor',
-    'totalFloors',
-    'builtUpArea',
-    'builtUpAreaUnit',
-    'bathrooms',
-    'balconies',
-    'facing',
-    'propertyAge',
-    'propertyCondition',
-    'hasBalcony',
-    'hasAC'
-  ],
-  
-  // Commercial basics
-  commercial_basics: [
-    'title',
-    'propertyType',
-    'commercialType',
-    'floor',
-    'totalFloors',
-    'builtUpArea',
-    'builtUpAreaUnit',
-    'facing',
-    'propertyAge',
-    'propertyCondition'
-  ],
-  
-  // Room details for PG/Hostel
-  room_details: [
-    'title',
-    'propertyType',
-    'roomType',
-    'occupancy',
-    'floor',
-    'totalFloors',
-    'builtUpArea',
-    'builtUpAreaUnit',
-    'bathrooms',
-    'facing'
-  ],
-  
-  // Land details
-  land_details: [
-    'title',
-    'landType',
-    'plotArea',
-    'plotAreaUnit',
-    'plotFrontage',
-    'plotFrontageUnit',
-    'plotLength',
-    'plotLengthUnit'
+  // Basic property details (formerly 'details')
+  basic_details: [
+    'steps.basic_details.title',
+    'steps.basic_details.propertyType',
+    'steps.basic_details.bhkType',
+    'steps.basic_details.floor',
+    'steps.basic_details.totalFloors',
+    'steps.basic_details.builtUpArea',
+    'steps.basic_details.builtUpAreaUnit',
+    'steps.basic_details.bathrooms',
+    'steps.basic_details.balconies',
+    'steps.basic_details.facing',
+    'steps.basic_details.propertyAge',
+    'steps.basic_details.propertyCondition',
+    'steps.basic_details.hasBalcony',
+    'steps.basic_details.hasAC'
   ],
   
   // Location details
   location: [
-    'address',
-    'flatPlotNo',
-    'landmark',
-    'locality',
-    'area',
-    'city',
-    'district',
-    'state',
-    'pinCode',
-    'latitude',
-    'longitude',
-    'coordinates'
+    'steps.location.address',
+    'steps.location.flatPlotNo',
+    'steps.location.landmark',
+    'steps.location.locality',
+    'steps.location.area',
+    'steps.location.city',
+    'steps.location.district',
+    'steps.location.state',
+    'steps.location.pinCode',
+    'steps.location.coordinates.latitude',
+    'steps.location.coordinates.longitude'
   ],
   
   // Features and amenities
   features: [
-    'amenities',
-    'parking',
-    'petFriendly',
-    'hasGym',
-    'nonVegAllowed',
-    'isNonVegAllowed',
-    'waterSupply',
-    'powerBackup',
-    'gatedSecurity',
-    'description',
-    'isSmokingAllowed',
-    'isDrinkingAllowed',
-    'hasAttachedBathroom'
+    'steps.features.amenities',
+    'steps.features.parking',
+    'steps.features.petFriendly',
+    'steps.features.nonVegAllowed',
+    'steps.features.waterSupply',
+    'steps.features.powerBackup',
+    'steps.features.gatedSecurity',
+    'steps.features.description',
+    'steps.features.isSmokingAllowed',
+    'steps.features.isDrinkingAllowed',
+    'steps.features.hasAttachedBathroom'
   ],
   
   // Rental details
   rental: [
-    'rentAmount',
-    'securityDeposit',
-    'maintenanceCharges',
-    'rentNegotiable',
-    'availableFrom',
-    'preferredTenants',
-    'leaseDuration',
-    'furnishingStatus',
-    'hasSimilarUnits',
-    'propertyShowOption',
-    'propertyShowPerson',
-    'secondaryNumber',
-    'secondaryContactNumber'
+    'steps.rental.rentAmount',
+    'steps.rental.securityDeposit',
+    'steps.rental.maintenanceCharges',
+    'steps.rental.rentNegotiable',
+    'steps.rental.availableFrom',
+    'steps.rental.preferredTenants',
+    'steps.rental.leaseDuration',
+    'steps.rental.furnishingStatus',
+    'steps.rental.hasSimilarUnits',
+    'steps.rental.propertyShowOption',
+    'steps.rental.propertyShowPerson',
+    'steps.rental.secondaryNumber',
+    'steps.rental.secondaryContactNumber'
   ],
   
   // Sale details
   sale: [
-    'expectedPrice',
-    'priceNegotiable',
-    'possessionDate',
-    'hasSimilarUnits',
-    'propertyShowOption',
-    'propertyShowPerson',
-    'secondaryNumber',
-    'secondaryContactNumber'
+    'steps.sale.expectedPrice',
+    'steps.sale.priceNegotiable',
+    'steps.sale.possessionDate',
+    'steps.sale.hasSimilarUnits',
+    'steps.sale.propertyShowOption',
+    'steps.sale.propertyShowPerson',
+    'steps.sale.secondaryNumber',
+    'steps.sale.secondaryContactNumber'
   ],
   
   // Flatmate details
   flatmate_details: [
-    'preferredGender',
-    'occupancy',
-    'foodPreference',
-    'tenantType',
-    'roomSharing',
-    'maxFlatmates',
-    'currentFlatmates',
-    'about'
+    'steps.flatmate_details.preferredGender',
+    'steps.flatmate_details.occupancy',
+    'steps.flatmate_details.foodPreference',
+    'steps.flatmate_details.tenantType',
+    'steps.flatmate_details.roomSharing',
+    'steps.flatmate_details.maxFlatmates',
+    'steps.flatmate_details.currentFlatmates',
+    'steps.flatmate_details.about'
   ],
   
   // PG/Hostel details
   pg_details: [
-    'pgType',
-    'mealOptions',
-    'roomTypes',
-    'occupancyTypes',
-    'genderPreference',
-    'rules',
-    'facilities',
-    'noticePolicy'
+    'steps.pg_details.pgType',
+    'steps.pg_details.mealOptions',
+    'steps.pg_details.roomTypes',
+    'steps.pg_details.occupancyTypes',
+    'steps.pg_details.genderPreference',
+    'steps.pg_details.rules',
+    'steps.pg_details.facilities',
+    'steps.pg_details.noticePolicy'
   ],
   
   // Commercial sale details
   commercial_sale: [
-    'expectedPrice',
-    'priceNegotiable',
-    'possessionDate',
-    'hasSimilarUnits',
-    'propertyShowOption',
-    'propertyShowPerson',
-    'cabins',
-    'meetingRooms',
-    'washrooms',
-    'cornerProperty',
-    'mainRoadFacing'
+    'steps.sale.expectedPrice',
+    'steps.sale.priceNegotiable',
+    'steps.sale.possessionDate',
+    'steps.sale.hasSimilarUnits',
+    'steps.sale.propertyShowOption',
+    'steps.sale.propertyShowPerson',
+    'steps.commercial_details.cabins',
+    'steps.commercial_details.meetingRooms',
+    'steps.commercial_details.washrooms',
+    'steps.commercial_details.cornerProperty',
+    'steps.commercial_details.mainRoadFacing'
   ],
   
   // Coworking details
   coworking: [
-    'spaceType',
-    'capacity',
-    'operatingHours',
-    'amenities',
-    'securityDeposit',
-    'minimumCommitment',
-    'discounts',
-    'availableFrom'
+    'steps.coworking.spaceType',
+    'steps.coworking.capacity',
+    'steps.coworking.operatingHours',
+    'steps.coworking.amenities',
+    'steps.coworking.securityDeposit',
+    'steps.coworking.minimumCommitment',
+    'steps.coworking.discounts',
+    'steps.coworking.availableFrom'
   ],
   
   // Land features
   land_features: [
-    'approvals',
-    'boundaryStatus',
-    'cornerPlot',
-    'landUseZone',
-    'description'
+    'steps.land_features.approvals',
+    'steps.land_features.boundaryStatus',
+    'steps.land_features.cornerPlot',
+    'steps.land_features.landUseZone',
+    'steps.land_features.description'
   ],
   
   // Review step
@@ -310,10 +267,7 @@ export const createStepObjectsFromFlow = (flowType: string) => {
   
   // Step icon mappings
   const stepIcons = {
-    details: 'Home',
-    commercial_basics: 'Building',
-    room_details: 'Bed',
-    land_details: 'Map',
+    basic_details: 'Home',
     location: 'MapPin',
     rental: 'DollarSign',
     sale: 'DollarSign',
@@ -328,10 +282,7 @@ export const createStepObjectsFromFlow = (flowType: string) => {
   
   // Step title mappings
   const stepTitles = {
-    details: 'Basic Details',
-    commercial_basics: 'Basic Details',
-    room_details: 'Room Details',
-    land_details: 'Land Details',
+    basic_details: 'Basic Details',
     location: 'Location',
     rental: 'Rental Details',
     sale: 'Sale Details',
