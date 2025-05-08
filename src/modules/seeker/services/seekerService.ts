@@ -1,7 +1,7 @@
 // src/modules/seeker/services/seekerService.ts
-// Version: 4.8.0
-// Last Modified: 13-04-2025 15:30 IST
-// Purpose: Fixed exports and optimized property likes functionality
+// Version: 5.1.0
+// Last Modified: 09-05-2025 11:45 IST
+// Purpose: Updated to use only properties_v2 table with improved debugging
 
 import { supabase } from '@/lib/supabase';
 import { PropertyType } from '@/modules/owner/components/property/types';
@@ -53,7 +53,7 @@ export const formatPrice = (price: number): string => {
 
 // Get marker pin URL based on property type
 export const getMarkerPin = (property: PropertyType) => {
-  const propertyType = property.property_details?.propertyType?.toLowerCase() || '';
+  const propertyType = property.property_details?.basicDetails?.propertyType?.toLowerCase() || '';
 
   if (propertyType.includes('apartment')) {
     return markerPins.apartment;
@@ -72,310 +72,496 @@ export const getMarkerPin = (property: PropertyType) => {
   return markerPins.default;
 };
 
-// Fetch properties with filters and pagination
+// Helper to safely extract number from value
+const safeParseNumber = (value: any, defaultValue = 0): number => {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') {
+    const numMatch = value.match(/^(\d+)/);
+    if (numMatch && numMatch[1]) {
+      return parseInt(numMatch[1], 10) || defaultValue;
+    }
+    const parsed = parseFloat(value);
+    return isNaN(parsed) ? defaultValue : parsed;
+  }
+  return defaultValue;
+};
+
+// Helper to safely get nested property value
+const getNestedValue = (obj: any, path: string, defaultValue: any = null) => {
+  try {
+    return path.split('.').reduce((prev, curr) => {
+      return prev && prev[curr] !== undefined ? prev[curr] : defaultValue;
+    }, obj);
+  } catch (e) {
+    console.error(`Error getting nested value for path ${path}:`, e);
+    return defaultValue;
+  }
+};
+
+// Helper to extract property information from the JSONB property_details field
+const processPropertyData = (property: any) => {
+  try {
+    if (!property) {
+      console.warn('Received null or undefined property in processPropertyData');
+      return null;
+    }
+    
+    // Check if property_details exists
+    const details = property.property_details || {};
+    
+    if (typeof details === 'string') {
+      try {
+        // Try to parse if it's a JSON string
+        const parsedDetails = JSON.parse(details);
+        console.log('Successfully parsed property_details from string to object');
+        property.property_details = parsedDetails;
+      } catch (e) {
+        console.error('Failed to parse property_details string:', e);
+      }
+    }
+    
+    // Extract data from property_details - use getNestedValue for safety
+    const basicDetails = getNestedValue(property, 'property_details.basicDetails', {});
+    const location = getNestedValue(property, 'property_details.location', {});
+    const flow = getNestedValue(property, 'property_details.flow', {});
+    const rental = getNestedValue(property, 'property_details.rental', {});
+    const sale = getNestedValue(property, 'property_details.sale', {});
+    
+    // Price - try different potential locations
+    const price = getNestedValue(rental, 'rentAmount', 0) || 
+                  getNestedValue(sale, 'expectedPrice', 0) || 
+                  getNestedValue(property, 'property_details.price', 0) || 
+                  0;
+    
+    // Calculate bedrooms from bhkType or directly from property
+    let bedrooms = 0;
+    const bhkType = getNestedValue(basicDetails, 'bhkType', '');
+    if (bhkType) {
+      const match = bhkType.match(/^(\d+)/);
+      if (match && match[1]) {
+        bedrooms = parseInt(match[1], 10);
+      }
+    }
+    
+    // Get coordinates from various possible locations
+    let latitude = null;
+    let longitude = null;
+    
+    // Try location.coordinates
+    const coordinates = getNestedValue(location, 'coordinates', null);
+    if (coordinates) {
+      latitude = getNestedValue(coordinates, 'latitude', null) || getNestedValue(coordinates, 'lat', null);
+      longitude = getNestedValue(coordinates, 'longitude', null) || getNestedValue(coordinates, 'lng', null);
+    }
+    
+    // If not found, try direct property_details coordinates
+    if (!latitude || !longitude) {
+      const directCoords = getNestedValue(property, 'property_details.coordinates', null);
+      if (directCoords) {
+        latitude = getNestedValue(directCoords, 'latitude', null) || getNestedValue(directCoords, 'lat', null);
+        longitude = getNestedValue(directCoords, 'longitude', null) || getNestedValue(directCoords, 'lng', null);
+      }
+    }
+    
+    // Create a standardized property object with normalized data
+    return {
+      ...property,
+      // Extract fields from property_details for compatibility with UI components
+      title: getNestedValue(basicDetails, 'title', 'Property Listing'),
+      price: safeParseNumber(price),
+      bedrooms: bedrooms || safeParseNumber(getNestedValue(property, 'property_details.bedrooms', 0)),
+      bathrooms: safeParseNumber(getNestedValue(basicDetails, 'bathrooms', 0)),
+      square_feet: safeParseNumber(getNestedValue(basicDetails, 'builtUpArea', 0)),
+      address: getNestedValue(location, 'address', ''),
+      city: getNestedValue(location, 'city', ''),
+      state: getNestedValue(location, 'state', ''),
+      zip_code: getNestedValue(location, 'pinCode', ''),
+      // Add coordinates to top level for map usage
+      latitude: latitude !== null ? safeParseNumber(latitude) : null,
+      longitude: longitude !== null ? safeParseNumber(longitude) : null,
+      // Keep property_details as is
+      property_details: property.property_details
+    };
+  } catch (error) {
+    console.error('Error in processPropertyData:', error);
+    return property; // Return original property on error
+  }
+};
+
+// Helper to extract images from property_details
+const extractImagesFromProperty = (property: any) => {
+  try {
+    // Initialize images array
+    let images: any[] = [];
+    
+    if (!property || !property.property_details) {
+      return [];
+    }
+    
+    const details = property.property_details;
+    
+    // Try various paths where images might be stored in property_details
+    if (details.images && Array.isArray(details.images)) {
+      images = details.images;
+    } else if (details.photos?.images && Array.isArray(details.photos.images)) {
+      images = details.photos.images;
+    } else if (details.media?.images && Array.isArray(details.media.images)) {
+      images = details.media.images;
+    }
+    
+    // If images were found, process them to have consistent properties
+    if (images.length > 0) {
+      return images.map((img, idx) => ({
+        id: img.id || `img-${idx}`,
+        url: img.dataUrl || img.url || '',
+        is_primary: !!img.isPrimary || !!img.is_primary,
+        display_order: img.display_order || idx
+      }));
+    }
+    
+    // No images found
+    return [];
+  } catch (error) {
+    console.error('Error extracting images:', error);
+    return [];
+  }
+};
+
+// Debug helper to log table schema
+export const debugTableSchema = async (tableName: string) => {
+  try {
+    console.log(`Checking table schema for: ${tableName}`);
+    
+    // First check if table exists by trying to count records
+    const { count, error } = await supabase
+      .from(tableName)
+      .select('*', { count: 'exact', head: true });
+      
+    if (error) {
+      console.error(`Error accessing table ${tableName}:`, error);
+      return { exists: false, error: error.message };
+    }
+    
+    console.log(`Table ${tableName} exists with approximately ${count} records`);
+    
+    // Get sample records to infer schema
+    const { data, error: sampleError } = await supabase
+      .from(tableName)
+      .select('*')
+      .limit(1);
+      
+    if (sampleError || !data || data.length === 0) {
+      console.warn(`No sample data found in ${tableName}`);
+      return { exists: true, count, schema: 'No sample data available' };
+    }
+    
+    // Extract column names and types
+    const record = data[0];
+    const schema = Object.keys(record).map(key => {
+      let type = typeof record[key];
+      if (record[key] === null) type = 'null';
+      if (Array.isArray(record[key])) type = 'array';
+      
+      return { column: key, type };
+    });
+    
+    console.log(`Table ${tableName} schema:`, schema);
+    
+    return { exists: true, count, schema };
+  } catch (error) {
+    console.error('Error in debugTableSchema:', error);
+    return { exists: false, error: error.message };
+  }
+};
+
+// Fetch properties with filters and pagination - Only from properties_v2
 export const fetchProperties = async (filters: PropertyFilters = {}) => {
   try {
+    // First check if the table exists
+    const schemaCheck = await debugTableSchema('properties_v2');
+    console.log('Schema check results:', schemaCheck);
+    
+    if (!schemaCheck.exists) {
+      console.error('properties_v2 table does not exist or cannot be accessed');
+      return {
+        properties: [],
+        totalCount: 0,
+        currentPage: 1,
+        totalPages: 0
+      };
+    }
+    
     // Set default pagination values
     const page = filters.page || 1;
-    const pageSize = filters.pageSize || 50; // Increased from default to show more properties
+    const pageSize = filters.pageSize || 50; 
     const startIndex = (page - 1) * pageSize;
+    
+    console.log(`Fetching properties: page=${page}, pageSize=${pageSize}`);
 
-    // Build the query
+    // Get total count of records first with minimal filtering
+    let countQuery = supabase
+      .from('properties_v2')
+      .select('id', { count: 'exact', head: true });
+      
+    const { count: totalRecords, error: countError } = await countQuery;
+    
+    if (countError) {
+      console.error('Error counting records:', countError);
+    } else {
+      console.log(`Total records in properties_v2: ${totalRecords}`);
+    }
+    
+    // Build the query for properties_v2
     let query = supabase
-      .from('properties')
+      .from('properties_v2')
       .select(`
         *,
-        property_images (
-          id,
-          url,
-          is_primary,
-          display_order
-        ),
         profiles:owner_id (
           id,
           email
         )
-      `);
-
-    // Create a count query to get total results
-    let countQuery = supabase
-      .from('properties')
-      .select('id', { count: 'exact' });
-
-    // Apply filters to both queries
-    if (filters.furnishing) {
-      query = query.filter('property_details->furnishing', 'eq', filters.furnishing);
-      countQuery = countQuery.filter('property_details->furnishing', 'eq', filters.furnishing);
-    }
-
-    if (filters.propertyAge) {
-      query = query.filter('property_details->propertyAge', 'eq', filters.propertyAge);
-      countQuery = countQuery.filter('property_details->propertyAge', 'eq', filters.propertyAge);
-    }
-
+      `, { count: 'exact' });
+    
+    // Apply filters
     if (filters.searchQuery) {
-      const searchFilter = `title.ilike.%${filters.searchQuery}%,address.ilike.%${filters.searchQuery}%,city.ilike.%${filters.searchQuery}%`;
-      query = query.or(searchFilter);
-      countQuery = countQuery.or(searchFilter);
+      console.log(`Applying search filter: ${filters.searchQuery}`);
+      // Less restrictive search - search in entire property_details
+      query = query.filter('property_details', 'ilike', `%${filters.searchQuery}%`);
     }
-
-    if (filters.propertyType) {
-      query = query.filter('property_details->propertyType', 'ilike', `%${filters.propertyType}%`);
-      countQuery = countQuery.filter('property_details->propertyType', 'ilike', `%${filters.propertyType}%`);
+    
+    if (filters.propertyType && filters.propertyType !== 'all') {
+      console.log(`Applying property type filter: ${filters.propertyType}`);
+      // Less restrictive - search in entire property_details
+      query = query.filter('property_details', 'ilike', `%${filters.propertyType}%`);
     }
-
-    if (filters.minPrice !== undefined) {
-      query = query.gte('price', filters.minPrice);
-      countQuery = countQuery.gte('price', filters.minPrice);
-    }
-
-    if (filters.maxPrice !== undefined) {
-      query = query.lte('price', filters.maxPrice);
-      countQuery = countQuery.lte('price', filters.maxPrice);
-    }
-
-    if (filters.bedrooms !== undefined) {
-      query = query.gte('bedrooms', filters.bedrooms);
-      countQuery = countQuery.gte('bedrooms', filters.bedrooms);
-    }
-
-    if (filters.bathrooms !== undefined) {
-      query = query.gte('bathrooms', filters.bathrooms);
-      countQuery = countQuery.gte('bathrooms', filters.bathrooms);
-    }
-
-    // Apply sorting
-    if (filters.sortBy) {
-      switch (filters.sortBy) {
-        case 'price_low':
-          query = query.order('price', { ascending: true });
-          break;
-        case 'price_high':
-          query = query.order('price', { ascending: false });
-          break;
-        case 'size_high':
-          query = query.order('square_feet', { ascending: false });
-          break;
-        case 'newest':
-        default:
-          query = query.order('created_at', { ascending: false });
-          break;
-      }
-    } else {
-      // Default sort by creation date (newest first)
-      query = query.order('created_at', { ascending: false });
-    }
-
+    
+    // No price or bedroom filters for initial debugging
+    
+    // Apply sorting - Use created_at for all cases initially
+    query = query.order('created_at', { ascending: false });
+    
     // Apply pagination
     query = query.range(startIndex, startIndex + pageSize - 1);
-
-    // Execute both queries in parallel
-    const [dataResult, countResult] = await Promise.all([
-      query,
-      countQuery
-    ]);
-
-    if (dataResult.error) {
-      console.error('Error fetching properties:', dataResult.error);
-      throw dataResult.error;
+    
+    console.log(`Executing query for properties_v2`);
+    
+    // Execute query
+    const { data, error, count } = await query;
+    
+    if (error) {
+      console.error('Error fetching properties:', error);
+      throw error;
+    }
+    
+    console.log(`Query returned ${data?.length || 0} properties out of ${count || 0} total matching records`);
+    
+    // Debug - log first record structure if available
+    if (data && data.length > 0) {
+      console.log('First record ID:', data[0].id);
+      console.log('First record property_details type:', typeof data[0].property_details);
+      
+      // Safely stringify part of the first record for debugging
+      try {
+        const recordPreview = JSON.stringify(data[0], null, 2).substring(0, 200) + '...';
+        console.log('First record preview:', recordPreview);
+      } catch (e) {
+        console.error('Error stringifying record:', e);
+      }
+    } else {
+      console.warn('No properties returned from query');
     }
 
-    if (countResult.error) {
-      console.error('Error counting properties:', countResult.error);
-      throw countResult.error;
-    }
-
-    const totalCount = countResult.count || 0;
-    const totalPages = Math.ceil(totalCount / pageSize);
-
-    console.log(`Fetched ${dataResult.data?.length || 0} properties (page ${page}/${totalPages}, total: ${totalCount})`);
-
-    // Process images to ensure consistent sorting
-    const processedProperties = (dataResult.data || []).map(property => ({
-      ...property,
-      property_images: property.property_images
-        ? property.property_images.sort((a, b) => {
+    // Process the data to have consistent format
+    const processedProperties = (data || []).map(property => {
+      try {
+        // Process property data
+        const processedProperty = processPropertyData(property);
+        
+        if (!processedProperty) {
+          console.warn(`Failed to process property ${property.id}`);
+          return null;
+        }
+        
+        // Extract images
+        const propertyImages = extractImagesFromProperty(processedProperty);
+        
+        // Sort images - primary ones first, then by display_order
+        const sortedImages = propertyImages.sort((a, b) => {
           // Sort by is_primary first (primary images first)
           if (a.is_primary && !b.is_primary) return -1;
           if (!a.is_primary && b.is_primary) return 1;
 
           // Then sort by display_order if available
           return (a.display_order || 0) - (b.display_order || 0);
-        })
-        : []
-    }));
+        });
+        
+        // Add sorted images to the property
+        return {
+          ...processedProperty,
+          property_images: sortedImages
+        };
+      } catch (error) {
+        console.error(`Error processing property ${property.id}:`, error);
+        return null;
+      }
+    }).filter(Boolean); // Remove any null entries
 
     return {
       properties: processedProperties,
-      totalCount,
+      totalCount: count || 0,
       currentPage: page,
-      totalPages
+      totalPages: Math.ceil((count || 0) / pageSize)
     };
   } catch (error) {
-    console.error('Comprehensive property fetch error:', error);
-    throw error;
+    console.error('Error fetching properties:', error);
+    return {
+      properties: [],
+      totalCount: 0,
+      currentPage: 1,
+      totalPages: 0
+    };
   }
 };
 
-// Fetch properties specifically for map display
+// Fetch properties specifically for map display - Only from properties_v2
 export const fetchPropertiesForMap = async (filters: PropertyFilters = {}) => {
   try {
-    // Set default pagination values - changed to 9 to match previous default
+    // First check the table exists and has data
+    const { count: tableCount, error: countError } = await supabase
+      .from('properties_v2')
+      .select('*', { count: 'exact', head: true });
+      
+    console.log(`Checking properties_v2 table: ${tableCount} total records exist. Error: ${countError ? countError.message : 'None'}`);
+    
+    if (countError) {
+      console.error('Error accessing properties_v2 table. Check if table exists:', countError);
+      return {
+        properties: [],
+        totalCount: 0,
+        currentPage: 1,
+        totalPages: 0
+      };
+    }
+    
+    // Set default pagination values
     const page = filters.page || 1;
-    const pageSize = filters.pageSize || 9; // Changed from 10 to 9 to match the original display count
+    const pageSize = filters.pageSize || 9; 
     const startIndex = (page - 1) * pageSize;
 
     console.log(`Fetching properties for map: page=${page}, pageSize=${pageSize}, startIndex=${startIndex}`);
-
-    // Build the query with necessary fields for map display
+    
+    // Build the query for properties_v2 - with minimal filtering for debug
     let query = supabase
-      .from('properties')
-      .select(`
-        id,
-        title,
-        price,
-        address,
-        city,
-        bedrooms,
-        bathrooms,
-        square_feet,
-        property_details,
-        property_images (
-          id,
-          url,
-          is_primary,
-          display_order
-        )
-      `);
-
-    // Create a count query to get total results
-    let countQuery = supabase
-      .from('properties')
-      .select('id', { count: 'exact' });
-
-    // Apply filters to both queries
-    if (filters.searchQuery) {
-      const searchFilter = `title.ilike.%${filters.searchQuery}%,address.ilike.%${filters.searchQuery}%,city.ilike.%${filters.searchQuery}%`;
-      query = query.or(searchFilter);
-      countQuery = countQuery.or(searchFilter);
-    }
-
-    if (filters.propertyType) {
-      query = query.filter('property_details->propertyType', 'ilike', `%${filters.propertyType}%`);
-      countQuery = countQuery.filter('property_details->propertyType', 'ilike', `%${filters.propertyType}%`);
-    }
-
-    if (filters.minPrice !== undefined) {
-      query = query.gte('price', filters.minPrice);
-      countQuery = countQuery.gte('price', filters.minPrice);
-    }
-
-    if (filters.maxPrice !== undefined) {
-      query = query.lte('price', filters.maxPrice);
-      countQuery = countQuery.lte('price', filters.maxPrice);
-    }
-
-    if (filters.bedrooms !== undefined) {
-      query = query.gte('bedrooms', filters.bedrooms);
-      countQuery = countQuery.gte('bedrooms', filters.bedrooms);
-    }
-
-    if (filters.bathrooms !== undefined) {
-      query = query.gte('bathrooms', filters.bathrooms);
-      countQuery = countQuery.gte('bathrooms', filters.bathrooms);
-    }
-
-    // Apply sorting
-    if (filters.sortBy) {
-      switch (filters.sortBy) {
-        case 'price_low':
-          query = query.order('price', { ascending: true });
-          break;
-        case 'price_high':
-          query = query.order('price', { ascending: false });
-          break;
-        case 'size_high':
-          query = query.order('square_feet', { ascending: false });
-          break;
-        case 'newest':
-        default:
-          query = query.order('created_at', { ascending: false });
-          break;
-      }
-    } else {
-      // Default sort by creation date (newest first)
-      query = query.order('created_at', { ascending: false });
-    }
-
+      .from('properties_v2')
+      .select('*', { count: 'exact' });
+    
+    console.log('Querying properties_v2 table with minimal filters');
+    
+    // Apply sorting (same as in fetchProperties)
+    query = query.order('created_at', { ascending: false });
+    
     // Apply pagination
     query = query.range(startIndex, startIndex + pageSize - 1);
-
-    // Execute both queries in parallel
-    const [dataResult, countResult] = await Promise.all([
-      query,
-      countQuery
-    ]);
-
-    if (dataResult.error) {
-      console.error('Error fetching properties for map:', dataResult.error);
-      throw dataResult.error;
-    }
-
-    if (countResult.error) {
-      console.error('Error counting properties for map:', countResult.error);
-      throw countResult.error;
-    }
-
-    const totalCount = countResult.count || 0;
-    const totalPages = Math.ceil(totalCount / pageSize);
-
-    console.log(`Fetched ${dataResult.data?.length || 0} properties for map (page ${page}/${totalPages}, total: ${totalCount})`);
-
-    // Process the data to include primary images
-    const processedProperties = (dataResult.data || []).map(property => {
-      let primaryImage = '/noimage.png';
-
-      if (property.property_images && property.property_images.length > 0) {
-        // Find primary image or use first image
-        const primary = property.property_images.find(img => img.is_primary);
-        primaryImage = (primary || property.property_images[0]).url;
-      }
-
-      // Add primary image to property_details
+    
+    // Execute query
+    const { data, error, count } = await query;
+    
+    console.log(`Raw query result: Found ${count || 0} properties. Error: ${error ? error.message : 'None'}`);
+    
+    if (error) {
+      console.error('Error querying properties_v2:', error);
       return {
-        ...property,
-        property_details: {
-          ...property.property_details,
-          primaryImage
-        }
+        properties: [],
+        totalCount: 0,
+        currentPage: 1,
+        totalPages: 0
       };
-    });
+    }
+    
+    // Debug the first record to see structure
+    if (data && data.length > 0) {
+      console.log(`First record ID: ${data[0].id}`);
+      try {
+        console.log(`First record property_details type: ${typeof data[0].property_details}`);
+        
+        // Safely stringify a portion to see the structure
+        if (typeof data[0].property_details === 'object') {
+          const preview = JSON.stringify(data[0].property_details).substring(0, 200) + '...';
+          console.log(`Property details preview: ${preview}`);
+        } else {
+          console.log(`Raw property_details: ${data[0].property_details}`);
+        }
+      } catch (e) {
+        console.error('Error logging property details:', e);
+      }
+    } else {
+      console.warn('No properties found in properties_v2 table');
+    }
+
+    // Process the data to have consistent format
+    const processedProperties = (data || []).map(property => {
+      try {
+        // Process property data 
+        const processedProperty = processPropertyData(property);
+        
+        if (!processedProperty) {
+          console.warn(`Failed to process property ${property.id}`);
+          return null;
+        }
+        
+        // Extract images
+        const images = extractImagesFromProperty(processedProperty);
+        
+        // Find primary image or first available image
+        let primaryImage = '/noimage.png';
+        if (images.length > 0) {
+          const primary = images.find(img => img.is_primary);
+          primaryImage = primary ? primary.url : images[0].url;
+        }
+        
+        // Add primary image to property_details
+        return {
+          ...processedProperty,
+          property_details: {
+            ...processedProperty.property_details,
+            primaryImage
+          }
+        };
+      } catch (error) {
+        console.error(`Error processing property ${property.id}:`, error);
+        return null;
+      }
+    }).filter(Boolean); // Remove any null entries
+    
+    console.log(`Successfully processed ${processedProperties.length} properties for map`);
 
     return {
       properties: processedProperties,
-      totalCount,
+      totalCount: count || 0,
       currentPage: page,
-      totalPages
+      totalPages: Math.ceil((count || 0) / pageSize)
     };
   } catch (error) {
     console.error('Error fetching properties for map:', error);
-    throw error;
+    return {
+      properties: [],
+      totalCount: 0,
+      currentPage: 1,
+      totalPages: 0
+    };
   }
 };
 
-// Fetch a single property by ID
+// Fetch a single property by ID - Only from properties_v2
 export const fetchPropertyById = async (propertyId: string) => {
   try {
+    console.log(`Fetching property with ID: ${propertyId}`);
+    
+    // Fetch from properties_v2 table
     const { data, error } = await supabase
-      .from('properties')
+      .from('properties_v2')
       .select(`
         *,
-        property_images (
-          id,
-          url,
-          is_primary,
-          display_order
-        ),
         profiles:owner_id (
           id,
           email,
@@ -384,32 +570,44 @@ export const fetchPropertyById = async (propertyId: string) => {
       `)
       .eq('id', propertyId)
       .single();
-
+    
     if (error) {
       console.error('Error fetching property by ID:', error);
       throw error;
     }
 
     if (!data) {
+      console.warn(`Property with ID ${propertyId} not found`);
       throw new Error(`Property with ID ${propertyId} not found`);
     }
+    
+    console.log(`Found property ${propertyId}. Processing...`);
+    
+    // Process property to ensure consistent structure
+    const processedProperty = processPropertyData(data);
+    
+    if (!processedProperty) {
+      console.error(`Failed to process property ${propertyId}`);
+      throw new Error(`Error processing property ${propertyId}`);
+    }
+    
+    // Extract and process images
+    const images = extractImagesFromProperty(processedProperty);
+    
+    // Sort images
+    const sortedImages = images.sort((a, b) => {
+      // Sort by is_primary first (primary images first)
+      if (a.is_primary && !b.is_primary) return -1;
+      if (!a.is_primary && b.is_primary) return 1;
 
-    // Process images to ensure consistent sorting
-    const processedImages = data.property_images
-      ? data.property_images.sort((a, b) => {
-        // Sort by is_primary first (primary images first)
-        if (a.is_primary && !b.is_primary) return -1;
-        if (!a.is_primary && b.is_primary) return 1;
-
-        // Then sort by display_order if available
-        return (a.display_order || 0) - (b.display_order || 0);
-      })
-      : [];
-
-    // Create processed property with sorted images
-    const processedProperty = {
-      ...data,
-      property_images: processedImages
+      // Then sort by display_order if available
+      return (a.display_order || 0) - (b.display_order || 0);
+    });
+    
+    // Add sorted images to the property
+    const finalProperty = {
+      ...processedProperty,
+      property_images: sortedImages
     };
 
     // Record view count increment in the background (don't await)
@@ -417,7 +615,7 @@ export const fetchPropertyById = async (propertyId: string) => {
       console.error('Error incrementing view count:', err);
     });
 
-    return processedProperty;
+    return finalProperty;
   } catch (error) {
     console.error(`Error fetching property with ID ${propertyId}:`, error);
     throw error;
@@ -465,8 +663,7 @@ const incrementPropertyViewCount = async (propertyId: string) => {
           });
       }
     } else {
-      // For anonymous users, just increment the property's view count
-      // This could be implemented in the future if needed
+      // For anonymous users, just log without DB tracking
       console.log('Anonymous user view - not tracked in database');
     }
 
@@ -477,7 +674,7 @@ const incrementPropertyViewCount = async (propertyId: string) => {
   }
 };
 
-// Favorite properties functions
+// Favorite properties functions - Updated for properties_v2
 
 export const getUserFavorites = async () => {
   try {
@@ -487,53 +684,86 @@ export const getUserFavorites = async () => {
       throw new Error('User not authenticated');
     }
 
-    const { data, error } = await supabase
+    // Get the user's liked property IDs
+    const { data: likeData, error: likeError } = await supabase
       .from('property_likes')
-      .select(`
-        property_id,
-        properties:property_id (
-          *,
-          property_images (
-            id,
-            url,
-            is_primary,
-            display_order
-          )
-        )
-      `)
+      .select('property_id')
       .eq('user_id', user.user.id);
 
-    if (error) {
-      throw error;
+    if (likeError) {
+      console.error('Error fetching liked property IDs:', likeError);
+      throw likeError;
     }
 
-    // Format the properties data
-    return data.map(like => {
-      const property = like.properties;
+    if (!likeData || likeData.length === 0) {
+      return [];
+    }
 
-      // Find primary image or first image
-      let primaryImage = '/noimage.png';
-      if (property.property_images && property.property_images.length > 0) {
-        const primary = property.property_images.find(img => img.is_primary);
-        primaryImage = (primary || property.property_images[0]).url;
-      }
+    console.log(`Found ${likeData.length} favorited properties for user ${user.user.id}`);
 
-      // Add primary image to property_details
-      return {
-        ...property,
-        property_details: {
-          ...property.property_details,
-          primaryImage
+    // Extract property IDs
+    const propertyIds = likeData.map(like => like.property_id);
+
+    // Fetch properties from properties_v2
+    const { data: propertiesData, error: fetchError } = await supabase
+      .from('properties_v2')
+      .select('*')
+      .in('id', propertyIds);
+      
+    if (fetchError) {
+      console.error('Error fetching properties from properties_v2:', fetchError);
+      throw fetchError;
+    }
+    
+    console.log(`Found ${propertiesData?.length || 0} properties in properties_v2 out of ${propertyIds.length} favorites`);
+    
+    if (!propertiesData || propertiesData.length === 0) {
+      return [];
+    }
+    
+    // Process all properties to ensure consistent format
+    const processedProperties = propertiesData.map(property => {
+      try {
+        // Process property data
+        const processedProperty = processPropertyData(property);
+        
+        if (!processedProperty) {
+          console.warn(`Failed to process property ${property.id}`);
+          return null;
         }
-      };
-    });
+        
+        // Extract and process images
+        const propertyImages = extractImagesFromProperty(processedProperty);
+        
+        // Find primary image or use first available
+        let primaryImage = '/noimage.png';
+        if (propertyImages.length > 0) {
+          const primary = propertyImages.find(img => img.is_primary);
+          primaryImage = primary ? primary.url : propertyImages[0].url;
+        }
+        
+        // Add primary image to property_details
+        return {
+          ...processedProperty,
+          property_details: {
+            ...(processedProperty.property_details || {}),
+            primaryImage
+          }
+        };
+      } catch (error) {
+        console.error(`Error processing property ${property.id}:`, error);
+        return null;
+      }
+    }).filter(Boolean); // Remove any null entries
+
+    return processedProperties;
   } catch (error) {
     console.error('Error getting user favorites:', error);
     return [];
   }
 };
 
-// Fixed version - Get all user's liked property IDs
+// Get all user's liked property IDs
 export const getUserLikedPropertyIds = async (userId: string): Promise<string[]> => {
   try {
     if (!userId) {
@@ -557,7 +787,7 @@ export const getUserLikedPropertyIds = async (userId: string): Promise<string[]>
   }
 };
 
-// Fixed version with better error handling
+// Check if a property is liked by the user
 export const checkPropertyLike = async (propertyId: string, userId: string) => {
   try {
     if (!propertyId || !userId) {
@@ -584,6 +814,7 @@ export const checkPropertyLike = async (propertyId: string, userId: string) => {
   }
 };
 
+// Add a property to favorites
 export const addFavorite = async (propertyId: string) => {
   try {
     const { data: user } = await supabase.auth.getUser();
@@ -622,6 +853,7 @@ export const addFavorite = async (propertyId: string) => {
   }
 };
 
+// Remove a property from favorites
 export const removeFavorite = async (propertyId: string) => {
   try {
     const { data: user } = await supabase.auth.getUser();
@@ -647,6 +879,7 @@ export const removeFavorite = async (propertyId: string) => {
   }
 };
 
+// Toggle property like status
 export const togglePropertyLike = async (propertyId: string, isLiked: boolean) => {
   try {
     // If isLiked is true, we want to add a favorite; otherwise remove it
@@ -700,10 +933,7 @@ export const reportProperty = async (
   description?: string
 ) => {
   try {
-    // Check if the table exists in the database
-    // If not, this would require creating a table, but for now we'll use the existing structure
-
-    // Insert the report into a property_reports table or a general reports table
+    // Insert the report into a property_visits table or a general reports table
     const { data, error } = await supabase
       .from('property_visits')
       .insert({
@@ -736,6 +966,7 @@ interface SimilarPropertiesOptions {
   limit?: number;
 }
 
+// Fetch similar properties - Only from properties_v2
 export const fetchSimilarProperties = async (options: SimilarPropertiesOptions) => {
   try {
     const {
@@ -755,161 +986,37 @@ export const fetchSimilarProperties = async (options: SimilarPropertiesOptions) 
       return [];
     }
 
-    // Base query to fetch properties
+    // Base query to fetch properties from properties_v2 with minimal restrictions for debugging
     let query = supabase
-      .from('properties')
-      .select(`
-        id,
-        title,
-        price,
-        address,
-        city,
-        state,
-        bedrooms,
-        bathrooms,
-        square_feet,
-        property_details,
-        property_images (
-          id,
-          url,
-          is_primary
-        )
-      `)
+      .from('properties_v2')
+      .select('*')
       .neq('id', currentPropertyId) // Exclude current property
       .order('created_at', { ascending: false }) // Latest properties first
       .limit(limit + 5); // Fetch a few extra to allow for filtering
-
-    // Add location filters if available
+    
+    // Apply city filter if available - use raw property_details filter for debugging
     if (city) {
-      query = query.eq('city', city);
+      query = query.filter('property_details', 'ilike', `%${city}%`);
     }
-
-    if (state) {
-      query = query.eq('state', state);
-    }
-
-    // Add property type filter if available
-    if (propertyType) {
-      query = query.filter('property_details->propertyType', 'ilike', `%${propertyType}%`);
-    }
-
-    // Add bedrooms filter if available (with some flexibility)
-    if (bedrooms !== undefined && bedrooms !== null) {
-      // Find properties with similar bedrooms count (±1)
-      query = query.gte('bedrooms', Math.max(1, bedrooms - 1))
-        .lte('bedrooms', bedrooms + 1);
-    }
-
-    // Add price range filter if available
-    if (price !== undefined && price !== null && price > 0) {
-      // Find properties within ±30% of the price (more flexibility)
-      const minPrice = price * 0.7;
-      const maxPrice = price * 1.3;
-      query = query.gte('price', minPrice).lte('price', maxPrice);
-    }
-
-    console.log('[fetchSimilarProperties] Executing first query with filters');
-
-    // Execute the query
+    
+    // Execute the query with minimal restrictions
     const { data, error } = await query;
-
+    
     if (error) {
       console.error('[fetchSimilarProperties] Error fetching similar properties:', error);
-      throw error;
+      return [];
     }
-
-    const resultCount = data?.length || 0;
-    console.log(`[fetchSimilarProperties] First query returned ${resultCount} properties`);
-
-    // If we got some results, return them
+    
+    console.log(`[fetchSimilarProperties] Found ${data?.length || 0} similar properties`);
+    
     if (data && data.length >= 1) {
+      // Process and return the properties
       return processSimilarProperties(data);
     }
-
-    console.log('[fetchSimilarProperties] No similar properties found with strict criteria, trying with relaxed filters');
-
-    // Try again with more relaxed filters
-    let fallbackQuery = supabase
-      .from('properties')
-      .select(`
-        id,
-        title,
-        price,
-        address,
-        city,
-        state,
-        bedrooms,
-        bathrooms,
-        square_feet,
-        property_details,
-        property_images (
-          id,
-          url,
-          is_primary
-        )
-      `)
-      .neq('id', currentPropertyId)
-      .limit(limit + 2);
-
-    // Keep city/state filter if available
-    if (city) {
-      fallbackQuery = fallbackQuery.eq('city', city);
-    } else if (state) {
-      fallbackQuery = fallbackQuery.eq('state', state);
-    }
-
-    // Remove other filters for a broader search
-
-    const { data: fallbackData, error: fallbackError } = await fallbackQuery;
-
-    if (fallbackError) {
-      console.error('[fetchSimilarProperties] Error fetching fallback properties:', fallbackError);
-      throw fallbackError;
-    }
-
-    const fallbackCount = fallbackData?.length || 0;
-    console.log(`[fetchSimilarProperties] Fallback query returned ${fallbackCount} properties`);
-
-    if (fallbackData && fallbackData.length >= 1) {
-      return processSimilarProperties(fallbackData);
-    }
-
-    // If still no results, just get any recent properties
-    console.log('[fetchSimilarProperties] No properties found with location criteria, fetching most recent properties');
-
-    const { data: lastResortData, error: lastResortError } = await supabase
-      .from('properties')
-      .select(`
-        id,
-        title,
-        price,
-        address,
-        city,
-        state,
-        bedrooms,
-        bathrooms,
-        square_feet,
-        property_details,
-        property_images (
-          id,
-          url,
-          is_primary
-        )
-      `)
-      .neq('id', currentPropertyId)
-      .order('created_at', { ascending: false })
-      .limit(limit);
-
-    if (lastResortError) {
-      console.error('[fetchSimilarProperties] Error fetching last resort properties:', lastResortError);
-      throw lastResortError;
-    }
-
-    const lastResortCount = lastResortData?.length || 0;
-    console.log(`[fetchSimilarProperties] Last resort query returned ${lastResortCount} properties`);
-
-    // Return whatever we found, or empty array
-    return processSimilarProperties(lastResortData || []);
+    
+    // If no results, return empty array
+    console.log('[fetchSimilarProperties] No similar properties found');
+    return [];
   } catch (error) {
     console.error('[fetchSimilarProperties] Error:', error);
     // Return empty array instead of throwing to prevent component errors
@@ -920,20 +1027,36 @@ export const fetchSimilarProperties = async (options: SimilarPropertiesOptions) 
 // Helper function for processing similar properties
 const processSimilarProperties = (properties: any[]) => {
   return properties.map(property => {
-    // Find primary image or first image
-    let primaryImage = '/noimage.png';
-    if (property.property_images && property.property_images.length > 0) {
-      const primary = property.property_images.find((img: any) => img.is_primary);
-      primaryImage = primary ? primary.url : property.property_images[0].url;
-    }
-
-    // Add primary image to property_details
-    return {
-      ...property,
-      property_details: {
-        ...property.property_details,
-        primaryImage
+    try {
+      // Process property data
+      const processedProperty = processPropertyData(property);
+      
+      if (!processedProperty) {
+        console.warn(`Failed to process property ${property.id} for similar properties`);
+        return null;
       }
-    };
-  });
+      
+      // Extract images
+      const extractedImages = extractImagesFromProperty(processedProperty);
+      
+      // Find primary image or first image
+      let primaryImage = '/noimage.png';
+      if (extractedImages.length > 0) {
+        const primary = extractedImages.find(img => img.is_primary);
+        primaryImage = primary ? primary.url : extractedImages[0].url;
+      }
+      
+      // Add primary image to property_details
+      return {
+        ...processedProperty,
+        property_details: {
+          ...processedProperty.property_details,
+          primaryImage
+        }
+      };
+    } catch (error) {
+      console.error(`Error processing similar property ${property.id}:`, error);
+      return null;
+    }
+  }).filter(Boolean); // Remove any null entries
 };

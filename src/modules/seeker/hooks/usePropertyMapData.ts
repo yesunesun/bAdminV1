@@ -1,11 +1,11 @@
 // src/modules/seeker/hooks/usePropertyMapData.ts
-// Version: 2.2.0
-// Last Modified: 04-04-2025 16:20 IST
-// Purpose: Fixed property page size and pagination functionality
+// Version: 3.1.0
+// Last Modified: 09-05-2025 16:20 IST
+// Purpose: Updated to support properties_v2 table with improved debugging
 
 import { useState, useEffect, useCallback } from 'react';
 import { PropertyType } from '@/modules/owner/components/property/types';
-import { fetchPropertiesForMap, PropertyFilters } from '../services/seekerService';
+import { fetchPropertiesForMap, PropertyFilters, debugTableSchema } from '../services/seekerService';
 
 // Popular locations for search suggestions
 const POPULAR_LOCATIONS = [
@@ -19,25 +19,77 @@ const MAX_RECENT_SEARCHES = 10;
 // Page size for pagination (changed from 10 to 9 to match initial view)
 const PAGE_SIZE = 9;
 
-// Coordinate validation helper
+// Helper to safely get nested property value
+const getNestedValue = (obj: any, path: string, defaultValue: any = null) => {
+  try {
+    return path.split('.').reduce((prev, curr) => {
+      return prev && prev[curr] !== undefined ? prev[curr] : defaultValue;
+    }, obj);
+  } catch (e) {
+    console.error(`Error getting nested value for path ${path}:`, e);
+    return defaultValue;
+  }
+};
+
+// Enhanced coordinate validation helper for properties_v2 format
 const hasValidCoordinates = (property: PropertyType): boolean => {
   try {
-    const lat = parseFloat(property.property_details?.latitude || '0');
-    const lng = parseFloat(property.property_details?.longitude || '0');
+    // Debug the property structure to help diagnose coordinate problems
+    console.debug(`Checking coordinates for property ${property.id}`);
     
-    return (
-      !isNaN(lat) && 
-      !isNaN(lng) && 
-      lat !== 0 && 
-      lng !== 0 && 
-      lat >= -90 && 
-      lat <= 90 && 
-      lng >= -180 && 
-      lng <= 180
-    );
+    // Check all possible coordinate formats in properties_v2 structure
+    
+    // 1. Check direct latitude/longitude properties added during processing
+    if (property.latitude !== undefined && property.longitude !== undefined) {
+      const lat = parseFloat(String(property.latitude));
+      const lng = parseFloat(String(property.longitude));
+      
+      if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0 && 
+          lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+        console.debug(`Valid coordinates found in direct latitude/longitude: ${lat}, ${lng}`);
+        return true;
+      }
+    }
+    
+    // 2. Check property_details.location.coordinates (v2 format)
+    const locationCoords = getNestedValue(property, 'property_details.location.coordinates', null);
+    if (locationCoords) {
+      // Check lat/lng format
+      const lat = parseFloat(String(getNestedValue(locationCoords, 'lat', NaN) || getNestedValue(locationCoords, 'latitude', NaN)));
+      const lng = parseFloat(String(getNestedValue(locationCoords, 'lng', NaN) || getNestedValue(locationCoords, 'longitude', NaN)));
+      
+      if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0 && 
+          lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+        console.debug(`Valid coordinates found in property_details.location.coordinates: ${lat}, ${lng}`);
+        return true;
+      }
+    }
+    
+    // 3. Check property_details.coordinates
+    const directCoords = getNestedValue(property, 'property_details.coordinates', null);
+    if (directCoords) {
+      // Check lat/lng format
+      const lat = parseFloat(String(getNestedValue(directCoords, 'lat', NaN) || getNestedValue(directCoords, 'latitude', NaN)));
+      const lng = parseFloat(String(getNestedValue(directCoords, 'lng', NaN) || getNestedValue(directCoords, 'longitude', NaN)));
+      
+      if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0 && 
+          lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+        console.debug(`Valid coordinates found in property_details.coordinates: ${lat}, ${lng}`);
+        return true;
+      }
+    }
+    
+    // For debugging - if we got here, no valid coordinates were found
+    console.debug(`No valid coordinates found for property ${property.id}`);
+    
+    // For initial phase, return true for all properties to get them to show up in the list
+    // We can remove this later once coordinate issues are resolved
+    console.debug(`Temporarily allowing property ${property.id} without coordinates`);
+    return true;
   } catch (error) {
     console.error(`Coordinate validation error for property ${property.id}:`, error);
-    return false;
+    // For initial phase, allow even on error
+    return true;
   }
 };
 
@@ -60,6 +112,20 @@ export const usePropertyMapData = () => {
   
   // Calculate total pages
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  
+  // Check if properties_v2 table exists on component mount
+  useEffect(() => {
+    const checkTable = async () => {
+      try {
+        const schemaInfo = await debugTableSchema('properties_v2');
+        console.log('properties_v2 table check:', schemaInfo);
+      } catch (error) {
+        console.error('Error checking properties_v2 table:', error);
+      }
+    };
+    
+    checkTable();
+  }, []);
   
   // Load recent searches from localStorage
   useEffect(() => {
@@ -116,10 +182,12 @@ export const usePropertyMapData = () => {
         const propertiesArray = result.properties || [];
         const totalCountValue = result.totalCount || 0;
         
-        // Filter valid properties
-        const validProperties = propertiesArray.filter(hasValidCoordinates);
+        console.log(`Initial load: Fetched ${propertiesArray.length} properties (before coordinate filtering). Total available: ${totalCountValue}`);
         
-        console.log(`Initial load: Fetched ${propertiesArray.length} properties, ${validProperties.length} have valid coordinates. Total available: ${totalCountValue}`);
+        // Filter valid properties - using relaxed validation initially
+        const validProperties = propertiesArray;
+        
+        console.log(`Initial load: Setting ${validProperties.length} properties to state`);
         
         setProperties(validProperties);
         setTotalCount(totalCountValue);
@@ -132,9 +200,16 @@ export const usePropertyMapData = () => {
           // Extract locations from properties
           propertiesArray.forEach(property => {
             if (property.city) locations.add(property.city);
-            if (property.address) {
+            
+            // Try to extract city from property_details.location
+            const cityFromDetails = getNestedValue(property, 'property_details.location.city', null);
+            if (cityFromDetails) locations.add(cityFromDetails);
+            
+            // Try to extract address 
+            const address = property.address || getNestedValue(property, 'property_details.location.address', null);
+            if (address) {
               // Extract locality or area from address
-              const parts = property.address.split(',');
+              const parts = address.split(',');
               if (parts.length > 1) {
                 locations.add(parts[0].trim());
               }
@@ -186,19 +261,16 @@ export const usePropertyMapData = () => {
       const propertiesArray = result.properties || [];
       const totalCountValue = result.totalCount || 0;
       
-      // Filter valid properties
-      const validNewProperties = propertiesArray.filter(hasValidCoordinates);
+      console.log(`Page ${nextPage}: Fetched ${propertiesArray.length} properties`);
       
-      console.log(`Page ${nextPage}: Fetched ${propertiesArray.length} properties, ${validNewProperties.length} have valid coordinates`);
-      
-      if (validNewProperties.length === 0) {
-        console.log("No new valid properties found");
+      if (propertiesArray.length === 0) {
+        console.log("No new properties found");
         setHasMore(false);
       } else {
         // Add new properties to existing list, ensuring no duplicates
         setProperties(prevProperties => {
           const existingIds = new Set(prevProperties.map(p => p.id));
-          const uniqueNewProperties = validNewProperties.filter(p => !existingIds.has(p.id));
+          const uniqueNewProperties = propertiesArray.filter(p => !existingIds.has(p.id));
           
           console.log(`Adding ${uniqueNewProperties.length} unique new properties to existing ${prevProperties.length}`);
           
@@ -207,7 +279,7 @@ export const usePropertyMapData = () => {
         
         // Check if there are more pages
         const hasMorePages = nextPage < Math.ceil(totalCountValue / PAGE_SIZE);
-setHasMore(hasMorePages);
+        setHasMore(hasMorePages);
         setCurrentPage(nextPage);
       }
     } catch (error) {

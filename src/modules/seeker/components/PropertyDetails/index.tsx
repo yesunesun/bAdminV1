@@ -1,17 +1,16 @@
 // src/modules/seeker/components/PropertyDetails/index.tsx
-// Version: 9.1.0
-// Last Modified: 09-05-2025 17:00 IST
-// Purpose: Removed debug information from the UI
+// Version: 10.0.0
+// Last Modified: 09-05-2025 14:30 IST
+// Purpose: Refactored to improve component reuse and eliminate redundancy
 
 import React, { useState, useEffect } from 'react';
 import { PropertyDetails as PropertyDetailsType } from '../../hooks/usePropertyDetails';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertCircle } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 
-// Import components
+// Import existing components
 import PropertyGalleryCard from './PropertyGalleryCard';
 import PropertyActionButtons from './PropertyActionButtons';
 import PropertyDescriptionSection from './PropertyDescriptionSection';
@@ -24,7 +23,16 @@ import VisitRequestDialog from './VisitRequestDialog';
 import PropertyImageUpload from './PropertyImageUpload';
 import BasicDetailsSection from './BasicDetailsSection';
 
-// Import static data for similar properties
+// Import helper components and utilities
+import FeatureDetailsCard from './FeatureDetailsCard';
+import RentalDetailsCard from './RentalDetailsCard';
+import SaleDetailsCard from './SaleDetailsCard';
+import PropertyOverview from './PropertyOverview';
+import PropertyNotFound from './PropertyNotFound';
+import { PropertyDetailsSkeleton } from './PropertyDetailsSkeleton';
+import { getPropertyData, extractImagesFromJson } from './utils/propertyDataUtils';
+
+// Static data for similar properties
 const similarPropertiesData = [
   {
     id: 'similar-1',
@@ -71,434 +79,6 @@ interface PropertyDetailsProps {
   isLoading: boolean;
   onRefresh?: () => void;
 }
-
-// Helper functions
-const safeParseInt = (value: any): number => {
-  if (value === null || value === undefined) return 0;
-  if (typeof value === 'number') return value;
-  if (typeof value === 'string') {
-    const numMatch = value.match(/^(\d+)/);
-    if (match && match[1]) {
-      return parseInt(match[1], 10) || 0;
-    }
-    return parseInt(value, 10) || 0;
-  }
-  return 0;
-};
-
-const formatCurrency = (value: number): string => {
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    maximumFractionDigits: 0
-  }).format(value);
-};
-
-const formatDate = (dateString: string | null | undefined): string => {
-  if (!dateString) return 'Not specified';
-  try {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-IN', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    });
-  } catch (e) {
-    return dateString;
-  }
-};
-
-// Extract data from property based on its structure (v3, v2, or legacy)
-const getPropertyData = (property: any) => {
-  if (!property) return null;
-  
-  // Check if property has property_details with v3 structure
-  const propertyDetails = property.property_details || {};
-  const isV3Format = propertyDetails._version === 'v3';
-  
-  // Extract data based on structure
-  if (isV3Format) {
-    const flow = propertyDetails.flow || { category: 'residential', listingType: 'rent' };
-    const meta = propertyDetails.meta || { id: property.id, owner_id: property.owner_id };
-    const details = propertyDetails.details || {};
-    
-    return {
-      id: property.id || meta.id,
-      owner_id: property.owner_id || meta.owner_id,
-      flow,
-      basicDetails: details.basicDetails || {},
-      features: details.features || {},
-      location: details.location || {},
-      rentalInfo: details.rentalInfo || {},
-      saleInfo: details.saleInfo || {},
-      images: details.media?.photos?.images || property.property_images || [],
-      description: details.features?.description || property.description || "No description provided for this property."
-    };
-  }
-  
-  // For v2 or legacy format
-  return {
-    id: property.id,
-    owner_id: property.owner_id,
-    flow: property.flow || propertyDetails.flow || { category: 'residential', listingType: 'rent' },
-    basicDetails: property.basicDetails || propertyDetails.basicDetails || {
-      propertyType: propertyDetails.propertyType || 'Residential',
-      bhkType: property.bedrooms ? `${property.bedrooms} BHK` : '',
-      bathrooms: property.bathrooms || 0,
-      builtUpArea: property.square_feet || 0,
-      builtUpAreaUnit: 'sqft'
-    },
-    features: property.features || propertyDetails.features || {},
-    location: property.location || {
-      address: property.address,
-      city: property.city,
-      state: property.state,
-      pinCode: property.zip_code
-    },
-    rentalInfo: property.rental || propertyDetails.rental || {},
-    saleInfo: property.sale || propertyDetails.sale || {},
-    images: property.property_images || [],
-    description: property.features?.description || property.description || "No description provided for this property."
-  };
-};
-
-// Function for extracting images from JSON - simplified without debug logs
-const extractImagesFromJson = (property: any): any[] => {
-  if (!property) return [];
-  
-  try {
-    // Parse property_details if it's a string
-    let details = property.property_details;
-    if (typeof details === 'string') {
-      try {
-        details = JSON.parse(details);
-      } catch (e) {
-        // Silent catch - no debug logs
-      }
-    }
-    
-    // Direct extraction from property_details.images - handling DataUrl format
-    if (details && details.images && Array.isArray(details.images) && details.images.length > 0) {
-      const firstImg = details.images[0];
-      
-      // Check if images use dataUrl format (from PropertyImageUpload)
-      if (firstImg.dataUrl) {
-        return details.images.map((img: any, idx: number) => ({
-          id: img.id || `img-${idx}`,
-          url: img.dataUrl, // Map dataUrl to url for standard components
-          is_primary: !!img.isPrimary,
-          display_order: idx
-        }));
-      }
-      
-      // Handle standard image format if not dataUrl
-      return details.images.map((img: any, idx: number) => ({
-        id: img.id || `img-${idx}`,
-        url: img.url || (typeof img === 'string' ? img : ''),
-        is_primary: !!img.is_primary,
-        display_order: img.display_order || idx
-      }));
-    }
-    
-    // Try other known paths where images might be stored
-    let foundImages: any[] = [];
-    
-    // Path: details.media.photos.images
-    if (details?.media?.photos?.images) {
-      foundImages = details.media.photos.images;
-    }
-    // Path: property.property_images
-    else if (property.property_images && Array.isArray(property.property_images)) {
-      foundImages = property.property_images;
-    }
-    
-    // If we found images in an alternative path, process them
-    if (foundImages.length > 0) {
-      return foundImages.map((img, idx) => ({
-        id: img.id || `img-${idx}`,
-        url: img.url || (typeof img === 'string' ? img : ''),
-        is_primary: !!img.is_primary,
-        display_order: img.display_order || idx
-      }));
-    }
-    
-  } catch (error) {
-    // Silent catch - no debug logs
-  }
-  
-  return [];
-};
-
-// Feature details card component
-const FeatureDetailsCard = ({ features }: { features: any }) => {
-  if (!features || Object.keys(features).length === 0) return null;
-  
-  const amenities = features.amenities || [];
-  
-  return (
-    <Card className="overflow-hidden">
-      <CardContent className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Features & Amenities</h3>
-        <div className="grid grid-cols-2 gap-4">
-          {features.parking && (
-            <div>
-              <p className="text-sm text-muted-foreground">Parking:</p>
-              <p className="font-medium">{features.parking}</p>
-            </div>
-          )}
-          
-          {features.gatedSecurity !== undefined && (
-            <div>
-              <p className="text-sm text-muted-foreground">Gated Security:</p>
-              <p className="font-medium">
-                {features.gatedSecurity === true ? 'Yes' : 'No'}
-              </p>
-            </div>
-          )}
-          
-          {features.nonVegAllowed !== undefined && (
-            <div>
-              <p className="text-sm text-muted-foreground">Non-Veg Allowed:</p>
-              <p className="font-medium">
-                {features.nonVegAllowed === true ? 'Yes' : 'No'}
-              </p>
-            </div>
-          )}
-          
-          {features.petFriendly !== undefined && (
-            <div>
-              <p className="text-sm text-muted-foreground">Pet Friendly:</p>
-              <p className="font-medium">
-                {features.petFriendly === true ? 'Yes' : 'No'}
-              </p>
-            </div>
-          )}
-          
-          {features.powerBackup && (
-            <div>
-              <p className="text-sm text-muted-foreground">Power Backup:</p>
-              <p className="font-medium">{features.powerBackup}</p>
-            </div>
-          )}
-          
-          {features.waterSupply && (
-            <div>
-              <p className="text-sm text-muted-foreground">Water Supply:</p>
-              <p className="font-medium">{features.waterSupply}</p>
-            </div>
-          )}
-          
-          {amenities.length > 0 && (
-            <div className="col-span-2">
-              <p className="text-sm text-muted-foreground">Amenities:</p>
-              <p className="font-medium">{amenities.join(', ')}</p>
-            </div>
-          )}
-        </div>
-      </CardContent>
-    </Card>
-  );
-};
-
-// Rental details card component
-const RentalDetailsCard = ({ rentalInfo }: { rentalInfo: any }) => {
-  if (!rentalInfo || Object.keys(rentalInfo).length === 0) return null;
-  
-  return (
-    <Card className="overflow-hidden">
-      <CardContent className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Rental Details</h3>
-        <div className="grid grid-cols-2 gap-4">
-          {rentalInfo.rentAmount !== undefined && (
-            <div>
-              <p className="text-sm text-muted-foreground">Monthly Rent:</p>
-              <p className="font-medium">
-                {formatCurrency(rentalInfo.rentAmount)}
-              </p>
-            </div>
-          )}
-          
-          {rentalInfo.securityDeposit !== undefined && (
-            <div>
-              <p className="text-sm text-muted-foreground">Security Deposit:</p>
-              <p className="font-medium">
-                {formatCurrency(rentalInfo.securityDeposit)}
-              </p>
-            </div>
-          )}
-          
-          {rentalInfo.maintenanceCharges !== undefined && (
-            <div>
-              <p className="text-sm text-muted-foreground">Maintenance Charges:</p>
-              <p className="font-medium">
-                {rentalInfo.maintenanceCharges
-                  ? formatCurrency(rentalInfo.maintenanceCharges)
-                  : '-'}
-              </p>
-            </div>
-          )}
-          
-          {rentalInfo.availableFrom && (
-            <div>
-              <p className="text-sm text-muted-foreground">Available From:</p>
-              <p className="font-medium">
-                {formatDate(rentalInfo.availableFrom)}
-              </p>
-            </div>
-          )}
-          
-          {rentalInfo.furnishingStatus && (
-            <div>
-              <p className="text-sm text-muted-foreground">Furnishing Status:</p>
-              <p className="font-medium">{rentalInfo.furnishingStatus}</p>
-            </div>
-          )}
-          
-          {rentalInfo.leaseDuration && (
-            <div>
-              <p className="text-sm text-muted-foreground">Lease Duration:</p>
-              <p className="font-medium">{rentalInfo.leaseDuration}</p>
-            </div>
-          )}
-          
-          {rentalInfo.rentNegotiable !== undefined && (
-            <div>
-              <p className="text-sm text-muted-foreground">Rent Negotiable:</p>
-              <p className="font-medium">
-                {rentalInfo.rentNegotiable === true ? 'Yes' : 'No'}
-              </p>
-            </div>
-          )}
-          
-          {rentalInfo.preferredTenants && rentalInfo.preferredTenants.length > 0 && (
-            <div className="col-span-2">
-              <p className="text-sm text-muted-foreground">Preferred Tenants:</p>
-              <p className="font-medium">{rentalInfo.preferredTenants.join(', ')}</p>
-            </div>
-          )}
-        </div>
-      </CardContent>
-    </Card>
-  );
-};
-
-// Sale details card component
-const SaleDetailsCard = ({ saleInfo }: { saleInfo: any }) => {
-  if (!saleInfo || Object.keys(saleInfo).length === 0) return null;
-  
-  return (
-    <Card className="overflow-hidden">
-      <CardContent className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Sale Details</h3>
-        <div className="grid grid-cols-2 gap-4">
-          {saleInfo.expectedPrice !== undefined && (
-            <div>
-              <p className="text-sm text-muted-foreground">Expected Price:</p>
-              <p className="font-medium">
-                {formatCurrency(saleInfo.expectedPrice)}
-              </p>
-            </div>
-          )}
-          
-          {saleInfo.maintenanceCost !== undefined && (
-            <div>
-              <p className="text-sm text-muted-foreground">Maintenance Cost:</p>
-              <p className="font-medium">
-                {saleInfo.maintenanceCost
-                  ? formatCurrency(saleInfo.maintenanceCost)
-                  : '-'}
-              </p>
-            </div>
-          )}
-          
-          {saleInfo.kitchenType && (
-            <div>
-              <p className="text-sm text-muted-foreground">Kitchen Type:</p>
-              <p className="font-medium">{saleInfo.kitchenType}</p>
-            </div>
-          )}
-          
-          {saleInfo.possessionDate && (
-            <div>
-              <p className="text-sm text-muted-foreground">Available From:</p>
-              <p className="font-medium">
-                {formatDate(saleInfo.possessionDate)}
-              </p>
-            </div>
-          )}
-          
-          {saleInfo.priceNegotiable !== undefined && (
-            <div>
-              <p className="text-sm text-muted-foreground">Price Negotiable:</p>
-              <p className="font-medium">
-                {saleInfo.priceNegotiable === true ? 'Yes' : 'No'}
-              </p>
-            </div>
-          )}
-        </div>
-      </CardContent>
-    </Card>
-  );
-};
-
-// Property overview component
-const PropertyOverview = ({ 
-  propertyData, 
-  listingType, 
-  bedrooms, 
-  bathrooms, 
-  squareFeet 
-}: { 
-  propertyData: any, 
-  listingType: string, 
-  bedrooms: number, 
-  bathrooms: number, 
-  squareFeet: number 
-}) => {
-  const isSaleProperty = listingType === 'sale';
-  const priceNegotiable = isSaleProperty 
-    ? propertyData.saleInfo?.priceNegotiable 
-    : propertyData.rentalInfo?.rentNegotiable;
-  
-  const price = isSaleProperty 
-    ? safeParseInt(propertyData.saleInfo?.expectedPrice || 0) 
-    : safeParseInt(propertyData.rentalInfo?.rentAmount || 0);
-  
-  return (
-    <Card className="overflow-hidden">
-      <CardContent className="p-6">
-        <div className="flex flex-col md:flex-row md:justify-between mb-6">
-          <div className="mb-4 md:mb-0">
-            <h3 className="text-lg font-semibold">
-              {isSaleProperty ? 'Sale Price' : 'Monthly Rent'}
-            </h3>
-            <p className="text-3xl font-bold text-primary">{formatCurrency(price)}</p>
-            {priceNegotiable && (
-              <p className="text-sm text-green-600 mt-1">
-                {isSaleProperty ? 'Price Negotiable' : 'Rent Negotiable'}
-              </p>
-            )}
-          </div>
-          
-          <div className="grid grid-cols-3 gap-4">
-            <div className="flex flex-col items-center justify-center p-3 bg-muted/40 rounded-lg">
-              <span className="text-xl font-semibold">{bedrooms}</span>
-              <span className="text-sm text-muted-foreground">Beds</span>
-            </div>
-            <div className="flex flex-col items-center justify-center p-3 bg-muted/40 rounded-lg">
-              <span className="text-xl font-semibold">{bathrooms}</span>
-              <span className="text-sm text-muted-foreground">Baths</span>
-            </div>
-            <div className="flex flex-col items-center justify-center p-3 bg-muted/40 rounded-lg">
-              <span className="text-xl font-semibold">{squareFeet}</span>
-              <span className="text-sm text-muted-foreground">Sq.ft</span>
-            </div>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-};
 
 const PropertyDetails: React.FC<PropertyDetailsProps> = ({
   property,
@@ -565,20 +145,7 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
   
   // Error state - Property not found
   if (!property) {
-    return (
-      <div className="flex flex-col items-center justify-center py-16 px-4">
-        <div className="w-20 h-20 rounded-full bg-destructive/10 flex items-center justify-center mb-6">
-          <AlertCircle className="w-10 h-10 text-destructive" />
-        </div>
-        <h2 className="text-2xl font-bold mb-3">Property Not Found</h2>
-        <p className="text-muted-foreground text-center max-w-md mb-8">
-          This property may have been removed or is no longer available.
-        </p>
-        <Button variant="default" onClick={() => window.history.back()}>
-          Go Back
-        </Button>
-      </div>
-    );
+    return <PropertyNotFound />;
   }
   
   // Extract all the property data based on its structure
@@ -616,12 +183,12 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
       bedrooms = parseInt(match[1], 10);
     }
   } else if (property.bedrooms) {
-    bedrooms = safeParseInt(property.bedrooms);
+    bedrooms = property.bedrooms;
   }
   
   // Get bathrooms and square feet
-  const bathrooms = safeParseInt(basicDetails?.bathrooms || property.bathrooms || 0);
-  const squareFeet = safeParseInt(basicDetails?.builtUpArea || property.square_feet || 0);
+  const bathrooms = basicDetails?.bathrooms || property.bathrooms || 0;
+  const squareFeet = basicDetails?.builtUpArea || property.square_feet || 0;
   
   // Format location string
   const locationAddress = location?.address || property.address || '';
@@ -923,84 +490,6 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
       />
     </div>
   );
-};
-
-// Loading state skeleton
-const PropertyDetailsSkeleton: React.FC = () => {
- return (
-   <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-     {/* Title skeleton */}
-     <div className="mb-6">
-       <Skeleton className="h-8 w-3/4 mb-2" />
-       <Skeleton className="h-4 w-1/2" />
-     </div>
-     
-     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-       <div className="lg:col-span-2 space-y-6">
-         {/* Gallery skeleton */}
-         <Skeleton className="w-full aspect-[16/9] rounded-xl" />
-         
-         {/* Actions skeleton */}
-         <div className="flex gap-3">
-           <Skeleton className="h-10 w-24" />
-           <Skeleton className="h-10 w-24" />
-           <Skeleton className="h-10 w-24" />
-         </div>
-         
-         {/* Details skeleton */}
-         <Card>
-           <CardContent className="p-6">
-             <div className="flex flex-col md:flex-row md:justify-between mb-6">
-               <Skeleton className="h-8 w-36 mb-2" />
-               <div className="grid grid-cols-3 gap-4 w-full md:w-auto">
-                 <Skeleton className="h-16 w-full" />
-                 <Skeleton className="h-16 w-full" />
-                 <Skeleton className="h-16 w-full" />
-               </div>
-             </div>
-             
-             <Skeleton className="h-6 w-48 mb-3" />
-             <Skeleton className="h-4 w-full mb-2" />
-             <Skeleton className="h-4 w-full mb-2" />
-             <Skeleton className="h-4 w-3/4" />
-           </CardContent>
-         </Card>
-         
-         {/* Map skeleton */}
-         <Card>
-           <CardContent className="p-6">
-             <Skeleton className="h-6 w-48 mb-3" />
-             <Skeleton className="h-80 w-full rounded-lg" />
-           </CardContent>
-         </Card>
-       </div>
-       
-       <div className="space-y-6">
-         {/* Contact card skeleton */}
-         <Card>
-           <CardContent className="p-6">
-             <Skeleton className="h-6 w-40 mb-4" />
-             <Skeleton className="h-4 w-full mb-2" />
-             <Skeleton className="h-4 w-1/2 mb-4" />
-             <Skeleton className="h-10 w-full" />
-           </CardContent>
-         </Card>
-         
-         {/* Similar properties skeleton */}
-         <Card>
-           <CardContent className="p-6">
-             <Skeleton className="h-6 w-40 mb-4" />
-             <div className="space-y-2">
-               <Skeleton className="h-16 w-full" />
-               <Skeleton className="h-16 w-full" />
-               <Skeleton className="h-16 w-full" />
-             </div>
-           </CardContent>
-         </Card>
-       </div>
-     </div>
-   </div>
- );
 };
 
 export default PropertyDetails;
