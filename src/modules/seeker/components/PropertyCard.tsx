@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyCard.tsx
-// Version: 3.0.0
-// Last Modified: 03-04-2025 15:30 IST
-// Purpose: Enhanced property card with improved styling, animations, and consistent visual elements
+// Version: 3.5.0
+// Last Modified: 09-05-2025 23:00 IST
+// Purpose: Simplified favorite handling to avoid foreign key constraint errors
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -11,16 +11,16 @@ import {
   BathIcon, 
   SquareIcon,
   ShieldCheck,
-  Heart,
-  HeartOff
+  Heart
 } from 'lucide-react';
 
 import { PropertyType } from '@/modules/owner/components/property/types';
 import { formatCurrency, cn } from '@/lib/utils';
 import { Card } from '@/components/ui/card';
 import { useTheme } from '@/contexts/ThemeContext';
-import { checkPropertyLike, togglePropertyLike } from '../services/seekerService';
+import { checkPropertyLike } from '../services/seekerService';
 import { useAuth } from '@/contexts/AuthContext';
+import { useFavorites } from '@/contexts/FavoritesContext';
 import { useToast } from '@/components/ui/use-toast';
 import {
   Dialog,
@@ -50,35 +50,45 @@ const FavoriteButton: React.FC<{
   initialIsLiked: boolean;
   onToggle: (newState: boolean) => void;
   className?: string;
-}> = ({ initialIsLiked, onToggle, className = "" }) => {
+  disabled?: boolean;
+}> = ({ 
+  initialIsLiked, 
+  onToggle,
+  className = "",
+  disabled = false
+}) => {
   const [isLiked, setIsLiked] = useState(initialIsLiked);
   
-  // Handle click with animation
+  // Update local state when props change
+  useEffect(() => {
+    setIsLiked(initialIsLiked);
+  }, [initialIsLiked]);
+
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setIsLiked(!isLiked);
-    onToggle(!isLiked);
+    
+    if (!disabled) {
+      // Toggle state and notify parent
+      const newLikedState = !isLiked;
+      setIsLiked(newLikedState);
+      onToggle(newLikedState);
+    }
   };
-  
+
   return (
     <button
-      aria-label={isLiked ? "Remove from favorites" : "Add to favorites"}
       onClick={handleClick}
-      className={cn(
-        "rounded-full w-10 h-10 flex items-center justify-center backdrop-blur-sm",
-        "transition-all duration-300 transform hover:scale-110 active:scale-95 shadow-sm",
-        isLiked 
-          ? "bg-primary/20 text-primary hover:bg-primary/30" 
-          : "bg-white/80 text-foreground/70 hover:text-primary",
-        className
-      )}
+      disabled={disabled}
+      className={`flex items-center justify-center w-9 h-9 rounded-full bg-white/90 backdrop-blur-sm shadow-md hover:shadow-lg transition-all duration-300 ${
+        isLiked ? 'hover:bg-pink-50' : 'hover:bg-primary/5'
+      } ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}
+      aria-label={isLiked ? "Remove from favorites" : "Add to favorites"}
+      data-liked={isLiked ? "true" : "false"}
     >
-      {isLiked ? (
-        <Heart className="h-5 w-5 fill-primary" />
-      ) : (
-        <Heart className="h-5 w-5" />
-      )}
+      <Heart 
+        className={`w-5 h-5 ${isLiked ? 'fill-rose-500 text-rose-500' : 'fill-transparent text-gray-500 hover:text-primary'} transition-all duration-300 ${isLiked ? 'scale-110' : 'scale-100'}`}
+      />
     </button>
   );
 };
@@ -105,7 +115,15 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
   const navigate = useNavigate();
   const { toast } = useToast();
   
-  // Like state management
+  // Use global favorites context
+  const { 
+    addFavorite, 
+    removeFavorite, 
+    refreshFavorites, 
+    isFavorite 
+  } = useFavorites();
+  
+  // Local state
   const [isLiked, setIsLiked] = useState(initialIsLiked);
   const [isLikeLoading, setIsLikeLoading] = useState(false);
   const [showLoginDialog, setShowLoginDialog] = useState(false);
@@ -118,6 +136,14 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
     const checkLikeStatus = async () => {
       if (user) {
         try {
+          // Check from favorites context first (more reliable)
+          const isLikedInContext = isFavorite(property.id);
+          if (isLikedInContext) {
+            setIsLiked(true);
+            return;
+          }
+
+          // Fallback to API check
           const { liked } = await checkPropertyLike(property.id, user.id);
           setIsLiked(liked);
         } catch (error) {
@@ -127,9 +153,9 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
     };
     
     checkLikeStatus();
-  }, [property.id, user]);
+  }, [property.id, user, isFavorite]);
 
-  // Like toggle handler with login prompt for non-authenticated users
+  // Handle like toggle
   const handleLikeToggle = async (newLikedState: boolean) => {
     if (!user) {
       // Show login dialog for non-authenticated users
@@ -138,11 +164,22 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
     }
 
     setIsLikeLoading(true);
+    
     try {
-      const result = await togglePropertyLike(property.id, newLikedState);
-      if (result.success) {
+      // Use the global context functions
+      const success = newLikedState 
+        ? await addFavorite(property.id)
+        : await removeFavorite(property.id);
+      
+      if (success) {
+        // Update local state
         setIsLiked(newLikedState);
+        
+        // Notify parent component if callback provided
         onLikeToggle?.(property.id, newLikedState);
+        
+        // Refresh favorites in global context to update header count
+        await refreshFavorites();
         
         // Show success toast
         toast({
@@ -152,16 +189,19 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
             : "This property has been removed from your favorites.",
           duration: 3000,
         });
+      } else {
+        throw new Error('Unable to update favorites. Please try again later.');
       }
     } catch (error) {
       console.error('Like toggle failed:', error);
-      // Revert back to the original state on error
+      
+      // Revert local state back to original
       setIsLiked(!newLikedState);
       
-      // Show error toast
+      // Provide feedback to the user
       toast({
         title: "Action failed",
-        description: "There was a problem updating your favorites. Please try again.",
+        description: "There was a problem updating your favorites. This property may not be compatible with the favorites system.",
         variant: "destructive",
         duration: 5000,
       });
@@ -250,7 +290,8 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
             <FavoriteButton
               initialIsLiked={isLiked}
               onToggle={handleLikeToggle}
-              className={isLikeLoading ? "opacity-70 pointer-events-none" : ""}
+              disabled={isLikeLoading}
+              className={isLikeLoading ? "opacity-70" : ""}
             />
           </div>
 
