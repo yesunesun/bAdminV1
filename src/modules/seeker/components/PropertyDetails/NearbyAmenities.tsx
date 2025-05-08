@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyDetails/NearbyAmenities.tsx
-// Version: 1.4.0
-// Last Modified: 05-04-2025 19:30 IST
-// Purpose: Fixed lucide-react icon imports and matched SimilarProperties styling
+// Version: 1.5.0
+// Last Modified: 09-05-2025 15:30 IST
+// Purpose: Fixed Google Maps geometry library integration and error handling
 
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -58,26 +58,77 @@ const NearbyAmenities: React.FC<NearbyAmenitiesProps> = ({
   const [amenities, setAmenities] = useState<Amenity[]>([]);
   const [loading, setLoading] = useState(false);
   const [isGoogleMapsLoaded, setIsGoogleMapsLoaded] = useState(false);
+  const [isGeometryLibraryLoaded, setIsGeometryLibraryLoaded] = useState(false);
   
-  // Check if Google Maps API is loaded
+  // Check if Google Maps API and geometry library are loaded
   useEffect(() => {
-    if (typeof google !== 'undefined' && google.maps) {
-      setIsGoogleMapsLoaded(true);
-    } else {
-      // Google Maps should already be loaded by PropertyLocationMap
-      console.log("[NearbyAmenities] Waiting for Google Maps to load");
-      
-      // Add a listener to check when Google Maps becomes available
-      const checkGoogleMaps = setInterval(() => {
-        if (typeof google !== 'undefined' && google.maps) {
-          setIsGoogleMapsLoaded(true);
-          clearInterval(checkGoogleMaps);
-        }
-      }, 500);
-      
-      return () => clearInterval(checkGoogleMaps);
-    }
+    const checkGoogleMapsGeometry = () => {
+      if (typeof google !== 'undefined' && 
+          google.maps && 
+          google.maps.places && 
+          google.maps.geometry && 
+          google.maps.geometry.spherical) {
+        setIsGoogleMapsLoaded(true);
+        setIsGeometryLibraryLoaded(true);
+        return true;
+      }
+      return false;
+    };
+
+    // Check immediately
+    if (checkGoogleMapsGeometry()) return;
+    
+    console.log("[NearbyAmenities] Waiting for Google Maps and geometry library to load");
+    
+    // Add a listener to check when Google Maps becomes available
+    const checkInterval = setInterval(() => {
+      if (checkGoogleMapsGeometry()) {
+        clearInterval(checkInterval);
+      }
+    }, 500);
+    
+    return () => clearInterval(checkInterval);
   }, []);
+  
+  // Safe distance calculation function
+  const calculateSafeDistance = (
+    location1: google.maps.LatLng, 
+    location2: google.maps.LatLng | undefined
+  ): number => {
+    if (!location2) return 0;
+    
+    try {
+      // Check if geometry library is available
+      if (google.maps.geometry && google.maps.geometry.spherical) {
+        return google.maps.geometry.spherical.computeDistanceBetween(location1, location2);
+      }
+      
+      // Fallback: Calculate Haversine distance manually
+      const toRad = (value: number) => (value * Math.PI) / 180;
+      const R = 6371000; // Earth radius in meters
+      
+      const lat1 = location1.lat();
+      const lon1 = location1.lng();
+      const lat2 = location2.lat();
+      const lon2 = location2.lng();
+      
+      const dLat = toRad(lat2 - lat1);
+      const dLon = toRad(lon2 - lon1);
+      
+      const a = 
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * 
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      const distance = R * c;
+      
+      return distance;
+    } catch (error) {
+      console.error("[NearbyAmenities] Error calculating distance:", error);
+      return 0;
+    }
+  };
   
   // Fetch nearby amenities when coordinates change or when type is selected
   useEffect(() => {
@@ -102,17 +153,23 @@ const NearbyAmenities: React.FC<NearbyAmenitiesProps> = ({
             const amenitiesList: Amenity[] = results
               .slice(0, 6) // Limit to 6 results
               .map(place => {
-                const distanceInMeters = google.maps.geometry.spherical.computeDistanceBetween(
-                  location,
-                  place.geometry?.location as google.maps.LatLng
-                );
+                // Only calculate distance if we have a valid location
+                let distanceText = "Nearby";
+                if (place.geometry?.location) {
+                  const distanceInMeters = calculateSafeDistance(
+                    location,
+                    place.geometry.location
+                  );
+                  
+                  distanceText = distanceInMeters < 1000 
+                    ? `${Math.round(distanceInMeters)} m` 
+                    : `${(distanceInMeters / 1000).toFixed(1)} km`;
+                }
                 
                 return {
                   name: place.name || 'Unnamed place',
                   address: place.vicinity || '',
-                  distance: distanceInMeters < 1000 
-                    ? `${Math.round(distanceInMeters)} m` 
-                    : `${(distanceInMeters / 1000).toFixed(1)} km`,
+                  distance: distanceText,
                   rating: place.rating,
                   type: selectedType
                 };
@@ -184,7 +241,7 @@ const NearbyAmenities: React.FC<NearbyAmenitiesProps> = ({
   // If Google Maps isn't available, use static data
   const displayAmenities = isGoogleMapsLoaded && coordinates && amenities.length > 0 
     ? amenities 
-    : staticAmenitiesData;
+    : staticAmenitiesData.filter(amenity => amenity.type === selectedType);
     
   // Get the icon for the selected type
   const getIconForType = (type: string) => {
