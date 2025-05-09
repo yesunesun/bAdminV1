@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/components/FormNavigation.tsx
-// Version: 5.0.0
-// Last Modified: 07-05-2025 21:30 IST
-// Purpose: Updated to use correct flow structure from flows.ts
+// Version: 5.0.2
+// Last Modified: 09-05-2025 17:00 IST
+// Purpose: Fix React component casing issues with icon components
 
 import React, { useMemo } from 'react';
 import { cn } from '@/lib/utils';
@@ -38,6 +38,7 @@ const getIconForStep = (stepId: string) => {
   const iconMap: Record<string, React.ElementType> = {
     details: Home,
     basicDetails: Home,
+    basic_details: Home,
     commercial_basics: Building,
     location: MapPin,
     features: Settings,
@@ -65,6 +66,7 @@ const getTitleForStep = (stepId: string) => {
   const titleMap: Record<string, string> = {
     details: 'Basic Details',
     basicDetails: 'Basic Details',
+    basic_details: 'Basic Details',
     commercial_basics: 'Basic Details',
     location: 'Location',
     features: 'Features',
@@ -205,7 +207,21 @@ const NavigationComponent = (props: FormNavigationProps) => {
       <div className="overflow-x-auto" style={{ maxWidth: '100%', overflowX: 'auto' }}>
         <div className="flex space-x-2" style={{ display: 'flex', gap: '0.5rem', minWidth: 'max-content' }}>
           {stepsToRender.map((step, index) => {
-            const Icon = step.icon || (() => <span className="w-4 h-4">•</span>);
+            // Make sure we have a proper React component, not a string or unknown type
+            // Using a more defensive approach to handle any type of icon input
+            let IconComponent: React.ElementType;
+            
+            if (React.isValidElement(step.icon)) {
+              // If it's already a valid React element, use its type
+              IconComponent = step.icon.type;
+            } else if (typeof step.icon === 'function') {
+              // If it's a function component
+              IconComponent = step.icon;
+            } else {
+              // Fallback to a default icon
+              IconComponent = Settings;
+            }
+            
             const isActive = currentStep === index + 1;
             const isPassed = currentStep > index + 1;
             const isClickable = mode === 'edit' || isPassed;
@@ -241,7 +257,7 @@ const NavigationComponent = (props: FormNavigationProps) => {
                   !isClickable && "opacity-60 cursor-not-allowed"
                 )}
               >
-                <Icon className="w-4 h-4 mr-1.5" style={{ marginRight: '0.375rem' }} />
+                <IconComponent className="w-4 h-4 mr-1.5" style={{ marginRight: '0.375rem' }} />
                 <span>{step.title}</span>
               </button>
             );

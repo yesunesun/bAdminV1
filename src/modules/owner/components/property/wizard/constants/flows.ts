@@ -1,7 +1,12 @@
 // src/modules/owner/components/property/wizard/constants/flows.ts
-// Version: 5.1.0
-// Last Modified: 09-05-2025 11:30 IST
-// Purpose: Updated flow definitions for structured step hierarchy
+// Version: 5.1.1
+// Last Modified: 09-05-2025 17:00 IST
+// Purpose: Fix icon component references to use proper React component imports
+
+import { 
+  Home, MapPin, Settings, Image, FileText, DollarSign, 
+  Building, Bed, Users, Briefcase, Map 
+} from 'lucide-react';
 
 /**
  * Available flow types
@@ -265,19 +270,19 @@ export const createStepObjectsFromFlow = (flowType: string) => {
   // Get the steps for this flow
   const steps = FLOW_STEPS[flowType] || FLOW_STEPS.default;
   
-  // Step icon mappings
+  // Step icon mappings - Use actual React components instead of strings
   const stepIcons = {
-    basic_details: 'Home',
-    location: 'MapPin',
-    rental: 'DollarSign',
-    sale: 'DollarSign',
-    commercial_sale: 'Building',
-    flatmate_details: 'Users',
-    pg_details: 'Building',
-    coworking: 'Briefcase',
-    land_features: 'Settings',
-    features: 'Settings',
-    review: 'FileText'
+    basic_details: Home,
+    location: MapPin,
+    rental: DollarSign,
+    sale: DollarSign,
+    commercial_sale: Building,
+    flatmate_details: Users,
+    pg_details: Building,
+    coworking: Briefcase,
+    land_features: Map,
+    features: Settings,
+    review: FileText
   };
   
   // Step title mappings
@@ -299,7 +304,7 @@ export const createStepObjectsFromFlow = (flowType: string) => {
   return steps.map(stepId => ({
     id: stepId,
     title: stepTitles[stepId] || stepId.charAt(0).toUpperCase() + stepId.slice(1).replace(/([A-Z])/g, ' $1'),
-    icon: stepIcons[stepId] || 'Settings'
+    icon: stepIcons[stepId] || Settings
   }));
 };
 

@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyCard.tsx
-// Version: 4.1.0
-// Last Modified: 10-05-2025 14:30 IST
-// Purpose: Fixed favorite functionality for properties_v2 table
+// Version: 5.0.0
+// Last Modified: 11-05-2025 11:00 IST
+// Purpose: Refactored to be a wrapper around PropertyItem for backward compatibility
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -13,11 +13,9 @@ import { checkPropertyLike } from '../services/seekerService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFavorites } from '@/contexts/FavoritesContext';
 import { useToast } from '@/components/ui/use-toast';
-import FavoriteButton from './FavoriteButton';
 
-// Import simplified sub-components
-import PropertyCardImage from './PropertyCardImage';
-import PropertyCardContent from './PropertyCardContent';
+// Import the PropertyItem component
+import PropertyItem from './PropertyItem';
 import PropertyCardLoginDialog from './PropertyCardLoginDialog';
 
 interface PropertyCardProps {
@@ -29,6 +27,10 @@ interface PropertyCardProps {
   isHovered?: boolean;
 }
 
+/**
+ * @deprecated Use PropertyItem component instead
+ * This component is maintained for backward compatibility and will be removed in a future version
+ */
 const PropertyCard: React.FC<PropertyCardProps> = ({ 
   property, 
   initialIsLiked = false,
@@ -54,6 +56,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
   const [isLiked, setIsLiked] = useState(initialIsLiked);
   const [isLikeLoading, setIsLikeLoading] = useState(false);
   const [showLoginDialog, setShowLoginDialog] = useState(false);
+  const [propertyImage, setPropertyImage] = useState('/noimage.png');
 
   // Check like status on mount if user is logged in
   useEffect(() => {
@@ -77,14 +80,25 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
     };
     
     checkLikeStatus();
+    
+    // Try to get an image for the property
+    if (property.property_details?.imageFiles?.length > 0) {
+      const mainImage = property.property_details.imageFiles.find(
+        (img: any) => img.isPrimary || img.is_primary
+      ) || property.property_details.imageFiles[0];
+      
+      if (mainImage?.url) {
+        setPropertyImage(mainImage.url);
+      }
+    }
   }, [property.id, user, isFavorite]);
 
   // Handle like toggle
-  const handleLikeToggle = async (newLikedState: boolean) => {
+  const handleLikeToggle = async (propertyId: string, newLikedState: boolean) => {
     if (!user) {
       // Show login dialog for non-authenticated users
       setShowLoginDialog(true);
-      return;
+      return false;
     }
 
     setIsLikeLoading(true);
@@ -113,6 +127,8 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
             : "This property has been removed from your favorites.",
           duration: 3000,
         });
+        
+        return true;
       } else {
         throw new Error('Unable to update favorites. Please try again later.');
       }
@@ -129,6 +145,8 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
         variant: "destructive",
         duration: 5000,
       });
+      
+      return false;
     } finally {
       setIsLikeLoading(false);
     }
@@ -143,6 +161,11 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
     onHover?.(property.id, false);
   };
 
+  // Handle property selection
+  const handleSelect = (p: PropertyType) => {
+    navigate(`/seeker/property/${p.id}`);
+  };
+
   // Handle login dialog actions
   const handleLoginClick = () => {
     setShowLoginDialog(false);
@@ -152,6 +175,36 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
 
   const handleCancelLogin = () => {
     setShowLoginDialog(false);
+  };
+
+  // Handle share action
+  const handleShare = (e: React.MouseEvent, p: PropertyType) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const propertyLink = `${window.location.origin}/seeker/property/${p.id}`;
+    
+    if (navigator.share) {
+      navigator.share({
+        title: p.title || 'Check out this property',
+        text: `Check out this property: ${p.title || 'Property'}`,
+        url: propertyLink,
+      }).catch(err => {
+        navigator.clipboard.writeText(propertyLink);
+        toast({
+          title: "Link copied!",
+          description: "Property link copied to clipboard.",
+          duration: 2000,
+        });
+      });
+    } else {
+      navigator.clipboard.writeText(propertyLink);
+      toast({
+        title: "Link copied!",
+        description: "Property link copied to clipboard.",
+        duration: 2000,
+      });
+    }
   };
 
   return (
@@ -167,16 +220,16 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
       >
-        <PropertyCardImage 
-          property={property} 
+        {/* Use PropertyItem inside Card for backward compatibility */}
+        <PropertyItem 
+          property={property}
           isLiked={isLiked}
-          isLikeLoading={isLikeLoading}
-          onLikeToggle={handleLikeToggle}
-        />
-
-        <PropertyCardContent 
-          property={property} 
-          theme={theme} 
+          isHovered={isHovered}
+          propertyImage={propertyImage}
+          onHover={(id, hovering) => onHover?.(id, hovering)}
+          onSelect={handleSelect}
+          onFavoriteToggle={handleLikeToggle}
+          onShare={handleShare}
         />
       </Card>
 

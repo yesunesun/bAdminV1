@@ -1,11 +1,10 @@
 // src/modules/seeker/components/PropertyGrid.tsx
-// Version: 2.0.0
-// Last Modified: 03-04-2025 16:15 IST
-// Purpose: Enhanced property grid with improved styling, loading states, and empty state UI
+// Version: 3.0.0
+// Last Modified: 11-05-2025 11:30 IST
+// Purpose: Updated to use PropertyItem directly instead of PropertyCard
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PropertyType } from '@/modules/owner/components/property/types';
-import PropertyCard from './PropertyCard';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { togglePropertyLike } from '../services/seekerService';
@@ -13,6 +12,11 @@ import { useToast } from '@/components/ui/use-toast';
 import { Card, CardContent } from '@/components/ui/card';
 import { SearchIcon, FilterIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/lib/supabase';
+
+// Import PropertyItem instead of PropertyCard
+import PropertyItem from './PropertyItem';
 
 interface PropertyGridProps {
   properties: PropertyType[];
@@ -32,7 +36,102 @@ const PropertyGrid: React.FC<PropertyGridProps> = ({
   const { user } = useAuth();
   const { theme } = useTheme();
   const { toast } = useToast();
+  const navigate = useNavigate();
+  
   const [hoveredPropertyId, setHoveredPropertyId] = useState<string | null>(null);
+  const [propertyImageCache, setPropertyImageCache] = useState<Record<string, string>>({});
+  
+  // Constants
+  const STORAGE_BUCKET = 'property-images-v2';
+  
+  // Batch load property images when properties change
+  useEffect(() => {
+    const loadPropertyImages = async () => {
+      // Only process properties that aren't already in the cache
+      const propertiesToLoad = properties.filter(p => !propertyImageCache[p.id]);
+      
+      if (propertiesToLoad.length === 0) return;
+      
+      const newImageCache = { ...propertyImageCache };
+      
+      // Process each property
+      for (const property of propertiesToLoad) {
+        try {
+          // First check if property has imageFiles in property_details
+          const details = property.property_details || {};
+          
+          if (details.imageFiles && Array.isArray(details.imageFiles) && details.imageFiles.length > 0) {
+            // Look for primary image first
+            const primaryImage = details.imageFiles.find((img: any) => img.isPrimary || img.is_primary);
+            const imageToUse = primaryImage || details.imageFiles[0];
+            
+            if (imageToUse && imageToUse.fileName) {
+              // Get image from Supabase storage
+              const { data, error } = await supabase
+                .storage
+                .from(STORAGE_BUCKET)
+                .createSignedUrl(`${property.id}/${imageToUse.fileName}`, 3600);
+                
+              if (!error && data.signedUrl) {
+                newImageCache[property.id] = data.signedUrl;
+                continue; // Skip to next property if we found an image
+              }
+            }
+          }
+          
+          // If imageFiles didn't work, try listing files in storage
+          const { data: files, error: listError } = await supabase
+            .storage
+            .from(STORAGE_BUCKET)
+            .list(`${property.id}/`, {
+              limit: 1,
+              sortBy: { column: 'name', order: 'asc' }
+            });
+            
+          if (!listError && files && files.length > 0) {
+            // Filter out folders
+            const imageFiles = files.filter(file => !file.metadata?.contentType?.includes('folder'));
+            
+            if (imageFiles.length > 0) {
+              // Get signed URL for first image
+              const { data: urlData, error: urlError } = await supabase
+                .storage
+                .from(STORAGE_BUCKET)
+                .createSignedUrl(`${property.id}/${imageFiles[0].name}`, 3600);
+                
+              if (!urlError && urlData?.signedUrl) {
+                newImageCache[property.id] = urlData.signedUrl;
+                continue;
+              }
+            }
+          }
+          
+          // If no image found in storage, set default image
+          newImageCache[property.id] = '/noimage.png';
+          
+        } catch (error) {
+          console.error(`Error loading image for property ${property.id}:`, error);
+          newImageCache[property.id] = '/noimage.png';
+        }
+      }
+      
+      // Update cache with all new images
+      setPropertyImageCache(newImageCache);
+    };
+    
+    loadPropertyImages();
+  }, [properties, propertyImageCache]);
+
+  // Get property image using cache
+  const getPropertyImage = (property: PropertyType): string => {
+    // First check if we have a cached image
+    if (propertyImageCache[property.id]) {
+      return propertyImageCache[property.id];
+    }
+    
+    // Return placeholder while loading
+    return '/noimage.png';
+  };
 
   const handleLikeToggle = async (propertyId: string, liked: boolean) => {
     if (!user) {
@@ -41,7 +140,7 @@ const PropertyGrid: React.FC<PropertyGridProps> = ({
         description: "Please sign in to add properties to your favorites",
         variant: "destructive"
       });
-      return;
+      return false;
     }
 
     try {
@@ -56,6 +155,8 @@ const PropertyGrid: React.FC<PropertyGridProps> = ({
       if (!result.success) {
         throw new Error(result.message || "Failed to update favorite status");
       }
+      
+      return true;
     } catch (error) {
       console.error("Error toggling property like:", error);
       
@@ -69,11 +170,53 @@ const PropertyGrid: React.FC<PropertyGridProps> = ({
         description: "Unable to update favorite status. Please try again.",
         variant: "destructive"
       });
+      
+      return false;
     }
   };
 
   const handlePropertyHover = (propertyId: string, isHovering: boolean) => {
     setHoveredPropertyId(isHovering ? propertyId : null);
+  };
+  
+  // Handle property selection
+  const handlePropertySelect = (property: PropertyType) => {
+    navigate(`/seeker/property/${property.id}`);
+  };
+
+  // Handle share action
+  const handleShare = (e: React.MouseEvent, property: PropertyType) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const propertyLink = `${window.location.origin}/seeker/property/${property.id}`;
+    const propertyTitle = property.title;
+    
+    if (navigator.share) {
+      // Use Web Share API if available
+      navigator.share({
+        title: propertyTitle,
+        text: `Check out this property: ${propertyTitle}`,
+        url: propertyLink,
+      }).catch(err => {
+        console.error('Error sharing property:', err);
+        // Fallback to clipboard
+        navigator.clipboard.writeText(propertyLink);
+        toast({
+          title: "Link copied!",
+          description: "Property link has been copied to clipboard.",
+          duration: 3000,
+        });
+      });
+    } else {
+      // Fallback to clipboard
+      navigator.clipboard.writeText(propertyLink);
+      toast({
+        title: "Link copied!",
+        description: "Property link has been copied to clipboard.",
+        duration: 3000,
+      });
+    }
   };
 
   // Loading skeleton
@@ -170,15 +313,28 @@ const PropertyGrid: React.FC<PropertyGridProps> = ({
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
       {properties.map((property) => (
-        <PropertyCard 
-          key={property.id} 
-          property={property} 
-          initialIsLiked={likedProperties[property.id] || false}
-          onLikeToggle={(newState) => handleLikeToggle(property.id, newState)}
-          onHover={handlePropertyHover}
-          isHovered={hoveredPropertyId === property.id}
-          className="transition-all duration-300"
-        />
+        <Card 
+          key={property.id}
+          className={cn(
+            "overflow-hidden group transition-all duration-300",
+            "rounded-xl border border-border/40 h-full",
+            hoveredPropertyId === property.id ? "ring-2 ring-primary ring-offset-2" : "",
+            "hover:shadow-md",
+            theme === 'ocean' ? "bg-card" : "bg-card"
+          )}
+        >
+          {/* Use PropertyItem directly instead of PropertyCard */}
+          <PropertyItem 
+            property={property} 
+            isLiked={likedProperties[property.id] || false}
+            isHovered={hoveredPropertyId === property.id}
+            propertyImage={getPropertyImage(property)}
+            onHover={handlePropertyHover}
+            onSelect={handlePropertySelect}
+            onFavoriteToggle={handleLikeToggle}
+            onShare={handleShare}
+          />
+        </Card>
       ))}
     </div>
   );
