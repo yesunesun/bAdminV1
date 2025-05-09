@@ -1,17 +1,21 @@
 // src/modules/seeker/hooks/usePropertyDetails.ts
-// Version: 7.0.0
-// Last Modified: 09-05-2025 20:30 IST
-// Purpose: Complete fix for image loading inconsistencies between popup and main page
+// Version: 8.0.0
+// Last Modified: 09-05-2025 21:45 IST
+// Purpose: Updated to support Supabase storage for property images
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useLocation } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 
+// Constants
+const STORAGE_BUCKET = 'property-images-v2';
+
 export interface PropertyImage {
   id: string;
   url?: string;
   dataUrl?: string;
+  fileName?: string;
   is_primary?: boolean;
   isPrimary?: boolean;
   display_order?: number;
@@ -111,6 +115,29 @@ export interface PropertyDetails {
   };
 }
 
+// Get a public URL for an image stored in Supabase storage
+const getStorageImageUrl = (propertyId: string, fileName: string): string => {
+  if (!propertyId || !fileName) return '/noimage.png';
+  
+  // Handle legacy dataUrl format
+  if (fileName.startsWith('data:image/')) {
+    return fileName;
+  }
+  
+  // Handle legacy images that don't have a real file name
+  if (fileName.startsWith('legacy-') || fileName.startsWith('img-')) {
+    return '/noimage.png';
+  }
+  
+  // Get the Supabase public URL
+  const { data } = supabase
+    .storage
+    .from(STORAGE_BUCKET)
+    .getPublicUrl(`${propertyId}/${fileName}`);
+    
+  return data.publicUrl;
+};
+
 export const usePropertyDetails = (refreshDependency = 0) => {
   const params = useParams();
   const location = useLocation();
@@ -141,17 +168,12 @@ export const usePropertyDetails = (refreshDependency = 0) => {
   const extractImagesFromPropertyDetails = (propertyData: any): PropertyImage[] => {
     console.log('[usePropertyDetails] Attempting to extract images from property_details');
     
-    // Debug the raw property_details if available
-    if (propertyData.property_details) {
-      console.log('[DEBUG] Raw property_details structure type:', typeof propertyData.property_details);
-      if (typeof propertyData.property_details === 'object') {
-        console.log('[DEBUG] property_details has direct images array:', !!propertyData.property_details.images);
-        if (propertyData.property_details.images && propertyData.property_details.images.length > 0) {
-          console.log('[DEBUG] First image in property_details.images:', JSON.stringify(propertyData.property_details.images[0]));
-        }
-      }
+    if (!propertyData || !propertyData.property_details) {
+      console.log('[usePropertyDetails] No property_details available');
+      return [];
     }
     
+    const propertyId = propertyData.id;
     const timestamp = new Date().getTime();
     let extractedImages: PropertyImage[] = [];
     
@@ -167,29 +189,51 @@ export const usePropertyDetails = (refreshDependency = 0) => {
         }
       }
       
-      // CRITICAL FIX: Check directly for dataUrl images array (from PropertyImageUpload)
+      // PRIORITY 1: Check for new imageFiles format first (fileName based)
+      if (details && details.imageFiles && Array.isArray(details.imageFiles)) {
+        console.log('[usePropertyDetails] Found imageFiles in new format:', details.imageFiles.length);
+        
+        // These are in the new format with fileNames that point to Supabase storage
+        const newFormatImages = details.imageFiles.map((img: any, idx: number) => {
+          // Generate full URL from fileName
+          const url = getStorageImageUrl(propertyId, img.fileName);
+          
+          return {
+            id: img.id || `img-${idx}`,
+            fileName: img.fileName,
+            url: url,
+            is_primary: !!img.isPrimary,
+            isPrimary: !!img.isPrimary,
+            display_order: idx
+          };
+        });
+        
+        console.log('[usePropertyDetails] Processed new format images:', newFormatImages.length);
+        return newFormatImages;
+      }
+      
+      // PRIORITY 2: Check for legacy dataUrl format
       if (details && details.images && Array.isArray(details.images)) {
         const firstImage = details.images[0];
         console.log('[DEBUG] Checking first image format:', firstImage && JSON.stringify(firstImage));
         
-        // Check if images are in dataUrl format (from PropertyImageUpload)
+        // Check if images are in dataUrl format (from previous version)
         if (firstImage && firstImage.dataUrl) {
           console.log('[SUCCESS] Found images in dataUrl format:', details.images.length);
           
-          // These images are in dataUrl format with isPrimary (camelCase)
-          // Need to transform to standard format with url property and is_primary (snake_case)
+          // Convert to standard format with both url and dataUrl for compatibility
           return details.images.map((img: any, idx: number) => ({
             id: img.id || `img-${idx}`,
-            url: img.dataUrl, // Map dataUrl to url for compatibility
-            dataUrl: img.dataUrl, // Keep original dataUrl
-            is_primary: !!img.isPrimary, // Add standard is_primary for compatibility
-            isPrimary: !!img.isPrimary, // Keep original isPrimary
+            url: img.dataUrl,
+            dataUrl: img.dataUrl,
+            is_primary: !!img.isPrimary,
+            isPrimary: !!img.isPrimary,
             display_order: idx
           }));
         }
       }
       
-      // Try various paths to find images in order of likelihood
+      // PRIORITY 3: Try various other paths for legacy formats
       if (details?.details?.media?.photos?.images) {
         console.log('[usePropertyDetails] Found images in details.media.photos.images');
         extractedImages = details.details.media.photos.images;
@@ -342,7 +386,7 @@ export const usePropertyDetails = (refreshDependency = 0) => {
         }
       }
       
-      // 1. Try to extract images from property_details structure first
+      // 1. Extract images from property_details structure
       const extractedImages = extractImagesFromPropertyDetails(propertyData);
       console.log('[usePropertyDetails] Images extracted from property_details:', extractedImages.length);
       
@@ -387,9 +431,10 @@ export const usePropertyDetails = (refreshDependency = 0) => {
           id: allImages[0].id,
           url: allImages[0].url ? allImages[0].url.substring(0, 30) + '...' : 'No URL',
           dataUrl: allImages[0].dataUrl ? allImages[0].dataUrl.substring(0, 30) + '...' : 'No dataUrl',
+          fileName: allImages[0].fileName || 'No fileName',
           is_primary: allImages[0].is_primary,
-         isPrimary: allImages[0].isPrimary,
-         display_order: allImages[0].display_order
+          isPrimary: allImages[0].isPrimary,
+          display_order: allImages[0].display_order
        });
      }
 
@@ -502,11 +547,31 @@ export const usePropertyDetails = (refreshDependency = 0) => {
  };
 
  return {
-   property,
-   loading,
-   error,
-   isLiked,
-   toggleLike,
-   refreshData
- };
+  property,
+  loading,
+  error,
+  isLiked,
+  toggleLike,
+  refreshData,
+  getImageUrl: (image: PropertyImage) => {
+    if (!propertyId) return '/noimage.png';
+    
+    // Handle legacy dataUrl format
+    if (image.dataUrl?.startsWith('data:image/')) {
+      return image.dataUrl;
+    }
+    
+    // Handle fileName-based format
+    if (propertyId && image.fileName && !image.fileName.startsWith('legacy-')) {
+      return getStorageImageUrl(propertyId, image.fileName);
+    }
+    
+    // Fall back to standard URL if available
+    if (image.url) {
+      return image.url;
+    }
+    
+    return '/noimage.png';
+  }
+};
 };

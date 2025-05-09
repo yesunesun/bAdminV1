@@ -1,7 +1,7 @@
 // src/lib/supabase.ts
-// Version: 2.7.0
-// Last Modified: 08-04-2025 20:00 IST
-// Purpose: Fixed HTTP 400 errors in API requests and FormData handling
+// Version: 2.8.0
+// Last Modified: 09-05-2025 21:00 IST
+// Purpose: Added storage bucket helpers for property images
 
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './database.types';
@@ -123,6 +123,95 @@ export const directFileUpload = async (
   } catch (error) {
     console.error('Direct file upload failed:', error);
     return { publicUrl: null, error: error instanceof Error ? error : new Error('Unknown error') };
+  }
+};
+
+// Specialized helper for property images
+export const propertyImageStorage = {
+  // Constants
+  BUCKET_NAME: 'property-images-v2',
+  
+  // Upload property image to storage
+  uploadImage: async (propertyId: string, file: File): Promise<{ fileName: string; url: string | null; error: Error | null }> => {
+    try {
+      // Generate a unique filename with timestamp and random string
+      const timestamp = Date.now();
+      const randomString = Math.random().toString(36).substring(2, 10);
+      const fileExtension = file.name.split('.').pop() || 'jpg';
+      const fileName = `${timestamp}_${randomString}.${fileExtension}`;
+      
+      // Full path where the file will be stored
+      const filePath = `${propertyId}/${fileName}`;
+      
+      // Check if bucket exists, create if it doesn't
+      const { data: bucketData, error: bucketError } = await supabase
+        .storage
+        .getBucket(propertyImageStorage.BUCKET_NAME);
+        
+      if (bucketError && bucketError.message.includes('not found')) {
+        console.log(`Creating bucket: ${propertyImageStorage.BUCKET_NAME}`);
+        const { error: createError } = await supabase
+          .storage
+          .createBucket(propertyImageStorage.BUCKET_NAME, {
+            public: true, // Make bucket publicly accessible
+            fileSizeLimit: 5242880, // 5MB
+          });
+          
+        if (createError) {
+          throw new Error(`Failed to create storage bucket: ${createError.message}`);
+        }
+      }
+      
+      // Upload file
+      const { data, error } = await supabase
+        .storage
+        .from(propertyImageStorage.BUCKET_NAME)
+        .upload(filePath, file, {
+          cacheControl: '3600', // 1 hour cache
+          upsert: true
+        });
+        
+      if (error) {
+        throw error;
+      }
+      
+      // Get public URL
+      const { data: urlData } = supabase
+        .storage
+        .from(propertyImageStorage.BUCKET_NAME)
+        .getPublicUrl(filePath);
+        
+      return {
+        fileName,
+        url: urlData.publicUrl,
+        error: null
+      };
+    } catch (error) {
+      console.error('Property image upload failed:', error);
+      return {
+        fileName: '',
+        url: null,
+        error: error instanceof Error ? error : new Error('Unknown error during upload')
+      };
+    }
+  },
+  
+  // Get URL for a property image
+  getImageUrl: (propertyId: string, fileName: string): string => {
+    const filePath = `${propertyId}/${fileName}`;
+    const { data } = supabase
+      .storage
+      .from(propertyImageStorage.BUCKET_NAME)
+      .getPublicUrl(filePath);
+      
+    return data.publicUrl;
+  },
+  
+  // Generate full URLs for all property images
+  getPropertyImageUrls: (propertyId: string, fileNames: string[]): string[] => {
+    return fileNames.map(fileName => 
+      propertyImageStorage.getImageUrl(propertyId, fileName)
+    );
   }
 };
 

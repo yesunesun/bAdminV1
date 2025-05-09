@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyDetails/PropertyImageUpload.tsx
-// Version: 7.0.0
-// Last Modified: 08-05-2025 23:30 IST
-// Purpose: Store images directly in property JSON object
+// Version: 9.0.0
+// Last Modified: 10-05-2025 00:00 IST
+// Purpose: Fixed images with Supabase signed URLs to avoid CORS errors
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -19,9 +19,12 @@ interface PropertyImageUploadProps {
 
 interface PropertyImage {
   id: string;
-  dataUrl: string;
+  fileName: string;
   isPrimary: boolean;
 }
+
+// Constants
+const STORAGE_BUCKET = 'property-images-v2';
 
 const PropertyImageUpload: React.FC<PropertyImageUploadProps> = ({ property, onImageUploaded }) => {
   const { user } = useAuth();
@@ -34,11 +37,12 @@ const PropertyImageUpload: React.FC<PropertyImageUploadProps> = ({ property, onI
   const [uploading, setUploading] = useState(false);
   const [images, setImages] = useState<PropertyImage[]>([]);
   const [dragActive, setDragActive] = useState(false);
+  const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
 
   // Maximum of 10 images allowed
   const MAX_IMAGES = 10;
-  // Maximum size of 2MB to keep JSON size reasonable
-  const MAX_FILE_SIZE = 2 * 1024 * 1024;
+  // Maximum size of 5MB for storage upload
+  const MAX_FILE_SIZE = 5 * 1024 * 1024;
   
   // Load images from property JSON object
   useEffect(() => {
@@ -47,15 +51,77 @@ const PropertyImageUpload: React.FC<PropertyImageUploadProps> = ({ property, onI
     try {
       // Get images from property_details
       const propertyDetails = property.property_details || {};
-      const imageArray = propertyDetails.images || [];
       
-      console.log('Found images in property details:', imageArray.length);
-      setImages(imageArray);
+      // Check if we have images in the new format (fileName based)
+      if (propertyDetails.imageFiles && Array.isArray(propertyDetails.imageFiles)) {
+        console.log('[PropertyImageUpload] Found images in property details (fileName format):', propertyDetails.imageFiles.length);
+        setImages(propertyDetails.imageFiles);
+        
+        // Generate signed URLs for all images
+        generateSignedUrls(propertyDetails.imageFiles);
+        return;
+      }
       
+      // Legacy format: Check for dataUrl images
+      if (propertyDetails.images && Array.isArray(propertyDetails.images)) {
+        console.log('[PropertyImageUpload] Found legacy images in property details (dataUrl format):', propertyDetails.images.length);
+        // Convert from old format to new format
+        const convertedImages = propertyDetails.images.map((img: any, index: number) => ({
+          id: img.id || `img-${index}`,
+          fileName: img.id || `legacy-${index}`, // This is just a placeholder for legacy images
+          isPrimary: !!img.isPrimary
+        }));
+        setImages(convertedImages);
+        
+        // Cache the dataUrls
+        const urlMap: Record<string, string> = {};
+        propertyDetails.images.forEach((img: any) => {
+          if (img.id && img.dataUrl) {
+            urlMap[img.id] = img.dataUrl;
+          }
+        });
+        setImageUrls(urlMap);
+      } else {
+        console.log('[PropertyImageUpload] No images found in property details');
+        setImages([]);
+      }
     } catch (err) {
-      console.error('Error loading images from property details:', err);
+      console.error('[PropertyImageUpload] Error loading images from property details:', err);
+      setImages([]);
     }
   }, [property]);
+
+  // Generate signed URLs for all images
+  const generateSignedUrls = async (imageFiles: PropertyImage[]) => {
+    if (!property?.id || !imageFiles || imageFiles.length === 0) return;
+    
+    const urlMap: Record<string, string> = {};
+    
+    for (const img of imageFiles) {
+      if (!img.fileName || img.fileName.startsWith('legacy-') || img.fileName.startsWith('img-')) {
+        continue;
+      }
+      
+      try {
+        const { data, error } = await supabase
+          .storage
+          .from(STORAGE_BUCKET)
+          .createSignedUrl(`${property.id}/${img.fileName}`, 3600);
+          
+        if (error) {
+          console.error(`[PropertyImageUpload] Error generating signed URL for ${img.fileName}:`, error);
+          continue;
+        }
+        
+        urlMap[img.id] = data.signedUrl;
+        console.log(`[PropertyImageUpload] Generated signed URL for ${img.fileName}`);
+      } catch (err) {
+        console.error(`[PropertyImageUpload] Error generating signed URL:`, err);
+      }
+    }
+    
+    setImageUrls(urlMap);
+  };
 
   // Check authorization
   useEffect(() => {
@@ -80,7 +146,7 @@ const PropertyImageUpload: React.FC<PropertyImageUploadProps> = ({ property, onI
           
         isAdmin = !!adminData;
       } catch (err) {
-        console.error('Error checking admin status:', err);
+        console.error('[PropertyImageUpload] Error checking admin status:', err);
       }
       
       setIsAuthorized(isOwner || isAdmin);
@@ -93,7 +159,7 @@ const PropertyImageUpload: React.FC<PropertyImageUploadProps> = ({ property, onI
   // Handle dialog close and changes
   useEffect(() => {
     if (imagesChanged && !uploadDialogOpen) {
-      console.log('Dialog closed with image changes - triggering refresh');
+      console.log('[PropertyImageUpload] Dialog closed with image changes - triggering refresh');
       onImageUploaded();
       setImagesChanged(false);
       setSuccessMessage('');
@@ -132,16 +198,6 @@ const PropertyImageUpload: React.FC<PropertyImageUploadProps> = ({ property, onI
     }
   };
 
-  // Convert file to base64
-  const fileToDataUrl = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-  };
-
   // Process selected files
   const handleFiles = async (files: File[]) => {
     if (!property?.id) {
@@ -174,27 +230,56 @@ const PropertyImageUpload: React.FC<PropertyImageUploadProps> = ({ property, onI
 
     setErrorMessage('');
     setSuccessMessage('');
+    setUploading(true);
     
-    for (const file of imageFiles) {
-      try {
+    try {
+      for (const file of imageFiles) {
         await uploadImage(file);
-      } catch (err) {
-        console.error('Error uploading file:', err);
-        setErrorMessage('Failed to upload one or more images. Please try again.');
-        break;
       }
+      setSuccessMessage(`Successfully uploaded ${imageFiles.length} image${imageFiles.length > 1 ? 's' : ''}`);
+    } catch (err) {
+      console.error('[PropertyImageUpload] Error uploading files:', err);
+      setErrorMessage('Failed to upload one or more images. Please try again.');
+    } finally {
+      setUploading(false);
     }
   };
 
-  // Upload a single image
+  // Upload a single image to Supabase storage
   const uploadImage = async (file: File) => {
     if (!property?.id) return;
 
     try {
-      setUploading(true);
-
-      // Convert the file to base64 data URL
-      const dataUrl = await fileToDataUrl(file);
+      // Generate a unique filename with timestamp and random string
+      const timestamp = Date.now();
+      const randomString = Math.random().toString(36).substring(2, 10);
+      const fileExtension = file.name.split('.').pop() || 'jpg';
+      const fileName = `${timestamp}_${randomString}.${fileExtension}`;
+      
+      // Full path where the file will be stored
+      const filePath = `${property.id}/${fileName}`;
+      
+      console.log(`[PropertyImageUpload] Uploading file to ${STORAGE_BUCKET}/${filePath}`);
+      
+      // Upload file directly to Supabase storage
+      const { data, error } = await supabase
+        .storage
+        .from(STORAGE_BUCKET)
+        .upload(filePath, file, {
+          cacheControl: '3600', // 1 hour cache
+          upsert: true
+        });
+        
+      if (error) {
+        console.error('[PropertyImageUpload] Storage upload error:', error);
+        throw error;
+      }
+      
+      if (!data) {
+        throw new Error('Upload failed: No data returned');
+      }
+      
+      console.log(`[PropertyImageUpload] Image uploaded successfully. Path: ${filePath}`);
       
       // Create a unique ID for the image
       const imageId = `img_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
@@ -202,11 +287,27 @@ const PropertyImageUpload: React.FC<PropertyImageUploadProps> = ({ property, onI
       // Determine if this should be the primary image
       const isPrimary = images.length === 0;
       
+      // Generate a signed URL for the uploaded image
+      const { data: urlData, error: urlError } = await supabase
+        .storage
+        .from(STORAGE_BUCKET)
+        .createSignedUrl(filePath, 3600);
+        
+      if (urlError) {
+        console.error('[PropertyImageUpload] Error generating signed URL:', urlError);
+      } else {
+        // Store the signed URL in our cache
+        setImageUrls(prev => ({
+          ...prev,
+          [imageId]: urlData.signedUrl
+        }));
+      }
+      
       // Add the new image to our local state
       const newImage = { 
         id: imageId, 
-        dataUrl, 
-        isPrimary 
+        fileName: fileName, 
+        isPrimary
       };
       
       // If this is the first image, make it primary
@@ -223,14 +324,11 @@ const PropertyImageUpload: React.FC<PropertyImageUploadProps> = ({ property, onI
       
       // Update local state
       setImages(updatedImages);
-      setSuccessMessage('Image uploaded successfully');
       setImagesChanged(true);
       
     } catch (err) {
-      console.error('Upload error:', err);
+      console.error('[PropertyImageUpload] Upload error:', err);
       throw err;
-    } finally {
-      setUploading(false);
     }
   };
 
@@ -253,7 +351,7 @@ const PropertyImageUpload: React.FC<PropertyImageUploadProps> = ({ property, onI
       setImagesChanged(true);
       
     } catch (err) {
-      console.error('Error removing image:', err);
+      console.error('[PropertyImageUpload] Error removing image:', err);
       setErrorMessage('Failed to remove image. Please try again.');
     }
   };
@@ -282,7 +380,7 @@ const PropertyImageUpload: React.FC<PropertyImageUploadProps> = ({ property, onI
       setImagesChanged(true);
       
     } catch (err) {
-      console.error('Error setting primary image:', err);
+      console.error('[PropertyImageUpload] Error setting primary image:', err);
       setErrorMessage('Failed to set primary image. Please try again.');
     }
   };
@@ -293,10 +391,10 @@ const PropertyImageUpload: React.FC<PropertyImageUploadProps> = ({ property, onI
       // Get current property details
       const propertyDetails = property.property_details || {};
       
-      // Update images in property details
+      // Update images in property details with new format (imageFiles)
       const updatedDetails = {
         ...propertyDetails,
-        images: imageArray
+        imageFiles: imageArray
       };
       
       // Update property in database
@@ -309,14 +407,31 @@ const PropertyImageUpload: React.FC<PropertyImageUploadProps> = ({ property, onI
         .eq('id', property.id);
         
       if (error) {
-        console.error('Error updating property:', error);
+        console.error('[PropertyImageUpload] Error updating property:', error);
         throw new Error(`Failed to save images: ${error.message}`);
       }
       
     } catch (err) {
-      console.error('Error saving images to property:', err);
+      console.error('[PropertyImageUpload] Error saving images to property:', err);
       throw err;
     }
+  };
+
+  // Get image URL for display
+  const getImageUrl = (image: PropertyImage): string => {
+    // First check if we have a cached signed URL
+    if (image.id && imageUrls[image.id]) {
+      return imageUrls[image.id];
+    }
+    
+    // Check for legacy cases and incompatible formats
+    if (!property?.id || !image.fileName || image.fileName.startsWith('legacy-') || image.fileName.startsWith('img-')) {
+      return '/noimage.png';
+    }
+    
+    // If we don't have a cached URL yet, show a placeholder temporarily 
+    // and the useEffect will update it later when signed URLs are generated
+    return '/noimage.png';
   };
 
   // Check if we've reached the maximum number of images
@@ -430,7 +545,7 @@ const PropertyImageUpload: React.FC<PropertyImageUploadProps> = ({ property, onI
                           {uploading ? 'Uploading...' : 'Drag and drop your images here'}
                         </p>
                         <p className="mt-1 text-xs text-slate-500">
-                          Or click to browse. Supports PNG, JPG, GIF up to 2MB each
+                          Or click to browse. Supports PNG, JPG, GIF up to 5MB each
                         </p>
                       </div>
                     </div>
@@ -463,48 +578,61 @@ const PropertyImageUpload: React.FC<PropertyImageUploadProps> = ({ property, onI
                   Current Images ({images.length})
                 </h3>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  {images.map((image) => (
-                    <div
-                      key={image.id}
-                      className={`relative group aspect-video rounded-lg overflow-hidden border ${
-                        image.isPrimary ? 'border-primary ring-1 ring-primary' : 'border-slate-200'
-                      }`}
-                    >
-                      <img
-                        src={image.dataUrl}
-                        alt="Property"
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          e.currentTarget.src = '/noimage.png';
-                        }}
-                      />
-                      <div className="absolute top-2 right-2 flex space-x-1">
-                        {!image.isPrimary && (
+                  {images.map((image) => {
+                    // Get the image URL
+                    const imageUrl = getImageUrl(image);
+                    
+                    // Debug info for image
+                    console.log(`[PropertyImageUpload] Rendering image: ${image.id}, fileName: ${image.fileName}, URL available: ${!!imageUrl}`);
+                    
+                    return (
+                      <div
+                        key={image.id}
+                        className={`relative group aspect-video rounded-lg overflow-hidden border ${
+                          image.isPrimary ? 'border-primary ring-1 ring-primary' : 'border-slate-200'
+                        }`}
+                      >
+                        
+                        <img
+                          src={imageUrl}
+                          alt="Property"
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            console.log(`[PropertyImageUpload] Image load error for ${image.fileName}`);
+                            e.currentTarget.src = '/noimage.png';
+                          }}
+                          onLoad={() => {
+                            console.log(`[PropertyImageUpload] Successfully loaded image ${image.fileName}`);
+                          }}
+                        />
+                        <div className="absolute top-2 right-2 flex space-x-1">
+                          {!image.isPrimary && (
+                            <button
+                              onClick={() => handleSetPrimaryImage(image.id)}
+                              className="p-1.5 rounded-full bg-white/80 text-slate-600 hover:text-primary-600 hover:bg-white border-white/20 opacity-0 group-hover:opacity-100 transition-opacity"
+                              title="Set as main photo"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                              </svg>
+                            </button>
+                          )}
                           <button
-                            onClick={() => handleSetPrimaryImage(image.id)}
-                            className="p-1.5 rounded-full bg-white/80 text-slate-600 hover:text-primary-600 hover:bg-white border-white/20 opacity-0 group-hover:opacity-100 transition-opacity"
-                            title="Set as main photo"
+                            onClick={() => handleRemoveImage(image.id)}
+                            className="p-1.5 rounded-full bg-white/80 text-red-600 hover:text-red-800 hover:bg-white border-white/20 opacity-0 group-hover:opacity-100 transition-opacity"
+                            title="Remove image"
                           >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-                            </svg>
+                            <X className="h-4 w-4" />
                           </button>
-                        )}
-                        <button
-                          onClick={() => handleRemoveImage(image.id)}
-                          className="p-1.5 rounded-full bg-white/80 text-red-600 hover:text-red-800 hover:bg-white border-white/20 opacity-0 group-hover:opacity-100 transition-opacity"
-                          title="Remove image"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      </div>
-                      {image.isPrimary && (
-                        <div className="absolute bottom-2 left-2 bg-primary text-white text-xs px-2 py-1 rounded">
-                          Main Photo
                         </div>
-                      )}
-                    </div>
-                  ))}
+                        {image.isPrimary && (
+                          <div className="absolute bottom-2 left-2 bg-primary text-white text-xs px-2 py-1 rounded">
+                            Main Photo
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
