@@ -1,6 +1,6 @@
 // src/modules/seeker/services/constants.ts
-// Version: 1.0.0
-// Last Modified: 09-05-2025 13:30 IST
+// Version: 1.1.0
+// Last Modified: 09-05-2025 16:00 IST
 // Purpose: Constants used across seeker services
 
 // Colored marker URLs from Google Maps
@@ -22,21 +22,6 @@ export const propertyTypeOptions = [
   { id: 'commercial', label: 'Commercial', icon: 'Warehouse' },
   { id: 'land', label: 'Land', icon: 'LandPlot' },
 ];
-
-// Property filter interface
-export interface PropertyFilters {
-  searchQuery?: string;
-  propertyType?: string;
-  minPrice?: number;
-  maxPrice?: number;
-  bedrooms?: number;
-  bathrooms?: number;
-  furnishing?: string;
-  propertyAge?: string;
-  sortBy?: string;
-  page?: number;
-  pageSize?: number;
-}
 
 // Similar properties options interface
 export interface SimilarPropertiesOptions {

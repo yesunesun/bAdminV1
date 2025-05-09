@@ -1,11 +1,11 @@
 // src/modules/seeker/services/mapService.ts
-// Version: 1.0.0
-// Last Modified: 09-05-2025 13:30 IST
-// Purpose: Map-specific functions for properties on a map
+// Version: 1.1.0
+// Last Modified: 09-05-2025 16:00 IST
+// Purpose: Map-related services for displaying properties on maps
 
 import { supabase } from '@/lib/supabase';
-import { PropertyFilters } from './constants';
-import { processPropertyData, extractImagesFromProperty } from './utilityService';
+import { PropertyFilters } from './seekerService'; // Import from seekerService instead of constants
+import { debugTableSchema, processPropertyData, extractImagesFromProperty } from './utilityService';
 
 // Fetch properties specifically for map display - Only from properties_v2
 export const fetchPropertiesForMap = async (filters: PropertyFilters = {}) => {

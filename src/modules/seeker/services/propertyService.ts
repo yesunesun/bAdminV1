@@ -1,10 +1,11 @@
 // src/modules/seeker/services/propertyService.ts
-// Version: 1.0.0
-// Last Modified: 09-05-2025 13:30 IST
+// Version: 1.1.0
+// Last Modified: 09-05-2025 16:15 IST
 // Purpose: Property-related functions for fetching and processing properties
 
 import { supabase } from '@/lib/supabase';
-import { PropertyFilters, SimilarPropertiesOptions } from './constants';
+import { PropertyFilters } from './seekerService'; // Import from seekerService instead of constants
+import { SimilarPropertiesOptions } from './constants';
 import { debugTableSchema, processPropertyData, extractImagesFromProperty } from './utilityService';
 
 // Fetch properties with filters and pagination - Only from properties_v2
