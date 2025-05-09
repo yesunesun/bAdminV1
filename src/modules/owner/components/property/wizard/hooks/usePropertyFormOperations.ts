@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/hooks/usePropertyFormOperations.ts
-// Version: 5.1.0
-// Last Modified: 09-05-2025 12:30 IST
-// Purpose: Updated to support structured steps hierarchy
+// Version: 5.3.0
+// Last Modified: 09-05-2025 18:00 IST
+// Purpose: Comprehensive fix for incorrect listing type in Residential Sale flow
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -46,6 +46,117 @@ export function usePropertyFormOperations({
   const [lastOperation, setLastOperation] = useState<string | null>(null);
 
   /**
+   * Determine the correct flow type from various sources
+   */
+  const determineFlowType = (): { category: string, listingType: string } => {
+    let category = 'residential';
+    let listingType = 'rent';
+
+    // 1. Check URL path first (highest priority)
+    const pathParts = window.location.pathname.split('/');
+    if (pathParts.length > 3) {
+      const urlCategory = pathParts[pathParts.length - 3].toLowerCase();
+      const urlListingType = pathParts[pathParts.length - 2].toLowerCase();
+      
+      console.log(`URL path flow info - Category: ${urlCategory}, ListingType: ${urlListingType}`);
+      
+      // Set category based on URL
+      if (urlCategory.includes('commercial')) {
+        category = 'commercial';
+      } else if (urlCategory.includes('land') || urlCategory.includes('plot')) {
+        category = 'land';
+      }
+      
+      // Set listing type based on URL
+      if (urlListingType.includes('sale') || urlListingType.includes('sell')) {
+        listingType = 'sale';
+      } else if (urlListingType.includes('rent')) {
+        listingType = 'rent';
+      } else if (urlListingType.includes('flatmate')) {
+        listingType = 'flatmates';
+      } else if (urlListingType.includes('pg') || urlListingType.includes('hostel')) {
+        listingType = 'pghostel';
+      } else if (urlListingType.includes('coworking') || urlListingType.includes('co-working')) {
+        listingType = 'coworking';
+      }
+    }
+    
+    // 2. Check form data fields (second priority)
+    const formData = form.getValues();
+    
+    // Check explicit flow indicators in form data
+    if (formData.flow_property_type) {
+      const flowPropertyType = formData.flow_property_type.toLowerCase();
+      if (flowPropertyType.includes('commercial')) {
+        category = 'commercial';
+      } else if (flowPropertyType.includes('land')) {
+        category = 'land';
+      }
+    }
+    
+    if (formData.flow_listing_type) {
+      const flowListingType = formData.flow_listing_type.toLowerCase();
+      if (flowListingType.includes('sale') || flowListingType.includes('sell')) {
+        listingType = 'sale';
+      } else if (flowListingType.includes('rent')) {
+        listingType = 'rent';
+      } else if (flowListingType.includes('flatmate')) {
+        listingType = 'flatmates';
+      } else if (flowListingType.includes('pg') || flowListingType.includes('hostel')) {
+        listingType = 'pghostel';
+      } else if (flowListingType.includes('coworking')) {
+        listingType = 'coworking';
+      }
+    }
+    
+    // 3. Check form data content indicators
+    if (formData.expectedPrice && !formData.rentAmount) {
+      listingType = 'sale';
+    }
+    
+    if (formData.rentAmount && !formData.expectedPrice) {
+      listingType = 'rent';
+    }
+    
+    // 4. Check props passed to hook (third priority)
+    if (isPGHostelMode) {
+      listingType = 'pghostel';
+    } else if (isSaleMode) {
+      listingType = 'sale';
+    }
+    
+    if (adType) {
+      const adTypeLower = adType.toLowerCase();
+      if (adTypeLower.includes('commercial')) {
+        category = 'commercial';
+      } else if (adTypeLower.includes('land') || adTypeLower.includes('plot')) {
+        category = 'land';
+      }
+      
+      if (adTypeLower.includes('sale') || adTypeLower.includes('sell')) {
+        listingType = 'sale';
+      } else if (adTypeLower.includes('rent')) {
+        listingType = 'rent';
+      } else if (adTypeLower.includes('flatmate')) {
+        listingType = 'flatmates';
+      } else if (adTypeLower.includes('pg') || adTypeLower.includes('hostel')) {
+        listingType = 'pghostel';
+      } else if (adTypeLower.includes('coworking')) {
+        listingType = 'coworking';
+      }
+    }
+    
+    // Double-check for sale-specific fields as final check
+    if (formData.steps?.sale && Object.keys(formData.steps.sale).length > 0) {
+      listingType = 'sale';
+    }
+    
+    console.log(`Final determined flow - Category: ${category}, ListingType: ${listingType}`);
+    
+    return { category, listingType };
+  };
+
+  /**
    * Prepare form data before saving
    */
   const prepareFormData = (): FormData => {
@@ -65,43 +176,29 @@ export function usePropertyFormOperations({
       formData.meta.updated_at = new Date().toISOString();
     }
     
-    // Ensure flow section exists
-    if (!formData.flow) {
-      // Extract flow information from adType or URL if available
-      let category = 'residential';
-      let listingType = isSaleMode ? 'sale' : 'rent';
-      
-      if (isPGHostelMode) {
-        listingType = 'pghostel';
-      }
-      
-      if (adType) {
-        // Try to determine category and type from adType
-        if (adType.toLowerCase().includes('commercial')) {
-          category = 'commercial';
-        } else if (adType.toLowerCase().includes('land') || adType.toLowerCase().includes('plot')) {
-          category = 'land';
-        }
-        
-        if (adType.toLowerCase().includes('sale') || adType.toLowerCase().includes('sell')) {
-          listingType = 'sale';
-        } else if (adType.toLowerCase().includes('rent')) {
-          listingType = 'rent';
-        } else if (adType.toLowerCase().includes('flatmate')) {
-          listingType = 'flatmates';
-        } else if (adType.toLowerCase().includes('pg') || adType.toLowerCase().includes('hostel')) {
-          listingType = 'pghostel';
-        } else if (adType.toLowerCase().includes('coworking')) {
-          listingType = 'coworking';
-          category = 'commercial';
-        }
-      }
-      
-      formData.flow = {
-        category,
-        listingType
-      };
+    // Determine correct flow type
+    const { category, listingType } = determineFlowType();
+    
+    // Set or update flow section with determined values
+    formData.flow = {
+      category,
+      listingType
+    };
+    
+    // Force the proper listingType for the Sale flow
+    if (isSaleMode || listingType === 'sale') {
+      formData.flow.listingType = 'sale';
+      formData.listingType = 'sale';
     }
+    
+    // Also set the listingType at the root level for backward compatibility
+    formData.listingType = formData.flow.listingType;
+    
+    // Log final flow settings
+    console.log(`Setting final flow data:`, {
+      category: formData.flow.category,
+      listingType: formData.flow.listingType
+    });
     
     // Ensure steps section exists
     if (!formData.steps) {
@@ -139,6 +236,9 @@ export function usePropertyFormOperations({
       
       // Set status as draft
       formData.meta.status = 'draft';
+      
+      // IMPORTANT: Log the final data structure before saving
+      console.log('Saving property with flow.listingType:', formData.flow.listingType);
       
       // Save the property
       let result;
@@ -190,6 +290,9 @@ export function usePropertyFormOperations({
       
       // Set status as published
       formData.meta.status = 'published';
+      
+      // IMPORTANT: Log the final data structure before saving
+      console.log('Publishing property with flow.listingType:', formData.flow.listingType);
       
       // Save the property
       let result;
@@ -246,6 +349,9 @@ export function usePropertyFormOperations({
       
       // Keep the current status
       formData.meta.status = status;
+      
+      // IMPORTANT: Log the final data structure before saving
+      console.log('Updating property with flow.listingType:', formData.flow.listingType);
       
       // Update the property
       console.log('Updating existing property');

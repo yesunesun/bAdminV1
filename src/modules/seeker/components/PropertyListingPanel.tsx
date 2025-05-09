@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyListingPanel.tsx
-// Version: 2.3.0
-// Last Modified: 09-05-2025 15:30 IST
-// Purpose: Enhanced image selection logic to properly display property images
+// Version: 3.0.0
+// Last Modified: 10-05-2025 15:30 IST
+// Purpose: Updated image loading to use Supabase storage bucket
 
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
@@ -12,6 +12,7 @@ import { Loader2, ChevronRight, MapPin, Bed, Bath, Square, Info, Share2 } from '
 import FavoriteButton from './FavoriteButton';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
+import { supabase } from '@/lib/supabase';
 
 interface PropertyListingPanelProps {
   properties: PropertyType[];
@@ -45,6 +46,11 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
   const { user } = useAuth();
   const { toast } = useToast();
   const [propertyLikeState, setPropertyLikeState] = useState<Record<string, boolean>>({});
+  // NEW: Add image URL cache to avoid repeated requests for the same property
+  const [propertyImageCache, setPropertyImageCache] = useState<Record<string, string>>({});
+
+  // Constants
+  const STORAGE_BUCKET = 'property-images-v2';
 
   // Setup initial like states when favorites or properties change
   useEffect(() => {
@@ -63,6 +69,84 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
       newStates: newLikeState
     });
   }, [properties, favoriteProperties]);
+
+  // NEW: Batch load property images when properties change
+  useEffect(() => {
+    const loadPropertyImages = async () => {
+      // Only process properties that aren't already in the cache
+      const propertiesToLoad = properties.filter(p => !propertyImageCache[p.id]);
+      
+      if (propertiesToLoad.length === 0) return;
+      
+      const newImageCache = { ...propertyImageCache };
+      
+      // Process each property
+      for (const property of propertiesToLoad) {
+        try {
+          // First check if property has imageFiles in property_details
+          const details = property.property_details || {};
+          
+          if (details.imageFiles && Array.isArray(details.imageFiles) && details.imageFiles.length > 0) {
+            // Look for primary image first
+            const primaryImage = details.imageFiles.find((img: any) => img.isPrimary || img.is_primary);
+            const imageToUse = primaryImage || details.imageFiles[0];
+            
+            if (imageToUse && imageToUse.fileName) {
+              // Get image from Supabase storage
+              const { data, error } = await supabase
+                .storage
+                .from(STORAGE_BUCKET)
+                .createSignedUrl(`${property.id}/${imageToUse.fileName}`, 3600);
+                
+              if (!error && data.signedUrl) {
+                newImageCache[property.id] = data.signedUrl;
+                continue; // Skip to next property if we found an image
+              }
+            }
+          }
+          
+          // If imageFiles didn't work, try listing files in storage
+          const { data: files, error: listError } = await supabase
+            .storage
+            .from(STORAGE_BUCKET)
+            .list(`${property.id}/`, {
+              limit: 1,
+              sortBy: { column: 'name', order: 'asc' }
+            });
+            
+          if (!listError && files && files.length > 0) {
+            // Filter out folders
+            const imageFiles = files.filter(file => !file.metadata?.contentType?.includes('folder'));
+            
+            if (imageFiles.length > 0) {
+              // Get signed URL for first image
+              const { data: urlData, error: urlError } = await supabase
+                .storage
+                .from(STORAGE_BUCKET)
+                .createSignedUrl(`${property.id}/${imageFiles[0].name}`, 3600);
+                
+              if (!urlError && urlData?.signedUrl) {
+                newImageCache[property.id] = urlData.signedUrl;
+                continue;
+              }
+            }
+          }
+          
+          // If no image found in storage, set default image
+          newImageCache[property.id] = '/noimage.png';
+          
+        } catch (error) {
+          console.error(`Error loading image for property ${property.id}:`, error);
+          newImageCache[property.id] = '/noimage.png';
+        }
+      }
+      
+      // Update cache with all new images
+      setPropertyImageCache(newImageCache);
+    };
+    
+    loadPropertyImages();
+  }, [properties, propertyImageCache]);
 
   // Handle favorite toggle with persistence
   const handleFavoriteToggle = async (propertyId: string, newLikedState: boolean) => {
@@ -106,70 +190,14 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
     return success;
   };
 
-  // Enhanced image selection logic
+  // Updated to use image cache
   const getPropertyImage = (property: PropertyType): string => {
-    // First try to find images in property_images array
-    if (property.property_images && property.property_images.length > 0) {
-      // Try to find primary image first
-      const primaryImage = property.property_images.find(img => img.is_primary);
-      if (primaryImage?.url) {
-        return primaryImage.url;
-      }
-      
-      // Fall back to first image if no primary image
-      if (property.property_images[0].url) {
-        return property.property_images[0].url;
-      }
+    // First check if we have a cached image
+    if (propertyImageCache[property.id]) {
+      return propertyImageCache[property.id];
     }
     
-    // If no images in property_images, try to extract from property_details
-    try {
-      const details = typeof property.property_details === 'string'
-        ? JSON.parse(property.property_details)
-        : property.property_details;
-        
-      // Look for images in various possible locations within property_details
-      if (details?.images && Array.isArray(details.images)) {
-        // Check if images are in dataUrl format
-        const primaryImage = details.images.find((img: any) => img.isPrimary || img.is_primary);
-        if (primaryImage?.dataUrl) {
-          return primaryImage.dataUrl;
-        } else if (primaryImage?.url) {
-          return primaryImage.url;
-        }
-        
-        // Fall back to first image
-        if (details.images.length > 0) {
-          const firstImage = details.images[0];
-          return firstImage.dataUrl || firstImage.url;
-        }
-      }
-      
-      // Check for images in photos.images
-      if (details?.photos?.images && Array.isArray(details.photos.images)) {
-        const primaryImage = details.photos.images.find((img: any) => img.isPrimary || img.is_primary);
-        if (primaryImage?.dataUrl) {
-          return primaryImage.dataUrl;
-        } else if (primaryImage?.url) {
-          return primaryImage.url;
-        }
-        
-        // Fall back to first image
-        if (details.photos.images.length > 0) {
-          const firstImage = details.photos.images[0];
-          return firstImage.dataUrl || firstImage.url;
-        }
-      }
-    } catch (error) {
-      console.error('Error extracting images from property_details:', error);
-    }
-    
-    // Fall back to the legacy image property if available
-    if (property.image) {
-      return property.image;
-    }
-    
-    // Final fallback to default image
+    // Return placeholder while loading
     return '/noimage.png';
   };
 

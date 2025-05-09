@@ -1,7 +1,7 @@
 // src/modules/owner/services/propertyService.ts
-// Version: 8.1.0
-// Last Modified: 09-05-2025 12:00 IST
-// Purpose: Updated to support structured steps hierarchy
+// Version: 8.2.0
+// Last Modified: 09-05-2025 18:30 IST
+// Purpose: Fixed issue with flow listingType preservation in property saving
 
 import { supabase } from '@/lib/supabase';
 import { FormData } from '../components/property/wizard/types';
@@ -29,6 +29,12 @@ const createEmptyPropertyStructure = (
 ): any => {
   // Set current timestamp
   const now = new Date().toISOString();
+  
+  // Validate and ensure correct listingType, especially for Sale properties
+  if (flowListingType.toLowerCase().includes('sale') || flowListingType.toLowerCase().includes('sell')) {
+    flowListingType = 'sale';
+    console.log('Enforcing SALE listing type in empty structure');
+  }
   
   // Create base structure with new format
   const structure: any = {
@@ -74,6 +80,12 @@ const createEmptyPropertyStructure = (
 const organizePropertyData = (propertyData: any): any => {
   if (!propertyData) return createEmptyPropertyStructure();
   
+  // Preserve the original flow information, especially for Sale properties
+  const flowCategory = propertyData.flow?.category || 'residential';
+  const flowListingType = propertyData.flow?.listingType || 'rent';
+  
+  console.log(`Organizing property data with flow: ${flowCategory}_${flowListingType}`);
+  
   // Check if the data already has the steps structure
   if (propertyData.steps) {
     // Already has steps structure, just ensure complete structure
@@ -81,8 +93,6 @@ const organizePropertyData = (propertyData: any): any => {
   }
   
   // Create a new structure since we don't need backward compatibility
-  const flowCategory = propertyData.flow?.category || 'residential';
-  const flowListingType = propertyData.flow?.listingType || 'rent';
   return createEmptyPropertyStructure(flowCategory, flowListingType);
 };
 
@@ -94,6 +104,16 @@ const ensureCompleteStructure = (data: any): any => {
   
   // Clone the data to avoid mutations
   const result = JSON.parse(JSON.stringify(data));
+  
+  // Preserve the original flow information, especially for Sale properties
+  const flowCategory = result.flow?.category || 'residential';
+  let flowListingType = result.flow?.listingType || 'rent';
+  
+  // Validate and ensure correct listingType for Sale properties
+  if (flowListingType.toLowerCase().includes('sale') || flowListingType.toLowerCase().includes('sell')) {
+    flowListingType = 'sale';
+    console.log('Preserving SALE listing type in structure');
+  }
   
   // Ensure meta section exists
   if (!result.meta) {
@@ -108,12 +128,17 @@ const ensureCompleteStructure = (data: any): any => {
     result.meta._version = DATA_VERSION;
   }
   
-  // Ensure flow section exists
+  // Ensure flow section exists and preserves the correct listingType
   if (!result.flow) {
     result.flow = {
-      category: 'residential',
-      listingType: 'rent'
+      category: flowCategory,
+      listingType: flowListingType
     };
+  } else {
+    // Ensure the listingType is preserved, especially for Sale properties
+    if (flowListingType === 'sale') {
+      result.flow.listingType = 'sale';
+    }
   }
   
   // Ensure steps section exists
@@ -121,8 +146,6 @@ const ensureCompleteStructure = (data: any): any => {
     result.steps = {};
     
     // Initialize steps based on flow type
-    const flowCategory = result.flow.category || 'residential';
-    const flowListingType = result.flow.listingType || 'rent';
     const flowKey = `${flowCategory}_${flowListingType}`;
     const stepsArray = FLOW_STEPS[flowKey] || FLOW_STEPS.default;
     
@@ -277,6 +300,20 @@ export const propertyService = {
       organizedData.meta.owner_id = userId;
       organizedData.meta.status = status;
       
+      // IMPORTANT: Ensure flow information is preserved correctly, especially for Sale properties
+      if (propertyData.flow?.listingType === 'sale' || 
+          (propertyData.flow?.listingType || '').toLowerCase().includes('sale') ||
+          (propertyData.flow?.listingType || '').toLowerCase().includes('sell')) {
+        console.log('Preserving SALE listing type in createProperty');
+        organizedData.flow.listingType = 'sale';
+      }
+      
+      // Log the final flow information before saving
+      console.log('Creating property with flow:', {
+        category: organizedData.flow.category,
+        listingType: organizedData.flow.listingType
+      });
+      
       // Create in properties_v2 table
       const now = new Date().toISOString();
       
@@ -376,6 +413,20 @@ export const propertyService = {
         organizedData.meta.status = status;
       }
       
+      // IMPORTANT: Ensure flow information is preserved correctly, especially for Sale properties
+      if (propertyData.flow?.listingType === 'sale' || 
+          (propertyData.flow?.listingType || '').toLowerCase().includes('sale') ||
+          (propertyData.flow?.listingType || '').toLowerCase().includes('sell')) {
+        console.log('Preserving SALE listing type in updateProperty');
+        organizedData.flow.listingType = 'sale';
+      }
+      
+      // Log the final flow information before updating
+      console.log('Updating property with flow:', {
+        category: organizedData.flow.category,
+        listingType: organizedData.flow.listingType
+      });
+      
       // Update in properties_v2 table
       const updateData = {
         updated_at: new Date().toISOString(),
@@ -437,6 +488,14 @@ export const propertyService = {
       organizedData.meta.id = propertyId;
       organizedData.meta.updated_at = new Date().toISOString();
       
+      // IMPORTANT: Ensure flow information is preserved correctly, especially for Sale properties
+      if (propertyDetails.flow?.listingType === 'sale' || 
+          (propertyDetails.flow?.listingType || '').toLowerCase().includes('sale') ||
+          (propertyDetails.flow?.listingType || '').toLowerCase().includes('sell')) {
+        console.log('Preserving SALE listing type in updatePropertyDetails');
+        organizedData.flow.listingType = 'sale';
+      }
+      
       const { error } = await supabase
         .from('properties_v2')
         .update({ 
@@ -491,6 +550,26 @@ export const propertyService = {
     
     // Merge at top level
     deepMerge(result, newData);
+    
+    // Special handling for flow section to ensure listingType is preserved
+    if (newData.flow) {
+      if (!result.flow) result.flow = {};
+      
+      // Preserve category if it exists
+      if (newData.flow.category) {
+        result.flow.category = newData.flow.category;
+      }
+      
+      // IMPORTANT: Ensure Sale listingType is preserved during merge
+      if (newData.flow.listingType === 'sale' || 
+          (newData.flow.listingType || '').toLowerCase().includes('sale') ||
+          (newData.flow.listingType || '').toLowerCase().includes('sell')) {
+        result.flow.listingType = 'sale';
+        console.log('Preserving SALE listing type in merge');
+      } else if (newData.flow.listingType) {
+        result.flow.listingType = newData.flow.listingType;
+      }
+    }
     
     // Special handling for steps section to ensure full merging
     if (newData.steps && result.steps) {
