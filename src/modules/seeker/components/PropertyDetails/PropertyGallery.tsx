@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyDetails/PropertyGallery.tsx
-// Version: 6.2.0
-// Last Modified: 09-05-2025 23:30 IST
-// Purpose: Fixed CORS issues with signed URLs
+// Version: 6.3.0
+// Last Modified: 10-05-2025 15:00 IST
+// Purpose: Fixed image loading from Supabase storage
 
 import React, { useState, useEffect } from 'react';
 import { ChevronLeftIcon, ChevronRightIcon, ImageIcon, ExpandIcon, XIcon } from 'lucide-react';
@@ -33,6 +33,11 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({ images, propertyId })
   // Generate a signed URL to avoid CORS issues
   const getSignedUrl = async (fileName: string): Promise<string> => {
     if (!propertyId || !fileName) return '/noimage.png';
+    
+    // Skip signed URL generation for legacy formats
+    if (fileName.startsWith('legacy-') || fileName.startsWith('img-')) {
+      return '/noimage.png';
+    }
     
     try {
       // Generate a signed URL that expires in 1 hour (3600 seconds)
