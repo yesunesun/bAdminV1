@@ -1,18 +1,17 @@
 // src/modules/seeker/components/PropertyListingPanel.tsx
-// Version: 3.0.0
-// Last Modified: 10-05-2025 15:30 IST
-// Purpose: Updated image loading to use Supabase storage bucket
+// Version: 4.0.0
+// Last Modified: 10-05-2025 16:45 IST
+// Purpose: Refactored to use a separate PropertyItem component for better organization
 
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
 import { PropertyType } from '@/modules/owner/components/property/types';
 import { Button } from '@/components/ui/button';
 import { formatPrice } from '../services/seekerService';
-import { Loader2, ChevronRight, MapPin, Bed, Bath, Square, Info, Share2 } from 'lucide-react';
-import FavoriteButton from './FavoriteButton';
+import { Loader2, Info } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/lib/supabase';
+import PropertyItem from './PropertyItem'; // Import the new PropertyItem component
 
 interface PropertyListingPanelProps {
   properties: PropertyType[];
@@ -46,7 +45,6 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
   const { user } = useAuth();
   const { toast } = useToast();
   const [propertyLikeState, setPropertyLikeState] = useState<Record<string, boolean>>({});
-  // NEW: Add image URL cache to avoid repeated requests for the same property
   const [propertyImageCache, setPropertyImageCache] = useState<Record<string, string>>({});
 
   // Constants
@@ -70,7 +68,7 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
     });
   }, [properties, favoriteProperties]);
 
-  // NEW: Batch load property images when properties change
+  // Batch load property images when properties change
   useEffect(() => {
     const loadPropertyImages = async () => {
       // Only process properties that aren't already in the cache
@@ -190,7 +188,7 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
     return success;
   };
 
-  // Updated to use image cache
+  // Get property image using cache
   const getPropertyImage = (property: PropertyType): string => {
     // First check if we have a cached image
     if (propertyImageCache[property.id]) {
@@ -312,138 +310,22 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
         </div>
       );
     } else {
-      // Actual property cards
+      // Actual property cards - now using the PropertyItem component
       return (
         <div className="divide-y">
-          {properties.map((property) => {
-            // Get property image using the enhanced logic
-            const propertyImage = getPropertyImage(property);
-            
-            const isHovered = hoveredProperty === property.id;
-            
-            // Extract proper property type
-            const propertyType = property.property_details?.propertyType || 'Apartment';
-            
-            // Extract property name/title to display
-            const propertyName = property.bedrooms 
-              ? `${property.bedrooms} BHK Apartment`
-              : property.title || 'Apartment';
-            
-            // Extract locality from property details or fallback to city
-            const locality = property.property_details?.locality || property.city || '';
-            
-            // Check if property is liked using our state object
-            const isLiked = propertyLikeState[property.id] || false;
-            
-            return (
-              <div 
-                key={`property-${property.id}`}
-                className={`relative transition hover:bg-muted/40 ${isHovered ? 'bg-muted/40' : ''}`}
-              >
-                <div className="p-3"
-                  onMouseEnter={() => handlePropertyHover(property.id, true)}
-                  onMouseLeave={() => handlePropertyHover(property.id, false)}
-                  onClick={() => setActiveProperty(property)}
-                >
-                  {/* Property Name at the top with blue text */}
-                  <div className="flex items-center justify-between mb-2">
-                    <Link
-                      to={`/seeker/property/${property.id}`}
-                      className="text-sm font-medium text-blue-500 hover:underline truncate max-w-[70%]"
-                    >
-                      {propertyName}
-                    </Link>
-                    
-                    {/* Share and Favorite buttons - horizontal layout */}
-                    <div className="flex items-center space-x-2">
-                      <button
-                        onClick={(e) => handleShare(e, property)}
-                        className="text-gray-400 hover:text-blue-500"
-                        aria-label="Share property"
-                      >
-                        <Share2 className="h-4 w-4" />
-                      </button>
-                      
-                      <FavoriteButton
-                        initialIsLiked={isLiked}
-                        onToggle={(newLikedState) => handleFavoriteToggle(property.id, newLikedState)}
-                        className="text-gray-400 hover:text-primary" 
-                      />
-                    </div>
-                  </div>
-                  
-                  <Link 
-                    to={`/seeker/property/${property.id}`} 
-                    className="flex gap-2"
-                  >
-                    {/* Property image */}
-                    <div className="relative h-20 w-24 flex-shrink-0 overflow-hidden rounded-lg">
-                      <img
-                        src={propertyImage}
-                        alt={property.title || 'Property'}
-                        className="h-full w-full object-cover"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          target.onerror = null; // Prevent infinite loop
-                          target.src = '/noimage.png';
-                        }}
-                      />
-                    </div>
-                    
-                    {/* Property details */}
-                    <div className="flex-1 min-w-0">
-                      {/* Location with icon */}
-                      <div className="flex items-center text-xs text-gray-500 mb-1">
-                        <MapPin className="h-3 w-3 mr-1 flex-shrink-0" />
-                        <span className="truncate">
-                          {locality || property.address || 'Location unavailable'}
-                        </span>
-                      </div>
-                      
-                      {/* Price */}
-                      <p className="text-sm font-semibold mb-2">
-                        {formatPrice(property.price)}
-                      </p>
-                      
-                      {/* Property specs */}
-                      <div className="flex items-center gap-2 text-xs text-gray-500">
-                        {property.bedrooms && (
-                          <span className="flex items-center">
-                            <Bed className="h-3 w-3 mr-1" />
-                            <span>{property.bedrooms}</span>
-                          </span>
-                        )}
-                        
-                        {property.bathrooms && (
-                          <span className="flex items-center">
-                            <Bath className="h-3 w-3 mr-1" />
-                            <span>{property.bathrooms}</span>
-                          </span>
-                        )}
-                        
-                        {property.square_feet && (
-                          <span className="flex items-center">
-                            <Square className="h-3 w-3 mr-1" />
-                            <span className="whitespace-nowrap">{property.square_feet} sq.ft</span>
-                          </span>
-                        )}
-                      </div>
-                      
-                      {/* Property Type Badge */}
-                      <div className="mt-2 inline-block bg-gray-100 text-xs text-gray-600 px-2 py-0.5 rounded">
-                        {propertyType}
-                      </div>
-                    </div>
-                    
-                    {/* Chevron icon */}
-                    <div className="self-center flex-shrink-0">
-                      <ChevronRight className="h-4 w-4 text-gray-400" />
-                    </div>
-                  </Link>
-                </div>
-              </div>
-            );
-          })}
+          {properties.map((property) => (
+            <PropertyItem
+              key={property.id}
+              property={property}
+              isLiked={propertyLikeState[property.id] || false}
+              isHovered={hoveredProperty === property.id}
+              propertyImage={getPropertyImage(property)}
+              onHover={handlePropertyHover}
+              onSelect={setActiveProperty}
+              onFavoriteToggle={handleFavoriteToggle}
+              onShare={handleShare}
+            />
+          ))}
         </div>
       );
     }
