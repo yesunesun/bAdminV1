@@ -26,6 +26,8 @@ import { FormNavigation } from '../components/FormNavigation'; // Changed to nam
 import { useStepNavigation } from './hooks/useStepNavigation';
 import { useDebugTools } from './hooks/useDebugTools';
 
+import FormDataDebug from '../components/FormDataDebug';
+
 interface PropertyFormProps {
  initialData?: FormData;
  propertyId?: string;
@@ -529,6 +531,7 @@ export function PropertyForm({
          </div>
        </div>
      </div>
+     {process.env.NODE_ENV !== 'production' && <FormDataDebug form={form} />}
    </div>
  );
 }

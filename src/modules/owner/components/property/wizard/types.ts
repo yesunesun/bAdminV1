@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/types.ts
-// Version: 5.1.0
-// Last Modified: 09-05-2025 10:45 IST
-// Purpose: Updated to use structured steps hierarchy
+// Version: 5.2.0
+// Last Modified: 11-05-2025 21:00 IST
+// Purpose: Updated to better align with flow-based JSON structure
 
 import { UseFormReturn } from 'react-hook-form';
 
@@ -16,7 +16,7 @@ export interface PropertyImage {
 // V3 Form Data Structure with restructured fields
 export interface FormData {
   // Metadata section
-  meta: {
+  meta?: {
     _version: string;
     id?: string;
     owner_id?: string;
@@ -26,14 +26,13 @@ export interface FormData {
   };
   
   // Flow information
-  flow: {
+  flow?: {
     category: "residential" | "commercial" | "land";
     listingType: string;
   };
   
-  // Steps container object
-  steps: {
-    // Basic details section
+  // Direct steps container - this is where most wizard data should be stored
+  steps?: {
     basic_details?: {
       title?: string;
       propertyType?: string;
@@ -179,7 +178,7 @@ export interface FormData {
   };
   
   // Media section with photos and videos
-  media: {
+  media?: {
     photos: {
       images: PropertyImage[];
     };
@@ -187,6 +186,21 @@ export interface FormData {
       urls: string[];
     };
   };
+  
+  // Flow sections at top level (mapped during output preparation)
+  details?: any;
+  location?: any;
+  rental?: any;
+  sale?: any;
+  features?: any;
+  flatmate_details?: any;
+  pg_details?: any;
+  coworking?: any;
+  commercial_details?: any;
+  land_features?: any;
+  
+  // Legacy support for direct fields
+  [key: string]: any;
 }
 
 // Property interface
@@ -283,4 +297,10 @@ export interface HowItWorksProps {
   onStartListing?: () => void;
   showCTA?: boolean;
   className?: string;
+}
+
+// Debug Component
+export interface FormDataDebugProps {
+  form: UseFormReturn<FormData>;
+  collapsed?: boolean;
 }

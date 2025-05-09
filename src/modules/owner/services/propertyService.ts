@@ -1,7 +1,7 @@
 // src/modules/owner/services/propertyService.ts
-// Version: 8.2.0
-// Last Modified: 09-05-2025 18:30 IST
-// Purpose: Fixed issue with flow listingType preservation in property saving
+// Version: 8.3.0
+// Last Modified: 11-05-2025 15:45 IST
+// Purpose: Updated to handle new flow-structured data format
 
 import { supabase } from '@/lib/supabase';
 import { FormData } from '../components/property/wizard/types';
@@ -36,7 +36,11 @@ const createEmptyPropertyStructure = (
     console.log('Enforcing SALE listing type in empty structure');
   }
   
-  // Create base structure with new format
+  // Get flow steps
+  const flowKey = `${flowCategory}_${flowListingType}`;
+  const flowSteps = FLOW_STEPS[flowKey] || FLOW_STEPS.default;
+  
+  // Initialize the structured data based on flow type
   const structure: any = {
     meta: {
       _version: DATA_VERSION,
@@ -48,7 +52,6 @@ const createEmptyPropertyStructure = (
       category: flowCategory,
       listingType: flowListingType
     },
-    steps: {}, // Initialize empty steps object
     media: {
       photos: {
         images: []
@@ -59,16 +62,24 @@ const createEmptyPropertyStructure = (
     }
   };
   
-  // Get steps for this flow type
-  const flowKey = `${flowCategory}_${flowListingType}`;
-  const stepsArray = FLOW_STEPS[flowKey] || FLOW_STEPS.default;
-  
-  // Create step objects inside the steps container
-  stepsArray.forEach(step => {
-    if (step !== 'media' && step !== 'review') { // Skip media and review
-      structure.steps[step] = {};
+  // Add flow-specific sections based on the steps
+  flowSteps.forEach(step => {
+    if (step !== 'review') { // Skip review step
+      if (step === 'basic_details') {
+        structure.details = {};
+      } else if (step === 'location') {
+        structure.location = {};
+      } else {
+        // Add flow-specific steps (rental, sale, flatmate_details, etc.)
+        structure[step] = {};
+      }
     }
   });
+  
+  // Ensure features is included if it's in the steps
+  if (flowSteps.includes('features')) {
+    structure.features = {};
+  }
   
   return structure;
 };
@@ -87,13 +98,90 @@ const organizePropertyData = (propertyData: any): any => {
   console.log(`Organizing property data with flow: ${flowCategory}_${flowListingType}`);
   
   // Check if the data already has the steps structure
-  if (propertyData.steps) {
-    // Already has steps structure, just ensure complete structure
+  if (propertyData.flow && 
+      ((propertyData.details && propertyData.location) || 
+       propertyData.rental || 
+       propertyData.sale || 
+       propertyData.flatmate_details || 
+       propertyData.pg_details || 
+       propertyData.coworking || 
+       propertyData.land_features)) {
+    
     return ensureCompleteStructure(propertyData);
   }
   
-  // Create a new structure since we don't need backward compatibility
-  return createEmptyPropertyStructure(flowCategory, flowListingType);
+  // Create a new structure based on the flow type
+  const newStructure = createEmptyPropertyStructure(flowCategory, flowListingType);
+  
+  // Try to map existing data to the new structure
+  if (propertyData.steps) {
+    // Handle new step-based structure
+    if (propertyData.steps.basic_details) {
+      newStructure.details = { ...propertyData.steps.basic_details };
+    }
+    
+    if (propertyData.steps.location) {
+      newStructure.location = { ...propertyData.steps.location };
+    }
+    
+    // Map flow-specific steps
+    const flowKey = `${flowCategory}_${flowListingType}`;
+    const flowSteps = FLOW_STEPS[flowKey] || FLOW_STEPS.default;
+    
+    flowSteps.forEach(step => {
+      if (step !== 'basic_details' && step !== 'location' && step !== 'review') {
+        if (propertyData.steps[step]) {
+          newStructure[step] = { ...propertyData.steps[step] };
+        }
+      }
+    });
+    
+    // Handle features section
+    if (propertyData.steps.features) {
+      newStructure.features = { ...propertyData.steps.features };
+    }
+    
+    // Handle media section
+    if (propertyData.media) {
+      newStructure.media = { ...propertyData.media };
+    }
+  } else {
+    // Handle legacy or different structure
+    // Try to map from details section if it exists
+    if (propertyData.details) {
+      newStructure.details = { ...propertyData.details.basicDetails || {} };
+      newStructure.location = { ...propertyData.details.location || {} };
+      
+      // Map features if available
+      if (propertyData.details.features) {
+        newStructure.features = { ...propertyData.details.features };
+      }
+      
+      // Map rental info if available and applicable
+      if (propertyData.details.rentalInfo && (flowListingType === 'rent' || flowListingType.includes('rent'))) {
+        newStructure.rental = { ...propertyData.details.rentalInfo };
+      }
+      
+      // Map sale info if available and applicable
+      if (propertyData.details.saleInfo && (flowListingType === 'sale' || flowListingType.includes('sale'))) {
+        newStructure.sale = { ...propertyData.details.saleInfo };
+      }
+    }
+    
+    // Handle media section
+    if (propertyData.details && propertyData.details.media) {
+      newStructure.media = { ...propertyData.details.media };
+    } else if (propertyData.media) {
+      newStructure.media = { ...propertyData.media };
+    }
+  }
+  
+  // Preserve metadata
+  if (propertyData.meta) {
+    newStructure.meta = { ...propertyData.meta, _version: DATA_VERSION, updated_at: new Date().toISOString() };
+  }
+  
+  return newStructure;
 };
 
 /**
@@ -115,6 +203,10 @@ const ensureCompleteStructure = (data: any): any => {
     console.log('Preserving SALE listing type in structure');
   }
   
+  // Get flow steps
+  const flowKey = `${flowCategory}_${flowListingType}`;
+  const flowSteps = FLOW_STEPS[flowKey] || FLOW_STEPS.default;
+  
   // Ensure meta section exists
   if (!result.meta) {
     result.meta = {
@@ -126,6 +218,7 @@ const ensureCompleteStructure = (data: any): any => {
   } else {
     // Ensure version is set
     result.meta._version = DATA_VERSION;
+    result.meta.updated_at = new Date().toISOString();
   }
   
   // Ensure flow section exists and preserves the correct listingType
@@ -141,20 +234,18 @@ const ensureCompleteStructure = (data: any): any => {
     }
   }
   
-  // Ensure steps section exists
-  if (!result.steps) {
-    result.steps = {};
-    
-    // Initialize steps based on flow type
-    const flowKey = `${flowCategory}_${flowListingType}`;
-    const stepsArray = FLOW_STEPS[flowKey] || FLOW_STEPS.default;
-    
-    stepsArray.forEach(step => {
-      if (step !== 'media' && step !== 'review') {
-        result.steps[step] = {};
+  // Ensure all flow-specific sections exist
+  flowSteps.forEach(step => {
+    if (step !== 'review') { // Skip review step
+      if (step === 'basic_details' && !result.details) {
+        result.details = {};
+      } else if (step === 'location' && !result.location) {
+        result.location = {};
+      } else if (step !== 'basic_details' && step !== 'location' && !result[step]) {
+        result[step] = {};
       }
-    });
-  }
+    }
+  });
   
   // Ensure media section exists with photos and videos
   if (!result.media) {
