@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/LocationDetails/index.tsx
-// Version: 5.0.0
-// Last Modified: 11-05-2025 01:45 IST
-// Purpose: Updated to use flow-based architecture with stepId for proper data capture
+// Version: 5.1.0
+// Last Modified: 11-05-2025 19:30 IST
+// Purpose: Removed inline debug information while maintaining all functionality
 
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { FormSection } from '@/components/FormSection';
@@ -20,7 +20,9 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
   const saveField = useCallback((fieldName: string, value: any) => {
     if (!stepId) return;
     const path = `steps.${stepId}.${fieldName}`;
-    console.log(`Saving field ${fieldName} at path ${path}:`, value);
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`Saving field ${fieldName} at path ${path}:`, value);
+    }
     form.setValue(path, value, { shouldValidate: true });
   }, [form, stepId]);
 
@@ -28,7 +30,9 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
     if (!stepId) return defaultValue;
     const path = `steps.${stepId}.${fieldName}`;
     const value = form.getValues(path);
-    console.log(`Getting field ${fieldName} from path ${path}:`, value);
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`Getting field ${fieldName} from path ${path}:`, value);
+    }
     return value ?? defaultValue;
   }, [form, stepId]);
 
@@ -88,7 +92,9 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
     
     // Wait to make sure window.google.maps is available
     if (!window.google || !window.google.maps) {
-      console.log('Google Maps not fully loaded yet');
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Google Maps not fully loaded yet');
+      }
       return;
     }
     
@@ -184,7 +190,9 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
     setLocationError(null);
     
     try {
-      console.log('Geocoding address:', addressText);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Geocoding address:', addressText);
+      }
       
       const geocoder = new window.google.maps.Geocoder();
       geocoder.geocode({ address: addressText }, (results: any, status: string) => {
@@ -342,7 +350,9 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
       } catch (err: any) {
         // If high accuracy fails on Edge, try with low accuracy
         if (browser === 'Edge' && err.code === 2) {
-          console.log('Retrying with low accuracy for Edge...');
+          if (process.env.NODE_ENV === 'development') {
+            console.log('Retrying with low accuracy for Edge...');
+          }
           try {
             position = await getCurrentPosition({
               enableHighAccuracy: false,
@@ -628,17 +638,6 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
             </p>
           </div>
         </ErrorBoundary>
-
-        {/* Debug info in development */}
-        {process.env.NODE_ENV === 'development' && stepId && (
-          <div className="mt-4 p-2 bg-gray-100 rounded text-xs space-y-2">
-            <div>Step ID: {stepId}</div>
-            <div>Current step data:</div>
-            <pre className="text-xs overflow-auto max-h-40 bg-white p-2 rounded border">
-              {JSON.stringify(form.getValues(`steps.${stepId}`), null, 2)}
-            </pre>
-          </div>
-        )}
       </div>
     </FormSection>
   );

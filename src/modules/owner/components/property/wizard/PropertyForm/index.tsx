@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/PropertyForm/index.tsx
-// Version: 6.5.0
-// Last Modified: 07-05-2025 15:45 IST
-// Purpose: Fixed flowSteps is undefined error when initializing form
+// Version: 6.6.0
+// Last Modified: 11-05-2025 17:15 IST
+// Purpose: Removed debugging components and added non-intrusive debug mode
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -24,9 +24,6 @@ import { FormNavigation } from '../components/FormNavigation'; // Changed to nam
 
 // Hooks
 import { useStepNavigation } from './hooks/useStepNavigation';
-import { useDebugTools } from './hooks/useDebugTools';
-
-import FormDataDebug from '../components/FormDataDebug';
 
 interface PropertyFormProps {
  initialData?: FormData;
@@ -243,9 +240,6 @@ export function PropertyForm({
    }
  }, [initialStep, setCurrentStep]);
 
- // Initialize debug tools
- const { debugFormData, handleDebugClick } = useDebugTools(form, formIsSaleMode);
-
  // Initialize custom step navigation with the correct flow steps
  const { 
    isSaleMode, 
@@ -457,11 +451,10 @@ export function PropertyForm({
  return (
    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
      <div className="bg-card rounded-xl shadow-lg">
-       {/* Form Header with Status Indicator and Debug Tools */}
+       {/* Form Header with Status Indicator */}
        <FormHeader 
          status={status}
          handleAutoFill={handleAutoFill}
-         handleDebugClick={handleDebugClick}
        />
 
        <div className="px-6 pt-4">
@@ -531,7 +524,6 @@ export function PropertyForm({
          </div>
        </div>
      </div>
-     {process.env.NODE_ENV !== 'production' && <FormDataDebug form={form} />}
    </div>
  );
 }

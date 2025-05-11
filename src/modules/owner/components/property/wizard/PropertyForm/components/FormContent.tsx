@@ -1,9 +1,9 @@
 // src/modules/owner/components/property/wizard/PropertyForm/components/FormContent.tsx
-// Version: 6.0.0
-// Last Modified: 18-05-2025 15:15 IST
-// Purpose: Updated to pass stepId to section components for new flow-based architecture
+// Version: 6.1.0
+// Last Modified: 11-05-2025 16:30 IST
+// Purpose: Moved debug information to a non-intrusive popup
 
-import React from 'react';
+import React, { useState } from 'react';
 import { UseFormReturn } from 'react-hook-form';
 import { FormData } from '../../../types';
 
@@ -76,6 +76,9 @@ const FormContent = ({
   savedPropertyId,
   handleImageUploadComplete
 }: FormContentProps) => {
+  // State for debug modal visibility
+  const [showDebugInfo, setShowDebugInfo] = useState(false);
+  
   // Get current step ID from STEPS array
   const currentStepObj = STEPS[formStep - 1];
   
@@ -195,22 +198,90 @@ const FormContent = ({
     }
   };
   
+  // Debug panel as popup/modal
+  const debugPanel = () => {
+    if (!showDebugInfo || process.env.NODE_ENV !== 'development') return null;
+    
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg shadow-lg p-6 max-w-2xl w-full max-h-[80vh] overflow-auto">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold">Debug Information</h3>
+            <button 
+              onClick={() => setShowDebugInfo(false)}
+              className="text-gray-500 hover:text-gray-700"
+            >
+              ✕
+            </button>
+          </div>
+          
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <h4 className="font-medium mb-1">Form Information</h4>
+                <div className="bg-gray-100 p-3 rounded text-xs">
+                  <div><strong>Current Step:</strong> {currentStepObj?.id}</div>
+                  <div><strong>Flow Type:</strong> {flowType}</div>
+                  <div><strong>Step Progress:</strong> {formStep}/{STEPS.length}</div>
+                  <div><strong>Property Category:</strong> {effectiveCategory}</div>
+                  <div><strong>Listing Type:</strong> {effectiveAdType}</div>
+                  <div><strong>Mode:</strong> {mode}</div>
+                  <div><strong>Sale Mode:</strong> {isSaleMode ? 'Yes' : 'No'}</div>
+                  <div><strong>Property ID:</strong> {savedPropertyId || 'Not saved yet'}</div>
+                </div>
+              </div>
+              
+              <div>
+                <h4 className="font-medium mb-1">Property Type Flags</h4>
+                <div className="bg-gray-100 p-3 rounded text-xs">
+                  <div><strong>isPGHostelMode:</strong> {isPGHostelMode ? 'Yes' : 'No'}</div>
+                  <div><strong>isCommercialRentMode:</strong> {isCommercialRentMode ? 'Yes' : 'No'}</div>
+                  <div><strong>isCommercialSaleMode:</strong> {isCommercialSaleMode ? 'Yes' : 'No'}</div>
+                  <div><strong>isCoworkingMode:</strong> {isCoworkingMode ? 'Yes' : 'No'}</div>
+                  <div><strong>isLandSaleMode:</strong> {isLandSaleMode ? 'Yes' : 'No'}</div>
+                  <div><strong>isFlatmatesMode:</strong> {isFlatmatesMode ? 'Yes' : 'No'}</div>
+                </div>
+              </div>
+            </div>
+            
+            <div>
+              <h4 className="font-medium mb-1">Steps Data</h4>
+              <pre className="text-xs overflow-auto max-h-60 bg-gray-100 p-3 rounded">
+                {JSON.stringify(form.getValues('steps'), null, 2)}
+              </pre>
+            </div>
+            
+            <div>
+              <h4 className="font-medium mb-1">All Form Values</h4>
+              <pre className="text-xs overflow-auto max-h-60 bg-gray-100 p-3 rounded">
+                {JSON.stringify(form.getValues(), null, 2)}
+              </pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+  
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
       {renderFormSection()}
       
-      {/* Debug information in development */}
+      {/* Debug toggle button - only in development mode */}
       {process.env.NODE_ENV === 'development' && (
-        <div className="mt-4 p-2 bg-gray-100 rounded text-xs">
-          <div>Current Step: {currentStepObj?.id}</div>
-          <div>Flow Type: {flowType}</div>
-          <div>Form Step: {formStep}/{STEPS.length}</div>
-          <div>Current steps data:</div>
-          <pre className="text-xs overflow-auto max-h-40">
-            {JSON.stringify(form.getValues('steps'), null, 2)}
-          </pre>
+        <div className="flex justify-end mt-4">
+          <button
+            type="button"
+            onClick={() => setShowDebugInfo(true)}
+            className="text-xs px-2 py-1 bg-gray-200 hover:bg-gray-300 rounded text-gray-700 transition-colors"
+          >
+            🐞 Debug
+          </button>
         </div>
       )}
+      
+      {/* Debug modal/popup */}
+      {debugPanel()}
     </div>
   );
 };

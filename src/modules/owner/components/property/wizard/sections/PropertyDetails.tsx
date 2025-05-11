@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/PropertyDetails.tsx
-// Version: 4.0.2
-// Last Modified: 18-05-2025 16:40 IST
-// Purpose: Complete PropertyDetails with flow-specific step identifiers and all original functionality
+// Version: 4.1.0
+// Last Modified: 11-05-2025 18:30 IST
+// Purpose: Removed inline debug output and integrated with global debug panel
 
 import React, { useEffect, useState, useRef } from 'react';
 import { FormSection } from '@/components/FormSection';
@@ -134,7 +134,9 @@ export function PropertyDetails({
   
   // Subscribe to form changes with improved handling
   useEffect(() => {
-    console.log('Setting up form subscription');
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Setting up form subscription');
+    }
     
     // Watch all fields that we're interested in
     const watchFields = [
@@ -157,17 +159,23 @@ export function PropertyDetails({
       updateCounter.current += 1;
       const count = updateCounter.current;
       
-      console.log(`[${count}] Form update - Changed field: ${name}, Type: ${type}`);
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[${count}] Form update - Changed field: ${name}, Type: ${type}`);
+      }
       
       // If specific fields we care about change, update our state
       if (watchFields.includes(name as string) || name === undefined) {
-        console.log(`[${count}] Updating component state from form values`);
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[${count}] Updating component state from form values`);
+        }
         updateStateFromForm(true, `subscription-${count}`);
       }
       
       // For nested structure changes (v2 format)
       if (name === 'basicDetails') {
-        console.log(`[${count}] Updating from nested basicDetails structure`);
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[${count}] Updating from nested basicDetails structure`);
+        }
         const basicDetails = form.getValues('basicDetails');
         if (basicDetails) {
           // Update flat fields from nested structure
@@ -183,7 +191,9 @@ export function PropertyDetails({
             builtUpAreaUnit: basicDetails.builtUpAreaUnit || values.builtUpAreaUnit
           };
           
-          console.log(`[${count}] Updating flat fields from nested values:`, nestedValues);
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`[${count}] Updating flat fields from nested values:`, nestedValues);
+          }
           
           // Set local state
           if (isMounted.current) {
@@ -194,7 +204,9 @@ export function PropertyDetails({
           Object.entries(nestedValues).forEach(([field, value]) => {
             const currentValue = form.getValues(field);
             if (!currentValue && value) {
-              console.log(`[${count}] Setting flat field ${field} from nested structure:`, value);
+              if (process.env.NODE_ENV === 'development') {
+                console.log(`[${count}] Setting flat field ${field} from nested structure:`, value);
+              }
               form.setValue(field, value, { shouldValidate: false });
               
               // Also update steps structure
@@ -208,19 +220,25 @@ export function PropertyDetails({
     
     // One-time initialization
     if (!initialProcessDone.current) {
-      console.log('First-time processing of initial values');
+      if (process.env.NODE_ENV === 'development') {
+        console.log('First-time processing of initial values');
+      }
       initialProcessDone.current = true;
       
       // Ensure builtUpAreaUnit has a default value of 'sqft'
       if (!form.getValues().builtUpAreaUnit) {
-        console.log('Setting default builtUpAreaUnit to sqft');
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Setting default builtUpAreaUnit to sqft');
+        }
         saveField('builtUpAreaUnit', 'sqft');
       }
       
       // Process nested structure (v2 format)
       const basicDetails = form.getValues('basicDetails');
       if (basicDetails) {
-        console.log('Processing nested basicDetails:', basicDetails);
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Processing nested basicDetails:', basicDetails);
+        }
         
         // Map nested values to flat fields if they're not set
         if (basicDetails.propertyType && !form.getValues('propertyType')) {
@@ -261,7 +279,9 @@ export function PropertyDetails({
     if (!isMounted.current) return;
     
     const formValues = form.getValues();
-    console.log(`Updating state from form values (source: ${source})`, formValues);
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`Updating state from form values (source: ${source})`, formValues);
+    }
     
     // Get current step data
     const stepData = form.getValues(`steps.${stepId}`) || {};
@@ -290,7 +310,9 @@ export function PropertyDetails({
     });
     
     if (hasChanges) {
-      console.log(`State needs update - Changes detected (source: ${source})`, newValues);
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`State needs update - Changes detected (source: ${source})`, newValues);
+      }
       setValues(newValues);
       
       // Validate form after update if requested
@@ -300,7 +322,9 @@ export function PropertyDetails({
         }, 100);
       }
     } else {
-      console.log(`No state changes needed (source: ${source})`);
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`No state changes needed (source: ${source})`);
+      }
     }
   };
   
@@ -316,7 +340,9 @@ export function PropertyDetails({
     saveField(field, value);
     
     // Debug log
-    console.log(`Updated ${field} to:`, value);
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`Updated ${field} to:`, value);
+    }
   };
   
   // Process numeric input
@@ -503,7 +529,9 @@ export function PropertyDetails({
                 defaultValue="sqft"
                 value={unitValue}
                 onValueChange={(value) => {
-                  console.log('Area unit selected:', value);
+                  if (process.env.NODE_ENV === 'development') {
+                    console.log('Area unit selected:', value);
+                  }
                   updateFormAndState('builtUpAreaUnit', value);
                 }}
               >
@@ -548,65 +576,6 @@ export function PropertyDetails({
           </div>
         )}
       </div>
-      
-      {/* Debug output in development mode */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="mt-4 p-2 bg-gray-100 rounded text-xs">
-          <div>Current stepId: {stepId}</div>
-          <div>Flow type: {flowType}</div>
-          <div>Current builtUpAreaUnit value: {unitValue}</div>
-          <div>Current possessionDate value: {values.possessionDate || 'not set'}</div>
-          <div>Form builtUpAreaUnit value: {form.getValues().builtUpAreaUnit || 'not set'}</div>
-          <div>Form possessionDate value: {form.getValues().possessionDate || 'not set'}</div>
-          <div>Mode: {mode}</div>
-          <div>Update counter: {updateCounter.current}</div>
-          <div>Has steps: {form.getValues().steps ? 'Yes' : 'No'}</div>
-          <div>Has basicDetails: {form.getValues().basicDetails ? 'Yes' : 'No'}</div>
-          <div>Current values:</div>
-          <pre className="text-xs overflow-auto">
-            {JSON.stringify(values, null, 2)}
-          </pre>
-          <div>Steps data in form:</div>
-          <pre className="text-xs overflow-auto">
-            {JSON.stringify(form.getValues('steps'), null, 2)}
-          </pre>
-        </div>
-      )}
-      
-      {/* Add a special auto-refresh button in development */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="flex space-x-2 mt-2">
-          <button
-            type="button"
-            onClick={() => {
-              updateStateFromForm(true, 'manual-refresh');
-            }}
-            className="px-3 py-1 text-xs bg-blue-500 text-white rounded"
-          >
-            Reload Values
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              // Alert the current form values for debugging
-              const currentValues = form.getValues();
-              alert(JSON.stringify({
-                flat: {
-                  propertyType: currentValues.propertyType,
-                  bhkType: currentValues.bhkType,
-                  floor: currentValues.floor,
-                  builtUpAreaUnit: currentValues.builtUpAreaUnit,
-                },
-                nested: currentValues.basicDetails,
-                steps: currentValues.steps
-              }, null, 2));
-            }}
-            className="px-3 py-1 text-xs bg-green-500 text-white rounded"
-          >
-            Debug Values
-          </button>
-        </div>
-      )}
     </FormSection>
   );
 }
