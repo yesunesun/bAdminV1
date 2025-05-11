@@ -1,16 +1,19 @@
 // src/modules/owner/components/property/wizard/sections/PropertySummary.tsx
-// Version: 4.6.0
-// Last Modified: 03-05-2025 16:30 IST
-// Purpose: Added auto-generated property title based on flow type
+// Version: 9.0.0
+// Last Modified: 14-05-2025 16:30 IST
+// Purpose: Fixed to handle actual land sale data structure with proper field mapping
 
 import React, { useMemo, useState, useEffect } from 'react';
 import { FormSection } from '@/components/FormSection';
-import { cn } from '@/lib/utils';
 import { FormData } from '../types';
-import { MapPin, Home, SquareStack, Sparkles, IndianRupee, Building, Info, Edit, Check } from 'lucide-react';
+import { 
+  MapPin, Home, SquareStack, Sparkles, IndianRupee, Building, Info, Edit, 
+  Check, Users, Briefcase, Map, BedDouble, FileText
+} from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { FLOW_TYPES, FLOW_STEPS } from '../constants/flows';
 
 interface PropertySummaryProps {
   formData: FormData;
@@ -42,15 +45,17 @@ const SummarySection: React.FC<SummarySectionProps> = ({ title, icon, items }) =
     </CardHeader>
     <CardContent className="p-4">
       <dl className="grid gap-2">
-        {items.map(({ label, value }) => (
+        {items.filter(item => item.value !== undefined && item.value !== null && item.value !== '').map(({ label, value }) => (
           <div key={label} className="grid grid-cols-2 gap-2 py-1 border-b border-border/30 last:border-0">
             <dt className="text-sm font-medium text-muted-foreground">{label}:</dt>
             <dd className="text-sm text-foreground font-medium">
-              {typeof value === 'boolean'
-                ? value ? 'Yes' : 'No'
-                : Array.isArray(value)
-                  ? value.length > 0 ? value.join(', ') : '-'
-                  : value || '-'}
+              {typeof value === 'boolean' ? (
+                value ? 'Yes' : 'No'
+              ) : Array.isArray(value) ? (
+                value.length > 0 ? value.join(', ') : '-'
+              ) : typeof value === 'string' || typeof value === 'number' ? (
+                String(value) || '-'
+              ) : '-'}
             </dd>
           </div>
         ))}
@@ -59,239 +64,356 @@ const SummarySection: React.FC<SummarySectionProps> = ({ title, icon, items }) =
   </Card>
 );
 
-// Helper function to capitalize a string
+// Helper functions
 const capitalize = (str: string): string => {
   if (!str) return '';
   return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
 };
 
 const formatCurrency = (value?: string | number) => {
-  if (!value) return '-';
-  return `₹${Number(value).toLocaleString('en-IN')}`;
+  if (!value || value === 0) return '-';
+  const numValue = typeof value === 'string' ? parseFloat(value) : value;
+  return isNaN(numValue) ? '-' : `₹${numValue.toLocaleString('en-IN')}`;
 };
 
-// Function to format area with the correct unit
-const formatArea = (area?: string, unit?: string) => {
+const formatArea = (area?: string | number, unit?: string) => {
   if (!area) return '-';
-  // Display the appropriate unit based on the builtUpAreaUnit value
-  const displayUnit = unit === 'sqyd' ? 'sq.yard' : 'sq.ft.';
+  const displayUnit = unit === 'sqyd' ? 'sq. yard' : 'sq. ft.';
   return `${area} ${displayUnit}`;
 };
 
-/**
- * Generates an appropriate property title based on the flow type
- * @param formData The property form data
- * @param flowPropertyType Property type from URL or form data
- * @param flowListingType Listing type from URL or form data
- * @returns A generated property title
- */
-const generatePropertyTitle = (
-  formData: FormData,
-  flowPropertyType: string,
-  flowListingType: string
-): string => {
-  // Extract necessary data for title
-  const bhk = formData.bhkType || '';
-  const propertyType = formData.propertyType || '';
-  
-  // Determine area from various possible fields
-  let area = '';
-  if (formData.city) {
-    area = formData.city;
-  } else if (formData.locality) {
-    area = formData.locality;
-  } else if ('location' in formData && formData.location && typeof formData.location === 'object') {
-    area = formData.location.city || formData.location.locality || '';
+const formatBoolean = (value: any): boolean | undefined => {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    const lowercaseValue = value.toLowerCase();
+    return lowercaseValue === 'yes' || lowercaseValue === 'true' || lowercaseValue === 'on';
   }
-  
-  // If no area is found, use a default
-  if (!area) {
-    area = 'Hyderabad';
-  }
-  
-  // For PG/Hostel flow
-  if (flowListingType === 'pghostel') {
-    let roomType = '';
-    let capacity = '';
-    
-    // Extract PG-specific details
-    if ('pghostel' in formData && formData.pghostel) {
-      roomType = formData.pghostel.roomType || '';
-      capacity = formData.pghostel.roomCapacity ? String(formData.pghostel.roomCapacity) : '';
-    } else {
-      roomType = formData.roomType || 'Single Sharing';
-      capacity = formData.roomCapacity || '1';
-    }
-    
-    return `PG/Hostel ${roomType} for ${capacity} in ${area}`;
-  }
-  
-  // For Flatmates flow
-  else if (flowListingType === 'flatmates') {
-    return `${bhk} ${propertyType} for Flatmates in ${area}`;
-  }
-  
-  // For Sale/Rent flows (standard residential properties)
-  else {
-    const listingTypeName = flowListingType === 'sale' ? 'Sale' : 'Rent';
-    return `${bhk} ${propertyType} in ${area} for ${listingTypeName}`;
-  }
+  if (typeof value === 'number') return value !== 0;
+  return undefined;
 };
 
-export function PropertySummary({
-  formData,
-  onPrevious,
-  onSaveAsDraft,
-  onSaveAndPublish,
-  onUpdate,
-  saving,
-  status = 'draft',
-  propertyId
-}: PropertySummaryProps) {
-  const isPublished = status === 'published';
-  const isNewListing = !propertyId;
+/**
+ * Comprehensive flow type detection with land sale focus
+ */
+const determineFlowType = (formData: FormData): string => {
+  // Check for land sale specific data structure
+  if (formData.steps && (
+    formData.steps['land_sale_basic_details'] || 
+    formData.steps['land_sale_location'] || 
+    formData.steps['land_sale_land_features']
+  )) {
+    return FLOW_TYPES.LAND_SALE;
+  }
   
-  // State to manage the editable property title
+  // Other flow detection logic remains the same
+  if (formData.flow?.category && formData.flow?.listingType) {
+    const flowKey = `${formData.flow.category}_${formData.flow.listingType}`;
+    const standardFlowType = FLOW_TYPES[flowKey.toUpperCase() as keyof typeof FLOW_TYPES];
+    if (standardFlowType) return standardFlowType;
+  }
+  
+  // URL detection
+  const path = window.location.pathname.toLowerCase();
+  if (path.includes('land') && path.includes('sale')) return FLOW_TYPES.LAND_SALE;
+  
+  // Default fallback
+  return FLOW_TYPES.RESIDENTIAL_RENT;
+};
+
+/**
+ * Get step IDs for land sale flow specifically
+ */
+const getStepIdsForFlow = (flowType: string) => {
+  if (flowType === FLOW_TYPES.LAND_SALE) {
+    return {
+      basicDetails: 'land_sale_basic_details',
+      location: 'land_sale_location',
+      saleDetails: 'land_sale_basic_details', // Land sale price is in basic details
+      landFeatures: 'land_sale_land_features'
+    };
+  }
+  
+  // Fallback for other flows
+  const flowSteps = FLOW_STEPS[flowType] || FLOW_STEPS.default;
+  const stepMap: Record<string, string> = {};
+  
+  flowSteps.forEach(stepId => {
+    if (stepId.includes('basic_details')) stepMap.basicDetails = stepId;
+    if (stepId.includes('location')) stepMap.location = stepId;
+    if (stepId.includes('rental')) stepMap.rental = stepId;
+    if (stepId.includes('sale_details')) stepMap.saleDetails = stepId;
+    if (stepId.includes('features')) stepMap.features = stepId;
+    if (stepId.includes('flatmate_details')) stepMap.flatmateDetails = stepId;
+    if (stepId.includes('pg_details')) stepMap.pgDetails = stepId;
+    if (stepId.includes('coworking_details')) stepMap.coworkingDetails = stepId;
+    if (stepId.includes('land_features')) stepMap.landFeatures = stepId;
+  });
+  
+  return stepMap;
+};
+
+/**
+ * Enhanced field value retrieval for land sale
+ */
+const getFieldValue = (formData: FormData, stepId: string, fieldName: string, fallbackPaths?: string[]): any => {
+  // Primary: Check in steps structure
+  if (formData.steps?.[stepId]?.[fieldName] !== undefined) {
+    return formData.steps[stepId][fieldName];
+  }
+  
+  // Secondary: Check direct property
+  if (formData[fieldName] !== undefined) {
+    return formData[fieldName];
+  }
+  
+  // Land sale specific mappings
+  if (stepId === 'land_sale_basic_details') {
+    const stepData = formData.steps?.[stepId];
+    if (stepData) {
+      // Map specific field names
+      if (fieldName === 'totalArea') return stepData.builtUpArea;
+      if (fieldName === 'areaUnit') return stepData.builtUpAreaUnit;
+      if (fieldName === 'price' || fieldName === 'expectedPrice') return stepData.expectedPrice;
+    }
+  }
+  
+  if (stepId === 'land_sale_land_features') {
+    const stepData = formData.steps?.[stepId];
+    if (stepData) {
+      // Check for boolean features
+      if (fieldName === 'nearbyFacilities') {
+        // Collect all nearby features
+        const facilities = [];
+        if (stepData.nearbySchool) facilities.push('School');
+        if (stepData.nearbyStation) facilities.push('Station');
+        if (stepData.nearbyAirport) facilities.push('Airport');
+        if (stepData.nearbyHospital) facilities.push('Hospital');
+        if (stepData.nearbyMarket) facilities.push('Market');
+        if (stepData.nearbyHighway) facilities.push('Highway');
+        return facilities.length > 0 ? facilities : undefined;
+      }
+      
+      if (fieldName === 'landDocuments') {
+        // Collect all document types
+        const documents = [];
+        if (stepData.titleDeed) documents.push('Title Deed');
+        if (stepData.taxReceipts) documents.push('Tax Receipts');
+        if (stepData.encumbranceCertificate) documents.push('Encumbrance Certificate');
+        if (stepData.landSurveyReport) documents.push('Land Survey Report');
+        if (stepData.conversionOrder) documents.push('Conversion Order');
+        return documents.length > 0 ? documents : undefined;
+      }
+    }
+  }
+  
+  // Tertiary: Check fallback paths
+  if (fallbackPaths) {
+    for (const path of fallbackPaths) {
+      const parts = path.split('.');
+      let value = formData;
+      
+      for (const part of parts) {
+        if (value && typeof value === 'object' && value[part] !== undefined) {
+          value = value[part];
+        } else {
+          value = undefined;
+          break;
+        }
+      }
+      
+      if (value !== undefined) return value;
+    }
+  }
+  
+  return undefined;
+};
+
+export function PropertySummary(props: PropertySummaryProps) {
+  const {
+    formData,
+    onPrevious,
+    onSaveAsDraft,
+    onSaveAndPublish,
+    onUpdate,
+    saving,
+    status = 'draft',
+    propertyId
+  } = props;
+  
+  // State for editing title
   const [isEditingTitle, setIsEditingTitle] = useState(false);
-  const [editedTitle, setEditedTitle] = useState(formData.title || '');
+  const [editedTitle, setEditedTitle] = useState('');
   
-  // Extract flow information from URL path for display
-  const pathParts = useMemo(() => window.location.pathname.split('/'), []);
-  const urlPropertyType = useMemo(() => 
-    pathParts.length > 2 ? pathParts[pathParts.length - 3] : '', 
-  [pathParts]);
+  // Determine flow type and get step IDs
+  const flowType = useMemo(() => determineFlowType(formData), [formData]);
+  const stepIds = useMemo(() => getStepIdsForFlow(flowType), [flowType]);
   
-  const urlListingType = useMemo(() => 
-    pathParts.length > 2 ? pathParts[pathParts.length - 2] : '',
-  [pathParts]);
+  // Get property title and update state
+  useEffect(() => {
+    let title = getFieldValue(formData, stepIds.basicDetails || '', 'title', ['title', 'details.title']);
+    
+    if (!title || title === "New Property") {
+      // Generate title if not present
+      const flow = formData.flow || {};
+      const category = flow.category || 'land';
+      const listingType = flow.listingType || 'sale';
+      
+      title = generatePropertyTitle(formData, stepIds, flowType, category, listingType);
+      
+      // Save generated title
+      if (formData.steps?.[stepIds.basicDetails || '']) {
+        formData.steps[stepIds.basicDetails].title = title;
+      } else {
+        formData.title = title;
+      }
+    }
+    
+    setEditedTitle(title || '');
+  }, [formData, stepIds, flowType]);
   
-  // Get flow information from URL or form data
-  const flowPropertyType = useMemo(() => 
-    urlPropertyType || formData.flow_property_type || '',
-  [urlPropertyType, formData.flow_property_type]);
-  
-  const flowListingType = useMemo(() => 
-    urlListingType || formData.flow_listing_type || '',
-  [urlListingType, formData.flow_listing_type]);
-  
-  // Function to handle title edit completion
+  // Handle title edit
   const handleTitleEditComplete = () => {
     if (editedTitle.trim()) {
-      // Update the form data with the new title
-      formData.title = editedTitle.trim();
-      
-      // If using v2 format, update the nested structure too
-      if ('basicDetails' in formData && formData.basicDetails) {
-        formData.basicDetails.title = editedTitle.trim();
+      if (formData.steps?.[stepIds.basicDetails]) {
+        formData.steps[stepIds.basicDetails].title = editedTitle.trim();
+      } else {
+        formData.title = editedTitle.trim();
       }
     }
     setIsEditingTitle(false);
   };
   
-  // Function to handle title edit cancellation on Escape key
   const handleTitleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       handleTitleEditComplete();
     } else if (e.key === 'Escape') {
-      setEditedTitle(formData.title || '');
+      setEditedTitle(getFieldValue(formData, stepIds.basicDetails || '', 'title', ['title']) || '');
       setIsEditingTitle(false);
     }
   };
   
-  // Before rendering, prepare form data
-  useEffect(() => {
-    // Set flow information from URL path
-    const pathParts = window.location.pathname.split('/');
-    const urlPropertyType = pathParts.length > 2 ? pathParts[pathParts.length - 3] : '';
-    const urlListingType = pathParts.length > 2 ? pathParts[pathParts.length - 2] : '';
+  // Calculate derived values
+  const { flowInfo, coordinates, fullAddress } = useMemo(() => {
+    const flow = formData.flow || {};
+    const category = flow.category || 'land';
+    const listingType = flow.listingType || 'sale';
+    const flowInfo = `${capitalize(category)} ${capitalize(listingType)}`;
     
-    if (urlPropertyType && !formData.flow_property_type) {
-      formData.flow_property_type = urlPropertyType;
-    }
+    // Get coordinates for land sale
+    const lat = getFieldValue(formData, stepIds.location || '', 'latitude');
+    const lng = getFieldValue(formData, stepIds.location || '', 'longitude');
     
-    if (urlListingType && !formData.flow_listing_type) {
-      formData.flow_listing_type = urlListingType;
-    }
+    const coordinates = lat && lng ? `${Number(lat).toFixed(6)}, ${Number(lng).toFixed(6)}` : '-';
     
-    // Generate an appropriate title based on flow type if no title exists or if we're in a new listing
-    if (!formData.title || formData.title === "New Property" || formData.title === `${capitalize(formData.propertyType)} Property`) {
-      const generatedTitle = generatePropertyTitle(formData, flowPropertyType, flowListingType);
-      formData.title = generatedTitle;
+    // Get full address
+    const address = getFieldValue(formData, stepIds.location || '', 'address');
+    const fullAddress = address || '-';
+    
+    return { flowInfo, coordinates, fullAddress };
+  }, [formData, stepIds]);
+  
+  // Basic details for land sale
+  const basicDetailItems = useMemo(() => {
+    const items = [];
+    const stepId = stepIds.basicDetails || '';
+    
+    if (flowType === FLOW_TYPES.LAND_SALE) {
+      const landType = getFieldValue(formData, stepId, 'landType');
+      const length = getFieldValue(formData, stepId, 'plotLength');
+      const width = getFieldValue(formData, stepId, 'plotWidth');
+      const area = getFieldValue(formData, stepId, 'builtUpArea');
+      const areaUnit = getFieldValue(formData, stepId, 'builtUpAreaUnit') || 'sq.ft.';
+      const facing = getFieldValue(formData, stepId, 'plotFacing');
       
-      // If using v2 format, update the nested structure too
-      if ('basicDetails' in formData && formData.basicDetails) {
-        formData.basicDetails.title = generatedTitle;
+      items.push(
+        { label: 'Land Type', value: landType },
+        { label: 'Total Area', value: formatArea(area, areaUnit) },
+        { label: 'Plot Facing', value: facing }
+      );
+      
+      if (length && width) {
+        items.push({ label: 'Plot Dimensions', value: `${length} x ${width}` });
       }
     }
     
-    // Set initial edited title state
-    setEditedTitle(formData.title || '');
+    return items;
+  }, [formData, stepIds, flowType]);
+  
+  // Location details
+  const locationItems = useMemo(() => {
+    const stepId = stepIds.location || '';
+    return [
+      { label: 'Plot No.', value: getFieldValue(formData, stepId, 'flatPlotNo') },
+      { label: 'Address', value: getFieldValue(formData, stepId, 'address') },
+      { label: 'Landmark', value: getFieldValue(formData, stepId, 'landmark') },
+      { label: 'Locality', value: getFieldValue(formData, stepId, 'locality') },
+      { label: 'Area', value: getFieldValue(formData, stepId, 'area') },
+      { label: 'City', value: getFieldValue(formData, stepId, 'city') },
+      { label: 'PIN Code', value: getFieldValue(formData, stepId, 'pinCode') },
+      { label: 'Coordinates', value: coordinates }
+    ];
+  }, [formData, stepIds, coordinates]);
+  
+  // Sale details for land
+  const saleItems = useMemo(() => {
+    if (flowType === FLOW_TYPES.LAND_SALE) {
+      const stepId = stepIds.basicDetails || ''; // Price is in basic details for land
+      return [
+        { 
+          label: 'Expected Price', 
+          value: formatCurrency(getFieldValue(formData, stepId, 'expectedPrice')) 
+        },
+        { 
+          label: 'Development Status', 
+          value: getFieldValue(formData, stepId, 'developmentStatus')
+        },
+        { 
+          label: 'Approval Status', 
+          value: getFieldValue(formData, stepId, 'approvalStatus')
+        }
+      ];
+    }
+    return [];
+  }, [formData, stepIds, flowType]);
+  
+  // Land features
+  const landFeatureItems = useMemo(() => {
+    if (flowType === FLOW_TYPES.LAND_SALE) {
+      const stepId = stepIds.landFeatures || '';
+      return [
+        { label: 'Corner Plot', value: formatBoolean(getFieldValue(formData, stepId, 'cornerPlot')) },
+        { label: 'Park Facing', value: formatBoolean(getFieldValue(formData, stepId, 'parkFacing')) },
+        { label: 'East Facing', value: formatBoolean(getFieldValue(formData, stepId, 'eastFacing')) },
+        { label: 'Water Connection', value: formatBoolean(getFieldValue(formData, stepId, 'waterConnection')) },
+        { label: 'Gated Community', value: formatBoolean(getFieldValue(formData, stepId, 'gatedCommunity')) },
+        { label: 'Boundary Type', value: getFieldValue(formData, stepIds.basicDetails || '', 'boundaryType') },
+        { label: 'Topography', value: getFieldValue(formData, stepIds.basicDetails || '', 'topographyType') },
+        { label: 'Water Availability', value: getFieldValue(formData, stepIds.basicDetails || '', 'waterAvailability') },
+        { label: 'Electricity Status', value: getFieldValue(formData, stepIds.basicDetails || '', 'electricityStatus') },
+        { label: 'Road Connectivity', value: getFieldValue(formData, stepIds.basicDetails || '', 'roadConnectivity') },
+        { label: 'Distance from City', value: `${getFieldValue(formData, stepId, 'distanceFromCity')} km` },
+        { label: 'Distance from Highway', value: `${getFieldValue(formData, stepId, 'distanceFromHighway')} km` },
+        { label: 'Nearby Facilities', value: getFieldValue(formData, stepId, 'nearbyFacilities') },
+        { label: 'Land Documents', value: getFieldValue(formData, stepId, 'landDocuments') }
+      ];
+    }
+    return [];
+  }, [formData, stepIds, flowType]);
+  
+  // Get description
+  const description = useMemo(() => {
+    let desc = '';
     
-    // Ensure location data is set if missing
-    if (!formData.city && !formData.locality) {
-      formData.city = "Hyderabad";
+    if (flowType === FLOW_TYPES.LAND_SALE) {
+      // Check for description in basic details first
+      desc = getFieldValue(formData, stepIds.basicDetails || '', 'additionalDetails') ||
+             getFieldValue(formData, stepIds.landFeatures || '', 'nearbyLandmarks') ||
+             '';
     }
     
-    // Make sure there's a description
-    if (!formData.description) {
-      formData.description = `${formData.title} - A great property listing.`;
-    }
-    
-    console.log('Prepared form data for summary view:', {
-      title: formData.title,
-      flow: {
-        property_type: formData.flow_property_type,
-        listing_type: formData.flow_listing_type
-      }
-    });
-  }, [formData, flowPropertyType, flowListingType]);
-  
-  // Improved logic to detect if this is a sale property
-  const isSaleProperty = useMemo(() => {
-    // Check multiple indicators for sale property
-    const listingType = formData.listingType?.toLowerCase();
-    const isSaleListingType = listingType === 'sale' || listingType === 'sell';
-    
-    // Check if expected price exists (sale property) and rental amount doesn't
-    const hasExpectedPrice = !!formData.expectedPrice;
-    const hasNoRentAmount = !formData.rentAmount;
-    
-    // Check other sale-specific fields
-    const hasMaintenanceCost = !!formData.maintenanceCost;
-    const hasKitchenType = !!formData.kitchenType;
-    
-    // Return true if ANY of these indicators suggest it's a sale property
-    return isSaleListingType || (hasExpectedPrice && hasNoRentAmount) || hasMaintenanceCost;
-  }, [formData]);
-  
-  // Logic to detect if this is a commercial property
-  const isCommercialProperty = useMemo(() => {
-    // Check the property category
-    const category = formData.propertyCategory?.toLowerCase();
-    const isCommercialCategory = category === 'commercial';
-    
-    // Check for commercial-specific fields
-    const hasCommercialType = !!formData.commercialPropertyType;
-    const hasLeaseDuration = !!formData.leaseDuration;
-    const hasLockInPeriod = !!formData.lockInPeriod;
-    const hasPowerBackup = !!formData.powerBackup;
-    
-    // Check URL path for commercial indicators
-    const urlPath = window.location.pathname.toLowerCase();
-    const isCommercialFromUrl = urlPath.includes('commercial');
-    
-    // Return true if ANY of these indicators suggest it's a commercial property
-    return isCommercialCategory || hasCommercialType || hasLeaseDuration || 
-           hasLockInPeriod || hasPowerBackup || isCommercialFromUrl;
-  }, [formData]);
-
-  // Format coordinates for display
-  const coordinates = formData.latitude && formData.longitude 
-    ? `${formData.latitude.toFixed(6)}, ${formData.longitude.toFixed(6)}`
-    : '-';
-
-  // Full address without flat/plot number for summary display
-  const fullAddress = formData.address || '-';
+    return desc;
+  }, [formData, flowType, stepIds]);
 
   return (
     <FormSection
@@ -299,7 +421,7 @@ export function PropertySummary({
       description="Review all details before saving or publishing"
     >
       <div className="space-y-6">
-        {/* Property title preview with edit functionality */}
+        {/* Property title with edit functionality */}
         <div className="mb-6">
           {isEditingTitle ? (
             <div className="flex items-center gap-2">
@@ -324,7 +446,7 @@ export function PropertySummary({
           ) : (
             <div className="flex items-center gap-2">
               <h2 className="text-xl font-semibold text-foreground">
-                {formData.title || "Unnamed Property"}
+                {editedTitle || "Unnamed Property"}
               </h2>
               <Button 
                 size="sm" 
@@ -340,113 +462,62 @@ export function PropertySummary({
           <p className="text-muted-foreground text-sm mt-1">{fullAddress}</p>
         </div>
         
-        {/* Listing Information Section - Added for flow information */}
+        {/* Flow Information */}
         <SummarySection
           title="Listing Information"
           icon={<Info className="h-4 w-4" />}
           items={[
-            { label: 'Property Type', value: flowPropertyType ? capitalize(flowPropertyType) : capitalize(formData.propertyType) },
-            { label: 'Listing Type', value: flowListingType ? capitalize(flowListingType) : capitalize(formData.listingType) }
+            { label: 'Flow Type', value: flowInfo }
           ]}
         />
         
         <div className="grid gap-6 md:grid-cols-2">
+          {/* Basic Details */}
           <SummarySection
             title="Basic Details"
             icon={<Home className="h-4 w-4" />}
-            items={[
-              { label: 'Property Type', value: isCommercialProperty ? formData.commercialPropertyType : formData.propertyType },
-              { label: 'BHK Type', value: formData.bhkType },
-              { label: 'Built-up Area', value: formatArea(formData.builtUpArea, formData.builtUpAreaUnit) },
-              { label: 'Floor', value: `${formData.floor} of ${formData.totalFloors}` },
-              { label: 'Property Age', value: formData.propertyAge },
-              { label: 'Facing', value: formData.facing },
-              { label: 'Bathrooms', value: formData.bathrooms },
-              { label: 'Balconies', value: formData.balconies },
-              { label: 'Property Condition', value: formData.propertyCondition }
-            ]}
+            items={basicDetailItems}
           />
 
+          {/* Location Details */}
           <SummarySection
             title="Location Details"
             icon={<MapPin className="h-4 w-4" />}
-            items={[
-              { label: 'Flat/Plot No.', value: formData.flatPlotNo },
-              { label: 'Address', value: formData.address },
-              { label: 'Landmark', value: formData.landmark },
-              { label: 'PIN Code', value: formData.pinCode },
-              { label: 'Coordinates', value: coordinates }
-            ]}
+            items={locationItems}
           />
-
-          {isCommercialProperty ? (
-            <SummarySection
-              title="Commercial Details"
-              icon={<Building className="h-4 w-4" />}
-              items={[
-                { label: 'Commercial Type', value: formData.commercialPropertyType },
-                { label: 'Rent Amount', value: formatCurrency(formData.rentAmount) },
-                { label: 'Security Deposit', value: formatCurrency(formData.securityDeposit) },
-                { label: 'Lease Duration', value: formData.leaseDuration },
-                { label: 'Lock-in Period', value: formData.lockInPeriod ? `${formData.lockInPeriod} months` : '-' },
-                { label: 'Maintenance', value: formData.maintenance },
-                { label: 'Furnishing', value: formData.furnishing },
-                { label: 'Power Backup', value: formData.powerBackup },
-                { label: 'Available From', value: formData.availableFrom },
-                { label: 'Fire Safety', value: formData.fireSafety ? 'Yes' : 'No' },
-                { label: 'Centralized AC', value: formData.centralizedAC ? 'Yes' : 'No' }
-              ]}
-            />
-          ) : isSaleProperty ? (
+          
+          {/* Sale Details */}
+          {saleItems.length > 0 && (
             <SummarySection
               title="Sale Details"
               icon={<IndianRupee className="h-4 w-4" />}
-              items={[
-                { label: 'Expected Price', value: formatCurrency(formData.expectedPrice) },
-                { label: 'Maintenance Cost', value: formatCurrency(formData.maintenanceCost) },
-                { label: 'Kitchen Type', value: formData.kitchenType },
-                { label: 'Available From', value: formData.availableFrom },
-                { label: 'Price Negotiable', value: formData.priceNegotiable }
-              ]}
-            />
-          ) : (
-            <SummarySection
-              title="Rental Details"
-              icon={<SquareStack className="h-4 w-4" />}
-              items={[
-                { label: 'Rental Type', value: formData.rentalType },
-                { label: 'Rent Amount', value: formatCurrency(formData.rentAmount) },
-                { label: 'Security Deposit', value: formatCurrency(formData.securityDeposit) },
-                { label: 'Maintenance', value: formData.maintenance },
-                { label: 'Available From', value: formData.availableFrom },
-                { label: 'Rent Negotiable', value: formData.rentNegotiable },
-                { label: 'Preferred Tenants', value: formData.preferredTenants }
-              ]}
+              items={saleItems}
             />
           )}
-
-          <SummarySection
-            title="Features & Amenities"
-            icon={<Sparkles className="h-4 w-4" />}
-            items={[
-              { label: 'Furnishing', value: formData.furnishing },
-              { label: 'Parking', value: formData.parking },
-              { label: 'Property Show Option', value: formData.propertyShowOption },
-              { label: 'Gated Security', value: formData.gatedSecurity },
-              { label: 'Non-Veg Allowed', value: formData.nonVegAllowed },
-              { label: 'Gym Available', value: formData.hasGym },
-              { label: 'Amenities', value: formData.amenities }
-            ]}
-          />
+          
+          {/* Land Features */}
+          {landFeatureItems.length > 0 && (
+            <SummarySection
+              title="Land Features"
+              icon={<Map className="h-4 w-4" />}
+              items={landFeatureItems}
+            />
+          )}
         </div>
 
-        {formData.description && (
+        {/* Description Section */}
+        {description && (
           <Card className="overflow-hidden">
             <CardHeader className="bg-secondary/20 py-3 px-4">
-              <CardTitle className="text-base font-medium">Description</CardTitle>
+              <CardTitle className="text-base font-medium flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Description
+              </CardTitle>
             </CardHeader>
             <CardContent className="p-4">
-              <p className="text-sm text-foreground whitespace-pre-wrap">{formData.description}</p>
+              <p className="text-sm text-foreground whitespace-pre-wrap">
+                {description}
+              </p>
             </CardContent>
           </Card>
         )}
@@ -455,5 +526,28 @@ export function PropertySummary({
   );
 }
 
-// Add a default export to ensure the component can be imported correctly
+/**
+ * Property title generation for land sale
+ */
+function generatePropertyTitle(
+  formData: FormData,
+  stepIds: Record<string, string>,
+  flowType: string,
+  category: string,
+  listingType: string
+): string {
+  if (flowType === FLOW_TYPES.LAND_SALE) {
+    const landType = getFieldValue(formData, stepIds.basicDetails || '', 'landType') || 'Land';
+    const city = getFieldValue(formData, stepIds.location || '', 'city') || 
+                 getFieldValue(formData, stepIds.location || '', 'locality') || 
+                 'Hyderabad';
+    
+    return `${landType} for Sale in ${city}`;
+  }
+  
+  // Fallback for other flows
+  return `Property for ${capitalize(listingType)} in Hyderabad`;
+}
+
+// Export as default for compatibility
 export default PropertySummary;

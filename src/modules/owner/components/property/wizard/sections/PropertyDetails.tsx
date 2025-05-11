@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/PropertyDetails.tsx
-// Version: 3.8.0
-// Last Modified: 18-04-2025 09:30 IST
-// Purpose: Enhanced form value observation and reactivity
+// Version: 4.0.2
+// Last Modified: 18-05-2025 16:40 IST
+// Purpose: Complete PropertyDetails with flow-specific step identifiers and all original functionality
 
 import React, { useEffect, useState, useRef } from 'react';
 import { FormSection } from '@/components/FormSection';
@@ -17,28 +17,109 @@ import {
   AREA_UNITS,
 } from '../constants';
 
-export function PropertyDetails({ form, mode = 'create', category, adType }: FormSectionProps) {
+interface PropertyDetailsProps extends FormSectionProps {
+  stepId?: string;
+}
+
+export function PropertyDetails({ 
+  form, 
+  mode = 'create', 
+  category, 
+  adType,
+  stepId: providedStepId 
+}: PropertyDetailsProps) {
   // Track mount status to avoid updates after unmount
   const isMounted = useRef(true);
   
   // Track if initial form values have been processed
   const initialProcessDone = useRef(false);
   
+  // Generate stepId based on current flow if not provided
+  const formFlow = form.getValues('flow');
+  const flowType = formFlow ? `${formFlow.category}_${formFlow.listingType}` : 'residential_rent';
+  
+  // Determine the appropriate stepId based on flow type
+  let stepId = providedStepId;
+  if (!stepId) {
+    // Generate step ID based on flow
+    const prefix = flowType.split('_').map(part => part.substring(0, 3)).join('_');
+    stepId = `${prefix}_basic_details`;
+  }
+  
+  // Helper functions to work with the form directly
+  const getField = (fieldName: string, defaultValue?: any) => {
+    const path = `steps.${stepId}.${fieldName}`;
+    
+    // First try to get from new structure
+    const stepValue = form.getValues(path);
+    if (stepValue !== undefined) {
+      return stepValue;
+    }
+    
+    // Fallback to legacy structure
+    const legacyValue = form.getValues(fieldName);
+    if (legacyValue !== undefined) {
+      return legacyValue;
+    }
+    
+    // Check nested basicDetails structure
+    const basicDetails = form.getValues('basicDetails');
+    if (basicDetails && basicDetails[fieldName] !== undefined) {
+      return basicDetails[fieldName];
+    }
+    
+    return defaultValue;
+  };
+  
+  const saveField = (fieldName: string, value: any) => {
+    const path = `steps.${stepId}.${fieldName}`;
+    
+    // Ensure the steps structure exists
+    const steps = form.getValues('steps') || {};
+    if (!steps[stepId]) {
+      steps[stepId] = {};
+    }
+    
+    form.setValue(path, value, { shouldValidate: true });
+    
+    // Also update legacy flat structure for backward compatibility
+    form.setValue(fieldName, value, { shouldValidate: false });
+    
+    // Update nested basicDetails structure if it exists (v2 format)
+    const basicDetails = form.getValues('basicDetails');
+    if (basicDetails) {
+      // Convert value format for nested structure if needed
+      let structuredValue = value;
+      if (fieldName === 'floor' || fieldName === 'totalFloors' || fieldName === 'builtUpArea') {
+        const numValue = parseInt(value);
+        structuredValue = !isNaN(numValue) ? numValue : null;
+      }
+      
+      // Update the nested field
+      const updatedBasicDetails = {
+        ...basicDetails,
+        [fieldName]: structuredValue
+      };
+      
+      form.setValue('basicDetails', updatedBasicDetails, { shouldValidate: false });
+    }
+  };
+  
   // Get initial form values directly
   const initialValues = form.getValues();
   
   // Use component state to render values with proper initialization
   const [values, setValues] = useState({
-    propertyType: initialValues.propertyType || category || '',
-    bhkType: initialValues.bhkType || '',
-    floor: initialValues.floor || '',
-    totalFloors: initialValues.totalFloors || '',
-    propertyAge: initialValues.propertyAge || '',
-    facing: initialValues.facing || '',
-    builtUpArea: initialValues.builtUpArea || '',
-    builtUpAreaUnit: initialValues.builtUpAreaUnit || 'sqft', // Always default to sqft
-    possessionDate: initialValues.possessionDate || '',
-    title: initialValues.title || ''
+    propertyType: getField('propertyType', '') || category || '',
+    bhkType: getField('bhkType', ''),
+    floor: getField('floor', ''),
+    totalFloors: getField('totalFloors', ''),
+    propertyAge: getField('propertyAge', ''),
+    facing: getField('facing', ''),
+    builtUpArea: getField('builtUpArea', ''),
+    builtUpAreaUnit: getField('builtUpAreaUnit', 'sqft'), // Always default to sqft
+    possessionDate: getField('possessionDate', ''),
+    title: getField('title', '')
   });
   
   // Debug counter to track re-renders and updates
@@ -115,6 +196,10 @@ export function PropertyDetails({ form, mode = 'create', category, adType }: For
             if (!currentValue && value) {
               console.log(`[${count}] Setting flat field ${field} from nested structure:`, value);
               form.setValue(field, value, { shouldValidate: false });
+              
+              // Also update steps structure
+              const stepPath = `steps.${stepId}.${field}`;
+              form.setValue(stepPath, value, { shouldValidate: false });
             }
           });
         }
@@ -129,7 +214,7 @@ export function PropertyDetails({ form, mode = 'create', category, adType }: For
       // Ensure builtUpAreaUnit has a default value of 'sqft'
       if (!form.getValues().builtUpAreaUnit) {
         console.log('Setting default builtUpAreaUnit to sqft');
-        form.setValue('builtUpAreaUnit', 'sqft', { shouldValidate: false });
+        saveField('builtUpAreaUnit', 'sqft');
       }
       
       // Process nested structure (v2 format)
@@ -139,28 +224,28 @@ export function PropertyDetails({ form, mode = 'create', category, adType }: For
         
         // Map nested values to flat fields if they're not set
         if (basicDetails.propertyType && !form.getValues('propertyType')) {
-          form.setValue('propertyType', basicDetails.propertyType, { shouldValidate: false });
+          saveField('propertyType', basicDetails.propertyType);
         }
         if (basicDetails.bhkType && !form.getValues('bhkType')) {
-          form.setValue('bhkType', basicDetails.bhkType, { shouldValidate: false });
+          saveField('bhkType', basicDetails.bhkType);
         }
         if (basicDetails.floor && !form.getValues('floor')) {
-          form.setValue('floor', basicDetails.floor.toString(), { shouldValidate: false });
+          saveField('floor', basicDetails.floor.toString());
         }
         if (basicDetails.totalFloors && !form.getValues('totalFloors')) {
-          form.setValue('totalFloors', basicDetails.totalFloors.toString(), { shouldValidate: false });
+          saveField('totalFloors', basicDetails.totalFloors.toString());
         }
         if (basicDetails.propertyAge && !form.getValues('propertyAge')) {
-          form.setValue('propertyAge', basicDetails.propertyAge, { shouldValidate: false });
+          saveField('propertyAge', basicDetails.propertyAge);
         }
         if (basicDetails.facing && !form.getValues('facing')) {
-          form.setValue('facing', basicDetails.facing, { shouldValidate: false });
+          saveField('facing', basicDetails.facing);
         }
         if (basicDetails.builtUpArea && !form.getValues('builtUpArea')) {
-          form.setValue('builtUpArea', basicDetails.builtUpArea.toString(), { shouldValidate: false });
+          saveField('builtUpArea', basicDetails.builtUpArea.toString());
         }
         if (basicDetails.builtUpAreaUnit && !form.getValues('builtUpAreaUnit')) {
-          form.setValue('builtUpAreaUnit', basicDetails.builtUpAreaUnit, { shouldValidate: false });
+          saveField('builtUpAreaUnit', basicDetails.builtUpAreaUnit);
         }
       }
       
@@ -169,7 +254,7 @@ export function PropertyDetails({ form, mode = 'create', category, adType }: For
     }
     
     return () => subscription.unsubscribe();
-  }, [form, category]);
+  }, [form, category, stepId]);
   
   // Function to update component state from form values
   const updateStateFromForm = (validateAfter = false, source = 'unknown') => {
@@ -178,21 +263,24 @@ export function PropertyDetails({ form, mode = 'create', category, adType }: For
     const formValues = form.getValues();
     console.log(`Updating state from form values (source: ${source})`, formValues);
     
+    // Get current step data
+    const stepData = form.getValues(`steps.${stepId}`) || {};
+    
     // Ensure builtUpAreaUnit has a value
-    const areaUnit = formValues.builtUpAreaUnit || 'sqft';
+    const areaUnit = stepData.builtUpAreaUnit || formValues.builtUpAreaUnit || 'sqft';
     
     // Create new state object based on current form values
     const newValues = {
-      propertyType: formValues.propertyType || category || '',
-      bhkType: formValues.bhkType || '',
-      floor: formValues.floor || '',
-      totalFloors: formValues.totalFloors || '',
-      propertyAge: formValues.propertyAge || '',
-      facing: formValues.facing || '',
-      builtUpArea: formValues.builtUpArea || '',
+      propertyType: stepData.propertyType || formValues.propertyType || category || '',
+      bhkType: stepData.bhkType || formValues.bhkType || '',
+      floor: stepData.floor?.toString() || formValues.floor || '',
+      totalFloors: stepData.totalFloors?.toString() || formValues.totalFloors || '',
+      propertyAge: stepData.propertyAge || formValues.propertyAge || '',
+      facing: stepData.facing || formValues.facing || '',
+      builtUpArea: stepData.builtUpArea?.toString() || formValues.builtUpArea || '',
       builtUpAreaUnit: areaUnit,
-      possessionDate: formValues.possessionDate || '',
-      title: formValues.title || ''
+      possessionDate: stepData.possessionDate || formValues.possessionDate || '',
+      title: stepData.title || formValues.title || ''
     };
     
     // Only update state if any values have changed
@@ -224,29 +312,8 @@ export function PropertyDetails({ form, mode = 'create', category, adType }: For
       [field]: value
     }));
     
-    // Update form flat field
-    form.setValue(field, value, { shouldValidate: true });
-    
-    // Also update nested structure if it exists (v2 format)
-    const basicDetails = form.getValues('basicDetails');
-    if (basicDetails) {
-      console.log(`Also updating nested basicDetails.${field}:`, value);
-      
-      // Convert value format for nested structure if needed
-      let structuredValue = value;
-      if (field === 'floor' || field === 'totalFloors' || field === 'builtUpArea') {
-        const numValue = parseInt(value);
-        structuredValue = !isNaN(numValue) ? numValue : null;
-      }
-      
-      // Update the nested field
-      const updatedBasicDetails = {
-        ...basicDetails,
-        [field]: structuredValue
-      };
-      
-      form.setValue('basicDetails', updatedBasicDetails, { shouldValidate: false });
-    }
+    // Save using the step-based structure
+    saveField(field, value);
     
     // Debug log
     console.log(`Updated ${field} to:`, value);
@@ -485,13 +552,24 @@ export function PropertyDetails({ form, mode = 'create', category, adType }: For
       {/* Debug output in development mode */}
       {process.env.NODE_ENV === 'development' && (
         <div className="mt-4 p-2 bg-gray-100 rounded text-xs">
+          <div>Current stepId: {stepId}</div>
+          <div>Flow type: {flowType}</div>
           <div>Current builtUpAreaUnit value: {unitValue}</div>
           <div>Current possessionDate value: {values.possessionDate || 'not set'}</div>
           <div>Form builtUpAreaUnit value: {form.getValues().builtUpAreaUnit || 'not set'}</div>
           <div>Form possessionDate value: {form.getValues().possessionDate || 'not set'}</div>
           <div>Mode: {mode}</div>
           <div>Update counter: {updateCounter.current}</div>
+          <div>Has steps: {form.getValues().steps ? 'Yes' : 'No'}</div>
           <div>Has basicDetails: {form.getValues().basicDetails ? 'Yes' : 'No'}</div>
+          <div>Current values:</div>
+          <pre className="text-xs overflow-auto">
+            {JSON.stringify(values, null, 2)}
+          </pre>
+          <div>Steps data in form:</div>
+          <pre className="text-xs overflow-auto">
+            {JSON.stringify(form.getValues('steps'), null, 2)}
+          </pre>
         </div>
       )}
       
@@ -519,7 +597,8 @@ export function PropertyDetails({ form, mode = 'create', category, adType }: For
                   floor: currentValues.floor,
                   builtUpAreaUnit: currentValues.builtUpAreaUnit,
                 },
-                nested: currentValues.basicDetails
+                nested: currentValues.basicDetails,
+                steps: currentValues.steps
               }, null, 2));
             }}
             className="px-3 py-1 text-xs bg-green-500 text-white rounded"

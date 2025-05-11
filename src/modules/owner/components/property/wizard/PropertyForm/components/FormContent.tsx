@@ -1,13 +1,13 @@
 // src/modules/owner/components/property/wizard/PropertyForm/components/FormContent.tsx
-// Version: 5.1.0
-// Last Modified: 09-05-2025 13:45 IST
-// Purpose: Updated to use new step names and fix import issues for named exports
+// Version: 6.0.0
+// Last Modified: 18-05-2025 15:15 IST
+// Purpose: Updated to pass stepId to section components for new flow-based architecture
 
 import React from 'react';
 import { UseFormReturn } from 'react-hook-form';
 import { FormData } from '../../../types';
 
-// Import all sections - with correct named imports for components that use named exports
+// Import all sections
 import { PropertyDetails } from '../../sections/PropertyDetails';
 import { CommercialBasicDetails } from '../../sections/CommercialBasicDetails';
 import CoworkingBasicDetails from '../../sections/CoworkingBasicDetails';
@@ -76,112 +76,143 @@ const FormContent = ({
   savedPropertyId,
   handleImageUploadComplete
 }: FormContentProps) => {
-  // Get current step ID
-  const currentStep = STEPS[formStep - 1]?.id || '';
+  // Get current step ID from STEPS array
+  const currentStepObj = STEPS[formStep - 1];
+  
+  // Generate flow type based on category and type
+  const flowType = `${effectiveCategory}_${effectiveAdType}`;
+  
+  // Render section with proper stepId
+  const renderSection = (Component: React.ComponentType<any>, props: any) => {
+    return (
+      <Component
+        {...props}
+        form={form}
+        mode={mode}
+        category={effectiveCategory}
+        adType={effectiveAdType}
+        stepId={currentStepObj?.id}
+      />
+    );
+  };
   
   // Determine which form section to display based on the current step
   const renderFormSection = () => {
-    // Map step to component
-    switch (currentStep) {
-      // Basic details section - different components based on property type
-      case 'basic_details':
-        if (isCommercialRentMode || isCommercialSaleMode) {
-          return <CommercialBasicDetails form={form} mode={mode} category={effectiveCategory} adType={effectiveAdType} />;
-        } else if (isCoworkingMode) {
-          return <CoworkingBasicDetails form={form} mode={mode} category={effectiveCategory} adType={effectiveAdType} />;
-        } else if (isLandSaleMode) {
-          return <LandDetails form={form} mode={mode} category={effectiveCategory} adType={effectiveAdType} />;
-        } else if (isPGHostelMode || isFlatmatesMode) {
-          return <RoomDetails form={form} mode={mode} category={effectiveCategory} adType={effectiveAdType} />;
-        } else {
-          return <PropertyDetails form={form} mode={mode} category={effectiveCategory} adType={effectiveAdType} />;
-        }
-        
-      // Location details section - same for all property types
-      case 'location':
-        return <LocationDetails form={form} mode={mode} category={effectiveCategory} adType={effectiveAdType} />;
-        
-      // Rental details section
-      case 'rental':
-        return <RentalDetails form={form} mode={mode} category={effectiveCategory} adType={effectiveAdType} />;
-        
-      // Sale details section
-      case 'sale':
-        if (isCommercialSaleMode) {
-          return <CommercialSaleDetails form={form} mode={mode} category={effectiveCategory} adType={effectiveAdType} />;
-        } else {
-          return <SaleDetails form={form} mode={mode} category={effectiveCategory} adType={effectiveAdType} />;
-        }
-        
-      // PG/Hostel details section
-      case 'pg_details':
-        return <PGDetails form={form} mode={mode} category={effectiveCategory} adType={effectiveAdType} />;
-        
-      // Flatmate details section
-      case 'flatmate_details':
-        return <FlatmateDetails form={form} mode={mode} category={effectiveCategory} adType={effectiveAdType} />;
-        
-      // Coworking details section
-      case 'coworking':
-        return <CoworkingDetails form={form} mode={mode} category={effectiveCategory} adType={effectiveAdType} />;
-        
-      // Commercial features section
-      case 'commercial_details':
-        return <CommercialDetails form={form} mode={mode} category={effectiveCategory} adType={effectiveAdType} />;
-        
-      // Land features section
-      case 'land_features':
-        return <LandFeaturesDetails form={form} mode={mode} category={effectiveCategory} adType={effectiveAdType} />;
-        
-      // Features section
-      case 'features':
-        if (isCommercialRentMode || isCommercialSaleMode) {
-          return <CommercialFeatures form={form} mode={mode} category={effectiveCategory} adType={effectiveAdType} />;
-        } else {
-          return <AmenitiesSection form={form} mode={mode} category={effectiveCategory} adType={effectiveAdType} />;
-        }
-        
-      // Image upload section
-      case 'photos':
-        return savedPropertyId ? (
-          <ImageUploadSection 
-            propertyId={savedPropertyId} 
-            onUploadComplete={handleImageUploadComplete} 
-            onPrevious={handlePreviousStep} 
-          />
-        ) : (
-          <div className="text-center p-8">
-            <p className="text-primary text-lg">Please save your property first to upload images</p>
-          </div>
-        );
-        
-      // Review section
-      case 'review':
-        const formData = form.getValues();
-        return (
-          <PropertySummary
-            formData={formData}
-            onPrevious={handlePreviousStep}
-            onSaveAsDraft={handleSaveAsDraft}
-            onSaveAndPublish={handleSaveAndPublish}
-            onUpdate={handleUpdate}
-            saving={saving}
-            status={status}
-            propertyId={savedPropertyId}
-          />
-        );
-        
-      // Default fallback
-      default:
-        return (
-          <div className="text-center p-8">
-            <p className="text-primary text-lg">Section not found: {currentStep}</p>
-          </div>
-        );
+    if (!currentStepObj?.id) {
+      return (
+        <div className="text-center p-8">
+          <p className="text-primary text-lg">Step not found</p>
+        </div>
+      );
+    }
+
+    const stepId = currentStepObj.id;
+    
+    // Match step patterns to components
+    if (stepId.includes('_basic_details')) {
+      // Basic details - different components based on property type
+      if (isCommercialRentMode || isCommercialSaleMode) {
+        return renderSection(CommercialBasicDetails, {});
+      } else if (isCoworkingMode) {
+        return renderSection(CoworkingBasicDetails, {});
+      } else if (isLandSaleMode) {
+        return renderSection(LandDetails, {});
+      } else if (isPGHostelMode || isFlatmatesMode) {
+        return renderSection(RoomDetails, {});
+      } else {
+        return renderSection(PropertyDetails, {});
+      }
+    } 
+    else if (stepId.includes('_location')) {
+      return renderSection(LocationDetails, {});
+    }
+    else if (stepId.includes('_rental')) {
+      return renderSection(RentalDetails, {});
+    }
+    else if (stepId.includes('_sale_details')) {
+      if (isCommercialSaleMode) {
+        return renderSection(CommercialSaleDetails, {});
+      } else {
+        return renderSection(SaleDetails, {});
+      }
+    }
+    else if (stepId.includes('_pg_details')) {
+      return renderSection(PGDetails, {});
+    }
+    else if (stepId.includes('_flatmate_details')) {
+      return renderSection(FlatmateDetails, {});
+    }
+    else if (stepId.includes('_coworking_details')) {
+      return renderSection(CoworkingDetails, {});
+    }
+    else if (stepId.includes('_land_features')) {
+      return renderSection(LandFeaturesDetails, {});
+    }
+    else if (stepId.includes('_features')) {
+      if (isCommercialRentMode || isCommercialSaleMode) {
+        return renderSection(CommercialFeatures, {});
+      } else {
+        return renderSection(AmenitiesSection, {});
+      }
+    }
+    else if (stepId.includes('_review')) {
+      const formData = form.getValues();
+      return (
+        <PropertySummary
+          formData={formData}
+          onPrevious={handlePreviousStep}
+          onSaveAsDraft={handleSaveAsDraft}
+          onSaveAndPublish={handleSaveAndPublish}
+          onUpdate={handleUpdate}
+          saving={saving}
+          status={status}
+          propertyId={savedPropertyId}
+        />
+      );
+    }
+    // Handle photos step if it exists in STEPS
+    else if (stepId.includes('_photos')) {
+      return savedPropertyId ? (
+        <ImageUploadSection 
+          propertyId={savedPropertyId} 
+          onUploadComplete={handleImageUploadComplete} 
+          onPrevious={handlePreviousStep} 
+        />
+      ) : (
+        <div className="text-center p-8">
+          <p className="text-primary text-lg">Please save your property first to upload images</p>
+        </div>
+      );
+    }
+    // Default fallback
+    else {
+      return (
+        <div className="text-center p-8">
+          <p className="text-primary text-lg">Section not found: {stepId}</p>
+          <p className="text-sm text-gray-600 mt-2">Flow: {flowType}</p>
+        </div>
+      );
     }
   };
   
-  return <div className="space-y-6">{renderFormSection()}</div>;
+  return (
+    <div className="space-y-6">
+      {renderFormSection()}
+      
+      {/* Debug information in development */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="mt-4 p-2 bg-gray-100 rounded text-xs">
+          <div>Current Step: {currentStepObj?.id}</div>
+          <div>Flow Type: {flowType}</div>
+          <div>Form Step: {formStep}/{STEPS.length}</div>
+          <div>Current steps data:</div>
+          <pre className="text-xs overflow-auto max-h-40">
+            {JSON.stringify(form.getValues('steps'), null, 2)}
+          </pre>
+        </div>
+      )}
+    </div>
+  );
 };
 
 export default FormContent;

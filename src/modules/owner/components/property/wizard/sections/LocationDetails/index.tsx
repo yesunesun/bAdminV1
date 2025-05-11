@@ -1,9 +1,9 @@
 // src/modules/owner/components/property/wizard/sections/LocationDetails/index.tsx
-// Version: 4.8.1
-// Last Modified: 08-03-2025 15:00 IST
-// Purpose: Fix JSX syntax error in error message objects
+// Version: 5.0.0
+// Last Modified: 11-05-2025 01:45 IST
+// Purpose: Updated to use flow-based architecture with stepId for proper data capture
 
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { FormSection } from '@/components/FormSection';
 import { FormSectionProps } from '../../../types';
 import { useGoogleMaps } from './hooks/useGoogleMaps';
@@ -15,8 +15,37 @@ import { MapPin, Navigation } from 'lucide-react';
 import { RequiredLabel } from '@/components/ui/RequiredLabel';
 import ErrorBoundary from '@/components/ui/ErrorBoundary';
 
-export function LocationDetails({ form }: FormSectionProps) {
-  const { setValue, watch, register } = form;
+export function LocationDetails({ form, stepId }: FormSectionProps) {
+  // Custom hooks for step data handling
+  const saveField = useCallback((fieldName: string, value: any) => {
+    if (!stepId) return;
+    const path = `steps.${stepId}.${fieldName}`;
+    console.log(`Saving field ${fieldName} at path ${path}:`, value);
+    form.setValue(path, value, { shouldValidate: true });
+  }, [form, stepId]);
+
+  const getField = useCallback((fieldName: string, defaultValue?: any) => {
+    if (!stepId) return defaultValue;
+    const path = `steps.${stepId}.${fieldName}`;
+    const value = form.getValues(path);
+    console.log(`Getting field ${fieldName} from path ${path}:`, value);
+    return value ?? defaultValue;
+  }, [form, stepId]);
+
+  // Ensure step structure exists
+  useEffect(() => {
+    if (!stepId) return;
+    
+    // Initialize step structure if it doesn't exist
+    const currentSteps = form.getValues('steps') || {};
+    if (!currentSteps[stepId]) {
+      form.setValue('steps', {
+        ...currentSteps,
+        [stepId]: {}
+      });
+    }
+  }, [stepId, form]);
+
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const [isGeolocating, setIsGeolocating] = useState(false);
   const [isGeocoding, setIsGeocoding] = useState(false);
@@ -25,9 +54,9 @@ export function LocationDetails({ form }: FormSectionProps) {
   const [locationError, setLocationError] = useState<string | null>(null);
   
   // Get form values
-  const address = watch('address') || '';
-  const latitude = watch('latitude') || '';
-  const longitude = watch('longitude') || '';
+  const address = getField('address', '');
+  const latitude = getField('latitude', '');
+  const longitude = getField('longitude', '');
   
   // Check for edit mode by looking at URL
   const isEditMode = window.location.pathname.includes('/edit');
@@ -81,8 +110,8 @@ export function LocationDetails({ form }: FormSectionProps) {
         if (!event.latLng) return;
         
         // Update form coordinates
-        setValue('latitude', event.latLng.lat());
-        setValue('longitude', event.latLng.lng());
+        saveField('latitude', event.latLng.lat());
+        saveField('longitude', event.latLng.lng());
         
         // Update marker
         updateMarkerPosition(event.latLng);
@@ -132,8 +161,8 @@ export function LocationDetails({ form }: FormSectionProps) {
         if (!newPosition) return;
         
         // Update form coordinates
-        setValue('latitude', newPosition.lat());
-        setValue('longitude', newPosition.lng());
+        saveField('latitude', newPosition.lat());
+        saveField('longitude', newPosition.lng());
         
         // Optionally reverse geocode
         reverseGeocode(newPosition);
@@ -165,8 +194,8 @@ export function LocationDetails({ form }: FormSectionProps) {
           const location = results[0].geometry.location;
           
           // Update form
-          setValue('latitude', location.lat());
-          setValue('longitude', location.lng());
+          saveField('latitude', location.lat());
+          saveField('longitude', location.lng());
           
           // Update map and marker
           if (mapInstance) {
@@ -181,7 +210,7 @@ export function LocationDetails({ form }: FormSectionProps) {
           );
           
           if (postalCodeComponent && postalCodeComponent.long_name) {
-            setValue('pinCode', postalCodeComponent.long_name);
+            saveField('pinCode', postalCodeComponent.long_name);
           }
         } else {
           console.error('Geocoding failed with status:', status);
@@ -204,7 +233,7 @@ export function LocationDetails({ form }: FormSectionProps) {
       geocoder.geocode({ location: position }, (results: any, status: string) => {
         if (status === 'OK' && results && results.length > 0) {
           const address = results[0].formatted_address;
-          setValue('address', address);
+          saveField('address', address);
           
           // Extract components from address
           const addressComponents = results[0].address_components || [];
@@ -215,7 +244,7 @@ export function LocationDetails({ form }: FormSectionProps) {
           );
           
           if (postalCodeComponent && postalCodeComponent.long_name) {
-            setValue('pinCode', postalCodeComponent.long_name);
+            saveField('pinCode', postalCodeComponent.long_name);
           }
           
           // Extract city
@@ -226,7 +255,7 @@ export function LocationDetails({ form }: FormSectionProps) {
           );
           
           if (cityComponent && cityComponent.long_name) {
-            setValue('city', cityComponent.long_name);
+            saveField('city', cityComponent.long_name);
           }
           
           // Extract area/neighborhood
@@ -238,7 +267,7 @@ export function LocationDetails({ form }: FormSectionProps) {
           );
           
           if (areaComponent && areaComponent.long_name) {
-            setValue('area', areaComponent.long_name);
+            saveField('area', areaComponent.long_name);
           }
           
           // Extract locality
@@ -249,7 +278,7 @@ export function LocationDetails({ form }: FormSectionProps) {
           );
           
           if (localityComponent && localityComponent.long_name) {
-            setValue('locality', localityComponent.long_name);
+            saveField('locality', localityComponent.long_name);
           }
         }
       });
@@ -332,8 +361,8 @@ export function LocationDetails({ form }: FormSectionProps) {
         const { latitude, longitude } = position.coords;
         
         // Update form
-        setValue('latitude', latitude);
-        setValue('longitude', longitude);
+        saveField('latitude', latitude);
+        saveField('longitude', longitude);
         
         // Update map
         const latlng = { lat: latitude, lng: longitude };
@@ -414,7 +443,33 @@ export function LocationDetails({ form }: FormSectionProps) {
   // Handle PIN code input to only allow numbers
   const handlePinCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.replace(/\D/g, '').slice(0, 6);
-    setValue('pinCode', value);
+    saveField('pinCode', value);
+  };
+
+  // Create a modified form object to pass to child components
+  // This ensures child components use the flow-based architecture
+  const modifiedForm = {
+    ...form,
+    register: (name: string, options?: any) => {
+      // Register with the full path
+      const fullPath = stepId ? `steps.${stepId}.${name}` : name;
+      return form.register(fullPath, options);
+    },
+    setValue: (name: string, value: any, options?: any) => {
+      const fullPath = stepId ? `steps.${stepId}.${name}` : name;
+      return form.setValue(fullPath, value, options);
+    },
+    getValues: (name?: string) => {
+      if (name) {
+        const fullPath = stepId ? `steps.${stepId}.${name}` : name;
+        return form.getValues(fullPath);
+      }
+      return form.getValues();
+    },
+    watch: (name: string) => {
+      const fullPath = stepId ? `steps.${stepId}.${name}` : name;
+      return form.watch(fullPath);
+    }
   };
 
   return (
@@ -424,11 +479,11 @@ export function LocationDetails({ form }: FormSectionProps) {
     >
       <div className="space-y-4">
         {/* Flat No/Plot No Field */}
-        <FlatPlotInput form={form} />
+        <FlatPlotInput form={modifiedForm} />
         
         {/* Address with Map Controls */}
         <div>
-          <AddressInput form={form} />
+          <AddressInput form={modifiedForm} />
           
           <div className="flex justify-end mt-2 gap-4">
             <Button
@@ -459,7 +514,7 @@ export function LocationDetails({ form }: FormSectionProps) {
 
         {/* Landmark and PIN Code */}
         <LandmarkPincodeInputs 
-          form={form} 
+          form={modifiedForm} 
           handlePinCodeChange={handlePinCodeChange} 
         />
 
@@ -574,16 +629,16 @@ export function LocationDetails({ form }: FormSectionProps) {
           </div>
         </ErrorBoundary>
 
-        {/* Hidden inputs for coordinates */}
-        <div style={{ display: 'none' }}>
-          <input {...register('latitude')} defaultValue={latitude || ''} />
-          <input {...register('longitude')} defaultValue={longitude || ''} />
-          <input {...register('state')} defaultValue="" />
-          <input {...register('district')} defaultValue="" />
-          <input {...register('city')} defaultValue="" />
-          <input {...register('locality')} defaultValue="" />
-          <input {...register('area')} defaultValue="" />
-        </div>
+        {/* Debug info in development */}
+        {process.env.NODE_ENV === 'development' && stepId && (
+          <div className="mt-4 p-2 bg-gray-100 rounded text-xs space-y-2">
+            <div>Step ID: {stepId}</div>
+            <div>Current step data:</div>
+            <pre className="text-xs overflow-auto max-h-40 bg-white p-2 rounded border">
+              {JSON.stringify(form.getValues(`steps.${stepId}`), null, 2)}
+            </pre>
+          </div>
+        )}
       </div>
     </FormSection>
   );

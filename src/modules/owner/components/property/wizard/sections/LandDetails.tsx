@@ -1,9 +1,9 @@
 // src/modules/owner/components/property/wizard/sections/LandDetails.tsx
-// Version: 1.8.0
-// Last Modified: 14-04-2025 15:30 IST
-// Purpose: Fixed rupee symbol overlap issue by using direct text input with placeholder
+// Version: 2.1.0
+// Last Modified: 11-05-2025 02:00 IST
+// Purpose: Fixed controlled input issue for proper value updates
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useCallback, useState } from 'react';
 import { FormSection } from '@/components/FormSection';
 import { RequiredLabel } from '@/components/ui/RequiredLabel';
 import { Input } from '@/components/ui/input';
@@ -53,50 +53,117 @@ const AREA_CONVERSION = {
 
 const LandDetails: React.FC<FormSectionProps> = ({ 
   form,
-  adType
+  stepId = 'land_sale_basic_details' // Default stepId for land details
 }) => {
-  const { register, watch, setValue, formState: { errors } } = form;
-  
-  // Watch for certain values to conditionally display fields
-  const landType = watch('landType');
-  const isAgricultural = landType === 'Agricultural Land';
-  
-  // Calculate total area from dimensions and handle unit changes
-  const plotLength = watch('plotLength');
-  const plotWidth = watch('plotWidth');
-  const areaUnit = watch('areaUnit') || 'sqft';
-  const previousAreaUnit = React.useRef(areaUnit);
-  const builtUpArea = watch('builtUpArea');
+  // Local state to ensure proper updates
+  const [localState, setLocalState] = useState({
+    landType: '',
+    plotLength: '',
+    plotWidth: '',
+    builtUpArea: '',
+    areaUnit: 'sqft',
+    expectedPrice: '',
+    isNegotiable: false,
+    plotFacing: '',
+    developmentStatus: '',
+    approvalStatus: '',
+    floorSpaceIndex: '',
+    soilType: '',
+    boundaryType: '',
+    topographyType: '',
+    waterAvailability: '',
+    electricityStatus: '',
+    roadConnectivity: '',
+    additionalDetails: ''
+  });
+
+  // Custom hooks for step data handling
+  const saveField = useCallback((fieldName: string, value: any) => {
+    const path = `steps.${stepId}.${fieldName}`;
+    console.log(`Saving field ${fieldName} at path ${path}:`, value);
+    form.setValue(path, value, { shouldValidate: true });
+    
+    // Update local state immediately for responsive UI
+    setLocalState(prev => ({
+      ...prev,
+      [fieldName]: value
+    }));
+  }, [form, stepId]);
+
+  const getField = useCallback((fieldName: string, defaultValue?: any) => {
+    const path = `steps.${stepId}.${fieldName}`;
+    const value = form.getValues(path);
+    const finalValue = value ?? defaultValue;
+    console.log(`Getting field ${fieldName} from path ${path}:`, finalValue);
+    return finalValue;
+  }, [form, stepId]);
+
+  // Initialize local state from form when component mounts or stepId changes
+  useEffect(() => {
+    const currentSteps = form.getValues('steps') || {};
+    if (!currentSteps[stepId]) {
+      form.setValue('steps', {
+        ...currentSteps,
+        [stepId]: {}
+      });
+    } else {
+      // Sync local state with form state
+      const stepData = currentSteps[stepId];
+      setLocalState(prevState => ({
+        ...prevState,
+        ...stepData
+      }));
+    }
+  }, [stepId, form]);
+
+  // Watch for form changes and sync with local state
+  useEffect(() => {
+    const subscription = form.watch((value, { name }) => {
+      if (name && name.startsWith(`steps.${stepId}.`)) {
+        const fieldName = name.replace(`steps.${stepId}.`, '');
+        const fieldValue = form.getValues(name);
+        setLocalState(prev => ({
+          ...prev,
+          [fieldName]: fieldValue
+        }));
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [form, stepId]);
+
+  const previousAreaUnit = React.useRef(localState.areaUnit);
 
   // Effect to calculate area when dimensions change
   useEffect(() => {
-    if (plotLength && plotWidth && !isNaN(Number(plotLength)) && !isNaN(Number(plotWidth))) {
-      const totalAreaInSqft = Math.round(Number(plotLength) * Number(plotWidth));
+    if (localState.plotLength && localState.plotWidth && 
+        !isNaN(Number(localState.plotLength)) && !isNaN(Number(localState.plotWidth))) {
+      const totalAreaInSqft = Math.round(Number(localState.plotLength) * Number(localState.plotWidth));
       
       // Convert to the selected unit
       let convertedArea = totalAreaInSqft;
-      if (areaUnit !== 'sqft') {
-        convertedArea = totalAreaInSqft * AREA_CONVERSION.sqft[areaUnit];
+      if (localState.areaUnit !== 'sqft') {
+        convertedArea = totalAreaInSqft * AREA_CONVERSION.sqft[localState.areaUnit];
       }
 
-      setValue('builtUpArea', convertedArea.toFixed(
-        areaUnit === 'sqft' || areaUnit === 'sqyd' ? 0 : 4
-      ));
-      setValue('builtUpAreaUnit', areaUnit);
-    }
-  }, [plotLength, plotWidth, areaUnit, setValue]);
+      const newArea = convertedArea.toFixed(
+        localState.areaUnit === 'sqft' || localState.areaUnit === 'sqyd' ? 0 : 4
+      );
 
-  // Effect to handle area unit changes (convert existing area to new unit)
+      saveField('builtUpArea', newArea);
+      saveField('builtUpAreaUnit', localState.areaUnit);
+    }
+  }, [localState.plotLength, localState.plotWidth, localState.areaUnit, saveField]);
+
+  // Effect to handle area unit changes
   useEffect(() => {
-    // Skip on initial render or if no area value exists
-    if (previousAreaUnit.current === areaUnit || !builtUpArea) {
-      previousAreaUnit.current = areaUnit;
+    if (previousAreaUnit.current === localState.areaUnit || !localState.builtUpArea) {
+      previousAreaUnit.current = localState.areaUnit;
       return;
     }
 
-    // Convert from previous unit to new unit
-    if (builtUpArea && previousAreaUnit.current) {
-      const currentArea = parseFloat(builtUpArea);
+    if (localState.builtUpArea && previousAreaUnit.current) {
+      const currentArea = parseFloat(localState.builtUpArea);
       
       // First convert to sqft (our base unit)
       let areaInSqft;
@@ -108,19 +175,22 @@ const LandDetails: React.FC<FormSectionProps> = ({
 
       // Then convert from sqft to target unit
       let convertedArea = areaInSqft;
-      if (areaUnit !== 'sqft') {
-        convertedArea = areaInSqft * AREA_CONVERSION.sqft[areaUnit];
+      if (localState.areaUnit !== 'sqft') {
+        convertedArea = areaInSqft * AREA_CONVERSION.sqft[localState.areaUnit];
       }
 
-      // Update the area value with proper precision based on unit
-      setValue('builtUpArea', convertedArea.toFixed(
-        areaUnit === 'sqft' || areaUnit === 'sqyd' ? 0 : 4
-      ));
-      setValue('builtUpAreaUnit', areaUnit);
+      const newArea = convertedArea.toFixed(
+        localState.areaUnit === 'sqft' || localState.areaUnit === 'sqyd' ? 0 : 4
+      );
+
+      saveField('builtUpArea', newArea);
+      saveField('builtUpAreaUnit', localState.areaUnit);
     }
 
-    previousAreaUnit.current = areaUnit;
-  }, [areaUnit, builtUpArea, setValue]);
+    previousAreaUnit.current = localState.areaUnit;
+  }, [localState.areaUnit, localState.builtUpArea, saveField]);
+
+  const isAgricultural = localState.landType === 'Agricultural Land';
   
   return (
     <FormSection
@@ -136,7 +206,8 @@ const LandDetails: React.FC<FormSectionProps> = ({
           <select
             id="landType"
             className="w-full h-12 px-4 py-2 rounded-xl border border-border bg-background"
-            {...register('landType')}
+            value={localState.landType}
+            onChange={(e) => saveField('landType', e.target.value)}
           >
             <option value="">Select land type</option>
             {LAND_TYPES.map((type) => (
@@ -145,9 +216,6 @@ const LandDetails: React.FC<FormSectionProps> = ({
               </option>
             ))}
           </select>
-          {errors.landType && (
-            <p className="text-sm text-destructive mt-1">{errors.landType.message as string}</p>
-          )}
         </div>
         
         {/* Plot Dimensions */}
@@ -163,11 +231,9 @@ const LandDetails: React.FC<FormSectionProps> = ({
                 type="number"
                 placeholder="e.g., 60"
                 className="h-12 px-4 py-2 rounded-xl border border-border bg-background w-full"
-                {...register('plotLength')}
+                value={localState.plotLength}
+                onChange={(e) => saveField('plotLength', e.target.value)}
               />
-              {errors.plotLength && (
-                <p className="text-sm text-destructive mt-1">{errors.plotLength.message as string}</p>
-              )}
             </div>
             
             <div>
@@ -179,11 +245,9 @@ const LandDetails: React.FC<FormSectionProps> = ({
                 type="number"
                 placeholder="e.g., 40"
                 className="h-12 px-4 py-2 rounded-xl border border-border bg-background w-full"
-                {...register('plotWidth')}
+                value={localState.plotWidth}
+                onChange={(e) => saveField('plotWidth', e.target.value)}
               />
-              {errors.plotWidth && (
-                <p className="text-sm text-destructive mt-1">{errors.plotWidth.message as string}</p>
-              )}
             </div>
           </div>
         </div>
@@ -200,11 +264,8 @@ const LandDetails: React.FC<FormSectionProps> = ({
               placeholder="Auto-calculated"
               readOnly
               className="h-12 px-4 py-2 rounded-xl border border-border bg-background w-full"
-              {...register('builtUpArea')}
+              value={localState.builtUpArea}
             />
-            {errors.builtUpArea && (
-              <p className="text-sm text-destructive mt-1">{errors.builtUpArea.message as string}</p>
-            )}
           </div>
           
           <div>
@@ -214,16 +275,14 @@ const LandDetails: React.FC<FormSectionProps> = ({
             <select
               id="areaUnit"
               className="w-full h-12 px-4 py-2 rounded-xl border border-border bg-background"
-              {...register('areaUnit')}
+              value={localState.areaUnit}
+              onChange={(e) => saveField('areaUnit', e.target.value)}
             >
               <option value="sqft">Square Feet</option>
               <option value="sqyd">Square Yards</option>
               <option value="acre">Acre</option>
               <option value="hectare">Hectare</option>
             </select>
-            {errors.areaUnit && (
-              <p className="text-sm text-destructive mt-1">{errors.areaUnit.message as string}</p>
-            )}
           </div>
         </div>
         
@@ -236,7 +295,8 @@ const LandDetails: React.FC<FormSectionProps> = ({
             <select
               id="plotFacing"
               className="w-full h-12 px-4 py-2 rounded-xl border border-border bg-background"
-              {...register('plotFacing')}
+              value={localState.plotFacing}
+              onChange={(e) => saveField('plotFacing', e.target.value)}
             >
               <option value="">Select plot facing</option>
               {PLOT_FACING.map((facing) => (
@@ -245,32 +305,27 @@ const LandDetails: React.FC<FormSectionProps> = ({
                 </option>
               ))}
             </select>
-            {errors.plotFacing && (
-              <p className="text-sm text-destructive mt-1">{errors.plotFacing.message as string}</p>
-            )}
           </div>
           
           <div>
             <RequiredLabel htmlFor="expectedPrice" className="mb-2 block">
               Expected Price (₹)
             </RequiredLabel>
-            {/* Using a direct input field without the symbol overlay */}
             <Input
               id="expectedPrice"
               type="text"
               placeholder="e.g., 5000000"
               className="h-12 px-4 py-2 rounded-xl border border-border bg-background w-full"
-              {...register('expectedPrice')}
+              value={localState.expectedPrice}
+              onChange={(e) => saveField('expectedPrice', e.target.value)}
             />
-            {errors.expectedPrice && (
-              <p className="text-sm text-destructive mt-1">{errors.expectedPrice.message as string}</p>
-            )}
             <div className="flex items-center space-x-2 pt-2 mt-1">
               <input
                 type="checkbox"
                 id="isNegotiable"
                 className="h-4 w-4 text-primary border-gray-300 focus:ring-primary"
-                {...register('isNegotiable')}
+                checked={localState.isNegotiable || false}
+                onChange={(e) => saveField('isNegotiable', e.target.checked)}
               />
               <label
                 htmlFor="isNegotiable"
@@ -291,7 +346,8 @@ const LandDetails: React.FC<FormSectionProps> = ({
             <select
               id="developmentStatus"
               className="w-full h-12 px-4 py-2 rounded-xl border border-border bg-background"
-              {...register('developmentStatus')}
+              value={localState.developmentStatus}
+              onChange={(e) => saveField('developmentStatus', e.target.value)}
             >
               <option value="">Select development status</option>
               {DEVELOPMENT_STATUS.map((status) => (
@@ -300,9 +356,6 @@ const LandDetails: React.FC<FormSectionProps> = ({
                 </option>
               ))}
             </select>
-            {errors.developmentStatus && (
-              <p className="text-sm text-destructive mt-1">{errors.developmentStatus.message as string}</p>
-            )}
           </div>
           
           <div>
@@ -312,7 +365,8 @@ const LandDetails: React.FC<FormSectionProps> = ({
             <select
               id="approvalStatus"
               className="w-full h-12 px-4 py-2 rounded-xl border border-border bg-background"
-              {...register('approvalStatus')}
+              value={localState.approvalStatus}
+              onChange={(e) => saveField('approvalStatus', e.target.value)}
             >
               <option value="">Select approval status</option>
               {APPROVAL_STATUS.map((status) => (
@@ -321,9 +375,6 @@ const LandDetails: React.FC<FormSectionProps> = ({
                 </option>
               ))}
             </select>
-            {errors.approvalStatus && (
-              <p className="text-sm text-destructive mt-1">{errors.approvalStatus.message as string}</p>
-            )}
           </div>
         </div>
         
@@ -338,11 +389,9 @@ const LandDetails: React.FC<FormSectionProps> = ({
               type="text"
               placeholder="e.g., 1.5"
               className="h-12 px-4 py-2 rounded-xl border border-border bg-background w-full"
-              {...register('floorSpaceIndex')}
+              value={localState.floorSpaceIndex}
+              onChange={(e) => saveField('floorSpaceIndex', e.target.value)}
             />
-            {errors.floorSpaceIndex && (
-              <p className="text-sm text-destructive mt-1">{errors.floorSpaceIndex.message as string}</p>
-            )}
           </div>
         )}
         
@@ -355,7 +404,8 @@ const LandDetails: React.FC<FormSectionProps> = ({
             <select
               id="soilType"
               className="w-full h-12 px-4 py-2 rounded-xl border border-border bg-background"
-              {...register('soilType')}
+              value={localState.soilType}
+              onChange={(e) => saveField('soilType', e.target.value)}
             >
               <option value="">Select soil type</option>
               {SOIL_TYPES.map((type) => (
@@ -364,9 +414,6 @@ const LandDetails: React.FC<FormSectionProps> = ({
                 </option>
               ))}
             </select>
-            {errors.soilType && (
-              <p className="text-sm text-destructive mt-1">{errors.soilType.message as string}</p>
-            )}
           </div>
         )}
         
@@ -379,7 +426,8 @@ const LandDetails: React.FC<FormSectionProps> = ({
             <select
               id="boundaryType"
               className="w-full h-12 px-4 py-2 rounded-xl border border-border bg-background"
-              {...register('boundaryType')}
+              value={localState.boundaryType}
+              onChange={(e) => saveField('boundaryType', e.target.value)}
             >
               <option value="">Select boundary type</option>
               {BOUNDARY_TYPES.map((type) => (
@@ -388,9 +436,6 @@ const LandDetails: React.FC<FormSectionProps> = ({
                 </option>
               ))}
             </select>
-            {errors.boundaryType && (
-              <p className="text-sm text-destructive mt-1">{errors.boundaryType.message as string}</p>
-            )}
           </div>
           
           <div>
@@ -400,7 +445,8 @@ const LandDetails: React.FC<FormSectionProps> = ({
             <select
               id="topographyType"
               className="w-full h-12 px-4 py-2 rounded-xl border border-border bg-background"
-              {...register('topographyType')}
+              value={localState.topographyType}
+              onChange={(e) => saveField('topographyType', e.target.value)}
             >
               <option value="">Select topography</option>
               {TOPOGRAPHY_TYPES.map((type) => (
@@ -409,9 +455,6 @@ const LandDetails: React.FC<FormSectionProps> = ({
                 </option>
               ))}
             </select>
-            {errors.topographyType && (
-              <p className="text-sm text-destructive mt-1">{errors.topographyType.message as string}</p>
-            )}
           </div>
         </div>
         
@@ -426,7 +469,8 @@ const LandDetails: React.FC<FormSectionProps> = ({
               <select
                 id="waterAvailability"
                 className="w-full h-12 px-4 py-2 rounded-xl border border-border bg-background"
-                {...register('waterAvailability')}
+                value={localState.waterAvailability}
+                onChange={(e) => saveField('waterAvailability', e.target.value)}
               >
                 <option value="">Select water availability</option>
                 {WATER_AVAILABILITY.map((option) => (
@@ -435,9 +479,6 @@ const LandDetails: React.FC<FormSectionProps> = ({
                   </option>
                 ))}
               </select>
-              {errors.waterAvailability && (
-                <p className="text-sm text-destructive mt-1">{errors.waterAvailability.message as string}</p>
-              )}
             </div>
             
             <div>
@@ -447,7 +488,8 @@ const LandDetails: React.FC<FormSectionProps> = ({
               <select
                 id="electricityStatus"
                 className="w-full h-12 px-4 py-2 rounded-xl border border-border bg-background"
-                {...register('electricityStatus')}
+                value={localState.electricityStatus}
+                onChange={(e) => saveField('electricityStatus', e.target.value)}
               >
                 <option value="">Select electricity status</option>
                 {ELECTRICITY_STATUS.map((status) => (
@@ -456,9 +498,6 @@ const LandDetails: React.FC<FormSectionProps> = ({
                   </option>
                 ))}
               </select>
-              {errors.electricityStatus && (
-                <p className="text-sm text-destructive mt-1">{errors.electricityStatus.message as string}</p>
-              )}
             </div>
           </div>
         </div>
@@ -471,7 +510,8 @@ const LandDetails: React.FC<FormSectionProps> = ({
           <select
             id="roadConnectivity"
             className="w-full h-12 px-4 py-2 rounded-xl border border-border bg-background"
-            {...register('roadConnectivity')}
+            value={localState.roadConnectivity}
+            onChange={(e) => saveField('roadConnectivity', e.target.value)}
           >
             <option value="">Select road connectivity</option>
             {ROAD_CONNECTIVITY.map((option) => (
@@ -480,9 +520,6 @@ const LandDetails: React.FC<FormSectionProps> = ({
               </option>
             ))}
           </select>
-          {errors.roadConnectivity && (
-            <p className="text-sm text-destructive mt-1">{errors.roadConnectivity.message as string}</p>
-          )}
         </div>
         
         {/* Additional Details */}
@@ -498,11 +535,9 @@ const LandDetails: React.FC<FormSectionProps> = ({
             placeholder="Add any additional details about your land/plot..."
             rows={4}
             className="w-full px-4 py-3 rounded-xl border border-border bg-background min-h-32"
-            {...register('additionalDetails')}
+            value={localState.additionalDetails}
+            onChange={(e) => saveField('additionalDetails', e.target.value)}
           />
-          {errors.additionalDetails && (
-            <p className="text-sm text-destructive mt-1">{errors.additionalDetails.message as string}</p>
-          )}
           <div className="mt-2 flex items-start text-xs text-muted-foreground">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 mr-1 flex-shrink-0 mt-0.5">
               <circle cx="12" cy="12" r="10"></circle>
@@ -513,6 +548,21 @@ const LandDetails: React.FC<FormSectionProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Debug info in development */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="mt-4 p-2 bg-gray-100 rounded text-xs space-y-2">
+          <div>Step ID: {stepId}</div>
+          <div>Local State:</div>
+          <pre className="text-xs overflow-auto max-h-40 bg-white p-2 rounded border">
+            {JSON.stringify(localState, null, 2)}
+          </pre>
+          <div>Current step data from form:</div>
+          <pre className="text-xs overflow-auto max-h-40 bg-white p-2 rounded border">
+            {JSON.stringify(form.getValues(`steps.${stepId}`), null, 2)}
+          </pre>
+        </div>
+      )}
     </FormSection>
   );
 };

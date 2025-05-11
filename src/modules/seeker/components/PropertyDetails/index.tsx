@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyDetails/index.tsx
-// Version: 10.0.0
-// Last Modified: 09-05-2025 14:30 IST
-// Purpose: Refactored to improve component reuse and eliminate redundancy
+// Version: 10.1.0
+// Last Modified: 10-05-2025 15:45 IST
+// Purpose: Updated to better reflect property data from JSON and improved property type/listing type display
 
 import React, { useState, useEffect } from 'react';
 import { PropertyDetails as PropertyDetailsType } from '../../hooks/usePropertyDetails';
@@ -166,9 +166,12 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
   } = propertyData;
   
   // Get listing type and category
-  const listingType = flow.listingType || 'rent';
-  const isSaleProperty = listingType === 'sale';
-  const propertyCategory = flow.category || 'residential';
+  const listingType = flow?.listingType || property.property_details?.listingType || 'rent';
+  const isSaleProperty = listingType.toLowerCase() === 'sale';
+  const propertyCategory = flow?.category || property.property_details?.category || 'residential';
+  
+  // Get property type for tag display
+  const propertyType = basicDetails?.propertyType || property.property_details?.propertyType || propertyCategory;
   
   // Get property title
   const propertyTitle = basicDetails?.title || 
@@ -381,10 +384,10 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
           <span className={`px-3 py-1 rounded-full text-sm font-medium ${
             isSaleProperty ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
           }`}>
-            {isSaleProperty ? 'For Sale' : 'For Rent'}
+            For {isSaleProperty ? 'Sale' : 'Rent'}
           </span>
           <span className="px-3 py-1 rounded-full bg-purple-100 text-purple-800 text-sm font-medium capitalize">
-            {propertyCategory}
+            {propertyType}
           </span>
         </div>
         <p className="text-muted-foreground">{locationString}</p>
@@ -393,6 +396,16 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Content Column */}
         <div className="lg:col-span-2 space-y-6">
+          {/* Property Debug Info Box - For Admin/Developers */}
+          {process.env.NODE_ENV === 'development' && (
+            <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg mb-4 text-sm">
+              <div><strong>PropertyId:</strong> {id}</div>
+              <div><strong>Images:</strong> {propertyImages.length}</div>
+              <div><strong>First image filename:</strong> {propertyImages[0]?.fileName || 'None'}</div>
+              <div><strong>Current Image:</strong> {propertyImages.findIndex(img => img.is_primary || img.isPrimary) + 1}/{propertyImages.length}</div>
+            </div>
+          )}
+          
           {/* Image Gallery - Using propertyImages state */}
           <PropertyGalleryCard images={propertyImages} />
           

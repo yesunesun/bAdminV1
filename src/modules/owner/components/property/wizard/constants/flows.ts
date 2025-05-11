@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/constants/flows.ts
-// Version: 5.1.1
-// Last Modified: 09-05-2025 17:00 IST
-// Purpose: Fix icon component references to use proper React component imports
+// Version: 6.0.0
+// Last Modified: 18-05-2025 14:55 IST
+// Purpose: Implement new flow-based architecture with flow-specific step identifiers
 
 import { 
   Home, MapPin, Settings, Image, FileText, DollarSign, 
@@ -31,281 +31,404 @@ export const FLOW_TYPES = {
 };
 
 /**
- * Step definitions for each flow type
+ * Step definitions for each flow type with unique identifiers
  * These define the exact JSON object keys that will be used in the database
  */
 export const FLOW_STEPS = {
   // Residential flows
   residential_rent: [
-    'basic_details',
-    'location',
-    'rental',
-    'features',
-    'review'
+    'res_rent_basic_details',
+    'res_rent_location',
+    'res_rent_rental',
+    'res_rent_features',
+    'res_rent_review'
   ],
   
   residential_sale: [
-    'basic_details',
-    'location',
-    'sale',
-    'features',
-    'review'
+    'res_sale_basic_details',
+    'res_sale_location',
+    'res_sale_sale_details',
+    'res_sale_features',
+    'res_sale_review'
   ],
   
   residential_flatmates: [
-    'basic_details',
-    'location',
-    'flatmate_details',
-    'features',
-    'review'
+    'res_flat_basic_details',
+    'res_flat_location',
+    'res_flat_flatmate_details',
+    'res_flat_features',
+    'res_flat_review'
   ],
   
   residential_pghostel: [
-    'basic_details',
-    'location',
-    'pg_details',
-    'features',
-    'review'
+    'res_pg_basic_details',
+    'res_pg_location',
+    'res_pg_pg_details',
+    'res_pg_features',
+    'res_pg_review'
   ],
   
   // Commercial flows
   commercial_rent: [
-    'basic_details',
-    'location',
-    'rental',
-    'features',
-    'review'
+    'com_rent_basic_details',
+    'com_rent_location',
+    'com_rent_rental',
+    'com_rent_features',
+    'com_rent_review'
   ],
   
   commercial_sale: [
-    'basic_details',
-    'location',
-    'sale',
-    'features',
-    'review'
+    'com_sale_basic_details',
+    'com_sale_location',
+    'com_sale_sale_details',
+    'com_sale_features',
+    'com_sale_review'
   ],
   
   commercial_coworking: [
-    'basic_details',
-    'location',
-    'coworking',
-    'features',
-    'review'
+    'com_cow_basic_details',
+    'com_cow_location',
+    'com_cow_coworking_details',
+    'com_cow_features',
+    'com_cow_review'
   ],
   
   // Land flows
   land_sale: [
-    'basic_details',
-    'location',
-    'land_features',
-    'review'
+    'land_sale_basic_details',
+    'land_sale_location',
+    'land_sale_land_features',
+    'land_sale_review'
   ],
   
   // Default flow (fallback)
   default: [
-    'basic_details',
-    'location',
-    'rental',
-    'features',
-    'review'
+    'default_basic_details',
+    'default_location',
+    'default_rental',
+    'default_features',
+    'default_review'
   ]
 };
 
 /**
- * Field mappings for each step
- * These define which fields belong to which step
+ * Step metadata with icons and titles
  */
-export const STEP_FIELD_MAPPINGS = {
-  // Basic property details (formerly 'details')
-  basic_details: [
-    'steps.basic_details.title',
-    'steps.basic_details.propertyType',
-    'steps.basic_details.bhkType',
-    'steps.basic_details.floor',
-    'steps.basic_details.totalFloors',
-    'steps.basic_details.builtUpArea',
-    'steps.basic_details.builtUpAreaUnit',
-    'steps.basic_details.bathrooms',
-    'steps.basic_details.balconies',
-    'steps.basic_details.facing',
-    'steps.basic_details.propertyAge',
-    'steps.basic_details.propertyCondition',
-    'steps.basic_details.hasBalcony',
-    'steps.basic_details.hasAC'
-  ],
+export const STEP_METADATA = {
+  // Residential rent steps
+  res_rent_basic_details: {
+    id: 'res_rent_basic_details',
+    name: 'Basic Details',
+    component: 'PropertyDetails',
+    icon: Home,
+    description: 'Tell us about your property'
+  },
+  res_rent_location: {
+    id: 'res_rent_location',
+    name: 'Location',
+    component: 'LocationDetails',
+    icon: MapPin,
+    description: 'Where is your property located?'
+  },
+  res_rent_rental: {
+    id: 'res_rent_rental',
+    name: 'Rental Details',
+    component: 'RentalDetails',
+    icon: DollarSign,
+    description: 'Pricing and rental terms'
+  },
+  res_rent_features: {
+    id: 'res_rent_features',
+    name: 'Features',
+    component: 'AmenitiesSection',
+    icon: Settings,
+    description: 'Amenities and features'
+  },
+  res_rent_review: {
+    id: 'res_rent_review',
+    name: 'Review',
+    component: 'PropertySummary',
+    icon: FileText,
+    description: 'Review and publish'
+  },
   
-  // Location details
-  location: [
-    'steps.location.address',
-    'steps.location.flatPlotNo',
-    'steps.location.landmark',
-    'steps.location.locality',
-    'steps.location.area',
-    'steps.location.city',
-    'steps.location.district',
-    'steps.location.state',
-    'steps.location.pinCode',
-    'steps.location.coordinates.latitude',
-    'steps.location.coordinates.longitude'
-  ],
+  // Residential sale steps
+  res_sale_basic_details: {
+    id: 'res_sale_basic_details',
+    name: 'Basic Details',
+    component: 'PropertyDetails',
+    icon: Home,
+    description: 'Tell us about your property'
+  },
+  res_sale_location: {
+    id: 'res_sale_location',
+    name: 'Location',
+    component: 'LocationDetails',
+    icon: MapPin,
+    description: 'Where is your property located?'
+  },
+  res_sale_sale_details: {
+    id: 'res_sale_sale_details',
+    name: 'Sale Details',
+    component: 'SaleDetails',
+    icon: DollarSign,
+    description: 'Pricing and sale details'
+  },
+  res_sale_features: {
+    id: 'res_sale_features',
+    name: 'Features',
+    component: 'AmenitiesSection',
+    icon: Settings,
+    description: 'Amenities and features'
+  },
+  res_sale_review: {
+    id: 'res_sale_review',
+    name: 'Review',
+    component: 'PropertySummary',
+    icon: FileText,
+    description: 'Review and publish'
+  },
   
-  // Features and amenities
-  features: [
-    'steps.features.amenities',
-    'steps.features.parking',
-    'steps.features.petFriendly',
-    'steps.features.nonVegAllowed',
-    'steps.features.waterSupply',
-    'steps.features.powerBackup',
-    'steps.features.gatedSecurity',
-    'steps.features.description',
-    'steps.features.isSmokingAllowed',
-    'steps.features.isDrinkingAllowed',
-    'steps.features.hasAttachedBathroom'
-  ],
+  // Residential flatmates steps
+  res_flat_basic_details: {
+    id: 'res_flat_basic_details',
+    name: 'Basic Details',
+    component: 'RoomDetails',
+    icon: Bed,
+    description: 'Tell us about the room'
+  },
+  res_flat_location: {
+    id: 'res_flat_location',
+    name: 'Location',
+    component: 'LocationDetails',
+    icon: MapPin,
+    description: 'Where is your property located?'
+  },
+  res_flat_flatmate_details: {
+    id: 'res_flat_flatmate_details',
+    name: 'Flatmate Details',
+    component: 'FlatmateDetails',
+    icon: Users,
+    description: 'Flatmate preferences'
+  },
+  res_flat_features: {
+    id: 'res_flat_features',
+    name: 'Features',
+    component: 'AmenitiesSection',
+    icon: Settings,
+    description: 'Amenities and features'
+  },
+  res_flat_review: {
+    id: 'res_flat_review',
+    name: 'Review',
+    component: 'PropertySummary',
+    icon: FileText,
+    description: 'Review and publish'
+  },
   
-  // Rental details
-  rental: [
-    'steps.rental.rentAmount',
-    'steps.rental.securityDeposit',
-    'steps.rental.maintenanceCharges',
-    'steps.rental.rentNegotiable',
-    'steps.rental.availableFrom',
-    'steps.rental.preferredTenants',
-    'steps.rental.leaseDuration',
-    'steps.rental.furnishingStatus',
-    'steps.rental.hasSimilarUnits',
-    'steps.rental.propertyShowOption',
-    'steps.rental.propertyShowPerson',
-    'steps.rental.secondaryNumber',
-    'steps.rental.secondaryContactNumber'
-  ],
+  // Residential PG/Hostel steps
+  res_pg_basic_details: {
+    id: 'res_pg_basic_details',
+    name: 'Basic Details',
+    component: 'RoomDetails',
+    icon: Building,
+    description: 'Tell us about your PG/Hostel'
+  },
+  res_pg_location: {
+    id: 'res_pg_location',
+    name: 'Location',
+    component: 'LocationDetails',
+    icon: MapPin,
+    description: 'Where is your property located?'
+  },
+  res_pg_pg_details: {
+    id: 'res_pg_pg_details',
+    name: 'PG Details',
+    component: 'PGDetails',
+    icon: Building,
+    description: 'PG/Hostel specific details'
+  },
+  res_pg_features: {
+    id: 'res_pg_features',
+    name: 'Features',
+    component: 'AmenitiesSection',
+    icon: Settings,
+    description: 'Amenities and features'
+  },
+  res_pg_review: {
+    id: 'res_pg_review',
+    name: 'Review',
+    component: 'PropertySummary',
+    icon: FileText,
+    description: 'Review and publish'
+  },
   
-  // Sale details
-  sale: [
-    'steps.sale.expectedPrice',
-    'steps.sale.priceNegotiable',
-    'steps.sale.possessionDate',
-    'steps.sale.hasSimilarUnits',
-    'steps.sale.propertyShowOption',
-    'steps.sale.propertyShowPerson',
-    'steps.sale.secondaryNumber',
-    'steps.sale.secondaryContactNumber'
-  ],
+  // Commercial rent steps
+  com_rent_basic_details: {
+    id: 'com_rent_basic_details',
+    name: 'Basic Details',
+    component: 'CommercialBasicDetails',
+    icon: Building,
+    description: 'Tell us about your commercial space'
+  },
+  com_rent_location: {
+    id: 'com_rent_location',
+    name: 'Location',
+    component: 'LocationDetails',
+    icon: MapPin,
+    description: 'Where is your property located?'
+  },
+  com_rent_rental: {
+    id: 'com_rent_rental',
+    name: 'Rental Details',
+    component: 'RentalDetails',
+    icon: DollarSign,
+    description: 'Pricing and rental terms'
+  },
+  com_rent_features: {
+    id: 'com_rent_features',
+    name: 'Features',
+    component: 'CommercialFeatures',
+    icon: Settings,
+    description: 'Amenities and features'
+  },
+  com_rent_review: {
+    id: 'com_rent_review',
+    name: 'Review',
+    component: 'PropertySummary',
+    icon: FileText,
+    description: 'Review and publish'
+  },
   
-  // Flatmate details
-  flatmate_details: [
-    'steps.flatmate_details.preferredGender',
-    'steps.flatmate_details.occupancy',
-    'steps.flatmate_details.foodPreference',
-    'steps.flatmate_details.tenantType',
-    'steps.flatmate_details.roomSharing',
-    'steps.flatmate_details.maxFlatmates',
-    'steps.flatmate_details.currentFlatmates',
-    'steps.flatmate_details.about'
-  ],
+  // Commercial sale steps
+  com_sale_basic_details: {
+    id: 'com_sale_basic_details',
+    name: 'Basic Details',
+    component: 'CommercialBasicDetails',
+    icon: Building,
+    description: 'Tell us about your commercial space'
+  },
+  com_sale_location: {
+    id: 'com_sale_location',
+    name: 'Location',
+    component: 'LocationDetails',
+    icon: MapPin,
+    description: 'Where is your property located?'
+  },
+  com_sale_sale_details: {
+    id: 'com_sale_sale_details',
+    name: 'Sale Details',
+    component: 'CommercialSaleDetails',
+    icon: DollarSign,
+    description: 'Pricing and sale details'
+  },
+  com_sale_features: {
+    id: 'com_sale_features',
+    name: 'Features',
+    component: 'CommercialFeatures',
+    icon: Settings,
+    description: 'Amenities and features'
+  },
+  com_sale_review: {
+    id: 'com_sale_review',
+    name: 'Review',
+    component: 'PropertySummary',
+    icon: FileText,
+    description: 'Review and publish'
+  },
   
-  // PG/Hostel details
-  pg_details: [
-    'steps.pg_details.pgType',
-    'steps.pg_details.mealOptions',
-    'steps.pg_details.roomTypes',
-    'steps.pg_details.occupancyTypes',
-    'steps.pg_details.genderPreference',
-    'steps.pg_details.rules',
-    'steps.pg_details.facilities',
-    'steps.pg_details.noticePolicy'
-  ],
+  // Commercial coworking steps
+  com_cow_basic_details: {
+    id: 'com_cow_basic_details',
+    name: 'Basic Details',
+    component: 'CoworkingBasicDetails',
+    icon: Briefcase,
+    description: 'Tell us about your coworking space'
+  },
+  com_cow_location: {
+    id: 'com_cow_location',
+    name: 'Location',
+    component: 'LocationDetails',
+    icon: MapPin,
+    description: 'Where is your property located?'
+  },
+  com_cow_coworking_details: {
+    id: 'com_cow_coworking_details',
+    name: 'Coworking Details',
+    component: 'CoworkingDetails',
+    icon: Briefcase,
+    description: 'Coworking specific details'
+  },
+  com_cow_features: {
+    id: 'com_cow_features',
+    name: 'Features',
+    component: 'AmenitiesSection',
+    icon: Settings,
+    description: 'Amenities and features'
+  },
+  com_cow_review: {
+    id: 'com_cow_review',
+    name: 'Review',
+    component: 'PropertySummary',
+    icon: FileText,
+    description: 'Review and publish'
+  },
   
-  // Commercial sale details
-  commercial_sale: [
-    'steps.sale.expectedPrice',
-    'steps.sale.priceNegotiable',
-    'steps.sale.possessionDate',
-    'steps.sale.hasSimilarUnits',
-    'steps.sale.propertyShowOption',
-    'steps.sale.propertyShowPerson',
-    'steps.commercial_details.cabins',
-    'steps.commercial_details.meetingRooms',
-    'steps.commercial_details.washrooms',
-    'steps.commercial_details.cornerProperty',
-    'steps.commercial_details.mainRoadFacing'
-  ],
-  
-  // Coworking details
-  coworking: [
-    'steps.coworking.spaceType',
-    'steps.coworking.capacity',
-    'steps.coworking.operatingHours',
-    'steps.coworking.amenities',
-    'steps.coworking.securityDeposit',
-    'steps.coworking.minimumCommitment',
-    'steps.coworking.discounts',
-    'steps.coworking.availableFrom'
-  ],
-  
-  // Land features
-  land_features: [
-    'steps.land_features.approvals',
-    'steps.land_features.boundaryStatus',
-    'steps.land_features.cornerPlot',
-    'steps.land_features.landUseZone',
-    'steps.land_features.description'
-  ],
-  
-  // Review step
-  review: [
-    'finalCheck',
-    'termsAgreed',
-    'readyToPublish',
-    'additionalNotes'
-  ]
+  // Land sale steps
+  land_sale_basic_details: {
+    id: 'land_sale_basic_details',
+    name: 'Basic Details',
+    component: 'LandDetails',
+    icon: Map,
+    description: 'Tell us about your land'
+  },
+  land_sale_location: {
+    id: 'land_sale_location',
+    name: 'Location',
+    component: 'LocationDetails',
+    icon: MapPin,
+    description: 'Where is your land located?'
+  },
+  land_sale_land_features: {
+    id: 'land_sale_land_features',
+    name: 'Land Features',
+    component: 'LandFeaturesDetails',
+    icon: Map,
+    description: 'Land specific features'
+  },
+  land_sale_review: {
+    id: 'land_sale_review',
+    name: 'Review',
+    component: 'PropertySummary',
+    icon: FileText,
+    description: 'Review and publish'
+  }
 };
 
 /**
  * Convert existing step sequences to step objects for compatibility with the useStepNavigation hook
- * This bridges the existing step sequence format with our new flow structure
  */
 export const createStepObjectsFromFlow = (flowType: string) => {
-  // Get the steps for this flow
   const steps = FLOW_STEPS[flowType] || FLOW_STEPS.default;
   
-  // Step icon mappings - Use actual React components instead of strings
-  const stepIcons = {
-    basic_details: Home,
-    location: MapPin,
-    rental: DollarSign,
-    sale: DollarSign,
-    commercial_sale: Building,
-    flatmate_details: Users,
-    pg_details: Building,
-    coworking: Briefcase,
-    land_features: Map,
-    features: Settings,
-    review: FileText
-  };
-  
-  // Step title mappings
-  const stepTitles = {
-    basic_details: 'Basic Details',
-    location: 'Location',
-    rental: 'Rental Details',
-    sale: 'Sale Details',
-    commercial_sale: 'Sale Details',
-    flatmate_details: 'Flatmate Details',
-    pg_details: 'PG Details',
-    coworking: 'Co-working',
-    land_features: 'Land Features',
-    features: 'Features',
-    review: 'Review'
-  };
-  
-  // Convert to step objects format expected by useStepNavigation
-  return steps.map(stepId => ({
-    id: stepId,
-    title: stepTitles[stepId] || stepId.charAt(0).toUpperCase() + stepId.slice(1).replace(/([A-Z])/g, ' $1'),
-    icon: stepIcons[stepId] || Settings
-  }));
+  return steps.map(stepId => {
+    const metadata = STEP_METADATA[stepId];
+    
+    if (!metadata) {
+      console.warn(`No metadata found for step: ${stepId}`);
+      return {
+        id: stepId,
+        title: stepId.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+        icon: Settings
+      };
+    }
+    
+    return {
+      id: metadata.id,
+      title: metadata.name,
+      icon: metadata.icon
+    };
+  });
 };
 
 /**
@@ -322,11 +445,15 @@ export const FLOW_STEP_SEQUENCES = {
   land_sale: createStepObjectsFromFlow('land_sale')
 };
 
+/**
+ * Field mappings are now removed, as data structure will be handled by useStepData hook
+ */
+
 // Export for use in other files
 export default {
   FLOW_TYPES,
   FLOW_STEPS,
   FLOW_STEP_SEQUENCES,
-  STEP_FIELD_MAPPINGS,
+  STEP_METADATA,
   createStepObjectsFromFlow
 };

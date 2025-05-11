@@ -1,29 +1,60 @@
 // src/modules/owner/components/property/wizard/sections/LandFeaturesDetails.tsx
-// Version: 1.0.0
-// Last Modified: 10-04-2025 23:30 IST
-// Purpose: Land/Plot features form section for the Land/Plot Sale property flow
+// Version: 2.0.0
+// Last Modified: 11-05-2025 01:40 IST
+// Purpose: Updated to use flow-based architecture with stepId for proper data capture
 
-import React from 'react';
+import React, { useEffect, useCallback } from 'react';
 import { FormSection } from '@/components/FormSection';
 import { RequiredLabel } from '@/components/ui/RequiredLabel';
 import { Input } from '@/components/ui/input';
-import { Select } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
-import { cn } from '@/lib/utils';
 import { FormSectionProps } from '../types';
 
 const LandFeaturesDetails: React.FC<FormSectionProps> = ({ 
   form,
-  adType
+  stepId = 'land_sale_land_features' // Default stepId for land features
 }) => {
-  const { register, watch, setValue, formState: { errors } } = form;
+  // Custom hooks for step data handling
+  const saveField = useCallback((fieldName: string, value: any) => {
+    const path = `steps.${stepId}.${fieldName}`;
+    console.log(`Saving field ${fieldName} at path ${path}:`, value);
+    form.setValue(path, value, { shouldValidate: true });
+  }, [form, stepId]);
+
+  const getField = useCallback((fieldName: string, defaultValue?: any) => {
+    const path = `steps.${stepId}.${fieldName}`;
+    const value = form.getValues(path);
+    console.log(`Getting field ${fieldName} from path ${path}:`, value);
+    return value ?? defaultValue;
+  }, [form, stepId]);
+
+  // Ensure step structure exists
+  useEffect(() => {
+    // Initialize step structure if it doesn't exist
+    const currentSteps = form.getValues('steps') || {};
+    if (!currentSteps[stepId]) {
+      form.setValue('steps', {
+        ...currentSteps,
+        [stepId]: {}
+      });
+    }
+  }, [stepId, form]);
   
-  // Watch for land type to conditionally display fields
-  const landType = watch('landType');
+  // Get land type to conditionally display fields
+  // This needs to be retrieved from the basic details step
+  const landType = form.getValues('steps.land_sale_basic_details.landType') || '';
   const isResidential = landType === 'Residential Plot';
   const isCommercial = landType === 'Commercial Plot';
   const isAgricultural = landType === 'Agricultural Land';
+  
+  // Helper for checkbox fields
+  const handleCheckboxChange = (fieldName: string, checked: boolean) => {
+    saveField(fieldName, checked);
+  };
+
+  const isChecked = (fieldName: string) => {
+    return getField(fieldName, false);
+  };
   
   return (
     <FormSection
@@ -36,9 +67,12 @@ const LandFeaturesDetails: React.FC<FormSectionProps> = ({
           <p className="text-sm font-medium mb-3">Nearby Developments</p>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             <div className="flex items-center space-x-2">
-              <Checkbox
+              <input
+                type="checkbox"
                 id="nearbySchool"
-                {...register('nearbySchool')}
+                checked={isChecked('nearbySchool')}
+                onChange={(e) => handleCheckboxChange('nearbySchool', e.target.checked)}
+                className="w-5 h-5 rounded border-border text-primary focus:ring-primary/20"
               />
               <label
                 htmlFor="nearbySchool"
@@ -49,9 +83,12 @@ const LandFeaturesDetails: React.FC<FormSectionProps> = ({
             </div>
             
             <div className="flex items-center space-x-2">
-              <Checkbox
+              <input
+                type="checkbox"
                 id="nearbyHospital"
-                {...register('nearbyHospital')}
+                checked={isChecked('nearbyHospital')}
+                onChange={(e) => handleCheckboxChange('nearbyHospital', e.target.checked)}
+                className="w-5 h-5 rounded border-border text-primary focus:ring-primary/20"
               />
               <label
                 htmlFor="nearbyHospital"
@@ -62,9 +99,12 @@ const LandFeaturesDetails: React.FC<FormSectionProps> = ({
             </div>
             
             <div className="flex items-center space-x-2">
-              <Checkbox
+              <input
+                type="checkbox"
                 id="nearbyMarket"
-                {...register('nearbyMarket')}
+                checked={isChecked('nearbyMarket')}
+                onChange={(e) => handleCheckboxChange('nearbyMarket', e.target.checked)}
+                className="w-5 h-5 rounded border-border text-primary focus:ring-primary/20"
               />
               <label
                 htmlFor="nearbyMarket"
@@ -75,9 +115,12 @@ const LandFeaturesDetails: React.FC<FormSectionProps> = ({
             </div>
             
             <div className="flex items-center space-x-2">
-              <Checkbox
+              <input
+                type="checkbox"
                 id="nearbyStation"
-                {...register('nearbyStation')}
+                checked={isChecked('nearbyStation')}
+                onChange={(e) => handleCheckboxChange('nearbyStation', e.target.checked)}
+                className="w-5 h-5 rounded border-border text-primary focus:ring-primary/20"
               />
               <label
                 htmlFor="nearbyStation"
@@ -88,9 +131,12 @@ const LandFeaturesDetails: React.FC<FormSectionProps> = ({
             </div>
             
             <div className="flex items-center space-x-2">
-              <Checkbox
+              <input
+                type="checkbox"
                 id="nearbyAirport"
-                {...register('nearbyAirport')}
+                checked={isChecked('nearbyAirport')}
+                onChange={(e) => handleCheckboxChange('nearbyAirport', e.target.checked)}
+                className="w-5 h-5 rounded border-border text-primary focus:ring-primary/20"
               />
               <label
                 htmlFor="nearbyAirport"
@@ -101,9 +147,12 @@ const LandFeaturesDetails: React.FC<FormSectionProps> = ({
             </div>
             
             <div className="flex items-center space-x-2">
-              <Checkbox
+              <input
+                type="checkbox"
                 id="nearbyHighway"
-                {...register('nearbyHighway')}
+                checked={isChecked('nearbyHighway')}
+                onChange={(e) => handleCheckboxChange('nearbyHighway', e.target.checked)}
+                className="w-5 h-5 rounded border-border text-primary focus:ring-primary/20"
               />
               <label
                 htmlFor="nearbyHighway"
@@ -121,9 +170,12 @@ const LandFeaturesDetails: React.FC<FormSectionProps> = ({
             <p className="text-sm font-medium mb-3">Residential Plot Features</p>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               <div className="flex items-center space-x-2">
-                <Checkbox
+                <input
+                  type="checkbox"
                   id="gatedCommunity"
-                  {...register('gatedCommunity')}
+                  checked={isChecked('gatedCommunity')}
+                  onChange={(e) => handleCheckboxChange('gatedCommunity', e.target.checked)}
+                  className="w-5 h-5 rounded border-border text-primary focus:ring-primary/20"
                 />
                 <label
                   htmlFor="gatedCommunity"
@@ -134,9 +186,12 @@ const LandFeaturesDetails: React.FC<FormSectionProps> = ({
               </div>
               
               <div className="flex items-center space-x-2">
-                <Checkbox
+                <input
+                  type="checkbox"
                   id="cornerPlot"
-                  {...register('cornerPlot')}
+                  checked={isChecked('cornerPlot')}
+                  onChange={(e) => handleCheckboxChange('cornerPlot', e.target.checked)}
+                  className="w-5 h-5 rounded border-border text-primary focus:ring-primary/20"
                 />
                 <label
                   htmlFor="cornerPlot"
@@ -147,9 +202,12 @@ const LandFeaturesDetails: React.FC<FormSectionProps> = ({
               </div>
               
               <div className="flex items-center space-x-2">
-                <Checkbox
+                <input
+                  type="checkbox"
                   id="parkFacing"
-                  {...register('parkFacing')}
+                  checked={isChecked('parkFacing')}
+                  onChange={(e) => handleCheckboxChange('parkFacing', e.target.checked)}
+                  className="w-5 h-5 rounded border-border text-primary focus:ring-primary/20"
                 />
                 <label
                   htmlFor="parkFacing"
@@ -160,9 +218,12 @@ const LandFeaturesDetails: React.FC<FormSectionProps> = ({
               </div>
               
               <div className="flex items-center space-x-2">
-                <Checkbox
+                <input
+                  type="checkbox"
                   id="eastFacing"
-                  {...register('eastFacing')}
+                  checked={isChecked('eastFacing')}
+                  onChange={(e) => handleCheckboxChange('eastFacing', e.target.checked)}
+                  className="w-5 h-5 rounded border-border text-primary focus:ring-primary/20"
                 />
                 <label
                   htmlFor="eastFacing"
@@ -173,323 +234,391 @@ const LandFeaturesDetails: React.FC<FormSectionProps> = ({
               </div>
               
               <div className="flex items-center space-x-2">
-                <Checkbox
+                <input
+                  type="checkbox"
                   id="waterConnection"
-                  {...register('waterConnection')}
+                  checked={isChecked('waterConnection')}
+                  onChange={(e) => handleCheckboxChange('waterConnection', e.target.checked)}
+                  className="w-5 h-5 rounded border-border text-primary focus:ring-primary/20"
                 />
                 <label
                   htmlFor="waterConnection"
                   className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                >
-                  Water Connection
-                </label>
-              </div>
-              
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="sewerConnection"
-                  {...register('sewerConnection')}
-                />
-                <label
-                  htmlFor="sewerConnection"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                >
-                  Sewer Connection
-                </label>
-              </div>
-            </div>
-          </div>
-        )}
-        
-        {isCommercial && (
-          <div>
-            <p className="text-sm font-medium mb-3">Commercial Plot Features</p>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="mainRoadFacing"
-                  {...register('mainRoadFacing')}
-                />
-                <label
-                  htmlFor="mainRoadFacing"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                >
-                  Main Road Facing
-                </label>
-              </div>
-              
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="cornerCommercialPlot"
-                  {...register('cornerCommercialPlot')}
-                />
-                <label
-                  htmlFor="cornerCommercialPlot"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                >
-                  Corner Plot
-                </label>
-              </div>
-              
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="commercialComplex"
-                  {...register('commercialComplex')}
-                />
-                <label
-                  htmlFor="commercialComplex"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                >
-                  Commercial Complex
-                </label>
-              </div>
-              
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="industrialZone"
-                  {...register('industrialZone')}
-                />
-                <label
-                  htmlFor="industrialZone"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                >
-                  Industrial Zone
-                </label>
-              </div>
-              
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="businessPark"
-                  {...register('businessPark')}
-                />
-                <label
-                  htmlFor="businessPark"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                >
-                  Business Park
-                </label>
-              </div>
-              
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="highFootfall"
-                  {...register('highFootfall')}
-                />
-                <label
-                  htmlFor="highFootfall"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                >
-                  High Footfall Area
-                </label>
-              </div>
-            </div>
-          </div>
-        )}
-        
-        {isAgricultural && (
-          <div>
-            <p className="text-sm font-medium mb-3">Agricultural Land Features</p>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="irrigationFacility"
-                  {...register('irrigationFacility')}
-                />
-                <label
-                  htmlFor="irrigationFacility"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                >
-                  Irrigation Facility
-                </label>
-              </div>
-              
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="farmHouse"
-                  {...register('farmHouse')}
-                />
-                <label
-                  htmlFor="farmHouse"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                >
-                  Farm House
-                </label>
-              </div>
-              
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="borewellTubewell"
-                  {...register('borewellTubewell')}
-                />
-                <label
-                  htmlFor="borewellTubewell"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                >
-                  Borewell/Tubewell
-                </label>
-              </div>
-              
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="organicFarming"
-                  {...register('organicFarming')}
-                />
-                <label
-                  htmlFor="organicFarming"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                >
-                  Organic Farming
-                </label>
-              </div>
-              
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="riverCanal"
-                  {...register('riverCanal')}
-                />
-                <label
-                  htmlFor="riverCanal"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                >
-                  River/Canal Nearby
-                </label>
-              </div>
-            </div>
-          </div>
-        )}
-        
-        {/* Distance from Key Landmarks */}
-        <div>
-          <p className="text-sm font-medium mb-3">Distance from Key Locations (in km)</p>
-          <div className="grid md:grid-cols-2 gap-4">
-            <div className="grid gap-3">
-              <RequiredLabel htmlFor="distanceFromCity">
-                Distance from City Center
-              </RequiredLabel>
-              <Input
-                id="distanceFromCity"
-                type="number"
-                placeholder="e.g., 5"
-                error={errors.distanceFromCity?.message}
-                {...register('distanceFromCity')}
-              />
+              >
+                Water Connection
+              </label>
             </div>
             
-            <div className="grid gap-3">
-              <RequiredLabel htmlFor="distanceFromHighway">
-                Distance from Highway
-              </RequiredLabel>
-              <Input
-                id="distanceFromHighway"
-                type="number"
-                placeholder="e.g., 2"
-                error={errors.distanceFromHighway?.message}
-                {...register('distanceFromHighway')}
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="sewerConnection"
+                checked={isChecked('sewerConnection')}
+                onChange={(e) => handleCheckboxChange('sewerConnection', e.target.checked)}
+                className="w-5 h-5 rounded border-border text-primary focus:ring-primary/20"
               />
+              <label
+                htmlFor="sewerConnection"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              >
+                Sewer Connection
+              </label>
             </div>
           </div>
         </div>
-        
-        {/* Property Documents */}
+      )}
+      
+      {isCommercial && (
         <div>
-          <p className="text-sm font-medium mb-3">Available Documents</p>
+          <p className="text-sm font-medium mb-3">Commercial Plot Features</p>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             <div className="flex items-center space-x-2">
-              <Checkbox
-                id="titleDeed"
-                {...register('titleDeed')}
+              <input
+                type="checkbox"
+                id="mainRoadFacing"
+                checked={isChecked('mainRoadFacing')}
+                onChange={(e) => handleCheckboxChange('mainRoadFacing', e.target.checked)}
+                className="w-5 h-5 rounded border-border text-primary focus:ring-primary/20"
               />
               <label
-                htmlFor="titleDeed"
+                htmlFor="mainRoadFacing"
                 className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
               >
-                Title Deed
+                Main Road Facing
               </label>
             </div>
             
             <div className="flex items-center space-x-2">
-              <Checkbox
-                id="encumbranceCertificate"
-                {...register('encumbranceCertificate')}
+              <input
+                type="checkbox"
+                id="cornerCommercialPlot"
+                checked={isChecked('cornerCommercialPlot')}
+                onChange={(e) => handleCheckboxChange('cornerCommercialPlot', e.target.checked)}
+                className="w-5 h-5 rounded border-border text-primary focus:ring-primary/20"
               />
               <label
-                htmlFor="encumbranceCertificate"
+                htmlFor="cornerCommercialPlot"
                 className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
               >
-                Encumbrance Certificate
+                Corner Plot
               </label>
             </div>
             
             <div className="flex items-center space-x-2">
-              <Checkbox
-                id="approvalLetters"
-                {...register('approvalLetters')}
+              <input
+                type="checkbox"
+                id="commercialComplex"
+                checked={isChecked('commercialComplex')}
+                onChange={(e) => handleCheckboxChange('commercialComplex', e.target.checked)}
+                className="w-5 h-5 rounded border-border text-primary focus:ring-primary/20"
               />
               <label
-                htmlFor="approvalLetters"
+                htmlFor="commercialComplex"
                 className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
               >
-                Approval Letters
+                Commercial Complex
               </label>
             </div>
             
             <div className="flex items-center space-x-2">
-              <Checkbox
-                id="taxReceipts"
-                {...register('taxReceipts')}
+              <input
+                type="checkbox"
+                id="industrialZone"
+                checked={isChecked('industrialZone')}
+                onChange={(e) => handleCheckboxChange('industrialZone', e.target.checked)}
+                className="w-5 h-5 rounded border-border text-primary focus:ring-primary/20"
               />
               <label
-                htmlFor="taxReceipts"
+                htmlFor="industrialZone"
                 className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
               >
-                Tax Receipts
+                Industrial Zone
               </label>
             </div>
             
             <div className="flex items-center space-x-2">
-              <Checkbox
-                id="landSurveyReport"
-                {...register('landSurveyReport')}
+              <input
+                type="checkbox"
+                id="businessPark"
+                checked={isChecked('businessPark')}
+                onChange={(e) => handleCheckboxChange('businessPark', e.target.checked)}
+                className="w-5 h-5 rounded border-border text-primary focus:ring-primary/20"
               />
               <label
-                htmlFor="landSurveyReport"
+                htmlFor="businessPark"
                 className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
               >
-                Land Survey Report
+                Business Park
               </label>
             </div>
             
             <div className="flex items-center space-x-2">
-              <Checkbox
-                id="conversionOrder"
-                {...register('conversionOrder')}
+              <input
+                type="checkbox"
+                id="highFootfall"
+                checked={isChecked('highFootfall')}
+                onChange={(e) => handleCheckboxChange('highFootfall', e.target.checked)}
+                className="w-5 h-5 rounded border-border text-primary focus:ring-primary/20"
               />
               <label
-                htmlFor="conversionOrder"
+                htmlFor="highFootfall"
                 className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
               >
-                Conversion Order
+                High Footfall Area
               </label>
             </div>
           </div>
         </div>
-        
-        {/* Landmarks and Important Places */}
-        <div className="grid gap-3">
-          <RequiredLabel htmlFor="nearbyLandmarks">
-            Nearby Landmarks
-          </RequiredLabel>
-          <Textarea
-            id="nearbyLandmarks"
-            placeholder="Describe important landmarks near your land/plot..."
-            error={errors.nearbyLandmarks?.message}
-            {...register('nearbyLandmarks')}
-            rows={3}
-          />
+      )}
+      
+      {isAgricultural && (
+        <div>
+          <p className="text-sm font-medium mb-3">Agricultural Land Features</p>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="irrigationFacility"
+                checked={isChecked('irrigationFacility')}
+                onChange={(e) => handleCheckboxChange('irrigationFacility', e.target.checked)}
+                className="w-5 h-5 rounded border-border text-primary focus:ring-primary/20"
+              />
+              <label
+                htmlFor="irrigationFacility"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              >
+                Irrigation Facility
+              </label>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="farmHouse"
+                checked={isChecked('farmHouse')}
+                onChange={(e) => handleCheckboxChange('farmHouse', e.target.checked)}
+                className="w-5 h-5 rounded border-border text-primary focus:ring-primary/20"
+              />
+              <label
+                htmlFor="farmHouse"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              >
+                Farm House
+              </label>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="borewellTubewell"
+                checked={isChecked('borewellTubewell')}
+                onChange={(e) => handleCheckboxChange('borewellTubewell', e.target.checked)}
+                className="w-5 h-5 rounded border-border text-primary focus:ring-primary/20"
+              />
+              <label
+                htmlFor="borewellTubewell"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              >
+                Borewell/Tubewell
+              </label>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="organicFarming"
+                checked={isChecked('organicFarming')}
+                onChange={(e) => handleCheckboxChange('organicFarming', e.target.checked)}
+                className="w-5 h-5 rounded border-border text-primary focus:ring-primary/20"
+              />
+              <label
+                htmlFor="organicFarming"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              >
+                Organic Farming
+              </label>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="riverCanal"
+                checked={isChecked('riverCanal')}
+                onChange={(e) => handleCheckboxChange('riverCanal', e.target.checked)}
+                className="w-5 h-5 rounded border-border text-primary focus:ring-primary/20"
+              />
+              <label
+                htmlFor="riverCanal"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              >
+                River/Canal Nearby
+              </label>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Distance from Key Landmarks */}
+      <div>
+        <p className="text-sm font-medium mb-3">Distance from Key Locations (in km)</p>
+        <div className="grid md:grid-cols-2 gap-4">
+          <div className="grid gap-3">
+            <RequiredLabel htmlFor="distanceFromCity">
+              Distance from City Center
+            </RequiredLabel>
+            <Input
+              id="distanceFromCity"
+              type="number"
+              placeholder="e.g., 5"
+              value={getField('distanceFromCity', '')}
+              onChange={(e) => saveField('distanceFromCity', e.target.value)}
+            />
+          </div>
+          
+          <div className="grid gap-3">
+            <RequiredLabel htmlFor="distanceFromHighway">
+              Distance from Highway
+            </RequiredLabel>
+            <Input
+              id="distanceFromHighway"
+              type="number"
+              placeholder="e.g., 2"
+              value={getField('distanceFromHighway', '')}
+              onChange={(e) => saveField('distanceFromHighway', e.target.value)}
+            />
+          </div>
         </div>
       </div>
-    </FormSection>
-  );
+      
+      {/* Property Documents */}
+      <div>
+        <p className="text-sm font-medium mb-3">Available Documents</p>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          <div className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              id="titleDeed"
+              checked={isChecked('titleDeed')}
+              onChange={(e) => handleCheckboxChange('titleDeed', e.target.checked)}
+              className="w-5 h-5 rounded border-border text-primary focus:ring-primary/20"
+            />
+            <label
+              htmlFor="titleDeed"
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            >
+              Title Deed
+            </label>
+          </div>
+          
+          <div className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              id="encumbranceCertificate"
+              checked={isChecked('encumbranceCertificate')}
+              onChange={(e) => handleCheckboxChange('encumbranceCertificate', e.target.checked)}
+              className="w-5 h-5 rounded border-border text-primary focus:ring-primary/20"
+            />
+            <label
+              htmlFor="encumbranceCertificate"
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            >
+              Encumbrance Certificate
+            </label>
+          </div>
+          
+          <div className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              id="approvalLetters"
+              checked={isChecked('approvalLetters')}
+              onChange={(e) => handleCheckboxChange('approvalLetters', e.target.checked)}
+              className="w-5 h-5 rounded border-border text-primary focus:ring-primary/20"
+            />
+            <label
+              htmlFor="approvalLetters"
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            >
+              Approval Letters
+            </label>
+          </div>
+          
+          <div className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              id="taxReceipts"
+              checked={isChecked('taxReceipts')}
+              onChange={(e) => handleCheckboxChange('taxReceipts', e.target.checked)}
+              className="w-5 h-5 rounded border-border text-primary focus:ring-primary/20"
+            />
+            <label
+              htmlFor="taxReceipts"
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            >
+              Tax Receipts
+            </label>
+          </div>
+          
+          <div className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              id="landSurveyReport"
+              checked={isChecked('landSurveyReport')}
+              onChange={(e) => handleCheckboxChange('landSurveyReport', e.target.checked)}
+              className="w-5 h-5 rounded border-border text-primary focus:ring-primary/20"
+            />
+            <label
+              htmlFor="landSurveyReport"
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            >
+              Land Survey Report
+            </label>
+          </div>
+          
+          <div className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              id="conversionOrder"
+              checked={isChecked('conversionOrder')}
+              onChange={(e) => handleCheckboxChange('conversionOrder', e.target.checked)}
+              className="w-5 h-5 rounded border-border text-primary focus:ring-primary/20"
+            />
+            <label
+              htmlFor="conversionOrder"
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            >
+              Conversion Order
+            </label>
+          </div>
+        </div>
+      </div>
+      
+      {/* Landmarks and Important Places */}
+      <div className="grid gap-3">
+        <RequiredLabel htmlFor="nearbyLandmarks">
+          Nearby Landmarks
+        </RequiredLabel>
+        <Textarea
+          id="nearbyLandmarks"
+          placeholder="Describe important landmarks near your land/plot..."
+          value={getField('nearbyLandmarks', '')}
+          onChange={(e) => saveField('nearbyLandmarks', e.target.value)}
+          rows={3}
+        />
+      </div>
+    </div>
+
+    {/* Debug info in development */}
+    {process.env.NODE_ENV === 'development' && (
+      <div className="mt-4 p-2 bg-gray-100 rounded text-xs space-y-2">
+        <div>Step ID: {stepId}</div>
+        <div>Current step data:</div>
+        <pre className="text-xs overflow-auto max-h-40 bg-white p-2 rounded border">
+          {JSON.stringify(form.getValues(`steps.${stepId}`), null, 2)}
+        </pre>
+      </div>
+    )}
+  </FormSection>
+);
 };
 
 export default LandFeaturesDetails;

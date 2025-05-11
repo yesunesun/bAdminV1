@@ -1,18 +1,16 @@
 // src/modules/owner/components/property/wizard/sections/CommercialFeatures.tsx
-// Version: 1.1.0
-// Last Modified: 12-04-2025 19:15 IST
-// Purpose: Specialized features component for Commercial Rent properties with additional required fields
+// Version: 2.0.0
+// Last Modified: 11-05-2025 01:15 IST
+// Purpose: Updated to use flow-based architecture with stepId for proper data capture
 
-import React from 'react';
-import { UseFormReturn } from 'react-hook-form';
-import { FormData } from '../types';
-import { FURNISHING_OPTIONS, PARKING_OPTIONS } from '../constants';
+import React, { useCallback, useEffect } from 'react';
+import { FormSectionProps } from '../types';
+import { FURNISHING_OPTIONS } from '../constants';
 import { FormSection } from '@/components/FormSection';
 import { RequiredLabel } from '@/components/ui/RequiredLabel';
-import { checkbox } from '@/components/ui/checkbox';
-import { input } from '@/components/ui/input';
-import { select } from '@/components/ui/select';
-import { textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { Info } from 'lucide-react';
 
@@ -97,22 +95,58 @@ const CURRENT_BUSINESS_OPTIONS = [
 ] as const;
 const SIMILAR_UNITS_OPTIONS = ['Yes', 'No'] as const;
 
-interface CommercialFeaturesProps {
-  form: UseFormReturn<FormData>;
-  adType: string;
-}
-
-const CommercialFeatures = ({
+const CommercialFeatures: React.FC<FormSectionProps> = ({
   form,
-  adType
-}: CommercialFeaturesProps) => {
-  const { register, watch, formState: { errors } } = form;
+  stepId = 'com_rent_features' // Default stepId for commercial features
+}) => {
+  // Custom hooks for step data handling
+  const saveField = useCallback((fieldName: string, value: any) => {
+    const path = `steps.${stepId}.${fieldName}`;
+    console.log(`Saving field ${fieldName} at path ${path}:`, value);
+    form.setValue(path, value, { shouldValidate: true });
+  }, [form, stepId]);
 
-  // Get form values
-  const furnishingType = watch('furnishingType');
-  const hasParking = watch('hasParking');
-  const propertyCondition = watch('propertyCondition');
-  const hasSimilarUnits = watch('hasSimilarUnits');
+  const getField = useCallback((fieldName: string, defaultValue?: any) => {
+    const path = `steps.${stepId}.${fieldName}`;
+    const value = form.getValues(path);
+    console.log(`Getting field ${fieldName} from path ${path}:`, value);
+    return value ?? defaultValue;
+  }, [form, stepId]);
+
+  // Ensure step structure exists
+  useEffect(() => {
+    // Initialize step structure if it doesn't exist
+    const currentSteps = form.getValues('steps') || {};
+    if (!currentSteps[stepId]) {
+      form.setValue('steps', {
+        ...currentSteps,
+        [stepId]: {}
+      });
+    }
+  }, [stepId, form]);
+
+  // Get current values for conditional rendering
+  const furnishingType = getField('furnishingType', '');
+  const propertyCondition = getField('propertyCondition', '');
+
+  // Helper for checkbox arrays
+  const handleCheckboxChange = (fieldName: string, value: string, checked: boolean) => {
+    const currentValues = getField(fieldName, []);
+    let newValues;
+    
+    if (checked) {
+      newValues = [...currentValues, value];
+    } else {
+      newValues = currentValues.filter((v: string) => v !== value);
+    }
+    
+    saveField(fieldName, newValues);
+  };
+
+  const isChecked = (fieldName: string, value: string) => {
+    const currentValues = getField(fieldName, []);
+    return currentValues.includes(value);
+  };
 
   return (
     <div className="space-y-8">
@@ -125,7 +159,8 @@ const CommercialFeatures = ({
             <select
               id="powerBackup"
               className="w-full px-4 py-3 rounded-xl border border-border bg-background"
-              {...register('powerBackup', { required: 'Power backup is required' })}
+              value={getField('powerBackup', '')}
+              onChange={(e) => saveField('powerBackup', e.target.value)}
             >
               <option value="">Select Power Backup</option>
               {POWER_BACKUP_OPTIONS.map((option) => (
@@ -134,9 +169,6 @@ const CommercialFeatures = ({
                 </option>
               ))}
             </select>
-            {errors.powerBackup && (
-              <p className="mt-1 text-sm text-destructive">{errors.powerBackup.message as string}</p>
-            )}
           </div>
 
           {/* Lift - Required */}
@@ -145,7 +177,8 @@ const CommercialFeatures = ({
             <select
               id="lift"
               className="w-full px-4 py-3 rounded-xl border border-border bg-background"
-              {...register('lift', { required: 'Lift information is required' })}
+              value={getField('lift', '')}
+              onChange={(e) => saveField('lift', e.target.value)}
             >
               <option value="">Select Lift Option</option>
               {LIFT_OPTIONS.map((option) => (
@@ -154,9 +187,6 @@ const CommercialFeatures = ({
                 </option>
               ))}
             </select>
-            {errors.lift && (
-              <p className="mt-1 text-sm text-destructive">{errors.lift.message as string}</p>
-            )}
           </div>
 
           {/* Parking - Required */}
@@ -165,7 +195,8 @@ const CommercialFeatures = ({
             <select
               id="parkingType"
               className="w-full px-4 py-3 rounded-xl border border-border bg-background"
-              {...register('parkingType', { required: 'Parking information is required' })}
+              value={getField('parkingType', '')}
+              onChange={(e) => saveField('parkingType', e.target.value)}
             >
               <option value="">Select Parking Type</option>
               {PARKING_TYPE_OPTIONS.map((option) => (
@@ -174,9 +205,6 @@ const CommercialFeatures = ({
                 </option>
               ))}
             </select>
-            {errors.parkingType && (
-              <p className="mt-1 text-sm text-destructive">{errors.parkingType.message as string}</p>
-            )}
           </div>
 
           {/* Washroom(s) - Required */}
@@ -185,7 +213,8 @@ const CommercialFeatures = ({
             <select
               id="washroomType"
               className="w-full px-4 py-3 rounded-xl border border-border bg-background"
-              {...register('washroomType', { required: 'Washroom information is required' })}
+              value={getField('washroomType', '')}
+              onChange={(e) => saveField('washroomType', e.target.value)}
             >
               <option value="">Select Washroom Type</option>
               {WASHROOM_OPTIONS.map((option) => (
@@ -194,9 +223,6 @@ const CommercialFeatures = ({
                 </option>
               ))}
             </select>
-            {errors.washroomType && (
-              <p className="mt-1 text-sm text-destructive">{errors.washroomType.message as string}</p>
-            )}
           </div>
 
           {/* Water Storage Facility */}
@@ -207,7 +233,8 @@ const CommercialFeatures = ({
             <select
               id="waterStorage"
               className="w-full px-4 py-3 rounded-xl border border-border bg-background"
-              {...register('waterStorage')}
+              value={getField('waterStorage', '')}
+              onChange={(e) => saveField('waterStorage', e.target.value)}
             >
               <option value="">Select Option</option>
               {WATER_STORAGE_OPTIONS.map((option) => (
@@ -226,7 +253,8 @@ const CommercialFeatures = ({
             <select
               id="security"
               className="w-full px-4 py-3 rounded-xl border border-border bg-background"
-              {...register('security')}
+              value={getField('security', '')}
+              onChange={(e) => saveField('security', e.target.value)}
             >
               <option value="">Select Option</option>
               {SECURITY_OPTIONS.map((option) => (
@@ -247,7 +275,8 @@ const CommercialFeatures = ({
             <select
               id="propertyCondition"
               className="w-full px-4 py-3 rounded-xl border border-border bg-background"
-              {...register('propertyCondition', { required: 'Property condition is required' })}
+              value={propertyCondition}
+              onChange={(e) => saveField('propertyCondition', e.target.value)}
             >
               <option value="">Select Current Condition</option>
               {PROPERTY_CONDITION_OPTIONS.map((option) => (
@@ -256,9 +285,6 @@ const CommercialFeatures = ({
                 </option>
               ))}
             </select>
-            {errors.propertyCondition && (
-              <p className="mt-1 text-sm text-destructive">{errors.propertyCondition.message as string}</p>
-            )}
           </div>
 
           {/* Conditional field if "Own Business" is selected */}
@@ -268,7 +294,8 @@ const CommercialFeatures = ({
               <select
                 id="currentBusiness"
                 className="w-full px-4 py-3 rounded-xl border border-border bg-background"
-                {...register('currentBusiness', { required: 'Current business information is required' })}
+                value={getField('currentBusiness', '')}
+                onChange={(e) => saveField('currentBusiness', e.target.value)}
               >
                 <option value="">Select Business Type</option>
                 {CURRENT_BUSINESS_OPTIONS.map((option) => (
@@ -277,9 +304,6 @@ const CommercialFeatures = ({
                   </option>
                 ))}
               </select>
-              {errors.currentBusiness && (
-                <p className="mt-1 text-sm text-destructive">{errors.currentBusiness.message as string}</p>
-              )}
             </div>
           )}
 
@@ -293,7 +317,8 @@ const CommercialFeatures = ({
                     id={`similar-units-${option}`}
                     value={option}
                     className="w-4 h-4 text-primary border-border focus:ring-primary/20"
-                    {...register('hasSimilarUnits')}
+                    checked={getField('hasSimilarUnits', '') === option}
+                    onChange={(e) => saveField('hasSimilarUnits', e.target.value)}
                   />
                   <label htmlFor={`similar-units-${option}`} className="ml-2 text-sm">
                     {option}
@@ -316,7 +341,8 @@ const CommercialFeatures = ({
                   id={`furnishing-${option}`}
                   value={option}
                   className="peer absolute h-full w-full cursor-pointer opacity-0"
-                  {...register('furnishingType')}
+                  checked={furnishingType === option}
+                  onChange={(e) => saveField('furnishingType', e.target.value)}
                 />
                 <label
                   htmlFor={`furnishing-${option}`}
@@ -340,7 +366,8 @@ const CommercialFeatures = ({
                 id="furnishingDetails"
                 className="w-full px-4 py-3 rounded-xl border border-border bg-background"
                 placeholder="Describe what furnishing is included (e.g., workstations, chairs, tables, storage units, etc.)"
-                {...register('furnishingDetails')}
+                value={getField('furnishingDetails', '')}
+                onChange={(e) => saveField('furnishingDetails', e.target.value)}
               />
             </div>
           )}
@@ -356,8 +383,8 @@ const CommercialFeatures = ({
                 type="checkbox"
                 id={`amenity-${amenity}`}
                 className="w-5 h-5 rounded border-border text-primary focus:ring-primary/20"
-                value={amenity}
-                {...register('amenities')}
+                checked={isChecked('amenities', amenity)}
+                onChange={(e) => handleCheckboxChange('amenities', amenity, e.target.checked)}
               />
               <label htmlFor={`amenity-${amenity}`} className="ml-2 text-sm">
                 {amenity}
@@ -376,8 +403,8 @@ const CommercialFeatures = ({
                 type="checkbox"
                 id={`facility-${facility}`}
                 className="w-5 h-5 rounded border-border text-primary focus:ring-primary/20"
-                value={facility}
-                {...register('facilities')}
+                checked={isChecked('facilities', facility)}
+                onChange={(e) => handleCheckboxChange('facilities', facility, e.target.checked)}
               />
               <label htmlFor={`facility-${facility}`} className="ml-2 text-sm">
                 {facility}
@@ -396,8 +423,8 @@ const CommercialFeatures = ({
                 type="checkbox"
                 id={`infrastructure-${feature}`}
                 className="w-5 h-5 rounded border-border text-primary focus:ring-primary/20"
-                value={feature}
-                {...register('infrastructureFeatures')}
+                checked={isChecked('infrastructureFeatures', feature)}
+                onChange={(e) => handleCheckboxChange('infrastructureFeatures', feature, e.target.checked)}
               />
               <label htmlFor={`infrastructure-${feature}`} className="ml-2 text-sm">
                 {feature}
@@ -422,7 +449,8 @@ const CommercialFeatures = ({
                 id="directionsTip"
                 className="w-full px-4 py-3 rounded-xl border border-border bg-background min-h-24"
                 placeholder="Provide directions using nearby landmarks..."
-                {...register('directionsTip')}
+                value={getField('directionsTip', '')}
+                onChange={(e) => saveField('directionsTip', e.target.value)}
               />
               <div className="mt-2 flex items-start text-xs text-muted-foreground">
                 <Info className="h-4 w-4 mr-1 flex-shrink-0 mt-0.5" />
@@ -440,11 +468,23 @@ const CommercialFeatures = ({
               id="additionalFeatures"
               className="w-full px-4 py-3 rounded-xl border border-border bg-background min-h-32"
               placeholder="Add any other unique features of your commercial property (e.g., green building certification, proximity to business hubs, etc.)"
-              {...register('additionalFeatures')}
+              value={getField('additionalFeatures', '')}
+              onChange={(e) => saveField('additionalFeatures', e.target.value)}
             />
           </div>
         </div>
       </FormSection>
+
+      {/* Debug info in development */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="mt-4 p-2 bg-gray-100 rounded text-xs space-y-2">
+          <div>Step ID: {stepId}</div>
+          <div>Current step data:</div>
+          <pre className="text-xs overflow-auto max-h-40 bg-white p-2 rounded border">
+            {JSON.stringify(form.getValues(`steps.${stepId}`), null, 2)}
+          </pre>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/types.ts
-// Version: 5.2.0
-// Last Modified: 11-05-2025 21:00 IST
-// Purpose: Updated to better align with flow-based JSON structure
+// Version: 6.0.0
+// Last Modified: 18-05-2025 15:40 IST
+// Purpose: Updated to support flow-specific step identifiers in data structure
 
 import { UseFormReturn } from 'react-hook-form';
 
@@ -13,7 +13,7 @@ export interface PropertyImage {
   displayOrder: number;
 }
 
-// V3 Form Data Structure with restructured fields
+// Form Data Structure with flow-specific step identifiers
 export interface FormData {
   // Metadata section
   meta?: {
@@ -31,150 +31,57 @@ export interface FormData {
     listingType: string;
   };
   
-  // Direct steps container - this is where most wizard data should be stored
+  // Steps container with flow-specific identifiers
   steps?: {
-    basic_details?: {
-      title?: string;
-      propertyType?: string;
-      bhkType?: string;
-      floor?: number | null;
-      totalFloors?: number | null;
-      builtUpArea?: number | null;
-      builtUpAreaUnit?: 'sqft' | 'sqyd';
-      bathrooms?: number | null;
-      balconies?: number | null;
-      facing?: string;
-      propertyAge?: string;
-      propertyCondition?: string;
-      hasBalcony?: boolean;
-      hasAC?: boolean;
-      [key: string]: any; // Allow additional properties based on property type
-    };
+    // Residential rent steps
+    res_rent_basic_details?: StepData;
+    res_rent_location?: StepData;
+    res_rent_rental?: StepData;
+    res_rent_features?: StepData;
     
-    // Location details
-    location?: {
-      address?: string;
-      flatPlotNo?: string;
-      landmark?: string;
-      locality?: string;
-      city?: string;
-      state?: string;
-      pinCode?: string;
-      coordinates?: {
-        latitude: number | null;
-        longitude: number | null;
-      };
-      [key: string]: any;
-    };
+    // Residential sale steps
+    res_sale_basic_details?: StepData;
+    res_sale_location?: StepData;
+    res_sale_sale_details?: StepData;
+    res_sale_features?: StepData;
     
-    // Rental details (only relevant for rental properties)
-    rental?: {
-      rentAmount?: number | null;
-      securityDeposit?: number | null;
-      maintenanceCharges?: number | null;
-      rentNegotiable?: boolean;
-      availableFrom?: string;
-      preferredTenants?: string[];
-      leaseDuration?: string;
-      furnishingStatus?: string;
-      hasSimilarUnits?: boolean;
-      propertyShowOption?: string;
-      propertyShowPerson?: string;
-      secondaryNumber?: string;
-      secondaryContactNumber?: string;
-      [key: string]: any;
-    };
+    // Residential flatmates steps
+    res_flat_basic_details?: StepData;
+    res_flat_location?: StepData;
+    res_flat_flatmate_details?: StepData;
+    res_flat_features?: StepData;
     
-    // Sale details (only relevant for sale properties)
-    sale?: {
-      expectedPrice?: number | null;
-      priceNegotiable?: boolean;
-      possessionDate?: string;
-      hasSimilarUnits?: boolean;
-      propertyShowOption?: string;
-      propertyShowPerson?: string;
-      secondaryNumber?: string;
-      secondaryContactNumber?: string;
-      [key: string]: any;
-    };
+    // Residential PG/Hostel steps
+    res_pg_basic_details?: StepData;
+    res_pg_location?: StepData;
+    res_pg_pg_details?: StepData;
+    res_pg_features?: StepData;
     
-    // Features and amenities
-    features?: {
-      amenities?: string[];
-      parking?: string;
-      petFriendly?: boolean;
-      nonVegAllowed?: boolean;
-      waterSupply?: string;
-      powerBackup?: string;
-      gatedSecurity?: boolean;
-      description?: string;
-      isSmokingAllowed?: boolean;
-      isDrinkingAllowed?: boolean;
-      hasAttachedBathroom?: boolean;
-      [key: string]: any;
-    };
+    // Commercial rent steps
+    com_rent_basic_details?: StepData;
+    com_rent_location?: StepData;
+    com_rent_rental?: StepData;
+    com_rent_features?: StepData;
     
-    // Flatmate details
-    flatmate_details?: {
-      preferredGender?: string;
-      occupancy?: string;
-      foodPreference?: string;
-      tenantType?: string;
-      roomSharing?: boolean;
-      maxFlatmates?: number;
-      currentFlatmates?: number;
-      about?: string;
-      [key: string]: any;
-    };
+    // Commercial sale steps
+    com_sale_basic_details?: StepData;
+    com_sale_location?: StepData;
+    com_sale_sale_details?: StepData;
+    com_sale_features?: StepData;
     
-    // PG/Hostel details
-    pg_details?: {
-      pgType?: string;
-      mealOptions?: string[];
-      roomTypes?: string[];
-      occupancyTypes?: string[];
-      genderPreference?: string;
-      rules?: string[];
-      facilities?: string[];
-      noticePolicy?: string;
-      [key: string]: any;
-    };
+    // Commercial coworking steps
+    com_cow_basic_details?: StepData;
+    com_cow_location?: StepData;
+    com_cow_coworking_details?: StepData;
+    com_cow_features?: StepData;
     
-    // Commercial details
-    commercial_details?: {
-      cabins?: number;
-      meetingRooms?: number;
-      washrooms?: number;
-      cornerProperty?: boolean;
-      mainRoadFacing?: boolean;
-      [key: string]: any;
-    };
+    // Land sale steps
+    land_sale_basic_details?: StepData;
+    land_sale_location?: StepData;
+    land_sale_land_features?: StepData;
     
-    // Coworking details
-    coworking?: {
-      spaceType?: string;
-      capacity?: number;
-      operatingHours?: string;
-      amenities?: string[];
-      securityDeposit?: number;
-      minimumCommitment?: string;
-      discounts?: string[];
-      availableFrom?: string;
-      [key: string]: any;
-    };
-    
-    // Land features
-    land_features?: {
-      approvals?: string[];
-      boundaryStatus?: string;
-      cornerPlot?: boolean;
-      landUseZone?: string;
-      description?: string;
-      [key: string]: any;
-    };
-    
-    // Add other step types as needed
-    [key: string]: any; // Allow for dynamic step types
+    // Allow for dynamic step types
+    [key: string]: any;
   };
   
   // Media section with photos and videos
@@ -187,7 +94,7 @@ export interface FormData {
     };
   };
   
-  // Flow sections at top level (mapped during output preparation)
+  // Top-level sections (mapped from steps for backward compatibility)
   details?: any;
   location?: any;
   rental?: any;
@@ -201,6 +108,126 @@ export interface FormData {
   
   // Legacy support for direct fields
   [key: string]: any;
+}
+
+// Generic step data interface
+export interface StepData {
+  [key: string]: any;
+}
+
+// Specific step data interfaces for type safety
+export interface BasicDetailsStepData extends StepData {
+  title?: string;
+  propertyType?: string;
+  bhkType?: string;
+  floor?: number | null;
+  totalFloors?: number | null;
+  builtUpArea?: number | null;
+  builtUpAreaUnit?: 'sqft' | 'sqyd';
+  bathrooms?: number | null;
+  balconies?: number | null;
+  facing?: string;
+  propertyAge?: string;
+  propertyCondition?: string;
+  hasBalcony?: boolean;
+  hasAC?: boolean;
+}
+
+export interface LocationStepData extends StepData {
+  address?: string;
+  flatPlotNo?: string;
+  landmark?: string;
+  locality?: string;
+  city?: string;
+  state?: string;
+  pinCode?: string;
+  coordinates?: {
+    latitude: number | null;
+    longitude: number | null;
+  };
+}
+
+export interface RentalStepData extends StepData {
+  rentAmount?: number | null;
+  securityDeposit?: number | null;
+  maintenanceCharges?: number | null;
+  rentNegotiable?: boolean;
+  availableFrom?: string;
+  preferredTenants?: string[];
+  leaseDuration?: string;
+  furnishingStatus?: string;
+  hasSimilarUnits?: boolean;
+  propertyShowOption?: string;
+  propertyShowPerson?: string;
+  secondaryNumber?: string;
+  secondaryContactNumber?: string;
+}
+
+export interface SaleStepData extends StepData {
+  expectedPrice?: number | null;
+  priceNegotiable?: boolean;
+  possessionDate?: string;
+  hasSimilarUnits?: boolean;
+  propertyShowOption?: string;
+  propertyShowPerson?: string;
+  secondaryNumber?: string;
+  secondaryContactNumber?: string;
+}
+
+export interface FeaturesStepData extends StepData {
+  amenities?: string[];
+  parking?: string;
+  petFriendly?: boolean;
+  nonVegAllowed?: boolean;
+  waterSupply?: string;
+  powerBackup?: string;
+  gatedSecurity?: boolean;
+  description?: string;
+  isSmokingAllowed?: boolean;
+  isDrinkingAllowed?: boolean;
+  hasAttachedBathroom?: boolean;
+  hasGym?: boolean;
+}
+
+export interface FlatmateStepData extends StepData {
+  preferredGender?: string;
+  occupancy?: string;
+  foodPreference?: string;
+  tenantType?: string;
+  roomSharing?: boolean;
+  maxFlatmates?: number;
+  currentFlatmates?: number;
+  about?: string;
+}
+
+export interface PGStepData extends StepData {
+  pgType?: string;
+  mealOptions?: string[];
+  roomTypes?: string[];
+  occupancyTypes?: string[];
+  genderPreference?: string;
+  rules?: string[];
+  facilities?: string[];
+  noticePolicy?: string;
+}
+
+export interface CoworkingStepData extends StepData {
+  spaceType?: string;
+  capacity?: number;
+  operatingHours?: string;
+  amenities?: string[];
+  securityDeposit?: number;
+  minimumCommitment?: string;
+  discounts?: string[];
+  availableFrom?: string;
+}
+
+export interface LandFeaturesStepData extends StepData {
+  approvals?: string[];
+  boundaryStatus?: string;
+  cornerPlot?: boolean;
+  landUseZone?: string;
+  description?: string;
 }
 
 // Property interface
@@ -227,6 +254,7 @@ export interface FormSectionProps {
   mode?: 'create' | 'edit';
   category?: string;
   adType?: string;
+  stepId?: string;
 }
 
 export interface FormStepProps extends FormSectionProps {
@@ -303,4 +331,9 @@ export interface HowItWorksProps {
 export interface FormDataDebugProps {
   form: UseFormReturn<FormData>;
   collapsed?: boolean;
+}
+
+// Step Component Props with stepId
+export interface StepComponentProps extends FormSectionProps {
+  stepId: string;
 }

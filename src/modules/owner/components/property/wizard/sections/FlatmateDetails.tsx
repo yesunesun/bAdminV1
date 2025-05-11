@@ -1,9 +1,9 @@
 // src/modules/owner/components/property/wizard/sections/FlatmateDetails.tsx
-// Version: 1.8.0
-// Last Modified: 12-04-2025 16:15 IST
-// Purpose: Removed Additional Details section and further condensed the UI layout
+// Version: 2.3.0
+// Last Modified: 11-05-2025 00:45 IST
+// Purpose: Fixed data handling using custom hook that works with passed form prop
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { FormSection } from '@/components/FormSection';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -13,21 +13,52 @@ import { cn } from '@/lib/utils';
 
 const FlatmateDetails: React.FC<FormSectionProps> = ({ 
   form,
-  adType
+  stepId = 'res_flat_flatmate_details' // Default stepId for flatmates
 }) => {
-  const { register, watch, setValue, formState: { errors } } = form;
   const [showDirectionsTip, setShowDirectionsTip] = useState(true);
   const [showDirectionsField, setShowDirectionsField] = useState(false);
   
   // States for custom select components
   const [showPersonOptionsOpen, setShowPersonOptionsOpen] = useState(false);
   const [waterSupplyOptionsOpen, setWaterSupplyOptionsOpen] = useState(false);
-  const [selectedShowPerson, setSelectedShowPerson] = useState('');
-  const [selectedWaterSupply, setSelectedWaterSupply] = useState('');
+  
+  // Custom hooks for step data handling
+  const saveField = useCallback((fieldName: string, value: any) => {
+    const path = `steps.${stepId}.${fieldName}`;
+    console.log(`Saving field ${fieldName} at path ${path}:`, value);
+    form.setValue(path, value, { shouldValidate: true });
+  }, [form, stepId]);
 
-  // Toggle button component
-  const ToggleButtonGroup = ({ label, name }) => {
-    const value = watch(name) || "";
+  const getField = useCallback((fieldName: string, defaultValue?: any) => {
+    const path = `steps.${stepId}.${fieldName}`;
+    const value = form.getValues(path);
+    console.log(`Getting field ${fieldName} from path ${path}:`, value);
+    return value ?? defaultValue;
+  }, [form, stepId]);
+  
+  // Initialize values from existing data
+  const [selectedShowPerson, setSelectedShowPerson] = useState(getField('propertyShowPerson', ''));
+  const [selectedWaterSupply, setSelectedWaterSupply] = useState(getField('waterSupply', ''));
+
+  // Ensure step structure exists
+  useEffect(() => {
+    // Initialize step structure if it doesn't exist
+    const currentSteps = form.getValues('steps') || {};
+    if (!currentSteps[stepId]) {
+      form.setValue('steps', {
+        ...currentSteps,
+        [stepId]: {}
+      });
+    }
+    
+    // Load existing values
+    setSelectedShowPerson(getField('propertyShowPerson', ''));
+    setSelectedWaterSupply(getField('waterSupply', ''));
+  }, [stepId, form]);
+
+  // Toggle button component with updated data handling
+  const ToggleButtonGroup = ({ label, name }: { label: string; name: string }) => {
+    const value = getField(name, '');
     
     return (
       <div className="flex items-center justify-between">
@@ -41,7 +72,7 @@ const FlatmateDetails: React.FC<FormSectionProps> = ({
                 ? "bg-primary text-primary-foreground" 
                 : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
             )}
-            onClick={() => setValue(name, "Yes", { shouldValidate: true })}
+            onClick={() => saveField(name, "Yes")}
           >
             Yes
           </button>
@@ -53,31 +84,38 @@ const FlatmateDetails: React.FC<FormSectionProps> = ({
                 ? "bg-primary text-primary-foreground" 
                 : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
             )}
-            onClick={() => setValue(name, "No", { shouldValidate: true })}
+            onClick={() => saveField(name, "No")}
           >
             No
           </button>
         </div>
-        <input type="hidden" {...register(name)} />
       </div>
     );
   };
 
   // Helper function for option selection
-  const handleShowPersonSelect = (value) => {
+  const handleShowPersonSelect = (value: string) => {
     setSelectedShowPerson(value);
-    setValue('propertyShowPerson', value, { shouldValidate: true });
+    saveField('propertyShowPerson', value);
     setShowPersonOptionsOpen(false);
   };
 
-  const handleWaterSupplySelect = (value) => {
+  const handleWaterSupplySelect = (value: string) => {
     setSelectedWaterSupply(value);
-    setValue('waterSupply', value, { shouldValidate: true });
+    saveField('waterSupply', value);
     setWaterSupplyOptionsOpen(false);
   };
 
   // Options component for dropdown menus
-  const DropdownOptions = ({ isOpen, options, onSelect, onClose }) => {
+  const DropdownOptions = ({ 
+    isOpen, 
+    options, 
+    onSelect 
+  }: { 
+    isOpen: boolean; 
+    options: string[]; 
+    onSelect: (value: string) => void; 
+  }) => {
     if (!isOpen) return null;
     
     return (
@@ -143,9 +181,7 @@ const FlatmateDetails: React.FC<FormSectionProps> = ({
                   isOpen={showPersonOptionsOpen}
                   options={['Need help', 'I will show', 'Neighbours', 'Friends/Relatives', 'Security', 'Tenants', 'Others']}
                   onSelect={handleShowPersonSelect}
-                  onClose={() => setShowPersonOptionsOpen(false)}
                 />
-                <input type="hidden" {...register('propertyShowPerson')} value={selectedShowPerson} />
               </div>
             </div>
 
@@ -164,9 +200,7 @@ const FlatmateDetails: React.FC<FormSectionProps> = ({
                   isOpen={waterSupplyOptionsOpen}
                   options={['Corporation', 'Borewell', 'Both']}
                   onSelect={handleWaterSupplySelect}
-                  onClose={() => setWaterSupplyOptionsOpen(false)}
                 />
-                <input type="hidden" {...register('waterSupply')} value={selectedWaterSupply} />
               </div>
             </div>
 
@@ -184,8 +218,8 @@ const FlatmateDetails: React.FC<FormSectionProps> = ({
                   id="secondaryContactNumber"
                   placeholder="Enter phone number"
                   className="flex-1 rounded-l-none h-8 text-sm"
-                  error={errors.secondaryContactNumber?.message}
-                  {...register('secondaryContactNumber')}
+                  value={getField('secondaryContactNumber', '')}
+                  onChange={(e) => saveField('secondaryContactNumber', e.target.value)}
                 />
               </div>
             </div>
@@ -237,8 +271,39 @@ const FlatmateDetails: React.FC<FormSectionProps> = ({
               placeholder="E.g., 'Located near Big Bazaar, take the 2nd right after ABC school...'"
               rows={2}
               className="text-sm"
-              {...register('directions')}
+              value={getField('directions', '')}
+              onChange={(e) => saveField('directions', e.target.value)}
             />
+          </div>
+        )}
+
+        {/* Description field - this maps to the "about" field in JSON */}
+        <div className="grid gap-2">
+          <label htmlFor="about" className="text-sm font-medium">
+            Additional Details About Flatmate Requirements
+          </label>
+          <Textarea
+            id="about"
+            placeholder="Any specific requirements for flatmates, house rules, or additional information..."
+            rows={3}
+            className="text-sm"
+            value={getField('about', '')}
+            onChange={(e) => saveField('about', e.target.value)}
+          />
+        </div>
+
+        {/* Debug info in development */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="mt-4 p-2 bg-gray-100 rounded text-xs space-y-2">
+            <div>Step ID: {stepId}</div>
+            <div>Current step data:</div>
+            <pre className="text-xs overflow-auto max-h-40 bg-white p-2 rounded border">
+              {JSON.stringify(form.getValues(`steps.${stepId}`), null, 2)}
+            </pre>
+            <div>All form data:</div>
+            <pre className="text-xs overflow-auto max-h-40 bg-white p-2 rounded border">
+              {JSON.stringify(form.getValues(), null, 2)}
+            </pre>
           </div>
         )}
       </div>

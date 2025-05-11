@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyDetails/utils/propertyDataUtils.ts
-// Version: 1.0.0
-// Last Modified: 09-05-2025 14:30 IST
-// Purpose: Utility functions for property data processing
+// Version: 1.1.0
+// Last Modified: 10-05-2025 16:00 IST
+// Purpose: Enhanced data extraction with better property type and listing type handling
 
 // Helper functions for parsing and formatting
 export const safeParseInt = (value: any): number => {
@@ -39,6 +39,55 @@ export const formatDate = (dateString: string | null | undefined): string => {
   }
 };
 
+// Get property listing type (sale/rent) from various data structures
+export const getListingType = (property: any): string => {
+  if (!property) return 'rent';
+  
+  // Check different paths for listing type with fallbacks
+  const listingType = 
+    // From flow object
+    property.flow?.listingType || 
+    // From property_details.flow
+    property.property_details?.flow?.listingType || 
+    // Direct property_details property
+    property.property_details?.listingType || 
+    // Check for saleInfo or rentalInfo presence
+    (property.saleInfo || property.property_details?.saleInfo ? 'sale' : 
+     property.rentalInfo || property.property_details?.rentalInfo ? 'rent' : 
+     // Look for price field name hints
+     (property.expectedPrice || property.property_details?.expectedPrice ? 'sale' : 
+      property.rentAmount || property.property_details?.rentAmount ? 'rent' : 
+      // Default fallback
+      'rent'));
+  
+  return listingType.toLowerCase();
+};
+
+// Get property category/type from various data structures
+export const getPropertyType = (property: any): string => {
+  if (!property) return 'Residential';
+  
+  // Check different paths with fallbacks
+  const propertyType = 
+    // From basicDetails
+    property.basicDetails?.propertyType || 
+    // From property_details.basicDetails
+    property.property_details?.basicDetails?.propertyType || 
+    // Direct property_details property
+    property.property_details?.propertyType || 
+    // From flow.category (capitalized)
+    (property.flow?.category ? 
+      property.flow.category.charAt(0).toUpperCase() + property.flow.category.slice(1) : 
+      // From property_details.flow.category
+      property.property_details?.flow?.category ?
+        property.property_details.flow.category.charAt(0).toUpperCase() + 
+        property.property_details.flow.category.slice(1) : 
+        // Default fallback
+        'Residential');
+  
+  return propertyType;
+};
+
 // Extract data from property based on its structure (v3, v2, or legacy)
 export const getPropertyData = (property: any) => {
   if (!property) return null;
@@ -67,29 +116,79 @@ export const getPropertyData = (property: any) => {
     };
   }
   
-  // For v2 or legacy format
+  // For v2 format (often used in the newer properties)
+  if (property.basicDetails || propertyDetails.basicDetails) {
+    return {
+      id: property.id,
+      owner_id: property.owner_id,
+      flow: property.flow || propertyDetails.flow || { 
+        category: propertyDetails.category || 'residential', 
+        listingType: getListingType(property)
+      },
+      basicDetails: property.basicDetails || propertyDetails.basicDetails || {},
+      features: property.features || propertyDetails.features || {},
+      location: property.location || propertyDetails.location || {
+        address: property.address,
+        city: property.city,
+        state: property.state,
+        pinCode: property.zip_code
+      },
+      rentalInfo: property.rental || propertyDetails.rental || {},
+      saleInfo: property.sale || propertyDetails.sale || {},
+      images: property.property_images || [],
+      description: (property.features?.description || 
+                   propertyDetails.features?.description || 
+                   property.description || 
+                   "No description provided for this property.")
+    };
+  }
+  
+  // For legacy format - create a compatible structure
   return {
     id: property.id,
     owner_id: property.owner_id,
-    flow: property.flow || propertyDetails.flow || { category: 'residential', listingType: 'rent' },
-    basicDetails: property.basicDetails || propertyDetails.basicDetails || {
-      propertyType: propertyDetails.propertyType || 'Residential',
+    flow: { 
+      category: getPropertyType(property).toLowerCase(), 
+      listingType: getListingType(property)
+    },
+    basicDetails: {
+      propertyType: getPropertyType(property),
       bhkType: property.bedrooms ? `${property.bedrooms} BHK` : '',
       bathrooms: property.bathrooms || 0,
       builtUpArea: property.square_feet || 0,
-      builtUpAreaUnit: 'sqft'
+      builtUpAreaUnit: 'sqft',
+      title: property.title || '',
+      floor: propertyDetails.floor || 0,
+      totalFloors: propertyDetails.totalFloors || 0,
+      facing: propertyDetails.facing || '',
+      propertyAge: propertyDetails.propertyAge || '',
+      possessionDate: propertyDetails.possessionDate || ''
     },
-    features: property.features || propertyDetails.features || {},
-    location: property.location || {
-      address: property.address,
-      city: property.city,
-      state: property.state,
-      pinCode: property.zip_code
+    features: {
+      amenities: propertyDetails.amenities || [],
+      description: property.description || "",
+      parking: propertyDetails.parking || '',
+      furnishing: propertyDetails.furnishing || ''
     },
-    rentalInfo: property.rental || propertyDetails.rental || {},
-    saleInfo: property.sale || propertyDetails.sale || {},
+    location: {
+      address: property.address || '',
+      city: property.city || '',
+      state: property.state || '',
+      pinCode: property.zip_code || '',
+      coordinates: propertyDetails.coordinates || null
+    },
+    rentalInfo: {
+      rentAmount: property.price || 0,
+      securityDeposit: propertyDetails.securityDeposit || 0,
+      availableFrom: propertyDetails.availableFrom || '',
+      furnishingStatus: propertyDetails.furnishing || ''
+    },
+    saleInfo: {
+      expectedPrice: property.price || 0,
+      priceNegotiable: propertyDetails.priceNegotiable || false
+    },
     images: property.property_images || [],
-    description: property.features?.description || property.description || "No description provided for this property."
+    description: property.description || "No description provided for this property."
   };
 };
 

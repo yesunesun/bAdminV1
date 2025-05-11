@@ -1,9 +1,9 @@
 // src/modules/owner/components/property/wizard/sections/CommercialSaleDetails.tsx
-// Version: 1.6.0
-// Last Modified: 13-04-2025 19:15 IST
-// Purpose: Fixed create new tag button styling to match design
+// Version: 2.0.0
+// Last Modified: 11-05-2025 01:20 IST
+// Purpose: Updated to use flow-based architecture with stepId for proper data capture
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { FormSection } from '@/components/FormSection';
 import { RequiredLabel } from '@/components/ui/RequiredLabel';
 import { Input } from '@/components/ui/input';
@@ -30,17 +30,42 @@ const PREDEFINED_IDEAL_TAGS = [
 
 const CommercialSaleDetails: React.FC<FormSectionProps> = ({ 
   form,
-  adType
+  stepId = 'com_sale_sale_details' // Default stepId for commercial sale details
 }) => {
-  const { register, watch, setValue, formState: { errors } } = form;
+  // Custom hooks for step data handling
+  const saveField = useCallback((fieldName: string, value: any) => {
+    const path = `steps.${stepId}.${fieldName}`;
+    console.log(`Saving field ${fieldName} at path ${path}:`, value);
+    form.setValue(path, value, { shouldValidate: true });
+  }, [form, stepId]);
+
+  const getField = useCallback((fieldName: string, defaultValue?: any) => {
+    const path = `steps.${stepId}.${fieldName}`;
+    const value = form.getValues(path);
+    console.log(`Getting field ${fieldName} from path ${path}:`, value);
+    return value ?? defaultValue;
+  }, [form, stepId]);
+
+  // Ensure step structure exists
+  useEffect(() => {
+    // Initialize step structure if it doesn't exist
+    const currentSteps = form.getValues('steps') || {};
+    if (!currentSteps[stepId]) {
+      form.setValue('steps', {
+        ...currentSteps,
+        [stepId]: {}
+      });
+    }
+  }, [stepId, form]);
   
   // State for custom tags management
   const [customTagInput, setCustomTagInput] = useState('');
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   
-  // Watch for expected price and negotiable checkbox
-  const expectedPrice = watch('expectedPrice');
-  const isNegotiable = watch('isNegotiable');
+  // Get current values for display
+  const expectedPrice = getField('expectedPrice', '');
+  const isNegotiable = getField('isNegotiable', false);
+  const ownershipType = getField('ownershipType', '');
+  const idealFor = getField('idealFor', []);
   
   // Function to convert number to Indian currency format (e.g. 2500000 to "₹ 25 Lacs")
   const formatToIndianCurrency = (value: number): string => {
@@ -59,27 +84,26 @@ const CommercialSaleDetails: React.FC<FormSectionProps> = ({
   
   // Handle tag selection toggle
   const handleTagToggle = (tag: string) => {
-    setSelectedTags(prev => {
-      if (prev.includes(tag)) {
-        return prev.filter(t => t !== tag);
-      } else {
-        return [...prev, tag];
-      }
-    });
+    const currentTags = idealFor || [];
+    let newTags;
+    
+    if (currentTags.includes(tag)) {
+      newTags = currentTags.filter((t: string) => t !== tag);
+    } else {
+      newTags = [...currentTags, tag];
+    }
+    
+    saveField('idealFor', newTags);
   };
   
   // Add custom tag
   const handleAddCustomTag = () => {
-    if (customTagInput && !selectedTags.includes(customTagInput)) {
-      setSelectedTags(prev => [...prev, customTagInput]);
+    if (customTagInput && !idealFor.includes(customTagInput)) {
+      const newTags = [...idealFor, customTagInput];
+      saveField('idealFor', newTags);
       setCustomTagInput('');
     }
   };
-  
-  // Update form value when selected tags change
-  useEffect(() => {
-    setValue('idealFor', selectedTags);
-  }, [selectedTags, setValue]);
   
   return (
     <FormSection
@@ -99,8 +123,8 @@ const CommercialSaleDetails: React.FC<FormSectionProps> = ({
                 type="number"
                 placeholder="7500000"
                 className="pl-8"
-                error={errors.expectedPrice?.message}
-                {...register('expectedPrice')}
+                value={expectedPrice}
+                onChange={(e) => saveField('expectedPrice', e.target.value)}
               />
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">₹</span>
             </div>
@@ -111,10 +135,11 @@ const CommercialSaleDetails: React.FC<FormSectionProps> = ({
             )}
             <div className="flex items-center space-x-2 pt-1">
               <input
-                type="radio"
+                type="checkbox"
                 id="isNegotiable"
                 className="h-4 w-4 text-primary border-gray-300 focus:ring-primary"
-                {...register('isNegotiable')}
+                checked={isNegotiable}
+                onChange={(e) => saveField('isNegotiable', e.target.checked)}
               />
               <label
                 htmlFor="isNegotiable"
@@ -138,7 +163,8 @@ const CommercialSaleDetails: React.FC<FormSectionProps> = ({
                     id={`ownershipType_${type}`}
                     value={type}
                     className="h-4 w-4 text-primary border-gray-300 focus:ring-primary"
-                    {...register('ownershipType')}
+                    checked={ownershipType === type}
+                    onChange={(e) => saveField('ownershipType', e.target.value)}
                   />
                   <label
                     htmlFor={`ownershipType_${type}`}
@@ -162,8 +188,8 @@ const CommercialSaleDetails: React.FC<FormSectionProps> = ({
               id="availableFrom"
               type="date"
               placeholder="Select date"
-              error={errors.availableFrom?.message}
-              {...register('availableFrom')}
+              value={getField('availableFrom', '')}
+              onChange={(e) => saveField('availableFrom', e.target.value)}
               className="w-full md:w-1/2"
             />
           </div>
@@ -191,7 +217,7 @@ const CommercialSaleDetails: React.FC<FormSectionProps> = ({
                 onClick={() => handleTagToggle(tag)}
                 className={cn(
                   "px-4 py-2 text-sm rounded-sm",
-                  selectedTags.includes(tag)
+                  idealFor.includes(tag)
                     ? "bg-teal-500 text-white"
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 )}
@@ -199,6 +225,20 @@ const CommercialSaleDetails: React.FC<FormSectionProps> = ({
                 {tag}
               </button>
             ))}
+            
+            {/* Display custom tags */}
+            {idealFor
+              .filter((tag: string) => !PREDEFINED_IDEAL_TAGS.includes(tag))
+              .map((tag: string) => (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => handleTagToggle(tag)}
+                  className="px-4 py-2 text-sm rounded-sm bg-teal-500 text-white"
+                >
+                  {tag}
+                </button>
+              ))}
           </div>
           
           {/* Improved custom tag input and button layout */}
@@ -217,16 +257,19 @@ const CommercialSaleDetails: React.FC<FormSectionProps> = ({
               Create
             </button>
           </div>
-          
-          {/* Hidden input to store selected tags */}
-          <input 
-            type="hidden" 
-            {...register('idealFor')} 
-            id="idealFor" 
-            value={selectedTags.join(',')} 
-          />
         </div>
       </div>
+
+      {/* Debug info in development */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="mt-4 p-2 bg-gray-100 rounded text-xs space-y-2">
+          <div>Step ID: {stepId}</div>
+          <div>Current step data:</div>
+          <pre className="text-xs overflow-auto max-h-40 bg-white p-2 rounded border">
+            {JSON.stringify(form.getValues(`steps.${stepId}`), null, 2)}
+          </pre>
+        </div>
+      )}
     </FormSection>
   );
 };

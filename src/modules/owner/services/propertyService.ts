@@ -1,46 +1,34 @@
 // src/modules/owner/services/propertyService.ts
-// Version: 8.3.0
-// Last Modified: 11-05-2025 15:45 IST
-// Purpose: Updated to handle new flow-structured data format
+// Version: 9.2.0
+// Last Modified: 18-05-2025 17:50 IST
+// Purpose: Enhanced flow detection and improved flatmate data handling
 
 import { supabase } from '@/lib/supabase';
 import { FormData } from '../components/property/wizard/types';
-import { 
-  FLOW_TYPES,
-  FLOW_STEPS,
-  STEP_FIELD_MAPPINGS
-} from '../components/property/wizard/constants/flows';
+import { FLOW_STEPS } from '../components/property/wizard/constants/flows';
+import { FlowServiceFactory } from '../components/property/wizard/services/flows/FlowServiceFactory';
 
-// Cache for properties to avoid redundant fetches
+// Cache for properties
 const propertiesCache = new Map<string, {data: any[], timestamp: number}>();
 const CACHE_EXPIRY = 60000; // 1 minute cache expiry
 
-// Keep the data version as v3 since it's still in development
+// Data version for the new structure
 const DATA_VERSION = 'v3';
 
 /**
  * Creates a clean property data structure based on flow type
- * @param flowCategory Category of the property (residential, commercial, land)
- * @param flowListingType Type of listing (rent, sale, flatmates, etc.)
  */
 const createEmptyPropertyStructure = (
   flowCategory: string = 'residential',
   flowListingType: string = 'rent'
 ): any => {
-  // Set current timestamp
   const now = new Date().toISOString();
   
-  // Validate and ensure correct listingType, especially for Sale properties
-  if (flowListingType.toLowerCase().includes('sale') || flowListingType.toLowerCase().includes('sell')) {
-    flowListingType = 'sale';
-    console.log('Enforcing SALE listing type in empty structure');
-  }
-  
-  // Get flow steps
+  // Get flow-specific steps
   const flowKey = `${flowCategory}_${flowListingType}`;
   const flowSteps = FLOW_STEPS[flowKey] || FLOW_STEPS.default;
   
-  // Initialize the structured data based on flow type
+  // Initialize structure - ONLY with meta, flow, steps, and media
   const structure: any = {
     meta: {
       _version: DATA_VERSION,
@@ -52,6 +40,7 @@ const createEmptyPropertyStructure = (
       category: flowCategory,
       listingType: flowListingType
     },
+    steps: {},
     media: {
       photos: {
         images: []
@@ -62,130 +51,63 @@ const createEmptyPropertyStructure = (
     }
   };
   
-  // Add flow-specific sections based on the steps
-  flowSteps.forEach(step => {
-    if (step !== 'review') { // Skip review step
-      if (step === 'basic_details') {
-        structure.details = {};
-      } else if (step === 'location') {
-        structure.location = {};
-      } else {
-        // Add flow-specific steps (rental, sale, flatmate_details, etc.)
-        structure[step] = {};
-      }
+  // Initialize each step with empty object (excluding review step)
+  flowSteps.forEach(stepId => {
+    if (!stepId.includes('_review')) {
+      structure.steps[stepId] = {};
     }
   });
-  
-  // Ensure features is included if it's in the steps
-  if (flowSteps.includes('features')) {
-    structure.features = {};
-  }
   
   return structure;
 };
 
 /**
  * Organizes property data into the correct structure
- * @param propertyData Raw property data to organize
  */
 const organizePropertyData = (propertyData: any): any => {
   if (!propertyData) return createEmptyPropertyStructure();
   
-  // Preserve the original flow information, especially for Sale properties
   const flowCategory = propertyData.flow?.category || 'residential';
   const flowListingType = propertyData.flow?.listingType || 'rent';
   
   console.log(`Organizing property data with flow: ${flowCategory}_${flowListingType}`);
   
-  // Check if the data already has the steps structure
-  if (propertyData.flow && 
-      ((propertyData.details && propertyData.location) || 
-       propertyData.rental || 
-       propertyData.sale || 
-       propertyData.flatmate_details || 
-       propertyData.pg_details || 
-       propertyData.coworking || 
-       propertyData.land_features)) {
-    
+  // Check if data is already in the new format with steps
+  if (propertyData.steps && Object.keys(propertyData.steps).length > 0) {
     return ensureCompleteStructure(propertyData);
   }
   
-  // Create a new structure based on the flow type
-  const newStructure = createEmptyPropertyStructure(flowCategory, flowListingType);
+  // Create flow context for proper detection
+  const flowContext = {
+    urlPath: window.location.pathname,
+    adType: `${flowCategory}_${flowListingType}`,
+    category: flowCategory,
+    listingType: flowListingType
+  };
   
-  // Try to map existing data to the new structure
-  if (propertyData.steps) {
-    // Handle new step-based structure
-    if (propertyData.steps.basic_details) {
-      newStructure.details = { ...propertyData.steps.basic_details };
-    }
+  // Use FlowServiceFactory to convert legacy data to new format
+  try {
+    const flowService = FlowServiceFactory.getFlowService(propertyData, flowContext);
+    const formattedData = flowService.formatData(propertyData);
+    return ensureCompleteStructure(formattedData);
+  } catch (error) {
+    console.error('Error formatting property data:', error);
     
-    if (propertyData.steps.location) {
-      newStructure.location = { ...propertyData.steps.location };
-    }
-    
-    // Map flow-specific steps
-    const flowKey = `${flowCategory}_${flowListingType}`;
-    const flowSteps = FLOW_STEPS[flowKey] || FLOW_STEPS.default;
-    
-    flowSteps.forEach(step => {
-      if (step !== 'basic_details' && step !== 'location' && step !== 'review') {
-        if (propertyData.steps[step]) {
-          newStructure[step] = { ...propertyData.steps[step] };
-        }
-      }
-    });
-    
-    // Handle features section
-    if (propertyData.steps.features) {
-      newStructure.features = { ...propertyData.steps.features };
-    }
-    
-    // Handle media section
-    if (propertyData.media) {
-      newStructure.media = { ...propertyData.media };
-    }
-  } else {
-    // Handle legacy or different structure
-    // Try to map from details section if it exists
-    if (propertyData.details) {
-      newStructure.details = { ...propertyData.details.basicDetails || {} };
-      newStructure.location = { ...propertyData.details.location || {} };
-      
-      // Map features if available
-      if (propertyData.details.features) {
-        newStructure.features = { ...propertyData.details.features };
-      }
-      
-      // Map rental info if available and applicable
-      if (propertyData.details.rentalInfo && (flowListingType === 'rent' || flowListingType.includes('rent'))) {
-        newStructure.rental = { ...propertyData.details.rentalInfo };
-      }
-      
-      // Map sale info if available and applicable
-      if (propertyData.details.saleInfo && (flowListingType === 'sale' || flowListingType.includes('sale'))) {
-        newStructure.sale = { ...propertyData.details.saleInfo };
-      }
-    }
-    
-    // Handle media section
-    if (propertyData.details && propertyData.details.media) {
-      newStructure.media = { ...propertyData.details.media };
-    } else if (propertyData.media) {
-      newStructure.media = { ...propertyData.media };
+    // Fallback to simple flow service
+    try {
+      const flowService = FlowServiceFactory.getService(flowCategory, flowListingType);
+      const formattedData = flowService.formatData(propertyData);
+      return ensureCompleteStructure(formattedData);
+    } catch (fallbackError) {
+      console.error('Error with fallback flow service:', fallbackError);
+      return ensureCompleteStructure(propertyData);
     }
   }
-  
-  // Preserve metadata
-  if (propertyData.meta) {
-    newStructure.meta = { ...propertyData.meta, _version: DATA_VERSION, updated_at: new Date().toISOString() };
-  }
-  
-  return newStructure;
 };
 
 /**
  * Ensures the data structure is complete with all required sections
+ * ONLY meta, flow, steps, and media - NO root-level sections
  */
 const ensureCompleteStructure = (data: any): any => {
   if (!data) return createEmptyPropertyStructure();
@@ -193,17 +115,10 @@ const ensureCompleteStructure = (data: any): any => {
   // Clone the data to avoid mutations
   const result = JSON.parse(JSON.stringify(data));
   
-  // Preserve the original flow information, especially for Sale properties
   const flowCategory = result.flow?.category || 'residential';
-  let flowListingType = result.flow?.listingType || 'rent';
+  const flowListingType = result.flow?.listingType || 'rent';
   
-  // Validate and ensure correct listingType for Sale properties
-  if (flowListingType.toLowerCase().includes('sale') || flowListingType.toLowerCase().includes('sell')) {
-    flowListingType = 'sale';
-    console.log('Preserving SALE listing type in structure');
-  }
-  
-  // Get flow steps
+  // Get flow-specific steps
   const flowKey = `${flowCategory}_${flowListingType}`;
   const flowSteps = FLOW_STEPS[flowKey] || FLOW_STEPS.default;
   
@@ -216,38 +131,38 @@ const ensureCompleteStructure = (data: any): any => {
       status: 'draft'
     };
   } else {
-    // Ensure version is set
     result.meta._version = DATA_VERSION;
     result.meta.updated_at = new Date().toISOString();
   }
   
-  // Ensure flow section exists and preserves the correct listingType
+  // Ensure flow section exists
   if (!result.flow) {
     result.flow = {
       category: flowCategory,
       listingType: flowListingType
     };
-  } else {
-    // Ensure the listingType is preserved, especially for Sale properties
-    if (flowListingType === 'sale') {
-      result.flow.listingType = 'sale';
-    }
   }
   
-  // Ensure all flow-specific sections exist
-  flowSteps.forEach(step => {
-    if (step !== 'review') { // Skip review step
-      if (step === 'basic_details' && !result.details) {
-        result.details = {};
-      } else if (step === 'location' && !result.location) {
-        result.location = {};
-      } else if (step !== 'basic_details' && step !== 'location' && !result[step]) {
-        result[step] = {};
-      }
+  // Ensure steps section exists with all required steps (excluding review)
+  if (!result.steps) {
+    result.steps = {};
+  }
+  
+  flowSteps.forEach(stepId => {
+    if (!stepId.includes('_review') && !result.steps[stepId]) {
+      result.steps[stepId] = {};
     }
   });
   
-  // Ensure media section exists with photos and videos
+  // Special handling for flatmate details to ensure data is preserved
+  if (result.flow.listingType === 'flatmates' && result.flatmate_details) {
+    const flatmateStepId = flowSteps.find(step => step.includes('_flatmate_details'));
+    if (flatmateStepId && (!result.steps[flatmateStepId] || Object.keys(result.steps[flatmateStepId]).length === 0)) {
+      result.steps[flatmateStepId] = { ...result.flatmate_details };
+    }
+  }
+  
+  // Ensure media section exists
   if (!result.media) {
     result.media = {
       photos: { images: [] },
@@ -262,6 +177,21 @@ const ensureCompleteStructure = (data: any): any => {
     }
   }
   
+  // Remove any old root-level sections to keep output clean
+  delete result.details;
+  delete result.location;
+  delete result.rental;
+  delete result.sale;
+  delete result.features;
+  delete result.flatmate_details;
+  delete result.pg_details;
+  delete result.coworking;
+  delete result.land_features;
+  delete result.basicDetails;
+  delete result.rentalInfo;
+  delete result.saleInfo;
+  delete result.commercial_details;
+  
   return result;
 };
 
@@ -270,7 +200,6 @@ export const propertyService = {
    * Fetches all properties for a user with caching
    */
   async getUserProperties(userId: string, forceRefresh = false): Promise<any[]> {
-    // Check cache first if not forcing refresh
     const now = Date.now();
     const cachedData = propertiesCache.get(userId);
     
@@ -282,7 +211,6 @@ export const propertyService = {
     try {
       console.log('Fetching properties for user:', userId);
       
-      // Fetch from properties_v2 table
       const { data, error } = await supabase
         .from('properties_v2')
         .select('*')
@@ -295,7 +223,6 @@ export const propertyService = {
       
       // Format the properties data
       const formattedProperties = (data || []).map(property => {
-        // Organize property data
         const organizedData = organizePropertyData(property.property_details);
         
         // Ensure IDs are set
@@ -391,19 +318,12 @@ export const propertyService = {
       organizedData.meta.owner_id = userId;
       organizedData.meta.status = status;
       
-      // IMPORTANT: Ensure flow information is preserved correctly, especially for Sale properties
-      if (propertyData.flow?.listingType === 'sale' || 
-          (propertyData.flow?.listingType || '').toLowerCase().includes('sale') ||
-          (propertyData.flow?.listingType || '').toLowerCase().includes('sell')) {
-        console.log('Preserving SALE listing type in createProperty');
-        organizedData.flow.listingType = 'sale';
+      // Ensure flow information is correct
+      if (propertyData.flow) {
+        organizedData.flow = propertyData.flow;
       }
       
-      // Log the final flow information before saving
-      console.log('Creating property with flow:', {
-        category: organizedData.flow.category,
-        listingType: organizedData.flow.listingType
-      });
+      console.log('Creating property with flow:', organizedData.flow);
       
       // Create in properties_v2 table
       const now = new Date().toISOString();
@@ -430,7 +350,7 @@ export const propertyService = {
         throw new Error("No data returned after property creation");
       }
       
-      console.log('Property created successfully in properties_v2, returned data:', data[0]);
+      console.log('Property created successfully in properties_v2');
       
       // Update the ID in the property details
       organizedData.meta.id = data[0].id;
@@ -484,12 +404,10 @@ export const propertyService = {
         .eq('owner_id', userId)
         .single();
       
-      // Start with clean data
       let mergedData = propertyData;
       
-      // If we have current property data, merge it with new data
-      if (!fetchError && currentProperty && currentProperty.property_details) {
-        // Deep merge current and new data
+      // Merge current and new data
+      if (!fetchError && currentProperty?.property_details) {
         mergedData = this.mergePropertyData(currentProperty.property_details, propertyData);
       }
       
@@ -504,19 +422,12 @@ export const propertyService = {
         organizedData.meta.status = status;
       }
       
-      // IMPORTANT: Ensure flow information is preserved correctly, especially for Sale properties
-      if (propertyData.flow?.listingType === 'sale' || 
-          (propertyData.flow?.listingType || '').toLowerCase().includes('sale') ||
-          (propertyData.flow?.listingType || '').toLowerCase().includes('sell')) {
-        console.log('Preserving SALE listing type in updateProperty');
-        organizedData.flow.listingType = 'sale';
+      // Ensure flow information is correct
+      if (propertyData.flow) {
+        organizedData.flow = propertyData.flow;
       }
       
-      // Log the final flow information before updating
-      console.log('Updating property with flow:', {
-        category: organizedData.flow.category,
-        listingType: organizedData.flow.listingType
-      });
+      console.log('Updating property with flow:', organizedData.flow);
       
       // Update in properties_v2 table
       const updateData = {
@@ -532,7 +443,7 @@ export const propertyService = {
         .from('properties_v2')
         .update(updateData)
         .eq('id', propertyId)
-        .eq('owner_id', userId) // Security check
+        .eq('owner_id', userId)
         .select()
         .single();
 
@@ -563,50 +474,6 @@ export const propertyService = {
   },
 
   /**
-   * Updates just the property details
-   */
-  async updatePropertyDetails(
-    propertyId: string,
-    propertyDetails: any
-  ): Promise<void> {
-    try {
-      console.log(`Updating property_details for property ${propertyId}`);
-      
-      // Organize property data
-      const organizedData = organizePropertyData(propertyDetails);
-      
-      // Ensure metadata is set
-      organizedData.meta.id = propertyId;
-      organizedData.meta.updated_at = new Date().toISOString();
-      
-      // IMPORTANT: Ensure flow information is preserved correctly, especially for Sale properties
-      if (propertyDetails.flow?.listingType === 'sale' || 
-          (propertyDetails.flow?.listingType || '').toLowerCase().includes('sale') ||
-          (propertyDetails.flow?.listingType || '').toLowerCase().includes('sell')) {
-        console.log('Preserving SALE listing type in updatePropertyDetails');
-        organizedData.flow.listingType = 'sale';
-      }
-      
-      const { error } = await supabase
-        .from('properties_v2')
-        .update({ 
-          property_details: organizedData,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', propertyId);
-      
-      if (error) throw error;
-      
-      // Clear all caches since we don't know which user owns this property
-      propertiesCache.clear();
-      
-    } catch (error) {
-      console.error('Error in updatePropertyDetails:', error);
-      throw error;
-    }
-  },
-
-  /**
    * Helper method to deep merge property data
    */
   mergePropertyData(oldData: any, newData: any): any {
@@ -618,11 +485,19 @@ export const propertyService = {
       if (!source) return target;
       
       Object.keys(source).forEach(key => {
-        // Skip if undefined
         if (source[key] === undefined) return;
         
+        // Special handling for steps section
+        if (key === 'steps' && target[key] && source[key]) {
+          Object.keys(source[key]).forEach(stepKey => {
+            if (!target[key][stepKey]) {
+              target[key][stepKey] = {};
+            }
+            deepMerge(target[key][stepKey], source[key][stepKey]);
+          });
+        }
         // If both are objects and not arrays, recursively merge
-        if (
+        else if (
           source[key] && 
           typeof source[key] === 'object' && 
           !Array.isArray(source[key]) &&
@@ -642,41 +517,8 @@ export const propertyService = {
     // Merge at top level
     deepMerge(result, newData);
     
-    // Special handling for flow section to ensure listingType is preserved
-    if (newData.flow) {
-      if (!result.flow) result.flow = {};
-      
-      // Preserve category if it exists
-      if (newData.flow.category) {
-        result.flow.category = newData.flow.category;
-      }
-      
-      // IMPORTANT: Ensure Sale listingType is preserved during merge
-      if (newData.flow.listingType === 'sale' || 
-          (newData.flow.listingType || '').toLowerCase().includes('sale') ||
-          (newData.flow.listingType || '').toLowerCase().includes('sell')) {
-        result.flow.listingType = 'sale';
-        console.log('Preserving SALE listing type in merge');
-      } else if (newData.flow.listingType) {
-        result.flow.listingType = newData.flow.listingType;
-      }
-    }
-    
-    // Special handling for steps section to ensure full merging
-    if (newData.steps && result.steps) {
-      Object.keys(newData.steps).forEach(stepKey => {
-        if (!result.steps[stepKey]) {
-          result.steps[stepKey] = {};
-        }
-        
-        deepMerge(result.steps[stepKey], newData.steps[stepKey]);
-      });
-    }
-    
-    // Special handling for meta section
-    if (newData.meta) {
-      if (!result.meta) result.meta = {};
-      result.meta = { ...result.meta, ...newData.meta };
+    // Ensure proper structure
+    if (result.meta) {
       result.meta._version = DATA_VERSION;
       result.meta.updated_at = new Date().toISOString();
     }
