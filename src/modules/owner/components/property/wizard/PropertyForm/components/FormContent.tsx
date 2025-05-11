@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/PropertyForm/components/FormContent.tsx
-// Version: 6.1.0
-// Last Modified: 11-05-2025 16:30 IST
-// Purpose: Moved debug information to a non-intrusive popup
+// Version: 6.2.0
+// Last Modified: 13-05-2025 14:45 IST
+// Purpose: Removed debug button from bottom, moving it to header instead
 
 import React, { useState } from 'react';
 import { UseFormReturn } from 'react-hook-form';
@@ -50,6 +50,8 @@ interface FormContentProps {
   status: 'draft' | 'published';
   savedPropertyId?: string;
   handleImageUploadComplete?: () => void;
+  showDebugInfo?: boolean;
+  setShowDebugInfo?: (show: boolean) => void;
 }
 
 const FormContent = ({
@@ -74,11 +76,10 @@ const FormContent = ({
   saving,
   status,
   savedPropertyId,
-  handleImageUploadComplete
+  handleImageUploadComplete,
+  showDebugInfo = false,
+  setShowDebugInfo
 }: FormContentProps) => {
-  // State for debug modal visibility
-  const [showDebugInfo, setShowDebugInfo] = useState(false);
-  
   // Get current step ID from STEPS array
   const currentStepObj = STEPS[formStep - 1];
   
@@ -208,7 +209,7 @@ const FormContent = ({
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-semibold">Debug Information</h3>
             <button 
-              onClick={() => setShowDebugInfo(false)}
+              onClick={() => setShowDebugInfo && setShowDebugInfo(false)}
               className="text-gray-500 hover:text-gray-700"
             >
               ✕
@@ -266,19 +267,6 @@ const FormContent = ({
   return (
     <div className="space-y-6 relative">
       {renderFormSection()}
-      
-      {/* Debug toggle button - only in development mode */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="flex justify-end mt-4">
-          <button
-            type="button"
-            onClick={() => setShowDebugInfo(true)}
-            className="text-xs px-2 py-1 bg-gray-200 hover:bg-gray-300 rounded text-gray-700 transition-colors"
-          >
-            🐞 Debug
-          </button>
-        </div>
-      )}
       
       {/* Debug modal/popup */}
       {debugPanel()}

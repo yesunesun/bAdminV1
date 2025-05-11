@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/PropertyForm/index.tsx
-// Version: 6.6.0
-// Last Modified: 11-05-2025 17:15 IST
-// Purpose: Removed debugging components and added non-intrusive debug mode
+// Version: 6.7.0
+// Last Modified: 13-05-2025 14:45 IST
+// Purpose: Added debug button functionality to FormHeader
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -53,6 +53,9 @@ export function PropertyForm({
  // State for tracking custom save operation results
  const [saveInProgress, setSaveInProgress] = useState(false);
  const [propertyIdAfterSave, setPropertyIdAfterSave] = useState<string | null>(null);
+ 
+ // State for debug panel (moved from FormContent)
+ const [showDebugInfo, setShowDebugInfo] = useState(false);
  
  // Extract property type and listing type from initialData if in edit mode
  const derivedCategory = useMemo(() => {
@@ -401,6 +404,11 @@ export function PropertyForm({
    setShowTypeSelectionState(false);
  };
 
+ // Handle debug button click
+ const handleDebugClick = () => {
+   setShowDebugInfo(true);
+ };
+
  // If user is not logged in, show login prompt
  if (!user) {
    return <LoginPrompt onLoginClick={() => navigate('/login')} />;
@@ -424,108 +432,111 @@ export function PropertyForm({
  }
 
  // Ensure we have category and type either from props or initialData
- const effectiveCategory = derivedCategory || initialData?.propertyType || '';
- const effectiveAdType = derivedAdType || initialData?.listingType || '';
+const effectiveCategory = derivedCategory || initialData?.propertyType || '';
+const effectiveAdType = derivedAdType || initialData?.listingType || '';
 
- // Debug check for valid property parameters
- if (!effectiveCategory || !effectiveAdType) {
-   console.error('Missing required parameters:', { 
-     effectiveCategory, 
-     effectiveAdType,
-     derivedCategory,
-     derivedAdType,
-     'initialData?.propertyType': initialData?.propertyType,
-     'initialData?.listingType': initialData?.listingType
-   });
- }
+// Debug check for valid property parameters
+if (!effectiveCategory || !effectiveAdType) {
+  console.error('Missing required parameters:', { 
+    effectiveCategory, 
+    effectiveAdType,
+    derivedCategory,
+    derivedAdType,
+    'initialData?.propertyType': initialData?.propertyType,
+    'initialData?.listingType': initialData?.listingType
+  });
+}
 
- // Get the filtered steps for the form navigation
- const visibleSteps = getVisibleSteps();
- 
- // Determine the effective property ID for use in the UI
- const effectivePropertyId = savedPropertyId || propertyId || propertyIdAfterSave;
- 
- // Check if current step is the review step - safely access flowSteps array
- const isReviewStep = flowSteps && flowSteps[formStep - 1] ? flowSteps[formStep - 1].id === 'review' : false;
+// Get the filtered steps for the form navigation
+const visibleSteps = getVisibleSteps();
 
- return (
-   <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-     <div className="bg-card rounded-xl shadow-lg">
-       {/* Form Header with Status Indicator */}
-       <FormHeader 
-         status={status}
-         handleAutoFill={handleAutoFill}
-       />
+// Determine the effective property ID for use in the UI
+const effectivePropertyId = savedPropertyId || propertyId || propertyIdAfterSave;
 
-       <div className="px-6 pt-4">
-         <WizardBreadcrumbs
-           category={effectiveCategory}
-           adType={effectiveAdType}
-           currentStep={flowSteps && flowSteps[formStep - 1] ? flowSteps[formStep - 1].label : ''}
-         />
-       </div>
+// Check if current step is the review step - safely access flowSteps array
+const isReviewStep = flowSteps && flowSteps[formStep - 1] ? flowSteps[formStep - 1].id === 'review' : false;
 
-       <FormNavigation 
-         currentStep={formStep} 
-         onStepChange={setCurrentStep}
-         propertyId={effectivePropertyId}
-         mode={mode}
-         category={effectiveCategory}
-         adType={effectiveAdType}
-         steps={visibleSteps}
-       />
+return (
+  <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="bg-card rounded-xl shadow-lg">
+      {/* Form Header with Status Indicator */}
+      <FormHeader 
+        status={status}
+        handleAutoFill={handleAutoFill}
+        onDebugClick={handleDebugClick}
+      />
 
-       <div className="p-6">
-         {error && (
-           <div className="mb-4 bg-destructive/10 border border-destructive/20 p-3 rounded-xl">
-             <p className="text-sm text-destructive">{error}</p>
-           </div>
-         )}
+      <div className="px-6 pt-4">
+        <WizardBreadcrumbs
+          category={effectiveCategory}
+          adType={effectiveAdType}
+          currentStep={flowSteps && flowSteps[formStep - 1] ? flowSteps[formStep - 1].label : ''}
+        />
+      </div>
 
-         <div className="space-y-6">
-           {/* Form Content for the current step */}
-           <FormContent 
-             form={form}
-             formStep={formStep}
-             STEPS={flowSteps || STEPS}
-             effectiveCategory={effectiveCategory}
-             effectiveAdType={effectiveAdType}
-             mode={mode}
-             selectedCity={selectedCity || initialData?.locality || ''}
-             isSaleMode={isSaleMode}
-             isPGHostelMode={isPGHostelMode}
-             isCommercialRentMode={isCommercialRentMode}
-             isCommercialSaleMode={isCommercialSaleMode}
-             isCoworkingMode={isCoworkingMode}
-             isLandSaleMode={isLandSaleMode}
-             isFlatmatesMode={isFlatmatesMode}
-             handlePreviousStep={safePreviousStep}
-             handleSaveAsDraft={handleSaveAsDraft}
-             handleSaveAndPublish={handleSaveAndPublish}
-             handleUpdate={handleUpdate}
-             saving={saving}
-             status={status}
-             savedPropertyId={effectivePropertyId}
-             handleImageUploadComplete={handleImageUploadComplete}
-           />
-           
-           {/* Step Navigation (Previous/Next buttons) */}
-           <StepNavigation 
-             formStep={formStep}
-             STEPS={flowSteps || STEPS}
-             handlePreviousStep={safePreviousStep}
-             handleNextStep={handleNextStep}
-             savedPropertyId={effectivePropertyId}
-             onSave={enhancedSaveFunction}
-             onPublish={handleDirectSaveAndPublish} // Use our direct save function
-             isLastStep={isReviewStep} // Flag to indicate this is the review step
-             disablePrevious={saving || saveInProgress}
-           />
-         </div>
-       </div>
-     </div>
-   </div>
- );
+      <FormNavigation 
+        currentStep={formStep} 
+        onStepChange={setCurrentStep}
+        propertyId={effectivePropertyId}
+        mode={mode}
+        category={effectiveCategory}
+        adType={effectiveAdType}
+        steps={visibleSteps}
+      />
+
+      <div className="p-6">
+        {error && (
+          <div className="mb-4 bg-destructive/10 border border-destructive/20 p-3 rounded-xl">
+            <p className="text-sm text-destructive">{error}</p>
+          </div>
+        )}
+
+        <div className="space-y-6">
+          {/* Form Content for the current step */}
+          <FormContent 
+            form={form}
+            formStep={formStep}
+            STEPS={flowSteps || STEPS}
+            effectiveCategory={effectiveCategory}
+            effectiveAdType={effectiveAdType}
+            mode={mode}
+            selectedCity={selectedCity || initialData?.locality || ''}
+            isSaleMode={isSaleMode}
+            isPGHostelMode={isPGHostelMode}
+            isCommercialRentMode={isCommercialRentMode}
+            isCommercialSaleMode={isCommercialSaleMode}
+            isCoworkingMode={isCoworkingMode}
+            isLandSaleMode={isLandSaleMode}
+            isFlatmatesMode={isFlatmatesMode}
+            handlePreviousStep={safePreviousStep}
+            handleSaveAsDraft={handleSaveAsDraft}
+            handleSaveAndPublish={handleSaveAndPublish}
+            handleUpdate={handleUpdate}
+            saving={saving}
+            status={status}
+            savedPropertyId={effectivePropertyId}
+            handleImageUploadComplete={handleImageUploadComplete}
+            showDebugInfo={showDebugInfo}
+            setShowDebugInfo={setShowDebugInfo}
+          />
+          
+          {/* Step Navigation (Previous/Next buttons) */}
+          <StepNavigation 
+            formStep={formStep}
+            STEPS={flowSteps || STEPS}
+            handlePreviousStep={safePreviousStep}
+            handleNextStep={handleNextStep}
+            savedPropertyId={effectivePropertyId}
+            onSave={enhancedSaveFunction}
+            onPublish={handleDirectSaveAndPublish} // Use our direct save function
+            isLastStep={isReviewStep} // Flag to indicate this is the review step
+            disablePrevious={saving || saveInProgress}
+          />
+        </div>
+      </div>
+    </div>
+  </div>
+);
 }
 
 export default PropertyForm;
