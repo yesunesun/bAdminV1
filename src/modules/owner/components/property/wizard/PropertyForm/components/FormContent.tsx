@@ -15,7 +15,7 @@ import { LocationDetails } from '../../sections/LocationDetails';
 import RentalDetails from '../../sections/RentalDetails';
 import { SaleDetails } from '../../sections/SaleDetails';
 import { AmenitiesSection } from '../../sections/AmenitiesSection';
-import PropertySummary from '../../sections/PropertySummary';
+import { PropertySummary } from "../../sections/PropertySummary/";
 import { ImageUploadSection } from '../../sections/ImageUploadSection';
 import LandDetails from '../../sections/LandDetails';
 import LandFeaturesDetails from '../../sections/LandFeaturesDetails';
