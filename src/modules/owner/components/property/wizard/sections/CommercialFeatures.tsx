@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/CommercialFeatures.tsx
-// Version: 2.0.0
-// Last Modified: 11-05-2025 01:15 IST
-// Purpose: Updated to use flow-based architecture with stepId for proper data capture
+// Version: 2.1.0
+// Last Modified: 13-05-2025 16:45 IST
+// Purpose: Removed debug information display while keeping Debug button functionality
 
 import React, { useCallback, useEffect } from 'react';
 import { FormSectionProps } from '../types';
@@ -230,7 +230,7 @@ const CommercialFeatures: React.FC<FormSectionProps> = ({
             <label htmlFor="waterStorage" className="block text-sm font-medium mb-1">
               Water Storage Facility
             </label>
-            <select
+<select
               id="waterStorage"
               className="w-full px-4 py-3 rounded-xl border border-border bg-background"
               value={getField('waterStorage', '')}
@@ -474,17 +474,6 @@ const CommercialFeatures: React.FC<FormSectionProps> = ({
           </div>
         </div>
       </FormSection>
-
-      {/* Debug info in development */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="mt-4 p-2 bg-gray-100 rounded text-xs space-y-2">
-          <div>Step ID: {stepId}</div>
-          <div>Current step data:</div>
-          <pre className="text-xs overflow-auto max-h-40 bg-white p-2 rounded border">
-            {JSON.stringify(form.getValues(`steps.${stepId}`), null, 2)}
-          </pre>
-        </div>
-      )}
     </div>
   );
 };

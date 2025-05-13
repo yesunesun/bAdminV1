@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/CommercialBasicDetails.tsx
-// Version: 1.2.0
-// Last Modified: 04-05-2025 18:15 IST
-// Purpose: Made cabins and conference rooms conditional based on property type
+// Version: 1.3.0
+// Last Modified: 13-05-2025 16:45 IST
+// Purpose: Removed debug information display while keeping Debug button functionality
 
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { FormSection } from '@/components/FormSection';
@@ -577,20 +577,6 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
           </div>
         )}
       </div>
-      
-      {/* Debug output in development mode */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="mt-4 p-2 bg-gray-100 rounded text-xs">
-          <div>Current propertyType value: {values.propertyType}</div>
-          <div>Current buildingType value: {values.buildingType}</div>
-          <div>Current builtUpAreaUnit value: {unitValue}</div>
-          <div>Form builtUpAreaUnit value: {form.getValues().builtUpAreaUnit || 'not set'}</div>
-          <div>Is Office Type: {isOfficeType ? 'Yes' : 'No'}</div>
-          <div>Mode: {mode}</div>
-          <div>Update counter: {updateCounter.current}</div>
-          <div>Has basicDetails: {form.getValues().basicDetails ? 'Yes' : 'No'}</div>
-        </div>
-      )}
     </FormSection>
   );
 }

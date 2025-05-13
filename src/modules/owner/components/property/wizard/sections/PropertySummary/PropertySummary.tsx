@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/PropertySummary/PropertySummary.tsx
-// Version: 2.5.0
-// Last Modified: 13-05-2025 17:45 IST
-// Purpose: Fixed structure to ensure Listing Information is always at top
+// Version: 2.6.0
+// Last Modified: 14-05-2025 12:15 IST
+// Purpose: Fixed section ordering to ensure all Commercial Rent sections are displayed
 
 import React, { useEffect, useState } from 'react';
 import { Info, Home, MapPin, Check, Clock, Wallet, Wrench, Layers, Briefcase } from 'lucide-react';
@@ -90,6 +90,20 @@ const formatFieldValue = (key: string, value: any): string => {
   return String(value);
 };
 
+// Helper to determine section order
+const getSectionPriority = (stepId: string): number => {
+  if (stepId.includes('basic_details')) return 1;
+  if (stepId.includes('location')) return 2;
+  if (stepId.includes('rental')) return 3;
+  if (stepId.includes('sale_details')) return 3;
+  if (stepId.includes('features')) return 4;
+  if (stepId.includes('land_features')) return 5;
+  if (stepId.includes('coworking_details')) return 6;
+  if (stepId.includes('flatmate_details')) return 7;
+  if (stepId.includes('pg_details')) return 8;
+  return 10; // Default priority for other sections
+};
+
 export const PropertySummary: React.FC<PropertySummaryProps> = (props) => {
   const {
     formData,
@@ -132,8 +146,8 @@ export const PropertySummary: React.FC<PropertySummaryProps> = (props) => {
       // Clean up the JSON structure to only include standard sections
       const cleanedData = cleanupJsonStructure(transformed);
       
-      // Log for debugging
-      console.log('Transformed & cleaned JSON:', cleanedData);
+      // Log the raw steps data for debugging
+      console.log('Steps data for review:', cleanedData.steps);
       
       // Set the transformed data to state for rendering
       setTransformedData(cleanedData);
@@ -243,18 +257,25 @@ export const PropertySummary: React.FC<PropertySummaryProps> = (props) => {
   // Dynamically create sections based on step IDs
   const sections = [];
   
+  // Log all steps for debugging
+  console.log("Processing steps:", Object.keys(data?.steps || {}));
+  
   // Process each step as its own section
   for (const stepId in data?.steps) {
     // Skip empty steps
     if (!data.steps[stepId] || Object.keys(data.steps[stepId]).length === 0) {
+      console.log(`Skipping empty step: ${stepId}`);
       continue;
     }
+    
+    console.log(`Processing step: ${stepId} with ${Object.keys(data.steps[stepId]).length} fields`);
     
     // Format the section title based on the step ID
     let sectionTitle = stepId
       .replace(/_/g, ' ')
+      .replace(/com rent/, 'commercial rental')
       .replace(/com cow/, 'coworking')
-      .replace(/res rent/, 'residential')
+      .replace(/res rent/, 'residential rental')
       .replace(/land sale/, 'land')
       .split(' ')
       .map(word => word.charAt(0).toUpperCase() + word.slice(1))
@@ -355,10 +376,14 @@ export const PropertySummary: React.FC<PropertySummaryProps> = (props) => {
         id: stepId,
         title: sectionTitle,
         icon,
-        items
+        items,
+        priority: getSectionPriority(stepId) // Add priority for sorting
       });
     }
   }
+  
+  // Sort sections by priority
+  sections.sort((a, b) => a.priority - b.priority);
   
   return (
     <div className="space-y-6 py-4">
@@ -380,6 +405,14 @@ export const PropertySummary: React.FC<PropertySummaryProps> = (props) => {
           ]}
         />
       </div>
+      
+      {/* 3. DEBUG: Log which sections are being rendered */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="bg-gray-100 p-2 text-xs rounded hidden">
+          <div>Found {sections.length} sections to render</div>
+          <div>{sections.map(s => s.title).join(', ')}</div>
+        </div>
+      )}
       
       {/* 3. CONTENT: All other property details sections */}
       <div className="mt-6">
