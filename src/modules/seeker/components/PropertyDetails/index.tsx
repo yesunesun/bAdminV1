@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyDetails/index.tsx
-// Version: 11.4.0
-// Last Modified: 14-05-2025 12:00 IST
-// Purpose: Fixed similarPropertiesData reference error
+// Version: 11.5.0
+// Last Modified: 14-05-2025 12:30 IST
+// Purpose: Improved currency formatting and section ordering
 
 import React, { useState, useEffect } from 'react';
 import { PropertyDetails as PropertyDetailsType } from '../../hooks/usePropertyDetails';
@@ -63,6 +63,19 @@ const SIMILAR_PROPERTIES_DATA = [
     property_details: { propertyType: 'Apartment' }
   }
 ];
+
+// Enhanced Indian Rupee formatter
+const formatIndianRupees = (amount: number | string): string => {
+  const numValue = typeof amount === 'number' ? amount : Number(parseFloat(amount));
+  
+  if (isNaN(numValue)) return '₹0';
+  
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    maximumFractionDigits: 0
+  }).format(numValue);
+};
 
 // Component to render a single step section based on step data
 const StepSection: React.FC<{
@@ -159,25 +172,24 @@ const renderFieldValue = (field: any, key: string) => {
       (key.toLowerCase().includes('price') || 
        key.toLowerCase().includes('amount') || 
        key.toLowerCase().includes('deposit') || 
-       key.toLowerCase().includes('cost'))) {
+       key.toLowerCase().includes('cost') ||
+       key.toLowerCase().includes('value') ||
+       key.toLowerCase().includes('budget'))) {
     const numValue = typeof field === 'number' ? field : Number(field);
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      maximumFractionDigits: 0
-    }).format(numValue);
+    return formatIndianRupees(numValue);
   }
   
   return field.toString();
 };
 
-// Overview section component to show main property details
-const PropertyOverviewSection: React.FC<{
+// Basic Details section component for overview
+const BasicDetailsSection: React.FC<{
   basicDetails: any;
-  flow: any;
   price: number | string;
-}> = ({ basicDetails, flow, price }) => {
-  const listingType = flow?.listingType || 'rent';
+  listingType: string;
+}> = ({ basicDetails, price, listingType }) => {
+  if (!basicDetails) return null;
+
   const isSaleProperty = listingType.toLowerCase() === 'sale';
   
   // Get property type, bedrooms, bathrooms, and area
@@ -199,16 +211,10 @@ const PropertyOverviewSection: React.FC<{
   return (
     <Card className="p-4 md:p-6 shadow-sm">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4">
-        <h2 className="text-xl font-semibold">Overview</h2>
+        <h2 className="text-xl font-semibold">Basic Details</h2>
         <div className="mt-2 md:mt-0">
           <span className="text-2xl font-bold text-primary">
-            {typeof price === 'number' 
-              ? new Intl.NumberFormat('en-IN', {
-                  style: 'currency',
-                  currency: 'INR',
-                  maximumFractionDigits: 0
-                }).format(price)
-              : price}
+            {formatIndianRupees(price)}
           </span>
           {!isSaleProperty && <span className="text-gray-500 ml-1">/month</span>}
         </div>
@@ -242,6 +248,159 @@ const PropertyOverviewSection: React.FC<{
             <span className="text-gray-900">{builtUpArea} {builtUpAreaUnit}</span>
           </div>
         )}
+      </div>
+
+      {/* Display other basic details if available */}
+      {Object.entries(basicDetails)
+        .filter(([key]) => 
+          !['propertyType', 'bhkType', 'bathrooms', 'builtUpArea', 'builtUpAreaUnit'].includes(key) && 
+          key.toLowerCase() !== 'description'
+        )
+        .length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3 mt-4 border-t border-gray-200 pt-4">
+            {Object.entries(basicDetails)
+              .filter(([key]) => 
+                !['propertyType', 'bhkType', 'bathrooms', 'builtUpArea', 'builtUpAreaUnit'].includes(key) &&
+                key.toLowerCase() !== 'description'
+              )
+              .map(([key, value]) => (
+                <div key={key} className="flex flex-col">
+                  <span className="text-sm font-medium text-gray-500 capitalize">
+                    {key.replace(/([A-Z])/g, ' $1').trim()}
+                  </span>
+                  <span className="text-gray-900">
+                    {renderFieldValue(value, key)}
+                  </span>
+                </div>
+              ))}
+          </div>
+        )}
+        
+      {/* Description if available */}
+      {basicDetails.description && (
+        <div className="mt-4 border-t border-gray-200 pt-4">
+          <span className="text-sm font-medium text-gray-500">Description</span>
+          <p className="text-gray-700 whitespace-pre-line mt-1">{basicDetails.description}</p>
+        </div>
+      )}
+    </Card>
+  );
+};
+
+// Location section component
+const LocationSection: React.FC<{
+  location: any;
+  address?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
+}> = ({ location, address, city, state, zipCode }) => {
+  if (!location && !address) return null;
+  
+  // Format location string
+  const locationParts = location ? [
+    location.address,
+    location.area,
+    location.city,
+    location.state,
+    location.pinCode
+  ].filter(Boolean) : [];
+  
+  const locationString = locationParts.length > 0
+    ? locationParts.join(', ')
+    : address 
+      ? [address, city, state, zipCode].filter(Boolean).join(', ')
+      : "Location not specified";
+  
+  // Get coordinates
+  const coordinates = location
+    ? { lat: parseFloat(location.latitude), lng: parseFloat(location.longitude) }
+    : null;
+    
+  return (
+    <Card className="p-4 md:p-6 shadow-sm">
+      <h2 className="text-xl font-semibold mb-4">Location</h2>
+      
+      {coordinates && (
+        <div className="h-64 bg-gray-100 rounded-lg mb-4">
+          {/* Location map will be rendered here */}
+          <div className="h-full flex items-center justify-center">
+            <span className="text-gray-500">Map view available</span>
+          </div>
+        </div>
+      )}
+      
+      <p className="text-gray-700">{locationString}</p>
+      
+      {/* Display other location details if available */}
+      {location && Object.keys(location).length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3 mt-4 border-t border-gray-200 pt-4">
+          {Object.entries(location)
+            .filter(([key]) => 
+              !['latitude', 'longitude', 'address', 'area', 'city', 'state', 'pinCode'].includes(key)
+            )
+            .map(([key, value]) => (
+              <div key={key} className="flex flex-col">
+                <span className="text-sm font-medium text-gray-500 capitalize">
+                  {key.replace(/([A-Z])/g, ' $1').trim()}
+                </span>
+                <span className="text-gray-900">
+                  {renderFieldValue(value, key)}
+                </span>
+              </div>
+            ))}
+        </div>
+      )}
+    </Card>
+  );
+};
+
+// Sale/Rental Details section component
+const PricingDetailsSection: React.FC<{
+  listingType: string;
+  pricingDetails: any;
+  title?: string;
+}> = ({ listingType, pricingDetails, title }) => {
+  if (!pricingDetails) return null;
+  
+  const isSaleProperty = listingType.toLowerCase() === 'sale';
+  const sectionTitle = title || (isSaleProperty ? 'Sale Details' : 'Rental Details');
+  
+  // Format the main price display
+  const mainPrice = isSaleProperty
+    ? pricingDetails.expectedPrice || pricingDetails.price
+    : pricingDetails.rentAmount || pricingDetails.monthlyRent;
+    
+  return (
+    <Card className="p-4 md:p-6 shadow-sm">
+      <h2 className="text-xl font-semibold mb-4">{sectionTitle}</h2>
+      
+      <div className="mb-4">
+        <span className="text-sm font-medium text-gray-500">
+          {isSaleProperty ? 'Expected Price' : 'Monthly Rent'}
+        </span>
+        <div className="text-2xl font-bold text-primary">
+          {formatIndianRupees(mainPrice)}
+          {!isSaleProperty && <span className="text-gray-500 text-base ml-1">/month</span>}
+        </div>
+      </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3">
+        {Object.entries(pricingDetails)
+          .filter(([key]) => 
+            key !== (isSaleProperty ? 'expectedPrice' : 'rentAmount') && 
+            key !== (isSaleProperty ? 'price' : 'monthlyRent')
+          )
+          .map(([key, value]) => (
+            <div key={key} className="flex flex-col">
+              <span className="text-sm font-medium text-gray-500 capitalize">
+                {key.replace(/([A-Z])/g, ' $1').trim()}
+              </span>
+              <span className="text-gray-900">
+                {renderFieldValue(value, key)}
+              </span>
+            </div>
+          ))}
       </div>
     </Card>
   );
@@ -352,7 +511,7 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
   const propertyId = property.id || meta.id;
   const ownerId = property.owner_id || meta.owner_id;
   
-  // Find the basic details step (naming convention may vary by flow)
+  // Find the basic details step
   const basicDetailsStepKey = Object.keys(steps).find(key => 
     key.includes('basic_details')
   );
@@ -369,19 +528,17 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
   
   const location = locationStepKey ? steps[locationStepKey] : null;
   
-  // Format location string
+  // Format location string for breadcrumb display
   const locationParts = location ? [
-    location.address,
     location.area,
     location.city,
-    location.state,
-    location.pinCode
+    location.state
   ].filter(Boolean) : [];
   
   const locationString = locationParts.length > 0
     ? locationParts.join(', ')
-    : property.address 
-      ? [property.address, property.city, property.state, property.zip_code].filter(Boolean).join(', ')
+    : property.city
+      ? [property.city, property.state].filter(Boolean).join(', ')
       : "Location not specified";
   
   // Get coordinates
@@ -405,6 +562,21 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
   const price = isSaleProperty
     ? priceDetails?.expectedPrice || property.price || 0
     : priceDetails?.rentAmount || property.price || 0;
+  
+  // Find features/amenities steps
+  const featuresStepKey = Object.keys(steps).find(key => 
+    key.includes('features') || key.includes('amenities')
+  );
+  
+  const featuresDetails = featuresStepKey ? steps[featuresStepKey] : null;
+  
+  // Organize remaining steps by categories
+  const remainingStepKeys = Object.keys(steps).filter(key => 
+    key !== basicDetailsStepKey && 
+    key !== locationStepKey && 
+    key !== priceStepKey &&
+    key !== featuresStepKey
+  );
   
   // Handle share functionality
   const handleShare = () => {
@@ -465,35 +637,49 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
             onScheduleVisit={() => setVisitDialogOpen(true)}
           />
           
-          {/* Property Overview - with price and main details */}
-          <PropertyOverviewSection 
-            basicDetails={basicDetails}
-            flow={flow}
-            price={price}
+          {/* Section 1: Basic Details */}
+          {basicDetails && (
+            <BasicDetailsSection 
+              basicDetails={basicDetails}
+              price={price}
+              listingType={flow.listingType}
+            />
+          )}
+          
+          {/* Section 2: Location */}
+          <LocationSection 
+            location={location}
+            address={property.address}
+            city={property.city}
+            state={property.state}
+            zipCode={property.zip_code}
           />
           
-          {/* Dynamically render sections based on steps */}
-          {Object.entries(steps).map(([stepId, stepData]) => (
+          {/* Section 3: Sale/Rental Details */}
+          {priceDetails && (
+            <PricingDetailsSection 
+              listingType={flow.listingType}
+              pricingDetails={priceDetails}
+            />
+          )}
+          
+          {/* Section 4: Features/Amenities */}
+          {featuresDetails && (
+            <StepSection 
+              stepId={featuresStepKey!}
+              stepData={featuresDetails}
+              title="Features & Amenities"
+            />
+          )}
+          
+          {/* Remaining sections in original order */}
+          {remainingStepKeys.map(stepId => (
             <StepSection 
               key={stepId}
               stepId={stepId}
-              stepData={stepData}
+              stepData={steps[stepId]}
             />
           ))}
-          
-          {/* If no location in steps, show location component with extracted coordinates */}
-          {!locationStepKey && coordinates && (
-            <Card className="p-4 md:p-6 shadow-sm">
-              <h2 className="text-xl font-semibold mb-4">Location</h2>
-              <div className="h-64 bg-gray-100 rounded-lg mb-4">
-                {/* Location map will be rendered here */}
-                <div className="h-full flex items-center justify-center">
-                  <span className="text-gray-500">Map view available</span>
-                </div>
-              </div>
-              <p className="text-gray-700">{locationString}</p>
-            </Card>
-          )}
         </div>
         
         {/* Sidebar Column */}

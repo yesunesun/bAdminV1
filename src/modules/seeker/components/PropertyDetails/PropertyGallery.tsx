@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyDetails/PropertyGallery.tsx
-// Version: 6.4.0
-// Last Modified: 14-05-2025 11:00 IST
-// Purpose: Implemented direct blob URL support and fixed image loading issues
+// Version: 6.4.1
+// Last Modified: 14-05-2025 17:30 IST
+// Purpose: Fixed infinite loading issue in image gallery
 
 import React, { useState, useEffect, useRef } from 'react';
 import { ChevronLeftIcon, ChevronRightIcon, ImageIcon, ExpandIcon, XIcon } from 'lucide-react';
@@ -33,6 +33,7 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
   const [loadingImage, setLoadingImage] = useState(true);
   const loadAttempts = useRef<Record<string, number>>({});
+  const initialLoadAttempt = useRef(false);
   
   // Create alternative URL formats when original URLs fail
   const createAlternativeUrl = (url: string): string => {
@@ -179,6 +180,7 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({
     // Reset image errors when images change
     setImageErrors({});
     loadAttempts.current = {};
+    initialLoadAttempt.current = false;
     
     // Sort images: primary first, then by display order
     const sortedImages = [...validImages].sort((a, b) => {
@@ -204,6 +206,32 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({
       // since they're managed in PropertyDetailPage
     };
   }, []);
+  
+  // Add effect to handle initial loading
+  useEffect(() => {
+    // If we have directUrls, we can assume images will load faster
+    if (directUrls && directUrls.length > 0) {
+      // Set a short timeout to hide loading indicator if it's still showing
+      const timer = setTimeout(() => {
+        if (loadingImage && !initialLoadAttempt.current) {
+          setLoadingImage(false);
+          initialLoadAttempt.current = true;
+        }
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    }
+    
+    // For other URLs, set a longer timeout as backup
+    const timer = setTimeout(() => {
+      if (loadingImage && !initialLoadAttempt.current) {
+        setLoadingImage(false);
+        initialLoadAttempt.current = true;
+      }
+    }, 2000);
+    
+    return () => clearTimeout(timer);
+  }, [loadingImage, directUrls]);
   
   // If still no valid images after processing, show placeholder
   if (!displayImages || displayImages.length === 0) {
@@ -261,6 +289,7 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({
     if (attempts >= 2) {
       e.currentTarget.src = FALLBACK_IMAGE;
       setLoadingImage(false);
+      initialLoadAttempt.current = true;
       
       // Mark this image as permanently failed
       setImageErrors(prev => ({ ...prev, [imageId]: true }));
@@ -280,6 +309,7 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({
     // Fall back to placeholder if all else fails
     e.currentTarget.src = FALLBACK_IMAGE;
     setLoadingImage(false);
+    initialLoadAttempt.current = true;
   };
   
   // Get the URL for current image
@@ -302,7 +332,10 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({
             alt={`Property view ${currentIndex + 1}`}
             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
             onError={(e) => handleImageError(displayImages[currentIndex].id, e)}
-            onLoad={() => setLoadingImage(false)}
+            onLoad={() => {
+              setLoadingImage(false);
+              initialLoadAttempt.current = true;
+            }}
           />
         </div>
         
