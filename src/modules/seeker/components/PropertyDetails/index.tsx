@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyDetails/index.tsx
-// Version: 10.1.0
-// Last Modified: 10-05-2025 15:45 IST
-// Purpose: Updated to better reflect property data from JSON and improved property type/listing type display
+// Version: 11.2.0
+// Last Modified: 13-05-2025 17:45 IST
+// Purpose: Removed all debug information boxes including the one in PropertyGalleryCard
 
 import React, { useState, useEffect } from 'react';
 import { PropertyDetails as PropertyDetailsType } from '../../hooks/usePropertyDetails';
@@ -9,28 +9,94 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertCircle } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import { Card } from '@/components/ui/card';
 
-// Import existing components
-import PropertyGalleryCard from './PropertyGalleryCard';
+// Import existing components but update PropertyGalleryCard to remove debug info
 import PropertyActionButtons from './PropertyActionButtons';
-import PropertyDescriptionSection from './PropertyDescriptionSection';
-import PropertyLocationSection from './PropertyLocationSection';
 import ContactOwnerCard from './ContactOwnerCard';
 import PropertyHighlightsCard from './PropertyHighlightsCard';
 import SimilarProperties from './SimilarProperties';
 import NearbyAmenities from './NearbyAmenities';
 import VisitRequestDialog from './VisitRequestDialog';
 import PropertyImageUpload from './PropertyImageUpload';
-import BasicDetailsSection from './BasicDetailsSection';
-
-// Import helper components and utilities
-import FeatureDetailsCard from './FeatureDetailsCard';
-import RentalDetailsCard from './RentalDetailsCard';
-import SaleDetailsCard from './SaleDetailsCard';
-import PropertyOverview from './PropertyOverview';
 import PropertyNotFound from './PropertyNotFound';
 import { PropertyDetailsSkeleton } from './PropertyDetailsSkeleton';
-import { getPropertyData, extractImagesFromJson } from './utils/propertyDataUtils';
+import { extractImagesFromJson } from './utils/propertyDataUtils';
+
+// Create a clean version of PropertyGalleryCard that doesn't include debug info
+const CleanPropertyGalleryCard: React.FC<{ images: any[] }> = ({ images }) => {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  
+  // Find primary image index or default to 0
+  useEffect(() => {
+    if (images && images.length > 0) {
+      const primaryIndex = images.findIndex(img => img.is_primary || img.isPrimary);
+      setCurrentIndex(primaryIndex !== -1 ? primaryIndex : 0);
+    }
+  }, [images]);
+  
+  // If no images, show placeholder
+  if (!images || images.length === 0) {
+    return (
+      <Card className="overflow-hidden">
+        <div className="relative aspect-video bg-gray-100 flex items-center justify-center">
+          <img src="/noimage.png" alt="No Image Available" className="max-h-full" />
+        </div>
+      </Card>
+    );
+  }
+  
+  // Navigation functions
+  const nextImage = () => {
+    setCurrentIndex((prevIndex) => (prevIndex + 1) % images.length);
+  };
+  
+  const prevImage = () => {
+    setCurrentIndex((prevIndex) => (prevIndex - 1 + images.length) % images.length);
+  };
+  
+  return (
+    <Card className="overflow-hidden">
+      <div className="relative aspect-video bg-gray-50">
+        {/* Main image */}
+        <img 
+          src={images[currentIndex]?.url || '/noimage.png'} 
+          alt={`Property Image ${currentIndex + 1}`}
+          className="w-full h-full object-contain"
+        />
+        
+        {/* Navigation controls */}
+        {images.length > 1 && (
+          <>
+            <button 
+              onClick={prevImage}
+              className="absolute left-2 top-1/2 -mt-6 p-2 rounded-full bg-white/75 shadow-md hover:bg-white"
+              aria-label="Previous image"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M15 18l-6-6 6-6" />
+              </svg>
+            </button>
+            <button 
+              onClick={nextImage}
+              className="absolute right-2 top-1/2 -mt-6 p-2 rounded-full bg-white/75 shadow-md hover:bg-white"
+              aria-label="Next image"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 18l6-6-6-6" />
+              </svg>
+            </button>
+            
+            {/* Image counter */}
+            <div className="absolute bottom-2 right-2 py-1 px-3 bg-black/50 text-white rounded-full text-sm">
+              {currentIndex + 1} / {images.length}
+            </div>
+          </>
+        )}
+      </div>
+    </Card>
+  );
+};
 
 // Static data for similar properties
 const similarPropertiesData = [
@@ -79,6 +145,189 @@ interface PropertyDetailsProps {
   isLoading: boolean;
   onRefresh?: () => void;
 }
+
+// Helper function to render field value with appropriate formatting
+const renderFieldValue = (field: any, key: string) => {
+  // Handle different data types appropriately
+  if (field === null || field === undefined) {
+    return 'Not specified';
+  }
+  
+  if (typeof field === 'boolean') {
+    return field ? 'Yes' : 'No';
+  }
+  
+  if (Array.isArray(field)) {
+    return field.join(', ');
+  }
+  
+  // Format date fields (keys containing 'date', 'from', etc.)
+  if (typeof field === 'string' && 
+      (key.toLowerCase().includes('date') || 
+       key.toLowerCase().includes('from') || 
+       key.toLowerCase().includes('possession'))) {
+    try {
+      const date = new Date(field);
+      if (!isNaN(date.getTime())) {
+        return date.toLocaleDateString('en-IN', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric'
+        });
+      }
+    } catch (e) {
+      // If date parsing fails, return the original string
+    }
+  }
+  
+  // Format price fields (keys containing 'price', 'amount', etc.)
+  if ((typeof field === 'number' || !isNaN(Number(field))) && 
+      (key.toLowerCase().includes('price') || 
+       key.toLowerCase().includes('amount') || 
+       key.toLowerCase().includes('deposit') || 
+       key.toLowerCase().includes('cost'))) {
+    const numValue = typeof field === 'number' ? field : Number(field);
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      maximumFractionDigits: 0
+    }).format(numValue);
+  }
+  
+  return field.toString();
+};
+
+// Component to render a single step section based on step data
+const StepSection: React.FC<{
+  stepId: string;
+  stepData: any;
+  title?: string;
+}> = ({ stepId, stepData, title }) => {
+  if (!stepData || Object.keys(stepData).length === 0) {
+    return null;
+  }
+  
+  // Format step ID for display (e.g., "com_sale_basic_details" -> "Basic Details")
+  const formatStepId = (id: string): string => {
+    const parts = id.split('_');
+    // Remove flow prefix (e.g., "com_sale") and join remaining parts
+    const relevantParts = parts.slice(2);
+    return relevantParts
+      .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(' ');
+  };
+  
+  const sectionTitle = title || formatStepId(stepId);
+  
+  // Special handling for description field to display it as a paragraph
+  const descriptionField = Object.entries(stepData).find(
+    ([key]) => key.toLowerCase() === 'description'
+  );
+  
+  return (
+    <Card className="p-4 md:p-6 shadow-sm">
+      <h2 className="text-xl font-semibold mb-4">{sectionTitle}</h2>
+      
+      {/* Render description as a paragraph if it exists */}
+      {descriptionField && (
+        <div className="mb-4">
+          <p className="text-gray-700 whitespace-pre-line">{descriptionField[1]}</p>
+        </div>
+      )}
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3">
+        {Object.entries(stepData)
+          .filter(([key]) => key.toLowerCase() !== 'description') // Skip description as it's handled separately
+          .map(([key, value]) => (
+            <div key={key} className="flex flex-col">
+              <span className="text-sm font-medium text-gray-500 capitalize">
+                {key.replace(/([A-Z])/g, ' $1').trim()}
+              </span>
+              <span className="text-gray-900">
+                {renderFieldValue(value, key)}
+              </span>
+            </div>
+          ))}
+      </div>
+    </Card>
+  );
+};
+
+// Overview section component to show main property details
+const PropertyOverviewSection: React.FC<{
+  basicDetails: any;
+  flow: any;
+  price: number | string;
+}> = ({ basicDetails, flow, price }) => {
+  const listingType = flow?.listingType || 'rent';
+  const isSaleProperty = listingType.toLowerCase() === 'sale';
+  
+  // Get property type, bedrooms, bathrooms, and area
+  const propertyType = basicDetails?.propertyType || '';
+  
+  // Extract bedrooms from bhkType
+  let bedrooms = 0;
+  if (basicDetails?.bhkType) {
+    const match = basicDetails.bhkType.match(/^(\d+)/);
+    if (match && match[1]) {
+      bedrooms = parseInt(match[1], 10);
+    }
+  }
+  
+  const bathrooms = basicDetails?.bathrooms || 0;
+  const builtUpArea = basicDetails?.builtUpArea || 0;
+  const builtUpAreaUnit = basicDetails?.builtUpAreaUnit || 'sqft';
+  
+  return (
+    <Card className="p-4 md:p-6 shadow-sm">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4">
+        <h2 className="text-xl font-semibold">Overview</h2>
+        <div className="mt-2 md:mt-0">
+          <span className="text-2xl font-bold text-primary">
+            {typeof price === 'number' 
+              ? new Intl.NumberFormat('en-IN', {
+                  style: 'currency',
+                  currency: 'INR',
+                  maximumFractionDigits: 0
+                }).format(price)
+              : price}
+          </span>
+          {!isSaleProperty && <span className="text-gray-500 ml-1">/month</span>}
+        </div>
+      </div>
+      
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {propertyType && (
+          <div className="flex flex-col">
+            <span className="text-sm font-medium text-gray-500">Property Type</span>
+            <span className="text-gray-900 capitalize">{propertyType}</span>
+          </div>
+        )}
+        
+        {bedrooms > 0 && (
+          <div className="flex flex-col">
+            <span className="text-sm font-medium text-gray-500">Bedrooms</span>
+            <span className="text-gray-900">{bedrooms}</span>
+          </div>
+        )}
+        
+        {bathrooms > 0 && (
+          <div className="flex flex-col">
+            <span className="text-sm font-medium text-gray-500">Bathrooms</span>
+            <span className="text-gray-900">{bathrooms}</span>
+          </div>
+        )}
+        
+        {builtUpArea > 0 && (
+          <div className="flex flex-col">
+            <span className="text-sm font-medium text-gray-500">Built-up Area</span>
+            <span className="text-gray-900">{builtUpArea} {builtUpAreaUnit}</span>
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+};
 
 const PropertyDetails: React.FC<PropertyDetailsProps> = ({
   property,
@@ -147,217 +396,88 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
   if (!property) {
     return <PropertyNotFound />;
   }
+
+  // Extract structured data from property_details
+  const propertyDetails = property.property_details || {};
   
-  // Extract all the property data based on its structure
-  const propertyData = getPropertyData(property);
-  if (!propertyData) return null;
+  // Get flow information (category and listing type)
+  const flow = propertyDetails.flow || { 
+    category: 'residential', 
+    listingType: 'rent' 
+  };
   
-  // Get common property details
-  const {
-    id,
-    owner_id,
-    flow,
-    basicDetails,
-    features,
-    location,
-    rentalInfo,
-    saleInfo,
-    description
-  } = propertyData;
+  // Get steps from property_details if available
+  const steps = propertyDetails.steps || {};
   
-  // Get listing type and category
-  const listingType = flow?.listingType || property.property_details?.listingType || 'rent';
-  const isSaleProperty = listingType.toLowerCase() === 'sale';
-  const propertyCategory = flow?.category || property.property_details?.category || 'residential';
+  // Get meta information
+  const meta = propertyDetails.meta || { 
+    id: property.id, 
+    owner_id: property.owner_id 
+  };
   
-  // Get property type for tag display
-  const propertyType = basicDetails?.propertyType || property.property_details?.propertyType || propertyCategory;
+  // Get media information
+  const media = propertyDetails.media || { 
+    photos: { images: [] } 
+  };
+
+  // Extract key details for title and overview
+  const propertyId = property.id || meta.id;
+  const ownerId = property.owner_id || meta.owner_id;
+  
+  // Find the basic details step (naming convention may vary by flow)
+  const basicDetailsStepKey = Object.keys(steps).find(key => 
+    key.includes('basic_details')
+  );
+  
+  const basicDetails = basicDetailsStepKey ? steps[basicDetailsStepKey] : null;
   
   // Get property title
-  const propertyTitle = basicDetails?.title || 
-                      property.title || 
-                      `${basicDetails?.propertyType || 'Property'} in ${location?.city || ''}`;
+  const propertyTitle = basicDetails?.title || property.title || 'Property';
   
-  // Extract bedrooms from bhkType
-  let bedrooms = 0;
-  if (basicDetails?.bhkType) {
-    const match = basicDetails.bhkType.match(/^(\d+)/);
-    if (match && match[1]) {
-      bedrooms = parseInt(match[1], 10);
-    }
-  } else if (property.bedrooms) {
-    bedrooms = property.bedrooms;
-  }
+  // Get location information
+  const locationStepKey = Object.keys(steps).find(key => 
+    key.includes('location')
+  );
   
-  // Get bathrooms and square feet
-  const bathrooms = basicDetails?.bathrooms || property.bathrooms || 0;
-  const squareFeet = basicDetails?.builtUpArea || property.square_feet || 0;
+  const location = locationStepKey ? steps[locationStepKey] : null;
   
   // Format location string
-  const locationAddress = location?.address || property.address || '';
-  const locationCity = location?.city || property.city || '';
-  const locationState = location?.state || property.state || '';
-  const locationZipCode = location?.pinCode || property.zip_code || '';
+  const locationParts = location ? [
+    location.address,
+    location.area,
+    location.city,
+    location.state,
+    location.pinCode
+  ].filter(Boolean) : [];
   
-  const locationString = [locationAddress, locationCity, locationState, locationZipCode]
-    .filter(Boolean)
-    .join(", ") || "Location not specified";
+  const locationString = locationParts.length > 0
+    ? locationParts.join(', ')
+    : property.address 
+      ? [property.address, property.city, property.state, property.zip_code].filter(Boolean).join(', ')
+      : "Location not specified";
   
-  // Extract coordinates with proper null checks
-  const propertyCoordinates = (() => {
-    // Try direct latitude/longitude properties first (top-level)
-    if (typeof property.latitude === 'number' && typeof property.longitude === 'number') {
-      return { lat: property.latitude, lng: property.longitude };
-    }
-    
-    // Try string latitude/longitude and parse them
-    if (property.latitude && property.longitude) {
-      try {
-        const lat = parseFloat(String(property.latitude));
-        const lng = parseFloat(String(property.longitude));
-        
-        if (!isNaN(lat) && !isNaN(lng)) {
-          return { lat, lng };
-        }
-      } catch (e) {
-        // Silent catch
-      }
-    }
-    
-    // Check location object if it exists and has coordinates
-    if (location && location.coordinates) {
-      const coords = location.coordinates;
-      
-      // Try latitude/longitude format
-      if (coords.latitude && coords.longitude) {
-        try {
-          const lat = parseFloat(String(coords.latitude));
-          const lng = parseFloat(String(coords.longitude));
-          
-          if (!isNaN(lat) && !isNaN(lng)) {
-            return { lat, lng };
-          }
-        } catch (e) {
-          // Silent catch
-        }
-      }
-      
-      // Try lat/lng format
-      if (coords.lat && coords.lng) {
-        try {
-          const lat = parseFloat(String(coords.lat));
-          const lng = parseFloat(String(coords.lng));
-          
-          if (!isNaN(lat) && !isNaN(lng)) {
-            return { lat, lng };
-          }
-        } catch (e) {
-          // Silent catch
-        }
-      }
-    }
-    
-    // Check property_details if it exists
-    if (property.property_details) {
-      const details = property.property_details;
-      
-      // Try direct coordinates object
-      if (details.coordinates) {
-        const coords = details.coordinates;
-        
-        // Try latitude/longitude format
-        if (coords.latitude && coords.longitude) {
-          try {
-            const lat = parseFloat(String(coords.latitude));
-            const lng = parseFloat(String(coords.longitude));
-            
-            if (!isNaN(lat) && !isNaN(lng)) {
-              return { lat, lng };
-            }
-          } catch (e) {
-            // Silent catch
-          }
-        }
-        
-        // Try lat/lng format
-        if (coords.lat && coords.lng) {
-          try {
-            const lat = parseFloat(String(coords.lat));
-            const lng = parseFloat(String(coords.lng));
-            
-            if (!isNaN(lat) && !isNaN(lng)) {
-              return { lat, lng };
-            }
-          } catch (e) {
-            // Silent catch
-          }
-        }
-      }
-      
-      // Try direct lat/lng or latitude/longitude properties in property_details
-      if (details.latitude && details.longitude) {
-        try {
-          const lat = parseFloat(String(details.latitude));
-          const lng = parseFloat(String(details.longitude));
-          
-          if (!isNaN(lat) && !isNaN(lng)) {
-            return { lat, lng };
-          }
-        } catch (e) {
-          // Silent catch
-        }
-      }
-      
-      if (details.lat && details.lng) {
-        try {
-          const lat = parseFloat(String(details.lat));
-          const lng = parseFloat(String(details.lng));
-          
-          if (!isNaN(lat) && !isNaN(lng)) {
-            return { lat, lng };
-          }
-        } catch (e) {
-          // Silent catch
-        }
-      }
-      
-      // Try nested location.coordinates
-      if (details.location && details.location.coordinates) {
-        const coords = details.location.coordinates;
-        
-        // Try latitude/longitude format
-        if (coords.latitude && coords.longitude) {
-          try {
-            const lat = parseFloat(String(coords.latitude));
-            const lng = parseFloat(String(coords.longitude));
-            
-            if (!isNaN(lat) && !isNaN(lng)) {
-              return { lat, lng };
-            }
-          } catch (e) {
-            // Silent catch
-          }
-        }
-        
-        // Try lat/lng format
-        if (coords.lat && coords.lng) {
-          try {
-            const lat = parseFloat(String(coords.lat));
-            const lng = parseFloat(String(coords.lng));
-            
-            if (!isNaN(lat) && !isNaN(lng)) {
-              return { lat, lng };
-            }
-          } catch (e) {
-            // Silent catch
-          }
-        }
-      }
-    }
-    
-    return null;
-  })();
-
+  // Get coordinates
+  const coordinates = location
+    ? { lat: parseFloat(location.latitude), lng: parseFloat(location.longitude) }
+    : null;
+  
+  // Get price information
+  const isSaleProperty = flow.listingType.toLowerCase() === 'sale';
+  
+  // Find sale or rental details step
+  const priceStepKey = Object.keys(steps).find(key => 
+    isSaleProperty 
+      ? key.includes('sale_details') 
+      : key.includes('rental') || key.includes('rent')
+  );
+  
+  const priceDetails = priceStepKey ? steps[priceStepKey] : null;
+  
+  // Get price value
+  const price = isSaleProperty
+    ? priceDetails?.expectedPrice || property.price || 0
+    : priceDetails?.rentAmount || property.price || 0;
+  
   // Handle share functionality
   const handleShare = () => {
     if (navigator.share) {
@@ -387,7 +507,7 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
             For {isSaleProperty ? 'Sale' : 'Rent'}
           </span>
           <span className="px-3 py-1 rounded-full bg-purple-100 text-purple-800 text-sm font-medium capitalize">
-            {propertyType}
+            {flow.category}
           </span>
         </div>
         <p className="text-muted-foreground">{locationString}</p>
@@ -396,18 +516,8 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Content Column */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Property Debug Info Box - For Admin/Developers */}
-          {process.env.NODE_ENV === 'development' && (
-            <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg mb-4 text-sm">
-              <div><strong>PropertyId:</strong> {id}</div>
-              <div><strong>Images:</strong> {propertyImages.length}</div>
-              <div><strong>First image filename:</strong> {propertyImages[0]?.fileName || 'None'}</div>
-              <div><strong>Current Image:</strong> {propertyImages.findIndex(img => img.is_primary || img.isPrimary) + 1}/{propertyImages.length}</div>
-            </div>
-          )}
-          
-          {/* Image Gallery - Using propertyImages state */}
-          <PropertyGalleryCard images={propertyImages} />
+          {/* Image Gallery - Using our clean component without debug info */}
+          <CleanPropertyGalleryCard images={propertyImages} />
           
           {/* Image Upload Component (only shown to authorized users) */}
           <PropertyImageUpload 
@@ -423,46 +533,43 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
             onScheduleVisit={() => setVisitDialogOpen(true)}
           />
           
-          {/* Property Overview Card with Price Label */}
-          <PropertyOverview 
-            propertyData={propertyData}
-            listingType={listingType}
-            bedrooms={bedrooms}
-            bathrooms={bathrooms}
-            squareFeet={squareFeet}
+          {/* Property Overview - with price and main details */}
+          <PropertyOverviewSection 
+            basicDetails={basicDetails}
+            flow={flow}
+            price={price}
           />
           
-          {/* Basic Details Section */}
-          <BasicDetailsSection basicDetails={basicDetails} />
+          {/* Dynamically render sections based on steps */}
+          {Object.entries(steps).map(([stepId, stepData]) => (
+            <StepSection 
+              key={stepId}
+              stepId={stepId}
+              stepData={stepData}
+            />
+          ))}
           
-          {/* Sale Details Section - Only shown for Sale properties */}
-          {isSaleProperty && <SaleDetailsCard saleInfo={saleInfo} />}
-          
-          {/* Rental Details Section - Only shown for Rental properties */}
-          {!isSaleProperty && <RentalDetailsCard rentalInfo={rentalInfo} />}
-          
-          {/* Features & Amenities Section */}
-          <FeatureDetailsCard features={features} />
-          
-          {/* About this property */}
-          <PropertyDescriptionSection description={description} />
-          
-          {/* Property Location Map */}
-          <PropertyLocationSection
-            address={locationAddress}
-            city={locationCity}
-            state={locationState}
-            zipCode={locationZipCode}
-            coordinates={propertyCoordinates}
-          />
+          {/* If no location in steps, show location component with extracted coordinates */}
+          {!locationStepKey && coordinates && (
+            <Card className="p-4 md:p-6 shadow-sm">
+              <h2 className="text-xl font-semibold mb-4">Location</h2>
+              <div className="h-64 bg-gray-100 rounded-lg mb-4">
+                {/* Location map will be rendered here */}
+                <div className="h-full flex items-center justify-center">
+                  <span className="text-gray-500">Map view available</span>
+                </div>
+              </div>
+              <p className="text-gray-700">{locationString}</p>
+            </Card>
+          )}
         </div>
         
         {/* Sidebar Column */}
         <div className="space-y-6">
           <ContactOwnerCard
             propertyTitle={propertyTitle}
-            propertyId={id}
-            ownerId={owner_id}
+            propertyId={propertyId}
+            ownerId={ownerId}
             ownerInfo={property.ownerInfo}
           />
           
@@ -486,10 +593,10 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
           />
           
           <NearbyAmenities
-            address={locationAddress}
-            city={locationCity}
-            state={locationState}
-            coordinates={propertyCoordinates}
+            address={location?.address || property.address}
+            city={location?.city || property.city}
+            state={location?.state || property.state}
+            coordinates={coordinates}
             radius={1500}
           />
         </div>
@@ -497,7 +604,7 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
       
       {/* Visit Request Dialog */}
       <VisitRequestDialog
-        propertyId={id}
+        propertyId={propertyId}
         open={visitDialogOpen}
         onOpenChange={setVisitDialogOpen}
       />
