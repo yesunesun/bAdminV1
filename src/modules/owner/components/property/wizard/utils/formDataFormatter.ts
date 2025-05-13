@@ -1,6 +1,6 @@
 // src/modules/owner/components/property/wizard/utils/formDataFormatter.ts
-// Version: 1.2.0
-// Last Modified: 13-05-2025 15:10 IST
+// Version: 1.1.0
+// Last Modified: 13-05-2025 14:30 IST
 // Purpose: Enhanced utility to consistently format form data and prepare for submission
 
 import { FormData } from '../types';
@@ -66,18 +66,8 @@ export function prepareFormDataForSubmission(formValues: FormData, contextParams
     // Format the data using the existing utility
     const formattedData = formatFormData(rawFormData, contextParams);
     
-    // Add a marker to verify this utility is being used
-    if (!formattedData.meta) {
-      formattedData.meta = {};
-    }
-    
-    // Add our verification marker
-    formattedData.meta._formatterVersion = '1.2.0';
-    formattedData.meta._processedBy = 'centralizedFormatter';
-    formattedData.meta._processedAt = new Date().toISOString();
-    
     // Log the final output structure for debugging
-    console.log('Final structured output with marker:', JSON.stringify(formattedData.meta, null, 2));
+    console.log('Final structured output:', JSON.stringify(formattedData, null, 2));
     
     return formattedData;
   } catch (error) {
