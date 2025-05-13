@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyDetails/PropertyGalleryCard.tsx
-// Version: 4.3.0
-// Last Modified: 10-05-2025 16:00 IST
-// Purpose: Added extraction of image files from property_details
+// Version: 4.4.0
+// Last Modified: 14-05-2025 11:15 IST
+// Purpose: Added support for direct blob URLs and removed debug information
 
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -13,9 +13,14 @@ import { supabase } from '@/lib/supabase';
 interface PropertyGalleryCardProps {
   images: PropertyImage[];
   propertyId?: string;
+  directUrls?: string[];
 }
 
-const PropertyGalleryCard: React.FC<PropertyGalleryCardProps> = ({ images: propImages, propertyId: propId }) => {
+const PropertyGalleryCard: React.FC<PropertyGalleryCardProps> = ({ 
+  images: propImages, 
+  propertyId: propId,
+  directUrls
+}) => {
   // Get the property ID from URL params as backup
   const { id: urlParamId } = useParams();
   const location = useLocation();
@@ -29,8 +34,6 @@ const PropertyGalleryCard: React.FC<PropertyGalleryCardProps> = ({ images: propI
   useEffect(() => {
     const fetchPropertyDetails = async () => {
       if (!propertyId) return;
-      
-      console.log('[PropertyGalleryCard] Fetching property details for ID:', propertyId);
       
       try {
         // Try properties_v2 table first
@@ -53,16 +56,14 @@ const PropertyGalleryCard: React.FC<PropertyGalleryCardProps> = ({ images: propI
         }
         
         if (error || !data) {
-          console.error('[PropertyGalleryCard] Error fetching property:', error);
+          console.error('Error fetching property:', error);
           return;
         }
         
         // Extract image files from property_details
         const details = data.property_details || {};
         
-        if (details.imageFiles && Array.isArray(details.imageFiles) && details.imageFiles.length > 0) {
-          console.log('[PropertyGalleryCard] Found imageFiles in property details:', details.imageFiles.length);
-          
+        if (details.imageFiles && Array.isArray(details.imageFiles) && details.imageFiles.length > 0) {          
           // Convert to standard format with fileName
           const formattedImages = details.imageFiles.map((img: any, idx: number) => ({
             id: img.id || `img-${idx}`,
@@ -78,41 +79,25 @@ const PropertyGalleryCard: React.FC<PropertyGalleryCardProps> = ({ images: propI
         
         // If no imageFiles, check if we have the original propImages with dataUrl
         if (propImages && propImages.length > 0 && propImages[0].dataUrl) {
-          console.log('[PropertyGalleryCard] Using original images with dataUrl');
           setProcessedImages(propImages);
           return;
         }
-        
-        console.log('[PropertyGalleryCard] No valid images found in property details');
       } catch (err) {
-        console.error('[PropertyGalleryCard] Error processing property details:', err);
+        console.error('Error processing property details:', err);
       }
     };
     
     fetchPropertyDetails();
   }, [propertyId, propImages]);
   
-  // Log received images for debugging
-  console.log('[PropertyGalleryCard] Property ID:', propertyId);
-  console.log('[PropertyGalleryCard] Original images count:', propImages?.length || 0);
-  console.log('[PropertyGalleryCard] Processed images count:', processedImages?.length || 0);
-  
-  if (processedImages && processedImages.length > 0) {
-    const firstImage = processedImages[0];
-    console.log('[PropertyGalleryCard] First processed image details:', {
-      id: firstImage.id || 'none',
-      url: firstImage.url ? 'exists' : 'none',
-      dataUrl: firstImage.dataUrl ? 'exists' : 'none',
-      fileName: firstImage.fileName || 'none',
-      is_primary: !!firstImage.is_primary,
-      isPrimary: !!firstImage.isPrimary
-    });
-  }
-  
   return (
     <Card className="overflow-hidden">
       <CardContent className="p-0">
-        <PropertyGallery images={processedImages} propertyId={propertyId} />
+        <PropertyGallery 
+          images={processedImages} 
+          propertyId={propertyId} 
+          directUrls={directUrls}
+        />
       </CardContent>
     </Card>
   );

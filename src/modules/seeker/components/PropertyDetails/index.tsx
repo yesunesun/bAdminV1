@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyDetails/index.tsx
-// Version: 11.2.0
-// Last Modified: 13-05-2025 17:45 IST
-// Purpose: Removed all debug information boxes including the one in PropertyGalleryCard
+// Version: 11.4.0
+// Last Modified: 14-05-2025 12:00 IST
+// Purpose: Fixed similarPropertiesData reference error
 
 import React, { useState, useEffect } from 'react';
 import { PropertyDetails as PropertyDetailsType } from '../../hooks/usePropertyDetails';
@@ -11,7 +11,7 @@ import { AlertCircle } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { Card } from '@/components/ui/card';
 
-// Import existing components but update PropertyGalleryCard to remove debug info
+// Import all components
 import PropertyActionButtons from './PropertyActionButtons';
 import ContactOwnerCard from './ContactOwnerCard';
 import PropertyHighlightsCard from './PropertyHighlightsCard';
@@ -22,84 +22,10 @@ import PropertyImageUpload from './PropertyImageUpload';
 import PropertyNotFound from './PropertyNotFound';
 import { PropertyDetailsSkeleton } from './PropertyDetailsSkeleton';
 import { extractImagesFromJson } from './utils/propertyDataUtils';
+import PropertyGalleryCard from './PropertyGalleryCard';
 
-// Create a clean version of PropertyGalleryCard that doesn't include debug info
-const CleanPropertyGalleryCard: React.FC<{ images: any[] }> = ({ images }) => {
-  const [currentIndex, setCurrentIndex] = useState(0);
-  
-  // Find primary image index or default to 0
-  useEffect(() => {
-    if (images && images.length > 0) {
-      const primaryIndex = images.findIndex(img => img.is_primary || img.isPrimary);
-      setCurrentIndex(primaryIndex !== -1 ? primaryIndex : 0);
-    }
-  }, [images]);
-  
-  // If no images, show placeholder
-  if (!images || images.length === 0) {
-    return (
-      <Card className="overflow-hidden">
-        <div className="relative aspect-video bg-gray-100 flex items-center justify-center">
-          <img src="/noimage.png" alt="No Image Available" className="max-h-full" />
-        </div>
-      </Card>
-    );
-  }
-  
-  // Navigation functions
-  const nextImage = () => {
-    setCurrentIndex((prevIndex) => (prevIndex + 1) % images.length);
-  };
-  
-  const prevImage = () => {
-    setCurrentIndex((prevIndex) => (prevIndex - 1 + images.length) % images.length);
-  };
-  
-  return (
-    <Card className="overflow-hidden">
-      <div className="relative aspect-video bg-gray-50">
-        {/* Main image */}
-        <img 
-          src={images[currentIndex]?.url || '/noimage.png'} 
-          alt={`Property Image ${currentIndex + 1}`}
-          className="w-full h-full object-contain"
-        />
-        
-        {/* Navigation controls */}
-        {images.length > 1 && (
-          <>
-            <button 
-              onClick={prevImage}
-              className="absolute left-2 top-1/2 -mt-6 p-2 rounded-full bg-white/75 shadow-md hover:bg-white"
-              aria-label="Previous image"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M15 18l-6-6 6-6" />
-              </svg>
-            </button>
-            <button 
-              onClick={nextImage}
-              className="absolute right-2 top-1/2 -mt-6 p-2 rounded-full bg-white/75 shadow-md hover:bg-white"
-              aria-label="Next image"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 18l6-6-6-6" />
-              </svg>
-            </button>
-            
-            {/* Image counter */}
-            <div className="absolute bottom-2 right-2 py-1 px-3 bg-black/50 text-white rounded-full text-sm">
-              {currentIndex + 1} / {images.length}
-            </div>
-          </>
-        )}
-      </div>
-    </Card>
-  );
-};
-
-// Static data for similar properties
-const similarPropertiesData = [
+// Define static data for similar properties
+const SIMILAR_PROPERTIES_DATA = [
   {
     id: 'similar-1',
     title: 'Luxury Apartment in City Center',
@@ -137,65 +63,6 @@ const similarPropertiesData = [
     property_details: { propertyType: 'Apartment' }
   }
 ];
-
-interface PropertyDetailsProps {
-  property: PropertyDetailsType | null;
-  isLiked: boolean;
-  onToggleLike: () => Promise<{ success: boolean; message?: string }>;
-  isLoading: boolean;
-  onRefresh?: () => void;
-}
-
-// Helper function to render field value with appropriate formatting
-const renderFieldValue = (field: any, key: string) => {
-  // Handle different data types appropriately
-  if (field === null || field === undefined) {
-    return 'Not specified';
-  }
-  
-  if (typeof field === 'boolean') {
-    return field ? 'Yes' : 'No';
-  }
-  
-  if (Array.isArray(field)) {
-    return field.join(', ');
-  }
-  
-  // Format date fields (keys containing 'date', 'from', etc.)
-  if (typeof field === 'string' && 
-      (key.toLowerCase().includes('date') || 
-       key.toLowerCase().includes('from') || 
-       key.toLowerCase().includes('possession'))) {
-    try {
-      const date = new Date(field);
-      if (!isNaN(date.getTime())) {
-        return date.toLocaleDateString('en-IN', {
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric'
-        });
-      }
-    } catch (e) {
-      // If date parsing fails, return the original string
-    }
-  }
-  
-  // Format price fields (keys containing 'price', 'amount', etc.)
-  if ((typeof field === 'number' || !isNaN(Number(field))) && 
-      (key.toLowerCase().includes('price') || 
-       key.toLowerCase().includes('amount') || 
-       key.toLowerCase().includes('deposit') || 
-       key.toLowerCase().includes('cost'))) {
-    const numValue = typeof field === 'number' ? field : Number(field);
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      maximumFractionDigits: 0
-    }).format(numValue);
-  }
-  
-  return field.toString();
-};
 
 // Component to render a single step section based on step data
 const StepSection: React.FC<{
@@ -251,6 +118,57 @@ const StepSection: React.FC<{
       </div>
     </Card>
   );
+};
+
+// Helper function to render field value with appropriate formatting
+const renderFieldValue = (field: any, key: string) => {
+  // Handle different data types appropriately
+  if (field === null || field === undefined) {
+    return 'Not specified';
+  }
+  
+  if (typeof field === 'boolean') {
+    return field ? 'Yes' : 'No';
+  }
+  
+  if (Array.isArray(field)) {
+    return field.join(', ');
+  }
+  
+  // Format date fields (keys containing 'date', 'from', etc.)
+  if (typeof field === 'string' && 
+      (key.toLowerCase().includes('date') || 
+       key.toLowerCase().includes('from') || 
+       key.toLowerCase().includes('possession'))) {
+    try {
+      const date = new Date(field);
+      if (!isNaN(date.getTime())) {
+        return date.toLocaleDateString('en-IN', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric'
+        });
+      }
+    } catch (e) {
+      // If date parsing fails, return the original string
+    }
+  }
+  
+  // Format price fields (keys containing 'price', 'amount', etc.)
+  if ((typeof field === 'number' || !isNaN(Number(field))) && 
+      (key.toLowerCase().includes('price') || 
+       key.toLowerCase().includes('amount') || 
+       key.toLowerCase().includes('deposit') || 
+       key.toLowerCase().includes('cost'))) {
+    const numValue = typeof field === 'number' ? field : Number(field);
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      maximumFractionDigits: 0
+    }).format(numValue);
+  }
+  
+  return field.toString();
 };
 
 // Overview section component to show main property details
@@ -329,12 +247,22 @@ const PropertyOverviewSection: React.FC<{
   );
 };
 
+interface PropertyDetailsProps {
+  property: PropertyDetailsType | null;
+  isLiked: boolean;
+  onToggleLike: () => Promise<{ success: boolean; message?: string }>;
+  isLoading: boolean;
+  onRefresh?: () => void;
+  directUrls?: string[]; // Add direct blob URLs prop
+}
+
 const PropertyDetails: React.FC<PropertyDetailsProps> = ({
   property,
   isLiked,
   onToggleLike,
   isLoading,
-  onRefresh
+  onRefresh,
+  directUrls
 }) => {
   const { toast } = useToast();
   const [visitDialogOpen, setVisitDialogOpen] = useState(false);
@@ -516,8 +444,12 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Content Column */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Image Gallery - Using our clean component without debug info */}
-          <CleanPropertyGalleryCard images={propertyImages} />
+          {/* Image Gallery - Using PropertyGalleryCard with direct blob URLs */}
+          <PropertyGalleryCard 
+            images={propertyImages} 
+            propertyId={propertyId}
+            directUrls={directUrls}
+          />
           
           {/* Image Upload Component (only shown to authorized users) */}
           <PropertyImageUpload 
@@ -580,7 +512,7 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
           )}
           
           <SimilarProperties 
-            properties={similarPropertiesData.map(prop => ({
+            properties={SIMILAR_PROPERTIES_DATA.map(prop => ({
               id: prop.id,
               title: prop.title,
               city: prop.city,

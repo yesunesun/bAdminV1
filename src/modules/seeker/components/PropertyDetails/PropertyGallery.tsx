@@ -1,9 +1,9 @@
 // src/modules/seeker/components/PropertyDetails/PropertyGallery.tsx
-// Version: 6.3.0
-// Last Modified: 10-05-2025 15:00 IST
-// Purpose: Fixed image loading from Supabase storage
+// Version: 6.4.0
+// Last Modified: 14-05-2025 11:00 IST
+// Purpose: Implemented direct blob URL support and fixed image loading issues
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ChevronLeftIcon, ChevronRightIcon, ImageIcon, ExpandIcon, XIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
@@ -12,31 +12,58 @@ import { supabase } from '@/lib/supabase';
 
 // Constants
 const STORAGE_BUCKET = 'property-images-v2';
+const FALLBACK_IMAGE = '/noimage.png';
 
 interface PropertyGalleryProps {
   images: PropertyImage[];
   propertyId?: string;
+  directUrls?: string[];
 }
 
-const PropertyGallery: React.FC<PropertyGalleryProps> = ({ images, propertyId }) => {
-  // Debug info
-  console.log(`[PropertyGallery] Initializing with propertyId: ${propertyId}`);
-  console.log(`[PropertyGallery] Images received: ${images?.length || 0}`);
-  
+const PropertyGallery: React.FC<PropertyGalleryProps> = ({ 
+  images, 
+  propertyId,
+  directUrls 
+}) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
   const [fullscreenIndex, setFullscreenIndex] = useState(0);
   const [displayImages, setDisplayImages] = useState<PropertyImage[]>([]);
   const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
+  const [loadingImage, setLoadingImage] = useState(true);
+  const loadAttempts = useRef<Record<string, number>>({});
   
-  // Generate a signed URL to avoid CORS issues
+  // Create alternative URL formats when original URLs fail
+  const createAlternativeUrl = (url: string): string => {
+    if (!url) return FALLBACK_IMAGE;
+    
+    try {
+      // Special handling for blob URLs
+      if (url.startsWith('blob:')) return url;
+      if (url.startsWith('data:')) return url;
+      
+      // Use a direct HTTPS link to the object store
+      if (url.includes('supabase.co/storage/v1/object')) {
+        // Add cache busting to prevent stale images
+        const cacheBuster = `?t=${Date.now()}`;
+        return `${url}${cacheBuster}`;
+      }
+      
+      // Return placeholder for any other URL
+      return FALLBACK_IMAGE;
+    } catch (error) {
+      return FALLBACK_IMAGE;
+    }
+  };
+  
+  // Generate a signed URL to avoid CORS issues (fallback method)
   const getSignedUrl = async (fileName: string): Promise<string> => {
-    if (!propertyId || !fileName) return '/noimage.png';
+    if (!propertyId || !fileName) return FALLBACK_IMAGE;
     
     // Skip signed URL generation for legacy formats
     if (fileName.startsWith('legacy-') || fileName.startsWith('img-')) {
-      return '/noimage.png';
+      return FALLBACK_IMAGE;
     }
     
     try {
@@ -47,39 +74,50 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({ images, propertyId })
         .createSignedUrl(`${propertyId}/${fileName}`, 3600);
         
       if (error) {
-        console.error(`[PropertyGallery] Error generating signed URL: ${error.message}`);
-        return '/noimage.png';
+        console.error(`Error generating signed URL: ${error.message}`);
+        return FALLBACK_IMAGE;
       }
       
-      console.log(`[PropertyGallery] Generated signed URL: ${data.signedUrl}`);
       return data.signedUrl;
     } catch (err) {
-      console.error(`[PropertyGallery] Error:`, err);
-      return '/noimage.png';
+      console.error(`Error:`, err);
+      return FALLBACK_IMAGE;
     }
   };
   
-  // Load all image URLs
+  // Load all image URLs with priority for blob URLs
   const loadImageUrls = async () => {
-    if (!propertyId || !displayImages || displayImages.length === 0) return;
+    if (!displayImages || displayImages.length === 0) return;
     
-    const urlsMap: Record<string, string> = {};
-    for (const img of displayImages) {
-      if (img.id && img.fileName && !img.fileName.startsWith('legacy-') && !img.fileName.startsWith('img-')) {
-        try {
-          const url = await getSignedUrl(img.fileName);
-          urlsMap[img.id] = url;
-        } catch (err) {
-          console.error(`Error loading image URL for ${img.fileName}:`, err);
-        }
-      } else if (img.dataUrl) {
-        urlsMap[img.id] = img.dataUrl;
-      } else if (img.url) {
-        urlsMap[img.id] = img.url;
+    const newUrls: Record<string, string> = {};
+    
+    // Process each image and select the best URL
+    displayImages.forEach((image, index) => {
+      if (!image.id) return;
+      
+      // Priority 1: Use direct URLs if available (blob URLs)
+      if (directUrls && directUrls.length > index) {
+        newUrls[image.id] = directUrls[index];
+        return;
       }
-    }
+      
+      // Priority 2: Use dataUrl if available
+      if (image.dataUrl) {
+        newUrls[image.id] = image.dataUrl;
+        return;
+      }
+      
+      // Priority 3: Use URL if available
+      if (image.url) {
+        newUrls[image.id] = createAlternativeUrl(image.url);
+        return;
+      }
+      
+      // Fallback
+      newUrls[image.id] = FALLBACK_IMAGE;
+    });
     
-    setImageUrls(urlsMap);
+    setImageUrls(newUrls);
   };
   
   // Get image source - handles multiple image formats
@@ -96,40 +134,23 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({ images, propertyId })
     
     // Case 3: Standard URL format
     if (image.url && typeof image.url === 'string') {
-      return image.url;
+      return createAlternativeUrl(image.url);
     }
     
     // Fallback to placeholder
-    return '/noimage.png';
+    return FALLBACK_IMAGE;
   };
   
   // Process images when they change
   useEffect(() => {
-    console.log('[PropertyGallery] Received images:', images?.length || 0);
-    console.log('[PropertyGallery] Property ID:', propertyId);
-    
     if (!images || images.length === 0) {
-      console.log('[PropertyGallery] No images received, using placeholder');
       setDisplayImages([{
         id: 'placeholder',
-        url: '/noimage.png',
+        url: FALLBACK_IMAGE,
         is_primary: true,
         display_order: 0
       }]);
       return;
-    }
-
-    // Log the first image to debug format
-    if (images.length > 0) {
-      const firstImg = images[0];
-      console.log('[PropertyGallery] First image details:', {
-        id: firstImg.id,
-        url: firstImg.url ? (typeof firstImg.url === 'string' ? firstImg.url.substring(0, 30) + '...' : 'invalid') : 'none',
-        dataUrl: firstImg.dataUrl ? (typeof firstImg.dataUrl === 'string' ? firstImg.dataUrl.substring(0, 30) + '...' : 'invalid') : 'none',
-        fileName: firstImg.fileName || 'none',
-        is_primary: !!firstImg.is_primary,
-        isPrimary: !!firstImg.isPrimary,
-      });
     }
 
     // Ensure all images have valid sources
@@ -145,13 +166,10 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({ images, propertyId })
         display_order: img.display_order || index
       }));
     
-    console.log('[PropertyGallery] Valid images count:', validImages.length);
-    
     if (validImages.length === 0) {
-      console.log('[PropertyGallery] No valid images found, using placeholder');
       setDisplayImages([{
         id: 'placeholder',
-        url: '/noimage.png',
+        url: FALLBACK_IMAGE,
         is_primary: true,
         display_order: 0
       }]);
@@ -160,6 +178,7 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({ images, propertyId })
     
     // Reset image errors when images change
     setImageErrors({});
+    loadAttempts.current = {};
     
     // Sort images: primary first, then by display order
     const sortedImages = [...validImages].sort((a, b) => {
@@ -170,12 +189,21 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({ images, propertyId })
 
     setDisplayImages(sortedImages);
     setCurrentIndex(0); // Reset to first image when images change
+    setLoadingImage(true);
   }, [images, propertyId]);
   
   // Load all image URLs when displayImages changes
   useEffect(() => {
     loadImageUrls();
-  }, [displayImages, propertyId]);
+  }, [displayImages, propertyId, directUrls]);
+  
+  // Clean up blob URLs when component unmounts
+  useEffect(() => {
+    return () => {
+      // We don't need to revoke the blob URLs here
+      // since they're managed in PropertyDetailPage
+    };
+  }, []);
   
   // If still no valid images after processing, show placeholder
   if (!displayImages || displayImages.length === 0) {
@@ -191,16 +219,19 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({ images, propertyId })
     setCurrentIndex((prevIndex) => 
       prevIndex === displayImages.length - 1 ? 0 : prevIndex + 1
     );
+    setLoadingImage(true);
   };
 
   const goToPrevSlide = () => {
     setCurrentIndex((prevIndex) => 
       prevIndex === 0 ? displayImages.length - 1 : prevIndex - 1
     );
+    setLoadingImage(true);
   };
 
   const goToSlide = (index: number) => {
     setCurrentIndex(index);
+    setLoadingImage(true);
   };
 
   const openFullscreen = (index: number) => {
@@ -220,49 +251,58 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({ images, propertyId })
     );
   };
   
-  // Handle image load errors
+  // Handle image load errors with fallbacks
   const handleImageError = (imageId: string, e: React.SyntheticEvent<HTMLImageElement>) => {
-    console.log(`[PropertyGallery] Image load error for ID: ${imageId}`);
-    e.currentTarget.src = '/noimage.png';
+    // Get current attempts for this image
+    const attempts = loadAttempts.current[imageId] || 0;
+    loadAttempts.current[imageId] = attempts + 1;
     
-    // Track which images failed to load
-    setImageErrors(prev => ({ ...prev, [imageId]: true }));
-    
-    // If current image failed, try next one
-    if (imageId === displayImages[currentIndex].id && !imageErrors[imageId]) {
-      setTimeout(() => {
-        goToNextSlide();
-      }, 500);
+    // Stop after 2 attempts to prevent infinite loops
+    if (attempts >= 2) {
+      e.currentTarget.src = FALLBACK_IMAGE;
+      setLoadingImage(false);
+      
+      // Mark this image as permanently failed
+      setImageErrors(prev => ({ ...prev, [imageId]: true }));
+      return;
     }
+    
+    // Try alternative approaches before giving up
+    if (directUrls && directUrls.length > 0) {
+      // Try direct blob URL
+      const imageIndex = displayImages.findIndex(img => img.id === imageId);
+      if (imageIndex >= 0 && imageIndex < directUrls.length) {
+        e.currentTarget.src = directUrls[imageIndex];
+        return;
+      }
+    }
+    
+    // Fall back to placeholder if all else fails
+    e.currentTarget.src = FALLBACK_IMAGE;
+    setLoadingImage(false);
   };
   
   // Get the URL for current image
   const currentImageUrl = displayImages[currentIndex].id
     ? imageUrls[displayImages[currentIndex].id] || getImageSource(displayImages[currentIndex])
     : getImageSource(displayImages[currentIndex]);
-    
-  // Debug info for current image
-  console.log(`[PropertyGallery] Current image: index=${currentIndex}, url=${currentImageUrl}`);
   
   return (
     <div className="space-y-2">
-      {/* Debug info */}
-      <div className="bg-yellow-100 text-yellow-800 p-2 text-xs">
-        <p>PropertyId: {propertyId || 'None'}</p>
-        <p>Images: {displayImages.length}</p>
-        <p>Current Image: {currentIndex + 1}/{displayImages.length}</p>
-        <p>First image filename: {displayImages[0]?.fileName || 'None'}</p>
-      </div>
-      
       {/* Main featured image */}
       <div className="relative rounded-xl overflow-hidden bg-muted group">
         <div className="aspect-[16/9] md:aspect-[21/9] overflow-hidden">
+          {loadingImage && (
+            <div className="absolute inset-0 flex items-center justify-center bg-muted/50 z-10">
+              <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+            </div>
+          )}
           <img
             src={currentImageUrl}
             alt={`Property view ${currentIndex + 1}`}
             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
             onError={(e) => handleImageError(displayImages[currentIndex].id, e)}
-            onLoad={() => console.log(`[PropertyGallery] Successfully loaded image index ${currentIndex}`)}
+            onLoad={() => setLoadingImage(false)}
           />
         </div>
         
