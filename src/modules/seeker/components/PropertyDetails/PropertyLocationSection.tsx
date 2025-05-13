@@ -1,12 +1,12 @@
 // src/modules/seeker/components/PropertyDetails/PropertyLocationSection.tsx
-// Version: 5.3.0
-// Last Modified: 15-05-2025 11:45 IST
-// Purpose: Diagnostic version to identify map loading issues
+// Version: 9.0.0
+// Last Modified: 13-05-2025 16:30 IST
+// Purpose: Complete rewrite to fix Google Maps display issues
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { MapPinIcon, LandmarkIcon, MapIcon } from 'lucide-react';
-import PropertyLocationMapDiagnostic from './PropertyLocationMapDiagnostic';
+import PropertyLocationMap from './PropertyLocationMap';
 
 interface PropertyLocationSectionProps {
   property: any;
@@ -17,9 +17,138 @@ const PropertyLocationSection: React.FC<PropertyLocationSectionProps> = ({
   property,
   isLoading 
 }) => {
-  // Log the full property object to console for inspection
-  console.log('PropertyLocationSection - Full property object:', property);
+  // State to hold processed location data
+  const [locationData, setLocationData] = useState({
+    address: '',
+    locality: '',
+    city: '',
+    state: '',
+    pinCode: '',
+    landmark: '',
+    flatPlotNo: '',
+    coordinates: null as { lat: number; lng: number } | null
+  });
 
+  // Process property data once when component mounts or property changes
+  useEffect(() => {
+    if (!property) return;
+
+    // Extract coordinates from property data
+    const extractCoordinates = () => {
+      // Handle property_details parsing
+      let details = property.property_details;
+      if (typeof details === 'string') {
+        try {
+          details = JSON.parse(details);
+        } catch (e) {
+          details = {};
+        }
+      } else if (!details) {
+        details = {};
+      }
+
+      // Try all possible coordinate locations
+      // 1. Check property.location structure (v2 format)
+      if (property.location?.coordinates) {
+        const lat = Number(property.location.coordinates.latitude || property.location.coordinates.lat);
+        const lng = Number(property.location.coordinates.longitude || property.location.coordinates.lng);
+        
+        if (!isNaN(lat) && !isNaN(lng)) {
+          return { lat, lng };
+        }
+      }
+      
+      // 2. Check property_details.coordinates (wizard stores it here)
+      if (details.coordinates) {
+        const lat = Number(details.coordinates.lat || details.coordinates.latitude);
+        const lng = Number(details.coordinates.lng || details.coordinates.longitude);
+        
+        if (!isNaN(lat) && !isNaN(lng)) {
+          return { lat, lng };
+        }
+      }
+      
+      // 3. Check for lat/lng at top level
+      if (property.latitude && property.longitude) {
+        const lat = Number(property.latitude);
+        const lng = Number(property.longitude);
+        
+        if (!isNaN(lat) && !isNaN(lng)) {
+          return { lat, lng };
+        }
+      }
+      
+      // 4. Check for direct lat/lng in property_details
+      if (details.lat && details.lng) {
+        const lat = Number(details.lat);
+        const lng = Number(details.lng);
+        
+        if (!isNaN(lat) && !isNaN(lng)) {
+          return { lat, lng };
+        }
+      }
+      
+      // No valid coordinates found
+      return null;
+    };
+
+    // Extract location data from property
+    const extractLocationData = () => {
+      // Initialize with empty values
+      const data = {
+        address: '',
+        locality: '',
+        city: '',
+        state: '',
+        pinCode: '',
+        landmark: '',
+        flatPlotNo: '',
+        coordinates: extractCoordinates()
+      };
+      
+      // Parse property_details if needed
+      let details = {};
+      if (property.property_details) {
+        if (typeof property.property_details === 'string') {
+          try {
+            details = JSON.parse(property.property_details);
+          } catch (e) {
+            details = {};
+          }
+        } else {
+          details = property.property_details;
+        }
+      }
+      
+      // Check for location in property (v2 format)
+      if (property.location) {
+        data.address = property.location.address || '';
+        data.locality = property.location.locality || '';
+        data.city = property.location.city || '';
+        data.state = property.location.state || '';
+        data.pinCode = property.location.pinCode || '';
+        data.landmark = property.location.landmark || '';
+        data.flatPlotNo = property.location.flatPlotNo || '';
+      } 
+      // Fallback to property fields and details
+      else {
+        data.address = property.address || details.address || '';
+        data.locality = property.locality || details.locality || '';
+        data.city = property.city || details.city || '';
+        data.state = property.state || details.state || '';
+        data.pinCode = property.pinCode || property.zip_code || details.pinCode || '';
+        data.landmark = property.landmark || details.landmark || '';
+        data.flatPlotNo = property.flatPlotNo || details.flatPlotNo || '';
+      }
+      
+      return data;
+    };
+
+    // Update state with extracted data
+    setLocationData(extractLocationData());
+  }, [property]);
+
+  // Handle loading state
   if (isLoading) {
     return (
       <Card className="overflow-hidden">
@@ -40,142 +169,21 @@ const PropertyLocationSection: React.FC<PropertyLocationSectionProps> = ({
     );
   }
 
+  // Handle null property
   if (!property) return null;
 
-  // Extract location data from the property object with extensive logging
-  const getLocationData = () => {
-    console.log('Extracting location data from property:', property.id);
-    
-    // V2 format
-    if (property.location) {
-      console.log('V2 format detected - property.location exists:', property.location);
-      
-      // Extract coordinates with detailed logging
-      let coordinates = null;
-      if (property.location.coordinates) {
-        console.log('Location coordinates found:', property.location.coordinates);
-        coordinates = {
-          lat: property.location.coordinates.latitude || property.location.coordinates.lat,
-          lng: property.location.coordinates.longitude || property.location.coordinates.lng
-        };
-      } else {
-        console.log('No coordinates in property.location');
-      }
-      
-      return {
-        address: property.location.address,
-        locality: property.location.locality,
-        city: property.location.city,
-        state: property.location.state,
-        pinCode: property.location.pinCode,
-        landmark: property.location.landmark,
-        flatPlotNo: property.location.flatPlotNo,
-        coordinates
-      };
-    }
-    
-    // V1 format or nested property_details
-    console.log('V1 format or property_details format - checking property_details');
-    let details = property.property_details || {};
-    
-    // Try to parse property_details if it's a string
-    if (typeof details === 'string') {
-      console.log('property_details is a string, attempting to parse');
-      try {
-        details = JSON.parse(details);
-        console.log('Successfully parsed property_details string');
-      } catch (e) {
-        console.error('Failed to parse property_details string:', e);
-      }
-    }
-    
-    console.log('property_details object:', details);
-    
-    // Try every possible coordinate format
-    let coordinates = null;
-    
-    if (details.coordinates) {
-      console.log('Found coordinates in details.coordinates:', details.coordinates);
-      coordinates = {
-        lat: details.coordinates.lat || details.coordinates.latitude,
-        lng: details.coordinates.lng || details.coordinates.longitude
-      };
-    } else if (details.mapCoordinates) {
-      console.log('Found coordinates in details.mapCoordinates:', details.mapCoordinates);
-      coordinates = {
-        lat: details.mapCoordinates.lat || details.mapCoordinates.latitude,
-        lng: details.mapCoordinates.lng || details.mapCoordinates.longitude
-      };
-    } else if (details.lat && details.lng) {
-      console.log('Found lat/lng directly in details:', { lat: details.lat, lng: details.lng });
-      coordinates = {
-        lat: details.lat,
-        lng: details.lng
-      };
-    } else if (details.latitude && details.longitude) {
-      console.log('Found latitude/longitude directly in details:', { 
-        latitude: details.latitude, 
-        longitude: details.longitude 
-      });
-      coordinates = {
-        lat: details.latitude,
-        lng: details.longitude
-      };
-    } else if (details.location?.coordinates) {
-      console.log('Found coordinates in details.location.coordinates:', details.location.coordinates);
-      coordinates = {
-        lat: details.location.coordinates.lat || details.location.coordinates.latitude,
-        lng: details.location.coordinates.lng || details.location.coordinates.longitude
-      };
-    } else {
-      console.log('No coordinates found in any expected location');
-    }
-    
-    return {
-      address: property.address || details.address,
-      locality: details.locality,
-      city: property.city || details.city,
-      state: property.state || details.state,
-      pinCode: property.zip_code || details.pinCode || details.zipCode,
-      landmark: details.landmark,
-      flatPlotNo: details.flatPlotNo,
-      coordinates
-    };
-  };
-
-  const locationData = getLocationData();
-  console.log('Final extracted locationData:', locationData);
-  
-  // Prepare address for display
+  // Generate formatted full address
   const getFormattedAddress = () => {
     const parts = [];
     
-    if (locationData.flatPlotNo) {
-      parts.push(locationData.flatPlotNo);
-    }
-    
-    if (locationData.address) {
-      parts.push(locationData.address);
-    }
-    
-    if (locationData.locality) {
-      parts.push(locationData.locality);
-    }
-    
-    if (locationData.city) {
-      parts.push(locationData.city);
-    }
-    
-    if (locationData.state) {
-      parts.push(locationData.state);
-    }
-    
-    if (locationData.pinCode) {
-      parts.push(locationData.pinCode);
-    }
+    if (locationData.flatPlotNo) parts.push(locationData.flatPlotNo);
+    if (locationData.address) parts.push(locationData.address);
+    if (locationData.locality) parts.push(locationData.locality);
+    if (locationData.city) parts.push(locationData.city);
+    if (locationData.state) parts.push(locationData.state);
+    if (locationData.pinCode) parts.push(locationData.pinCode);
     
     if (parts.length === 0) {
-      // If no specific address components, try to use full address if available
       return property.address || "Address not available";
     }
     
@@ -191,8 +199,8 @@ const PropertyLocationSection: React.FC<PropertyLocationSectionProps> = ({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Map Component - Using diagnostic version */}
-        <PropertyLocationMapDiagnostic 
+        {/* Map Component */}
+        <PropertyLocationMap 
           coordinates={locationData.coordinates}
           address={locationData.address}
           locality={locationData.locality}

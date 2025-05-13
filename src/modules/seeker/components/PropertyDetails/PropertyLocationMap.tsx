@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyDetails/PropertyLocationMap.tsx
-// Version: 6.0.0
-// Last Modified: 15-05-2025 10:00 IST
-// Purpose: Simplified direct implementation with iframe for guaranteed map display
+// Version: 15.0.0
+// Last Modified: 14-05-2025 14:45 IST
+// Purpose: Emergency fix with visual indicator to confirm component loading
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
@@ -13,7 +13,7 @@ interface PropertyLocationMapProps {
     lng?: number | string;
     latitude?: number | string;
     longitude?: number | string;
-  };
+  } | null;
   address?: string;
   locality?: string;
   city?: string;
@@ -25,54 +25,85 @@ const PropertyLocationMap: React.FC<PropertyLocationMapProps> = ({
   locality,
   city
 }) => {
-  // Parse and validate coordinates
-  const parseCoordinates = () => {
-    if (!coordinates) return null;
-    
-    try {
-      const lat = parseFloat(String(coordinates.lat || coordinates.latitude || 0));
-      const lng = parseFloat(String(coordinates.lng || coordinates.longitude || 0));
+  // DEBUGGING: Log all incoming props
+  console.log('PropertyLocationMap v15.0 Props:', { 
+    coordinates, 
+    address, 
+    locality, 
+    city 
+  });
+  
+  // Use a simple, direct approach guaranteed to display a map
+  const getMapSrc = () => {
+    // If there are coordinates, try to use them
+    if (coordinates) {
+      const lat = coordinates.lat || coordinates.latitude;
+      const lng = coordinates.lng || coordinates.longitude;
       
-      if (isNaN(lat) || isNaN(lng)) return null;
-      if (lat === 0 && lng === 0) return null;
-      
-      return { lat, lng };
-    } catch (error) {
-      console.error("Error parsing coordinates:", error);
-      return null;
+      if (lat && lng) {
+        const numLat = Number(lat);
+        const numLng = Number(lng);
+        
+        if (!isNaN(numLat) && !isNaN(numLng)) {
+          return `https://maps.google.com/maps?q=${numLat},${numLng}&z=15&output=embed`;
+        }
+      }
     }
+    
+    // If there's an address or locality, use that
+    let locationString = "";
+    if (address) locationString = address;
+    if (!locationString && locality) locationString = locality;
+    if (!locationString && city) locationString = city;
+    
+    // Always default to Hyderabad if nothing else is available
+    if (!locationString) locationString = "Hyderabad, Telangana";
+    
+    return `https://maps.google.com/maps?q=${encodeURIComponent(locationString)}&output=embed`;
   };
   
-  // Create a formatted address string
-  const getFormattedAddress = () => {
-    const parts = [];
-    if (address) parts.push(address);
-    if (locality) parts.push(locality);
-    if (city) parts.push(city);
-    return parts.join(', ');
+  // Get external URL for "Open in Google Maps" button
+  const getExternalUrl = () => {
+    if (coordinates) {
+      const lat = coordinates.lat || coordinates.latitude;
+      const lng = coordinates.lng || coordinates.longitude;
+      
+      if (lat && lng) {
+        const numLat = Number(lat);
+        const numLng = Number(lng);
+        
+        if (!isNaN(numLat) && !isNaN(numLng)) {
+          return `https://maps.google.com/maps?q=${numLat},${numLng}`;
+        }
+      }
+    }
+    
+    let locationString = "";
+    if (address) locationString = address;
+    if (!locationString && locality) locationString = locality;
+    if (!locationString && city) locationString = city;
+    if (!locationString) locationString = "Hyderabad, Telangana";
+    
+    return `https://maps.google.com/maps?q=${encodeURIComponent(locationString)}`;
   };
   
-  // Generate fallback coordinates for Hyderabad if none are provided
-  // Or use coordinates for Prem Sagar Enclave from the screenshot
-  const validCoords = parseCoordinates() || { lat: 17.4381, lng: 78.3924 }; // Coordinates for Prem Sagar Enclave
-  const formattedAddress = getFormattedAddress() || "Prem Sagar Enclave, Rajiv Gandhi Nagar, Bowenpally, Hyderabad";
-  
-  // Create the Google Maps URL
-  const googleMapsUrl = `https://www.google.com/maps?q=${validCoords.lat},${validCoords.lng}&z=15&output=embed`;
-  const externalMapsUrl = `https://www.google.com/maps/search/?api=1&query=${validCoords.lat},${validCoords.lng}`;
-
   return (
     <div className="w-full h-full relative">
-      <div className="w-full aspect-[16/9] rounded-lg overflow-hidden border border-border">
-        <iframe 
-          src={googleMapsUrl}
-          width="100%" 
-          height="100%" 
-          style={{ border: 0 }} 
-          allowFullScreen={false} 
-          loading="lazy" 
-          referrerPolicy="no-referrer-when-downgrade"
+      {/* Visual indicator that this is the updated component */}
+      <div className="absolute top-0 left-0 z-10 bg-green-500 text-white text-xs px-2 py-1 rounded-br-md">
+        Map v15.0
+      </div>
+      
+      <div className="w-full aspect-[16/9] rounded-lg overflow-hidden border border-slate-200">
+        <iframe
+          src={getMapSrc()}
           title="Property Location"
+          width="100%"
+          height="100%"
+          style={{ border: 0 }}
+          allowFullScreen={false}
+          loading="lazy"
+          referrerPolicy="no-referrer-when-downgrade"
           className="w-full h-full"
         ></iframe>
       </div>
@@ -81,7 +112,7 @@ const PropertyLocationMap: React.FC<PropertyLocationMapProps> = ({
         <Button
           variant="secondary"
           size="sm"
-          onClick={() => window.open(externalMapsUrl, '_blank')}
+          onClick={() => window.open(getExternalUrl(), '_blank')}
           className="flex items-center gap-1 rounded-full px-3 shadow-md bg-background/90 backdrop-blur-sm"
         >
           <ExternalLinkIcon className="h-3.5 w-3.5" />

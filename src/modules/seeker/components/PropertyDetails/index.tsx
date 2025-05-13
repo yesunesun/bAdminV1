@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyDetails/index.tsx
-// Version: 11.5.0
-// Last Modified: 14-05-2025 12:30 IST
-// Purpose: Improved currency formatting and section ordering
+// Version: 12.0.0
+// Last Modified: 14-05-2025 14:30 IST
+// Purpose: Fixed map display by integrating PropertyLocationMap component
 
 import React, { useState, useEffect } from 'react';
 import { PropertyDetails as PropertyDetailsType } from '../../hooks/usePropertyDetails';
@@ -23,6 +23,7 @@ import PropertyNotFound from './PropertyNotFound';
 import { PropertyDetailsSkeleton } from './PropertyDetailsSkeleton';
 import { extractImagesFromJson } from './utils/propertyDataUtils';
 import PropertyGalleryCard from './PropertyGalleryCard';
+import PropertyLocationMap from './PropertyLocationMap'; // Import the PropertyLocationMap component
 
 // Define static data for similar properties
 const SIMILAR_PROPERTIES_DATA = [
@@ -312,23 +313,55 @@ const LocationSection: React.FC<{
       ? [address, city, state, zipCode].filter(Boolean).join(', ')
       : "Location not specified";
   
-  // Get coordinates
-  const coordinates = location
-    ? { lat: parseFloat(location.latitude), lng: parseFloat(location.longitude) }
-    : null;
+  // Extract coordinates from the location object
+  const getCoordinates = () => {
+    if (!location) return null;
+    
+    // Try various coordinate formats
+    if (location.latitude && location.longitude) {
+      return {
+        lat: parseFloat(location.latitude),
+        lng: parseFloat(location.longitude)
+      };
+    }
+    
+    if (location.lat && location.lng) {
+      return {
+        lat: parseFloat(location.lat),
+        lng: parseFloat(location.lng)
+      };
+    }
+    
+    if (location.coordinates) {
+      const lat = location.coordinates.lat || location.coordinates.latitude;
+      const lng = location.coordinates.lng || location.coordinates.longitude;
+      
+      if (lat && lng) {
+        return {
+          lat: parseFloat(lat),
+          lng: parseFloat(lng)
+        };
+      }
+    }
+    
+    return null;
+  };
+  
+  const coordinates = getCoordinates();
     
   return (
     <Card className="p-4 md:p-6 shadow-sm">
       <h2 className="text-xl font-semibold mb-4">Location</h2>
       
-      {coordinates && (
-        <div className="h-64 bg-gray-100 rounded-lg mb-4">
-          {/* Location map will be rendered here */}
-          <div className="h-full flex items-center justify-center">
-            <span className="text-gray-500">Map view available</span>
-          </div>
-        </div>
-      )}
+      {/* Map Section - Now using PropertyLocationMap component */}
+      <div className="mb-4 rounded-lg overflow-hidden">
+        <PropertyLocationMap 
+          coordinates={coordinates}
+          address={location?.address || address}
+          locality={location?.area || location?.locality}
+          city={location?.city || city}
+        />
+      </div>
       
       <p className="text-gray-700">{locationString}</p>
       
@@ -337,7 +370,7 @@ const LocationSection: React.FC<{
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3 mt-4 border-t border-gray-200 pt-4">
           {Object.entries(location)
             .filter(([key]) => 
-              !['latitude', 'longitude', 'address', 'area', 'city', 'state', 'pinCode'].includes(key)
+              !['latitude', 'longitude', 'lat', 'lng', 'coordinates', 'address', 'area', 'city', 'state', 'pinCode'].includes(key)
             )
             .map(([key, value]) => (
               <div key={key} className="flex flex-col">
