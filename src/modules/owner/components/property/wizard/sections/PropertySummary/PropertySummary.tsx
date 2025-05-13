@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/PropertySummary/PropertySummary.tsx
-// Version: 2.6.0
-// Last Modified: 14-05-2025 12:15 IST
-// Purpose: Fixed section ordering to ensure all Commercial Rent sections are displayed
+// Version: 2.7.0
+// Last Modified: 14-05-2025 14:45 IST
+// Purpose: Enhanced Commercial flow handling to correctly display all sections in review tab
 
 import React, { useEffect, useState } from 'react';
 import { Info, Home, MapPin, Check, Clock, Wallet, Wrench, Layers, Briefcase } from 'lucide-react';
@@ -87,6 +87,24 @@ const formatFieldValue = (key: string, value: any): string => {
     return value;
   }
   
+  // Format date values
+  if (key.toLowerCase().includes('date') || key.toLowerCase().includes('from') || key.toLowerCase().includes('until')) {
+    // Check if it's a valid date string
+    if (/^\d{4}-\d{2}-\d{2}/.test(value)) {
+      try {
+        const date = new Date(value);
+        return date.toLocaleDateString('en-IN', { 
+          day: '2-digit', 
+          month: '2-digit', 
+          year: 'numeric' 
+        });
+      } catch (e) {
+        // If date parsing fails, return the original value
+        return String(value);
+      }
+    }
+  }
+  
   return String(value);
 };
 
@@ -102,6 +120,45 @@ const getSectionPriority = (stepId: string): number => {
   if (stepId.includes('flatmate_details')) return 7;
   if (stepId.includes('pg_details')) return 8;
   return 10; // Default priority for other sections
+};
+
+// Helper to get appropriate section title
+const getSectionTitle = (stepId: string): string => {
+  if (stepId.includes('basic_details')) return 'Basic Details';
+  if (stepId.includes('location')) return 'Location Details';
+  if (stepId.includes('features')) return 'Property Features';
+  if (stepId.includes('sale_details')) return 'Sale Details';
+  if (stepId.includes('rental')) return 'Rental Details';
+  if (stepId.includes('land_features')) return 'Land Features';
+  if (stepId.includes('coworking_details')) return 'Coworking Details';
+  if (stepId.includes('flatmate_details')) return 'Flatmate Details';
+  if (stepId.includes('pg_details')) return 'PG Details';
+  
+  // If not a known step, create a title from the step ID
+  return stepId
+    .replace(/_/g, ' ')
+    .replace(/com rent/, 'commercial rental')
+    .replace(/com sale/, 'commercial sale')
+    .replace(/com cow/, 'coworking')
+    .replace(/res rent/, 'residential rental')
+    .replace(/land sale/, 'land')
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+};
+
+// Helper to get the appropriate icon for a section
+const getSectionIcon = (stepId: string) => {
+  if (stepId.includes('basic_details')) return <Home className="h-4 w-4" />;
+  if (stepId.includes('location')) return <MapPin className="h-4 w-4" />;
+  if (stepId.includes('features')) return <Check className="h-4 w-4" />;
+  if (stepId.includes('coworking')) return <Briefcase className="h-4 w-4" />;
+  if (stepId.includes('land_features')) return <Layers className="h-4 w-4" />;
+  if (stepId.includes('sale')) return <Wallet className="h-4 w-4" />;
+  if (stepId.includes('rental')) return <Wallet className="h-4 w-4" />;
+  
+  // Default icon
+  return <Info className="h-4 w-4" />;
 };
 
 export const PropertySummary: React.FC<PropertySummaryProps> = (props) => {
@@ -134,9 +191,12 @@ export const PropertySummary: React.FC<PropertySummaryProps> = (props) => {
     // Create context params for the data transformation
     const contextParams = {
       urlPath: window.location.pathname,
-      isSaleMode: formData?.propertyDetails?.adType === 'Sale' || false,
+      isSaleMode: formData?.propertyDetails?.adType === 'Sale' || 
+                 flowType?.includes('sale') || 
+                 false,
       isPGHostelMode: formData?.propertyDetails?.propertyType === 'PG/Hostel' || false,
-      adType: formData?.propertyDetails?.adType
+      adType: formData?.propertyDetails?.adType || 
+             (flowType?.includes('sale') ? 'sale' : 'rent')
     };
     
     try {
@@ -146,8 +206,8 @@ export const PropertySummary: React.FC<PropertySummaryProps> = (props) => {
       // Clean up the JSON structure to only include standard sections
       const cleanedData = cleanupJsonStructure(transformed);
       
-      // Log the raw steps data for debugging
-      console.log('Steps data for review:', cleanedData.steps);
+      // Log for debugging
+      console.log('Transformed & cleaned JSON:', cleanedData);
       
       // Set the transformed data to state for rendering
       setTransformedData(cleanedData);
@@ -157,7 +217,7 @@ export const PropertySummary: React.FC<PropertySummaryProps> = (props) => {
     } finally {
       setIsLoading(false);
     }
-  }, [formData]); // Only re-run if formData changes
+  }, [formData, flowType]); // Re-run if formData or flowType changes
   
   // Use the title from the transformed data or from the property title hook
   const {
@@ -225,7 +285,6 @@ export const PropertySummary: React.FC<PropertySummaryProps> = (props) => {
   
   // Get address information from the location step
   let address = '';
-  let coordinates = '-';
   
   // Search for address in all location steps
   for (const stepId in data?.steps) {
@@ -251,6 +310,9 @@ export const PropertySummary: React.FC<PropertySummaryProps> = (props) => {
     } else if (data.steps[stepId]?.nearbyLandmarks) {
       description = data.steps[stepId].nearbyLandmarks;
       break;
+    } else if (data.steps[stepId]?.directionsTip) {
+      description = data.steps[stepId].directionsTip;
+      break;
     }
   }
   
@@ -270,56 +332,9 @@ export const PropertySummary: React.FC<PropertySummaryProps> = (props) => {
     
     console.log(`Processing step: ${stepId} with ${Object.keys(data.steps[stepId]).length} fields`);
     
-    // Format the section title based on the step ID
-    let sectionTitle = stepId
-      .replace(/_/g, ' ')
-      .replace(/com rent/, 'commercial rental')
-      .replace(/com cow/, 'coworking')
-      .replace(/res rent/, 'residential rental')
-      .replace(/land sale/, 'land')
-      .split(' ')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
-    
-    // Remove redundant words
-    sectionTitle = sectionTitle
-      .replace('Basic Details', 'Basic Details')
-      .replace('Location Details', 'Location Details')
-      .replace('Coworking Details', 'Coworking Details')
-      .replace('Features Details', 'Features');
-    
-    // Remove flow prefix from title if present
-    ['Basic', 'Location', 'Coworking', 'Features', 'Land', 'Sale', 'Rental'].forEach(word => {
-      if (sectionTitle.startsWith(word)) {
-        sectionTitle = word + sectionTitle.substring(word.length);
-      }
-    });
-    
-    // Choose appropriate icon based on section content
-    let icon = <Info className="h-4 w-4" />;
-    
-    if (stepId.includes('basic_details')) {
-      icon = <Home className="h-4 w-4" />;
-      sectionTitle = 'Basic Details';
-    } else if (stepId.includes('location')) {
-      icon = <MapPin className="h-4 w-4" />;
-      sectionTitle = 'Location Details';
-    } else if (stepId.includes('features')) {
-      icon = <Check className="h-4 w-4" />;
-      sectionTitle = 'Property Features';
-    } else if (stepId.includes('coworking')) {
-      icon = <Briefcase className="h-4 w-4" />;
-      sectionTitle = 'Coworking Details';
-    } else if (stepId.includes('land_features')) {
-      icon = <Layers className="h-4 w-4" />;
-      sectionTitle = 'Land Features';
-    } else if (stepId.includes('sale')) {
-      icon = <Wallet className="h-4 w-4" />;
-      sectionTitle = 'Sale Details';
-    } else if (stepId.includes('rental')) {
-      icon = <Wallet className="h-4 w-4" />;
-      sectionTitle = 'Rental Details';
-    }
+    // Get the section title and icon
+    const sectionTitle = getSectionTitle(stepId);
+    const icon = getSectionIcon(stepId);
     
     // Create items for this section
     const items = [];
@@ -405,14 +420,6 @@ export const PropertySummary: React.FC<PropertySummaryProps> = (props) => {
           ]}
         />
       </div>
-      
-      {/* 3. DEBUG: Log which sections are being rendered */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="bg-gray-100 p-2 text-xs rounded hidden">
-          <div>Found {sections.length} sections to render</div>
-          <div>{sections.map(s => s.title).join(', ')}</div>
-        </div>
-      )}
       
       {/* 3. CONTENT: All other property details sections */}
       <div className="mt-6">
