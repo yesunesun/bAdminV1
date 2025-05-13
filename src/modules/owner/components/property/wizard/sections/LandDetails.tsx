@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/LandDetails.tsx
-// Version: 2.1.0
-// Last Modified: 11-05-2025 02:00 IST
-// Purpose: Fixed controlled input issue for proper value updates
+// Version: 2.2.0
+// Last Modified: 13-05-2025 16:45 IST
+// Purpose: Removed debug information display while keeping Debug button functionality
 
 import React, { useEffect, useCallback, useState } from 'react';
 import { FormSection } from '@/components/FormSection';
@@ -548,21 +548,6 @@ const LandDetails: React.FC<FormSectionProps> = ({
           </div>
         </div>
       </div>
-
-      {/* Debug info in development */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="mt-4 p-2 bg-gray-100 rounded text-xs space-y-2">
-          <div>Step ID: {stepId}</div>
-          <div>Local State:</div>
-          <pre className="text-xs overflow-auto max-h-40 bg-white p-2 rounded border">
-            {JSON.stringify(localState, null, 2)}
-          </pre>
-          <div>Current step data from form:</div>
-          <pre className="text-xs overflow-auto max-h-40 bg-white p-2 rounded border">
-            {JSON.stringify(form.getValues(`steps.${stepId}`), null, 2)}
-          </pre>
-        </div>
-      )}
     </FormSection>
   );
 };

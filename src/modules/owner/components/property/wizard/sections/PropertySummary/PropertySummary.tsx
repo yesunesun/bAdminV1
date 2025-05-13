@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/PropertySummary/PropertySummary.tsx
-// Version: 2.4.0
-// Last Modified: 13-05-2025 15:45 IST
-// Purpose: Removed error message and ensured Listing Information is at top
+// Version: 2.5.0
+// Last Modified: 13-05-2025 17:45 IST
+// Purpose: Fixed structure to ensure Listing Information is always at top
 
 import React, { useEffect, useState } from 'react';
 import { Info, Home, MapPin, Check, Clock, Wallet, Wrench, Layers, Briefcase } from 'lucide-react';
@@ -362,14 +362,15 @@ export const PropertySummary: React.FC<PropertySummaryProps> = (props) => {
   
   return (
     <div className="space-y-6 py-4">
-      {/* Property Title */}
-      <div>
+      {/* 1. HEADER: Property Title and Address */}
+      <div className="border-b border-border pb-4">
         <h2 className="text-2xl font-bold">{propertyTitle}</h2>
         {address && <p className="text-sm text-gray-600 mt-1">{address}</p>}
       </div>
       
-      {/* Listing Information Always First */}
+      {/* 2. ALWAYS FIRST: Listing Information */}
       <div className="bg-blue-50 rounded-lg p-4 shadow-sm">
+        <h3 className="text-lg font-semibold text-primary mb-3">Listing Information</h3>
         <SummarySection
           title="Listing Information"
           icon={<Clock className="h-4 w-4" />}
@@ -380,21 +381,25 @@ export const PropertySummary: React.FC<PropertySummaryProps> = (props) => {
         />
       </div>
       
-      {/* Content sections in a grid */}
-      <div className="grid gap-6 md:grid-cols-2">
-        {sections.map((section, index) => (
-          <SummarySection
-            key={section.id || `section-${index}`}
-            title={section.title}
-            icon={section.icon}
-            items={section.items}
-          />
-        ))}
+      {/* 3. CONTENT: All other property details sections */}
+      <div className="mt-6">
+        <h3 className="text-lg font-semibold text-primary mb-3">Property Details</h3>
+        <div className="grid gap-6 md:grid-cols-2">
+          {sections.map((section, index) => (
+            <SummarySection
+              key={section.id || `section-${index}`}
+              title={section.title}
+              icon={section.icon}
+              items={section.items}
+            />
+          ))}
+        </div>
       </div>
 
-      {/* Description Section if available */}
+      {/* 4. FOOTER: Description Section if available */}
       {description && (
-        <div className="mt-6">
+        <div className="mt-6 border-t border-border pt-4">
+          <h3 className="text-lg font-semibold text-primary mb-3">Description</h3>
           <DescriptionSection description={description} />
         </div>
       )}

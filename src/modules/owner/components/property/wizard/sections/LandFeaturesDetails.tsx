@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/LandFeaturesDetails.tsx
-// Version: 2.0.0
-// Last Modified: 11-05-2025 01:40 IST
-// Purpose: Updated to use flow-based architecture with stepId for proper data capture
+// Version: 2.1.0
+// Last Modified: 13-05-2025 16:45 IST
+// Purpose: Removed debug information display while keeping Debug button functionality
 
 import React, { useEffect, useCallback } from 'react';
 import { FormSection } from '@/components/FormSection';
@@ -606,17 +606,6 @@ const LandFeaturesDetails: React.FC<FormSectionProps> = ({
         />
       </div>
     </div>
-
-    {/* Debug info in development */}
-    {process.env.NODE_ENV === 'development' && (
-      <div className="mt-4 p-2 bg-gray-100 rounded text-xs space-y-2">
-        <div>Step ID: {stepId}</div>
-        <div>Current step data:</div>
-        <pre className="text-xs overflow-auto max-h-40 bg-white p-2 rounded border">
-          {JSON.stringify(form.getValues(`steps.${stepId}`), null, 2)}
-        </pre>
-      </div>
-    )}
   </FormSection>
 );
 };
