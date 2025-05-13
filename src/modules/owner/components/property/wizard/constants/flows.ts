@@ -118,7 +118,7 @@ export const STEP_METADATA = {
   // Residential rent steps
   res_rent_basic_details: {
     id: 'res_rent_basic_details',
-    name: 'Basic Details',
+    name: 'Property Details',
     component: 'PropertyDetails',
     icon: Home,
     description: 'Tell us about your property'
@@ -155,7 +155,7 @@ export const STEP_METADATA = {
   // Residential sale steps
   res_sale_basic_details: {
     id: 'res_sale_basic_details',
-    name: 'Basic Details',
+    name: 'Property Details',
     component: 'PropertyDetails',
     icon: Home,
     description: 'Tell us about your property'
@@ -192,7 +192,7 @@ export const STEP_METADATA = {
   // Residential flatmates steps
   res_flat_basic_details: {
     id: 'res_flat_basic_details',
-    name: 'Basic Details',
+    name: 'Room Details',
     component: 'RoomDetails',
     icon: Bed,
     description: 'Tell us about the room'
@@ -229,7 +229,7 @@ export const STEP_METADATA = {
   // Residential PG/Hostel steps
   res_pg_basic_details: {
     id: 'res_pg_basic_details',
-    name: 'Basic Details',
+    name: 'Room Details',
     component: 'RoomDetails',
     icon: Building,
     description: 'Tell us about your PG/Hostel'
@@ -266,7 +266,7 @@ export const STEP_METADATA = {
   // Commercial rent steps
   com_rent_basic_details: {
     id: 'com_rent_basic_details',
-    name: 'Basic Details',
+    name: 'Comm. Prop. Details',
     component: 'CommercialBasicDetails',
     icon: Building,
     description: 'Tell us about your commercial space'
@@ -303,7 +303,7 @@ export const STEP_METADATA = {
   // Commercial sale steps
   com_sale_basic_details: {
     id: 'com_sale_basic_details',
-    name: 'Basic Details',
+    name: 'Comm. Prop. Details',
     component: 'CommercialBasicDetails',
     icon: Building,
     description: 'Tell us about your commercial space'
@@ -377,7 +377,7 @@ export const STEP_METADATA = {
   // Land sale steps
   land_sale_basic_details: {
     id: 'land_sale_basic_details',
-    name: 'Basic Details',
+    name: 'Land/Plot Details',
     component: 'LandDetails',
     icon: Map,
     description: 'Tell us about your land'
