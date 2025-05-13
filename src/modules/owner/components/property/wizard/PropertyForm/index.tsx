@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/PropertyForm/index.tsx
-// Version: 6.7.0
-// Last Modified: 13-05-2025 14:45 IST
-// Purpose: Added debug button functionality to FormHeader
+// Version: 6.8.0
+// Last Modified: 13-05-2025 16:45 IST
+// Purpose: Removed validation error message on Review tab
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -454,7 +454,7 @@ const visibleSteps = getVisibleSteps();
 const effectivePropertyId = savedPropertyId || propertyId || propertyIdAfterSave;
 
 // Check if current step is the review step - safely access flowSteps array
-const isReviewStep = flowSteps && flowSteps[formStep - 1] ? flowSteps[formStep - 1].id === 'review' : false;
+const isReviewStep = flowSteps && flowSteps[formStep - 1] ? flowSteps[formStep - 1].id.includes('review') : false;
 
 return (
   <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -485,7 +485,8 @@ return (
       />
 
       <div className="p-6">
-        {error && (
+        {/* Only show error message if NOT on the review step */}
+        {error && !isReviewStep && (
           <div className="mb-4 bg-destructive/10 border border-destructive/20 p-3 rounded-xl">
             <p className="text-sm text-destructive">{error}</p>
           </div>

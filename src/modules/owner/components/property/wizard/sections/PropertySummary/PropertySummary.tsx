@@ -1,11 +1,10 @@
 // src/modules/owner/components/property/wizard/sections/PropertySummary/PropertySummary.tsx
-// Version: 1.4.0
-// Last Modified: 14-05-2025 11:45 IST
-// Purpose: Enhanced PropertySummary component that renders UI based on transformed JSON data
+// Version: 2.4.0
+// Last Modified: 13-05-2025 15:45 IST
+// Purpose: Removed error message and ensured Listing Information is at top
 
 import React, { useEffect, useState } from 'react';
-import { FormSection } from '@/components/FormSection';
-import { Home, MapPin, Check, Clock, Wallet, Wrench } from 'lucide-react';
+import { Info, Home, MapPin, Check, Clock, Wallet, Wrench, Layers, Briefcase } from 'lucide-react';
 import { PropertySummaryProps } from './types';
 import { useFlowDetection } from './hooks/useFlowDetection';
 import { usePropertyTitle } from './hooks/usePropertyTitle';
@@ -15,6 +14,81 @@ import { DescriptionSection } from './components/DescriptionSection';
 // Corrected import path
 import { prepareFormDataForSubmission } from '@/modules/owner/components/property/wizard/utils/formDataFormatter';
 import { formatCurrency, formatArea, formatBoolean } from './services/dataFormatter';
+
+// Helper function to clean up the JSON structure
+const cleanupJsonStructure = (data: any) => {
+  if (!data) return data;
+  
+  // Create a new object with only the standard sections
+  const cleanedData = {
+    meta: data.meta || {},
+    flow: data.flow || {},
+    steps: data.steps || {},
+    media: data.media || {}
+  };
+  
+  return cleanedData;
+};
+
+// Helper function to capitalize first letter of each word
+const capitalizeEachWord = (str: string): string => {
+  if (!str) return '';
+  return str.replace(/\w\S*/g, (txt) => {
+    return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
+  });
+};
+
+// Helper function to format field label from camelCase
+const formatFieldLabel = (key: string): string => {
+  // Remove common prefixes
+  const cleanKey = key
+    .replace(/^has/, '')
+    .replace(/^is/, '');
+  
+  // Convert camelCase to spaces
+  return cleanKey
+    .replace(/([A-Z])/g, ' $1')
+    .replace(/^./, (str) => str.toUpperCase())
+    .trim();
+};
+
+// Helper function to format field value based on type
+const formatFieldValue = (key: string, value: any): string => {
+  if (value === undefined || value === null || value === '') {
+    return '-';
+  }
+  
+  // Format boolean values
+  if (typeof value === 'boolean') {
+    return value ? 'Yes' : 'No';
+  }
+  
+  // Format array values
+  if (Array.isArray(value)) {
+    return value.join(', ');
+  }
+  
+  // Format price/monetary values
+  if ((key.toLowerCase().includes('price') || 
+      key.toLowerCase().includes('deposit') || 
+      key.toLowerCase().includes('cost') || 
+      key.toLowerCase().includes('amount')) && 
+      !isNaN(Number(value))) {
+    return `₹${parseInt(value).toLocaleString('en-IN')}`;
+  }
+  
+  // Format area values
+  if (key.toLowerCase().includes('area') && !key.toLowerCase().includes('areaunit')) {
+    return `${value} ${key.toLowerCase().includes('builtup') ? 'sq. ft.' : ''}`;
+  }
+  
+  // Format floor values
+  if (key === 'floor' && value && typeof value === 'string') {
+    return value;
+  }
+  
+  return String(value);
+};
 
 export const PropertySummary: React.FC<PropertySummaryProps> = (props) => {
   const {
@@ -31,6 +105,7 @@ export const PropertySummary: React.FC<PropertySummaryProps> = (props) => {
   // State to hold the transformed data
   const [transformedData, setTransformedData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
   // Detect flow type and get step IDs
   const { flowType, stepIds } = useFlowDetection(formData);
@@ -40,6 +115,7 @@ export const PropertySummary: React.FC<PropertySummaryProps> = (props) => {
     if (!formData) return;
     
     setIsLoading(true);
+    setError(null);
     
     // Create context params for the data transformation
     const contextParams = {
@@ -53,13 +129,17 @@ export const PropertySummary: React.FC<PropertySummaryProps> = (props) => {
       // Transform the data using the utility function
       const transformed = prepareFormDataForSubmission(formData, contextParams);
       
+      // Clean up the JSON structure to only include standard sections
+      const cleanedData = cleanupJsonStructure(transformed);
+      
       // Log for debugging
-      console.log('Transformed JSON:', transformed);
+      console.log('Transformed & cleaned JSON:', cleanedData);
       
       // Set the transformed data to state for rendering
-      setTransformedData(transformed);
+      setTransformedData(cleanedData);
     } catch (error) {
       console.error('Transformation error:', error);
+      setError('Failed to transform data. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -78,109 +158,218 @@ export const PropertySummary: React.FC<PropertySummaryProps> = (props) => {
   // Show loading state while data is being transformed
   if (isLoading) {
     return (
-      <FormSection
-        title="Preparing Summary"
-        description="Please wait while we prepare your property summary..."
-      >
+      <div className="py-6 px-4">
         <div className="flex justify-center items-center h-48">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
         </div>
-      </FormSection>
+      </div>
     );
   }
 
-  // Extract data directly from the transformed JSON
+  // Show error state if transformation failed
+  if (error) {
+    return (
+      <div className="py-6 px-4">
+        <div className="flex justify-center items-center h-48 text-red-500">
+          <div className="text-center">
+            <p className="text-lg font-semibold mb-4">Something went wrong</p>
+            <button 
+              className="px-4 py-2 bg-blue-500 text-white rounded-md"
+              onClick={() => window.location.reload()}
+            >
+              Refresh Page
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Use the transformed data if available, otherwise fall back to formData
   const data = transformedData || formData;
+  
+  // Get flow information
   const flowCategory = data?.flow?.category || '';
   const flowListingType = data?.flow?.listingType || '';
-  const flowInfo = `${flowCategory.charAt(0).toUpperCase() + flowCategory.slice(1)} ${flowListingType.charAt(0).toUpperCase() + flowListingType.slice(1)}`;
+  const flowInfo = `${capitalizeEachWord(flowCategory)} ${capitalizeEachWord(flowListingType)}`;
   
-  // Get title from the transformed data
-  const propertyTitle = data?.steps?.res_rent_basic_details?.title || editedTitle || 'Property Details';
+  // Find the title from the data
+  let propertyTitle = '';
   
-  // Extract location details
-  const locationData = data?.steps?.res_rent_location || {};
-  const address = locationData.address || '';
-  const coordinates = locationData.latitude && locationData.longitude 
-    ? `${locationData.latitude}, ${locationData.longitude}` 
-    : '-';
-
-  // Extract basic details
-  const basicDetails = data?.steps?.res_rent_basic_details || {};
+  // Search for title in all steps
+  for (const stepId in data?.steps) {
+    if (data.steps[stepId]?.title) {
+      propertyTitle = data.steps[stepId].title;
+      break;
+    }
+  }
   
-  // Extract rental details
-  const rentalDetails = data?.steps?.res_rent_rental || {};
+  // If not found, use the editedTitle or a default
+  if (!propertyTitle) {
+    propertyTitle = editedTitle || 'Property Details';
+  }
   
-  // Extract features
-  const features = data?.steps?.res_rent_features || {};
+  // Get address information from the location step
+  let address = '';
+  let coordinates = '-';
   
-  // Get description
-  const description = features.description || '';
-
-  // Prepare items for each section based on the flow type
-  const basicDetailItems = [
-    { label: 'Property Type', value: basicDetails.propertyType || '-' },
-    { label: 'BHK', value: basicDetails.bhkType || '-' },
-    { label: 'Bathrooms', value: basicDetails.bathrooms || '-' },
-    { label: 'Built-up Area', value: formatArea(basicDetails.builtUpArea, basicDetails.builtUpAreaUnit) },
-    { label: 'Floor', value: basicDetails.floor && basicDetails.totalFloors ? `${basicDetails.floor} out of ${basicDetails.totalFloors}` : '-' },
-    { label: 'Facing', value: basicDetails.facing || '-' },
-    { label: 'Balconies', value: basicDetails.balconies || '-' },
-    { label: 'Property Age', value: basicDetails.propertyAge || '-' },
-    { label: 'Property Condition', value: basicDetails.propertyCondition || '-' },
-    { label: 'Possession Date', value: basicDetails.possessionDate || '-' }
-  ];
-
-  const locationItems = [
-    { label: 'Address', value: locationData.address || '-' },
-    { label: 'Landmark', value: locationData.landmark || '-' },
-    { label: 'Locality', value: locationData.locality || '-' },
-    { label: 'Area', value: locationData.area || '-' },
-    { label: 'City', value: locationData.city || '-' },
-    { label: 'PIN Code', value: locationData.pinCode || '-' },
-    { label: 'Coordinates', value: coordinates }
-  ];
-
-  const rentalItems = [
-    { label: 'Monthly Rent', value: formatCurrency(rentalDetails.rentAmount) },
-    { label: 'Security Deposit', value: formatCurrency(rentalDetails.securityDeposit) },
-    { label: 'Maintenance Charges', value: formatCurrency(rentalDetails.maintenanceCharges) },
-    { label: 'Rent Negotiable', value: formatBoolean(rentalDetails.rentNegotiable) ? 'Yes' : 'No' },
-    { label: 'Available From', value: rentalDetails.availableFrom || '-' },
-    { label: 'Lease Duration', value: rentalDetails.leaseDuration || '-' },
-    { label: 'Furnishing Status', value: rentalDetails.furnishingStatus || '-' },
-    { label: 'Preferred Tenants', value: Array.isArray(rentalDetails.preferredTenants) ? rentalDetails.preferredTenants.join(', ') : '-' },
-    { label: 'Property Show Option', value: rentalDetails.propertyShowOption || '-' }
-  ];
-
-  const featuresItems = [
-    { label: 'Parking', value: features.parking || '-' },
-    { label: 'Pet Friendly', value: formatBoolean(features.petFriendly) ? 'Yes' : 'No' },
-    { label: 'Non-Veg Allowed', value: formatBoolean(features.nonVegAllowed) ? 'Yes' : 'No' },
-    { label: 'Gated Security', value: formatBoolean(features.gatedSecurity) ? 'Yes' : 'No' },
-    { label: 'Water Supply', value: features.waterSupply || '-' },
-    { label: 'Power Backup', value: features.powerBackup || '-' },
-    { label: 'Amenities', value: Array.isArray(features.amenities) ? features.amenities.join(', ') : '-' }
-  ];
-
+  // Search for address in all location steps
+  for (const stepId in data?.steps) {
+    if (stepId.toLowerCase().includes('location')) {
+      const locationStep = data.steps[stepId];
+      if (locationStep?.address) {
+        address = locationStep.address;
+      }
+      
+      break;
+    }
+  }
+  
+  // Get description from any step
+  let description = '';
+  for (const stepId in data?.steps) {
+    if (data.steps[stepId]?.description) {
+      description = data.steps[stepId].description;
+      break;
+    } else if (data.steps[stepId]?.additionalDetails) {
+      description = data.steps[stepId].additionalDetails;
+      break;
+    } else if (data.steps[stepId]?.nearbyLandmarks) {
+      description = data.steps[stepId].nearbyLandmarks;
+      break;
+    }
+  }
+  
+  // Dynamically create sections based on step IDs
+  const sections = [];
+  
+  // Process each step as its own section
+  for (const stepId in data?.steps) {
+    // Skip empty steps
+    if (!data.steps[stepId] || Object.keys(data.steps[stepId]).length === 0) {
+      continue;
+    }
+    
+    // Format the section title based on the step ID
+    let sectionTitle = stepId
+      .replace(/_/g, ' ')
+      .replace(/com cow/, 'coworking')
+      .replace(/res rent/, 'residential')
+      .replace(/land sale/, 'land')
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+    
+    // Remove redundant words
+    sectionTitle = sectionTitle
+      .replace('Basic Details', 'Basic Details')
+      .replace('Location Details', 'Location Details')
+      .replace('Coworking Details', 'Coworking Details')
+      .replace('Features Details', 'Features');
+    
+    // Remove flow prefix from title if present
+    ['Basic', 'Location', 'Coworking', 'Features', 'Land', 'Sale', 'Rental'].forEach(word => {
+      if (sectionTitle.startsWith(word)) {
+        sectionTitle = word + sectionTitle.substring(word.length);
+      }
+    });
+    
+    // Choose appropriate icon based on section content
+    let icon = <Info className="h-4 w-4" />;
+    
+    if (stepId.includes('basic_details')) {
+      icon = <Home className="h-4 w-4" />;
+      sectionTitle = 'Basic Details';
+    } else if (stepId.includes('location')) {
+      icon = <MapPin className="h-4 w-4" />;
+      sectionTitle = 'Location Details';
+    } else if (stepId.includes('features')) {
+      icon = <Check className="h-4 w-4" />;
+      sectionTitle = 'Property Features';
+    } else if (stepId.includes('coworking')) {
+      icon = <Briefcase className="h-4 w-4" />;
+      sectionTitle = 'Coworking Details';
+    } else if (stepId.includes('land_features')) {
+      icon = <Layers className="h-4 w-4" />;
+      sectionTitle = 'Land Features';
+    } else if (stepId.includes('sale')) {
+      icon = <Wallet className="h-4 w-4" />;
+      sectionTitle = 'Sale Details';
+    } else if (stepId.includes('rental')) {
+      icon = <Wallet className="h-4 w-4" />;
+      sectionTitle = 'Rental Details';
+    }
+    
+    // Create items for this section
+    const items = [];
+    
+    // Process each field in the step
+    for (const key in data.steps[stepId]) {
+      // Skip title and description fields as they are handled separately
+      if (key === 'title' || key === 'description' || key === '__typename') {
+        continue;
+      }
+      
+      // Special handling for floor + totalFloors
+      if (key === 'floor' && data.steps[stepId]['totalFloors']) {
+        items.push({
+          label: 'Floor',
+          value: `${data.steps[stepId]['floor']} out of ${data.steps[stepId]['totalFloors']}`
+        });
+        continue;
+      }
+      
+      // Skip totalFloors as it's handled with floor
+      if (key === 'totalFloors' && data.steps[stepId]['floor']) {
+        continue;
+      }
+      
+      // Special handling for builtUpArea + builtUpAreaUnit
+      if (key === 'builtUpArea' && data.steps[stepId]['builtUpAreaUnit']) {
+        items.push({
+          label: 'Built-up Area',
+          value: `${data.steps[stepId]['builtUpArea']} ${
+            data.steps[stepId]['builtUpAreaUnit'] === 'sqft' ? 'sq. ft.' : 
+            data.steps[stepId]['builtUpAreaUnit'] === 'sqyd' ? 'sq. yd.' : 
+            data.steps[stepId]['builtUpAreaUnit']
+          }`
+        });
+        continue;
+      }
+      
+      // Skip builtUpAreaUnit as it's handled with builtUpArea
+      if (key === 'builtUpAreaUnit' && data.steps[stepId]['builtUpArea']) {
+        continue;
+      }
+      
+      // Add standard field
+      items.push({
+        label: formatFieldLabel(key),
+        value: formatFieldValue(key, data.steps[stepId][key])
+      });
+    }
+    
+    // Only add sections with items
+    if (items.length > 0) {
+      sections.push({
+        id: stepId,
+        title: sectionTitle,
+        icon,
+        items
+      });
+    }
+  }
+  
   return (
-    <FormSection
-      title="Review Property Details"
-      description="Review all details before saving or publishing"
-    >
-      <div className="space-y-6">
-        {/* Property title with edit functionality */}
-        <PropertyTitleEditor
-          title={propertyTitle}
-          isEditing={isEditingTitle}
-          onEdit={() => setIsEditingTitle(true)}
-          onComplete={handleTitleEditComplete}
-          onKeyDown={handleTitleKeyDown}
-          onChange={setEditedTitle}
-          fullAddress={address}
-        />
-        
-        {/* Flow Information */}
+    <div className="space-y-6 py-4">
+      {/* Property Title */}
+      <div>
+        <h2 className="text-2xl font-bold">{propertyTitle}</h2>
+        {address && <p className="text-sm text-gray-600 mt-1">{address}</p>}
+      </div>
+      
+      {/* Listing Information Always First */}
+      <div className="bg-blue-50 rounded-lg p-4 shadow-sm">
         <SummarySection
           title="Listing Information"
           icon={<Clock className="h-4 w-4" />}
@@ -189,40 +378,26 @@ export const PropertySummary: React.FC<PropertySummaryProps> = (props) => {
             { label: 'Status', value: data?.meta?.status || status }
           ]}
         />
-        
-        <div className="grid gap-6 md:grid-cols-2">
-          {/* Basic Details */}
-          <SummarySection
-            title="Basic Details"
-            icon={<Home className="h-4 w-4" />}
-            items={basicDetailItems}
-          />
-
-          {/* Location Details */}
-          <SummarySection
-            title="Location Details"
-            icon={<MapPin className="h-4 w-4" />}
-            items={locationItems}
-          />
-          
-          {/* Rental Details */}
-          <SummarySection
-            title="Rental Details"
-            icon={<Wallet className="h-4 w-4" />}
-            items={rentalItems}
-          />
-          
-          {/* Features */}
-          <SummarySection
-            title="Property Features"
-            icon={<Check className="h-4 w-4" />}
-            items={featuresItems}
-          />
-        </div>
-
-        {/* Description Section */}
-        <DescriptionSection description={description} />
       </div>
-    </FormSection>
+      
+      {/* Content sections in a grid */}
+      <div className="grid gap-6 md:grid-cols-2">
+        {sections.map((section, index) => (
+          <SummarySection
+            key={section.id || `section-${index}`}
+            title={section.title}
+            icon={section.icon}
+            items={section.items}
+          />
+        ))}
+      </div>
+
+      {/* Description Section if available */}
+      {description && (
+        <div className="mt-6">
+          <DescriptionSection description={description} />
+        </div>
+      )}
+    </div>
   );
 };
