@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/hooks/usePropertyFormOperations.ts
-// Version: 7.0.0
-// Last Modified: 12-05-2025 18:00 IST
-// Purpose: Refactored to use the new Flow Service architecture
+// Version: 7.1.0
+// Last Modified: 13-05-2025 14:45 IST
+// Purpose: Refactored to use the centralized formDataFormatter utility
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -10,6 +10,7 @@ import { FormData } from '../types';
 import { propertyService } from '../../../../services/propertyService';
 import { FlowServiceFactory } from '../services/flows/FlowServiceFactory';
 import { FlowContext } from '../services/flows/FlowServiceInterface';
+import { prepareFormDataForSubmission } from '../utils/formDataFormatter';
 
 interface UsePropertyFormOperationsProps {
   form: UseFormReturn<FormData>;
@@ -46,32 +47,22 @@ export function usePropertyFormOperations({
   const [lastOperation, setLastOperation] = useState<string | null>(null);
 
   /**
-   * Prepare form data before saving
+   * Prepare form data before saving using the centralized utility
    */
   const prepareFormData = (): FormData => {
     // Get the current form data
     const rawFormData = form.getValues();
-    console.log('Raw form data:', JSON.stringify(rawFormData, null, 2));
     
-    // Create flow context from current state
-    const flowContext: FlowContext = {
+    // Create flow context params
+    const contextParams = {
       urlPath: window.location.pathname,
       isSaleMode,
       isPGHostelMode,
       adType
     };
     
-    // Get the appropriate flow service
-    const flowService = FlowServiceFactory.getFlowService(rawFormData, flowContext);
-    console.log(`Using flow service: ${flowService.getFlowType()}`);
-    
-    // Format the data using the flow service
-    const formattedData = flowService.formatData(rawFormData);
-    
-    // Log the final output structure for debugging
-    console.log('Final structured output:', JSON.stringify(formattedData, null, 2));
-    
-    return formattedData;
+    // Use the utility function to prepare the data for submission
+    return prepareFormDataForSubmission(rawFormData, contextParams);
   };
 
   /**
