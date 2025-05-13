@@ -1,107 +1,244 @@
 // src/modules/seeker/components/PropertyDetails/PropertyLocationSection.tsx
-// Version: 6.0.0
-// Last Modified: 10-05-2025 00:45 IST
-// Purpose: Explicitly extract address from property details
+// Version: 5.3.0
+// Last Modified: 15-05-2025 11:45 IST
+// Purpose: Diagnostic version to identify map loading issues
 
 import React from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { MapPin } from 'lucide-react';
-import PropertyLocationMap from './PropertyLocationMap';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { MapPinIcon, LandmarkIcon, MapIcon } from 'lucide-react';
+import PropertyLocationMapDiagnostic from './PropertyLocationMapDiagnostic';
 
 interface PropertyLocationSectionProps {
-  address?: string | null;
-  city?: string | null;
-  state?: string | null;
-  zipCode?: string | null;
-  coordinates?: { lat: number; lng: number } | null;
+  property: any;
+  isLoading?: boolean;
 }
 
-const PropertyLocationSection: React.FC<PropertyLocationSectionProps> = ({
-  address,
-  city,
-  state,
-  zipCode,
-  coordinates
+const PropertyLocationSection: React.FC<PropertyLocationSectionProps> = ({ 
+  property,
+  isLoading 
 }) => {
-  // CRITICAL: Direct access to the property's address if not provided via props
-  // This addresses when the actual address may be nested in property data but not passed as props
-  const extractAddressFromDOM = () => {
-    try {
-      // Check if address data is available in property_details data
-      const addressElement = document.querySelector('[data-property-address]');
-      if (addressElement && addressElement.textContent) {
-        return addressElement.textContent.trim();
+  // Log the full property object to console for inspection
+  console.log('PropertyLocationSection - Full property object:', property);
+
+  if (isLoading) {
+    return (
+      <Card className="overflow-hidden">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <MapPinIcon className="h-5 w-5 text-primary" />
+            <span>Location</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="w-full aspect-[16/9] bg-muted animate-pulse rounded-lg"></div>
+          <div className="mt-4 space-y-2">
+            <div className="h-5 bg-muted animate-pulse rounded w-3/4"></div>
+            <div className="h-5 bg-muted animate-pulse rounded w-1/2"></div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!property) return null;
+
+  // Extract location data from the property object with extensive logging
+  const getLocationData = () => {
+    console.log('Extracting location data from property:', property.id);
+    
+    // V2 format
+    if (property.location) {
+      console.log('V2 format detected - property.location exists:', property.location);
+      
+      // Extract coordinates with detailed logging
+      let coordinates = null;
+      if (property.location.coordinates) {
+        console.log('Location coordinates found:', property.location.coordinates);
+        coordinates = {
+          lat: property.location.coordinates.latitude || property.location.coordinates.lat,
+          lng: property.location.coordinates.longitude || property.location.coordinates.lng
+        };
+      } else {
+        console.log('No coordinates in property.location');
       }
       
-      // Check if the address can be found in root data element
-      const jsonElement = document.getElementById('property-data-json');
-      if (jsonElement && jsonElement.textContent) {
-        try {
-          const data = JSON.parse(jsonElement.textContent);
-          if (data.address) return data.address;
-          if (data.property_details && data.property_details.address) {
-            return data.property_details.address;
-          }
-        } catch (e) {
-          console.error('Failed to parse property data JSON', e);
-        }
-      }
-      
-      // If all else fails, use props
-      if (address) return address;
-      
-      // Lastly, use a placeholder address from Secunderabad
-      return "Manasarovar Heights Phase 2, Phase - 2, Manasarovar Heights Rd, above Ushodaya Super Market, Prem Sagar Enclave, RTC Officers Colony, Tirumalagiri, Secunderabad, Telangana 500009, India";
-    } catch (error) {
-      console.error('Error extracting address:', error);
-      return address || 'Address not available';
-    }
-  };
-  
-  // Get the full address
-  const fullAddress = extractAddressFromDOM();
-  
-  // Ensure we have coordinates
-  const getCoordinates = () => {
-    if (coordinates && typeof coordinates.lat === 'number' && typeof coordinates.lng === 'number') {
-      return coordinates;
+      return {
+        address: property.location.address,
+        locality: property.location.locality,
+        city: property.location.city,
+        state: property.location.state,
+        pinCode: property.location.pinCode,
+        landmark: property.location.landmark,
+        flatPlotNo: property.location.flatPlotNo,
+        coordinates
+      };
     }
     
-    // Fixed coordinates from the screenshot
-    return { lat: 17.478691, lng: 78.493462 };
+    // V1 format or nested property_details
+    console.log('V1 format or property_details format - checking property_details');
+    let details = property.property_details || {};
+    
+    // Try to parse property_details if it's a string
+    if (typeof details === 'string') {
+      console.log('property_details is a string, attempting to parse');
+      try {
+        details = JSON.parse(details);
+        console.log('Successfully parsed property_details string');
+      } catch (e) {
+        console.error('Failed to parse property_details string:', e);
+      }
+    }
+    
+    console.log('property_details object:', details);
+    
+    // Try every possible coordinate format
+    let coordinates = null;
+    
+    if (details.coordinates) {
+      console.log('Found coordinates in details.coordinates:', details.coordinates);
+      coordinates = {
+        lat: details.coordinates.lat || details.coordinates.latitude,
+        lng: details.coordinates.lng || details.coordinates.longitude
+      };
+    } else if (details.mapCoordinates) {
+      console.log('Found coordinates in details.mapCoordinates:', details.mapCoordinates);
+      coordinates = {
+        lat: details.mapCoordinates.lat || details.mapCoordinates.latitude,
+        lng: details.mapCoordinates.lng || details.mapCoordinates.longitude
+      };
+    } else if (details.lat && details.lng) {
+      console.log('Found lat/lng directly in details:', { lat: details.lat, lng: details.lng });
+      coordinates = {
+        lat: details.lat,
+        lng: details.lng
+      };
+    } else if (details.latitude && details.longitude) {
+      console.log('Found latitude/longitude directly in details:', { 
+        latitude: details.latitude, 
+        longitude: details.longitude 
+      });
+      coordinates = {
+        lat: details.latitude,
+        lng: details.longitude
+      };
+    } else if (details.location?.coordinates) {
+      console.log('Found coordinates in details.location.coordinates:', details.location.coordinates);
+      coordinates = {
+        lat: details.location.coordinates.lat || details.location.coordinates.latitude,
+        lng: details.location.coordinates.lng || details.location.coordinates.longitude
+      };
+    } else {
+      console.log('No coordinates found in any expected location');
+    }
+    
+    return {
+      address: property.address || details.address,
+      locality: details.locality,
+      city: property.city || details.city,
+      state: property.state || details.state,
+      pinCode: property.zip_code || details.pinCode || details.zipCode,
+      landmark: details.landmark,
+      flatPlotNo: details.flatPlotNo,
+      coordinates
+    };
   };
+
+  const locationData = getLocationData();
+  console.log('Final extracted locationData:', locationData);
   
+  // Prepare address for display
+  const getFormattedAddress = () => {
+    const parts = [];
+    
+    if (locationData.flatPlotNo) {
+      parts.push(locationData.flatPlotNo);
+    }
+    
+    if (locationData.address) {
+      parts.push(locationData.address);
+    }
+    
+    if (locationData.locality) {
+      parts.push(locationData.locality);
+    }
+    
+    if (locationData.city) {
+      parts.push(locationData.city);
+    }
+    
+    if (locationData.state) {
+      parts.push(locationData.state);
+    }
+    
+    if (locationData.pinCode) {
+      parts.push(locationData.pinCode);
+    }
+    
+    if (parts.length === 0) {
+      // If no specific address components, try to use full address if available
+      return property.address || "Address not available";
+    }
+    
+    return parts.join(', ');
+  };
+
   return (
     <Card className="overflow-hidden">
-      <CardContent className="p-6">
-        <h3 className="text-xl font-semibold mb-4">Property Location</h3>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <MapPinIcon className="h-5 w-5 text-primary" />
+          <span>Location</span>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Map Component - Using diagnostic version */}
+        <PropertyLocationMapDiagnostic 
+          coordinates={locationData.coordinates}
+          address={locationData.address}
+          locality={locationData.locality}
+          city={locationData.city}
+        />
         
-        {/* Top location display */}
-        <div className="flex items-start mb-4">
-          <MapPin className="h-5 w-5 text-blue-500 mt-0.5 mr-2 flex-shrink-0" />
-          <div>
-            <p className="text-gray-700">Location at {getCoordinates().lat.toFixed(6)}, {getCoordinates().lng.toFixed(6)}</p>
-            {fullAddress && <p className="text-sm text-gray-500 mt-1" data-property-address>{fullAddress}</p>}
+        {/* Address and Details */}
+        <div className="space-y-4">
+          <div className="pt-2">
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              {getFormattedAddress()}
+            </p>
+          </div>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {locationData.landmark && (
+              <div className="flex items-start gap-2">
+                <LandmarkIcon className="h-4 w-4 text-muted-foreground mt-0.5" />
+                <div>
+                  <p className="text-xs text-muted-foreground font-medium">Landmark</p>
+                  <p className="text-sm">{locationData.landmark}</p>
+                </div>
+              </div>
+            )}
+            
+            {locationData.locality && (
+              <div className="flex items-start gap-2">
+                <MapIcon className="h-4 w-4 text-muted-foreground mt-0.5" />
+                <div>
+                  <p className="text-xs text-muted-foreground font-medium">Locality</p>
+                  <p className="text-sm">{locationData.locality}</p>
+                </div>
+              </div>
+            )}
+            
+            {locationData.flatPlotNo && (
+              <div className="flex items-start gap-2">
+                <MapPinIcon className="h-4 w-4 text-muted-foreground mt-0.5" />
+                <div>
+                  <p className="text-xs text-muted-foreground font-medium">Flat Plot No</p>
+                  <p className="text-sm">{locationData.flatPlotNo}</p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
-        
-        {/* Adding hidden field to store the full address for extraction */}
-        <div className="hidden" data-property-address>{fullAddress}</div>
-        
-        {/* Hidden element to store coordinates as text for debugging */}
-        <div className="coordinates-debug hidden">
-          {getCoordinates().lat}, {getCoordinates().lng}
-        </div>
-        
-        {/* Map component with address properly passed */}
-        <PropertyLocationMap
-          address={fullAddress} 
-          city={city || ""} 
-          state={state || ""}
-          zipCode={zipCode || ""}
-          coordinates={coordinates}
-          fallbackCoordinates={getCoordinates()}
-        />
       </CardContent>
     </Card>
   );
