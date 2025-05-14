@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyItem.tsx
-// Version: 1.1.0
-// Last Modified: 10-05-2025 17:15 IST
-// Purpose: Reusable property item component with added listing type (Rent/Sale)
+// Version: 2.0.0
+// Last Modified: 14-05-2025 19:30 IST
+// Purpose: Updated to work with new JSON structure and display property details correctly
 
 import React from 'react';
 import { Link } from 'react-router-dom';
@@ -31,18 +31,27 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
   onFavoriteToggle,
   onShare
 }) => {
-  // Extract property details with fallbacks
-  const propertyType = property.property_details?.propertyType || 'Apartment';
-  const propertyName = property.bedrooms 
-    ? `${property.bedrooms} BHK Apartment`
-    : property.title || 'Apartment';
-  const locality = property.property_details?.locality || property.city || '';
+  // Get property details with better fallbacks - supports both legacy and new structure
+  const propertyType = property.property_type || 
+                      property.property_details?.propertyType || 
+                      'Apartment';
   
-  // Extract listing type (Rent/Sale)
-  const listingType = property.property_details?.listingType || 
-                      (property.property_details?.for === 'rent' ? 'Rent' : 
-                       property.property_details?.for === 'sale' ? 'Sale' : 
-                       property.price > 10000000 ? 'Sale' : 'Rent');
+  // Get appropriate property name/title
+  const propertyName = property.bedrooms 
+    ? `${property.bedrooms} BHK ${propertyType}`
+    : property.title || 'Property';
+  
+  // Get location with fallbacks
+  const locality = property.city || 
+                  property.address || 
+                  'Location unavailable';
+  
+  // Extract listing type (Rent/Sale) with better fallbacks
+  const listingType = property.listing_type || 
+                     property.property_details?.listingType || 
+                     (property.property_details?.for === 'rent' ? 'Rent' : 
+                      property.property_details?.for === 'sale' ? 'Sale' : 
+                      property.price > 10000000 ? 'Sale' : 'Rent');
 
   return (
     <div 
@@ -105,7 +114,7 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
             <div className="flex items-center text-xs text-gray-500 mb-1">
               <MapPin className="h-3 w-3 mr-1 flex-shrink-0" />
               <span className="truncate">
-                {locality || property.address || 'Location unavailable'}
+                {locality}
               </span>
             </div>
             
@@ -116,21 +125,21 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
             
             {/* Property specs */}
             <div className="flex items-center gap-2 text-xs text-gray-500">
-              {property.bedrooms && (
+              {property.bedrooms > 0 && (
                 <span className="flex items-center">
                   <Bed className="h-3 w-3 mr-1" />
                   <span>{property.bedrooms}</span>
                 </span>
               )}
               
-              {property.bathrooms && (
+              {property.bathrooms > 0 && (
                 <span className="flex items-center">
                   <Bath className="h-3 w-3 mr-1" />
                   <span>{property.bathrooms}</span>
                 </span>
               )}
               
-              {property.square_feet && (
+              {property.square_feet > 0 && (
                 <span className="flex items-center">
                   <Square className="h-3 w-3 mr-1" />
                   <span className="whitespace-nowrap">{property.square_feet} sq.ft</span>
@@ -147,7 +156,7 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
               
               {/* Listing Type Badge (Rent/Sale) */}
               <div className={`inline-block text-xs text-white px-2 py-0.5 rounded ${
-                listingType === 'Rent' ? 'bg-blue-500' : 'bg-green-500'
+                listingType.toLowerCase().includes('rent') ? 'bg-blue-500' : 'bg-green-500'
               }`}>
                 For {listingType}
               </div>

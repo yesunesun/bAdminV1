@@ -1,388 +1,172 @@
 // src/modules/seeker/components/MapPanel.tsx
-// Version: 3.2.0
-// Last Modified: 14-05-2025 19:20 IST
-// Purpose: Updated imports to fix missing DEFAULT_MAP_CENTER reference
+// Version: 2.1.0
+// Last Modified: 14-05-2025 12:50 IST
+// Purpose: Improved error handling for Google Maps API configuration issues
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Button } from '@/components/ui/button';
-import { MapIcon, ListIcon, HomeIcon, ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import React, { useCallback, useState, useEffect } from 'react';
 import { useGoogleMaps, DEFAULT_MAP_CENTER } from '../hooks/useGoogleMaps';
-import { GoogleMap, Marker, InfoWindow } from '@react-google-maps/api';
-import { PropertyData } from '@/modules/owner/components/property/types';
-import { fetchLocations } from '../services/seekerService';
+import { GoogleMap, useLoadScript, InfoWindow, Marker } from '@react-google-maps/api';
+import { Button } from '@/components/ui/button';
+import { Property } from '@/modules/owner/components/property/types';
+import { useNavigate } from 'react-router-dom';
+
+// Map container style
+const mapContainerStyle = {
+  width: '100%',
+  height: '100%',
+};
+
+// Map options
+const mapOptions = {
+  disableDefaultUI: false,
+  zoomControl: true,
+  streetViewControl: false,
+  mapTypeControl: false,
+};
 
 interface MapPanelProps {
-  properties: PropertyData[];
-  selectedProperty?: PropertyData | null;
-  onSelectProperty?: (property: PropertyData | null) => void;
-  onListViewToggle?: () => void;
-  showListToggle?: boolean;
-  mapHeight?: string;
-  standalone?: boolean;
-  zoom?: number;
-  center?: google.maps.LatLngLiteral;
+  properties: Property[];
+  isLoaded: boolean;
+  loadError: Error | null;
+  activeProperty: Property | null;
+  setActiveProperty: (property: Property | null) => void;
+  hoveredProperty: Property | null;
 }
 
 const MapPanel: React.FC<MapPanelProps> = ({
   properties,
-  selectedProperty,
-  onSelectProperty,
-  onListViewToggle,
-  showListToggle = true,
-  mapHeight = 'calc(100vh - 4rem)',
-  standalone = false,
-  zoom = 13,
-  center
+  isLoaded,
+  loadError,
+  activeProperty,
+  setActiveProperty,
+  hoveredProperty,
 }) => {
-  const { isLoaded, loadError } = useGoogleMaps();
-  const [mapRef, setMapRef] = useState<google.maps.Map | null>(null);
-  const [markers, setMarkers] = useState<any[]>([]);
-  const [infoWindowData, setInfoWindowData] = useState<{
-    position: google.maps.LatLngLiteral;
-    property: PropertyData;
-  } | null>(null);
-  const [mapBounds, setMapBounds] = useState<google.maps.LatLngBounds | null>(null);
-  const markerRefs = useRef<Map<string, google.maps.Marker>>(new Map());
   const navigate = useNavigate();
+  const [map, setMap] = useState<google.maps.Map | null>(null);
+  const [markers, setMarkers] = useState<Record<string, google.maps.Marker>>({});
   
-  // Use DEFAULT_MAP_CENTER as a fallback if center is not provided
-  const initialCenter = center || DEFAULT_MAP_CENTER;
-
-  // Extract coordinates from property data
-  const getPropertyCoordinates = useCallback((property: PropertyData): google.maps.LatLngLiteral | null => {
-    if (!property) return null;
-    
-    // Try to extract coordinates from various property formats
-    try {
-      // V2 format
-      if (property.location?.coordinates) {
-        const lat = property.location.coordinates.latitude || property.location.coordinates.lat;
-        const lng = property.location.coordinates.longitude || property.location.coordinates.lng;
-        
-        if (typeof lat === 'number' && typeof lng === 'number' && !isNaN(lat) && !isNaN(lng)) {
-          return { lat, lng };
-        }
-      }
+  // Get coordinates for a property
+  const getPropertyCoordinates = useCallback((property: Property) => {
+    // Check for coordinates in various places
+    const coordinates = 
+      property.property_details?.coordinates ||
+      property.property_details?.mapCoordinates;
       
-      // V1 format or property_details
-      const details = property.property_details || {};
-      
-      // Try different possible paths for coordinates
-      if (details.coordinates) {
-        const lat = details.coordinates.lat || details.coordinates.latitude;
-        const lng = details.coordinates.lng || details.coordinates.longitude;
-        
-        if (typeof lat === 'number' && typeof lng === 'number' && !isNaN(lat) && !isNaN(lng)) {
-          return { lat, lng };
-        }
-      }
-      
-      if (details.mapCoordinates) {
-        const lat = details.mapCoordinates.lat || details.mapCoordinates.latitude;
-        const lng = details.mapCoordinates.lng || details.mapCoordinates.longitude;
-        
-        if (typeof lat === 'number' && typeof lng === 'number' && !isNaN(lat) && !isNaN(lng)) {
-          return { lat, lng };
-        }
-      }
-      
-      // Try direct lat/lng values
-      if (details.lat && details.lng) {
-        const lat = parseFloat(details.lat);
-        const lng = parseFloat(details.lng);
-        
-        if (!isNaN(lat) && !isNaN(lng)) {
-          return { lat, lng };
-        }
-      }
-      
-      // Try latitude/longitude values
-      if (details.latitude && details.longitude) {
-        const lat = parseFloat(details.latitude);
-        const lng = parseFloat(details.longitude);
-        
-        if (!isNaN(lat) && !isNaN(lng)) {
-          return { lat, lng };
-        }
-      }
-    } catch (error) {
-      console.error("Error extracting coordinates:", error);
+    if (coordinates && typeof coordinates === 'object' && 'lat' in coordinates && 'lng' in coordinates) {
+      return {
+        lat: Number(coordinates.lat),
+        lng: Number(coordinates.lng)
+      };
     }
     
-    return null;
+    // Fallback to default center if no coordinates
+    return DEFAULT_MAP_CENTER;
   }, []);
 
-  // Process properties to get markers with valid coordinates
-  const processProperties = useCallback(() => {
-    if (!properties || properties.length === 0) return [];
-    
-    return properties
-      .map(property => {
-        const coordinates = getPropertyCoordinates(property);
-        if (!coordinates) return null;
-        
-        return {
-          position: coordinates,
-          property
-        };
-      })
-      .filter(marker => marker !== null);
-  }, [properties, getPropertyCoordinates]);
-
-  // Update markers when properties change
-  useEffect(() => {
-    const newMarkers = processProperties();
-    setMarkers(newMarkers);
-    
-    // Fit bounds if we have markers and map is available
-    if (newMarkers.length > 0 && mapRef) {
-      const bounds = new google.maps.LatLngBounds();
-      newMarkers.forEach(marker => bounds.extend(marker.position));
-      setMapBounds(bounds);
-      mapRef.fitBounds(bounds);
-      
-      // If there's only one marker, zoom in more
-      if (newMarkers.length === 1) {
-        mapRef.setZoom(15);
-      }
-    }
-  }, [properties, processProperties, mapRef]);
+  // Navigate to property detail page
+  const handlePropertyClick = useCallback((property: Property) => {
+    navigate(`/properties/${property.id}`);
+  }, [navigate]);
 
   // Handle map load
   const onMapLoad = useCallback((map: google.maps.Map) => {
-    setMapRef(map);
+    setMap(map);
   }, []);
 
-  // Handle marker load
-  const onMarkerLoad = useCallback((marker: google.maps.Marker, propertyId: string) => {
-    markerRefs.current.set(propertyId, marker);
-  }, []);
-
-  // Handle marker click to show info window
-  const handleMarkerClick = useCallback((marker: any) => {
-    setInfoWindowData(marker);
-    
-    if (onSelectProperty) {
-      onSelectProperty(marker.property);
-    }
-  }, [onSelectProperty]);
-
-  // Handle info window close
-  const handleInfoWindowClose = useCallback(() => {
-    setInfoWindowData(null);
-    
-    if (onSelectProperty) {
-      onSelectProperty(null);
-    }
-  }, [onSelectProperty]);
-
-  // Center on selected property
-  useEffect(() => {
-    if (selectedProperty && mapRef) {
-      const coords = getPropertyCoordinates(selectedProperty);
-      if (coords) {
-        mapRef.panTo(coords);
-        mapRef.setZoom(16);
-        
-        // Find the marker for the selected property
-        const marker = markerRefs.current.get(selectedProperty.id);
-        if (marker) {
-          // Show info window for the selected property
-          setInfoWindowData({
-            position: coords,
-            property: selectedProperty
-          });
-        }
-      }
-    }
-  }, [selectedProperty, mapRef, getPropertyCoordinates]);
-
-  // Apply bounds if available
-  useEffect(() => {
-    if (mapBounds && mapRef && !selectedProperty) {
-      mapRef.fitBounds(mapBounds);
-    }
-  }, [mapBounds, mapRef, selectedProperty]);
-
-  // Render a loading indicator while Google Maps is loading
-  if (!isLoaded) {
+  // If there's a configuration error, show a more helpful message
+  if (loadError) {
     return (
-      <div 
-        className="bg-muted/30 flex items-center justify-center rounded-lg"
-        style={{ height: mapHeight }}
-      >
-        <div className="flex flex-col items-center">
-          <div className="h-8 w-8 border-4 border-primary/60 border-t-transparent rounded-full animate-spin mb-4"></div>
-          <p className="text-muted-foreground text-sm">Loading map...</p>
+      <div className="w-full h-full flex flex-col items-center justify-center bg-background p-6">
+        <div className="max-w-md w-full bg-card p-6 rounded-lg shadow border border-border text-center">
+          <div className="text-destructive text-5xl mb-4">!</div>
+          <h2 className="text-xl font-semibold mb-3">Map Loading Failed</h2>
+          <p className="text-muted-foreground mb-4">
+            {loadError.message || "We couldn't load the Google Maps component."}
+          </p>
+          <div className="bg-muted p-3 rounded text-left mb-4 text-xs">
+            <strong>Possible solutions:</strong>
+            <ul className="list-disc pl-5 mt-2 space-y-1">
+              <li>Check that VITE_GOOGLE_MAPS_API_KEY is set in your .env file</li>
+              <li>Verify that your API key is valid and has Maps JavaScript API enabled</li>
+              <li>Make sure the domain restrictions for your API key include this website</li>
+            </ul>
+          </div>
+          <div className="flex gap-3 justify-center">
+            <Button variant="outline" onClick={() => window.location.reload()}>
+              Reload Page
+            </Button>
+            <Button onClick={() => navigate('/home')}>
+              Go to Home
+            </Button>
+          </div>
         </div>
       </div>
     );
   }
 
-  // Render error state if Google Maps failed to load
-  if (loadError) {
+  if (!isLoaded) {
     return (
-      <div 
-        className="bg-muted/30 flex items-center justify-center rounded-lg"
-        style={{ height: mapHeight }}
-      >
-        <div className="flex flex-col items-center p-6 max-w-md text-center">
-          <MapIcon className="h-10 w-10 text-muted-foreground mb-4" />
-          <h3 className="text-lg font-medium mb-2">Unable to load map</h3>
-          <p className="text-muted-foreground text-sm mb-4">
-            There was an issue loading the map. Please try again later.
-          </p>
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={() => window.location.reload()}
-          >
-            Retry
-          </Button>
+      <div className="w-full h-full flex items-center justify-center bg-muted">
+        <div className="text-center p-6">
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-primary border-r-transparent"></div>
+          <p className="mt-4 text-muted-foreground">Loading maps...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="relative h-full rounded-lg overflow-hidden">
+    <div className="w-full h-full">
       <GoogleMap
-        mapContainerStyle={{
-          width: '100%',
-          height: mapHeight
-        }}
-        options={{
-          disableDefaultUI: true,
-          zoomControl: true,
-          streetViewControl: false,
-          mapTypeControl: false,
-          fullscreenControl: false,
-        }}
-        center={initialCenter}
-        zoom={zoom}
+        mapContainerStyle={mapContainerStyle}
+        center={activeProperty ? getPropertyCoordinates(activeProperty) : DEFAULT_MAP_CENTER}
+        zoom={activeProperty ? 15 : 12}
+        options={mapOptions}
         onLoad={onMapLoad}
       >
-        {/* Map Controls */}
-        <div className="absolute top-4 right-4 flex flex-col space-y-2">
-          {showListToggle && (
-            <Button
-              variant="secondary"
-              size="icon"
-              className="shadow-md bg-background"
-              onClick={onListViewToggle}
-              title="Toggle list view"
-            >
-              <ListIcon className="h-4 w-4" />
-            </Button>
-          )}
-          
-          {!standalone && (
-            <Button
-              variant="secondary"
-              size="icon"
-              className="shadow-md bg-background"
-              onClick={() => navigate('/')}
-              title="Return to home"
-            >
-              <HomeIcon className="h-4 w-4" />
-            </Button>
-          )}
-        </div>
-        
-        {/* Markers for properties */}
-        {markers.map((marker, index) => (
+        {properties.map((property) => (
           <Marker
-            key={marker.property.id || index}
-            position={marker.position}
+            key={property.id}
+            position={getPropertyCoordinates(property)}
+            onClick={() => setActiveProperty(property)}
+            animation={
+              hoveredProperty?.id === property.id || activeProperty?.id === property.id
+                ? google.maps.Animation.BOUNCE
+                : undefined
+            }
             icon={{
-              url: selectedProperty && selectedProperty.id === marker.property.id
-                ? '/map-marker-active.svg'
-                : '/map-marker.svg',
-              scaledSize: new google.maps.Size(32, 40)
+              url: hoveredProperty?.id === property.id || activeProperty?.id === property.id
+                ? '/map-marker-active.png'
+                : '/map-marker.png',
+              scaledSize: new google.maps.Size(32, 32),
             }}
-            animation={google.maps.Animation.DROP}
-            onLoad={(markerInstance) => onMarkerLoad(markerInstance, marker.property.id)}
-            onClick={() => handleMarkerClick(marker)}
           />
         ))}
-        
-        {/* Info Window */}
-        {infoWindowData && (
+
+        {activeProperty && (
           <InfoWindow
-            position={infoWindowData.position}
-            onCloseClick={handleInfoWindowClose}
-            options={{ maxWidth: 300 }}
+            position={getPropertyCoordinates(activeProperty)}
+            onCloseClick={() => setActiveProperty(null)}
           >
-            <div className="p-1">
-              <h3 className="font-medium text-sm mb-1 truncate">
-                {infoWindowData.property.title || infoWindowData.property.basicDetails?.title || 'Property'}
-              </h3>
-              <p className="text-xs text-muted-foreground truncate">
-                {infoWindowData.property.address || 
-                  infoWindowData.property.location?.address || 
-                  (infoWindowData.property.location?.locality && infoWindowData.property.location?.city ? 
-                    `${infoWindowData.property.location.locality}, ${infoWindowData.property.location.city}` :
-                    'Location details not available'
-                  )
-                }
+            <div className="p-2">
+              <h3 className="font-medium text-sm mb-1">{activeProperty.title || 'Property'}</h3>
+              <p className="text-xs mb-2">
+                {activeProperty.property_details?.price && (
+                  <span className="font-semibold">₹{activeProperty.property_details.price}</span>
+                )}
+                {activeProperty.property_details?.location && (
+                  <span className="ml-1 text-gray-600">· {activeProperty.property_details.location}</span>
+                )}
               </p>
-              <div className="flex justify-between items-center mt-2">
-                <p className="text-xs font-medium">
-                  ₹{typeof infoWindowData.property.price === 'number' 
-                    ? infoWindowData.property.price.toLocaleString('en-IN') 
-                    : infoWindowData.property.price}
-                </p>
-                <Button
-                  variant="link"
-                  size="sm"
-                  className="p-0 h-auto text-xs"
-                  onClick={() => navigate(`/property/${infoWindowData.property.id}`)}
-                >
-                  View Details
-                </Button>
-              </div>
+              <Button 
+                size="sm" 
+                className="text-xs h-7 w-full"
+                onClick={() => handlePropertyClick(activeProperty)}
+              >
+                View Details
+              </Button>
             </div>
           </InfoWindow>
-        )}
-        
-        {/* Property Navigation Controls (when a property is selected) */}
-        {selectedProperty && markers.length > 1 && (
-          <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-2">
-            <Button
-              variant="secondary"
-              size="sm"
-              className="rounded-full px-3 shadow-md"
-              onClick={() => {
-                const currentIndex = markers.findIndex(m => m.property.id === selectedProperty.id);
-                const prevIndex = currentIndex <= 0 ? markers.length - 1 : currentIndex - 1;
-                
-                if (onSelectProperty) {
-                  onSelectProperty(markers[prevIndex].property);
-                }
-              }}
-            >
-              <ChevronLeftIcon className="h-4 w-4 mr-1" />
-              <span>Previous</span>
-            </Button>
-            
-            <Button
-              variant="secondary"
-              size="sm"
-              className="rounded-full px-3 shadow-md"
-              onClick={() => {
-                const currentIndex = markers.findIndex(m => m.property.id === selectedProperty.id);
-                const nextIndex = currentIndex >= markers.length - 1 ? 0 : currentIndex + 1;
-                
-                if (onSelectProperty) {
-                  onSelectProperty(markers[nextIndex].property);
-                }
-              }}
-            >
-              <span>Next</span>
-              <ChevronRightIcon className="h-4 w-4 ml-1" />
-            </Button>
-          </div>
         )}
       </GoogleMap>
     </div>

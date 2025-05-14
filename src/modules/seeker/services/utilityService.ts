@@ -1,7 +1,7 @@
 // src/modules/seeker/services/utilityService.ts
-// Version: 1.0.0
-// Last Modified: 09-05-2025 13:30 IST
-// Purpose: Common utility functions for seeker services
+// Version: 2.3.0
+// Last Modified: 14-05-2025 22:00 IST
+// Purpose: Final improvements to price extraction for all property types
 
 import { supabase } from '@/lib/supabase';
 import { markerPins } from './constants';
@@ -41,14 +41,28 @@ export const getMarkerPin = (property: PropertyType) => {
 
 // Helper to safely extract number from value
 export const safeParseNumber = (value: any, defaultValue = 0): number => {
+  if (value === null || value === undefined) return defaultValue;
   if (typeof value === 'number') return value;
   if (typeof value === 'string') {
-    const numMatch = value.match(/^(\d+)/);
-    if (numMatch && numMatch[1]) {
-      return parseInt(numMatch[1], 10) || defaultValue;
+    // Check for formats like "2.50 Cr" or "5.00 L"
+    if (value.includes('Cr')) {
+      const match = value.match(/(\d+(\.\d+)?)\s*Cr/);
+      if (match && match[1]) {
+        return parseFloat(match[1]) * 10000000;
+      }
     }
-    const parsed = parseFloat(value);
-    return isNaN(parsed) ? defaultValue : parsed;
+    if (value.includes('L')) {
+      const match = value.match(/(\d+(\.\d+)?)\s*L/);
+      if (match && match[1]) {
+        return parseFloat(match[1]) * 100000;
+      }
+    }
+    
+    // Try to extract any number
+    const numMatch = value.match(/(\d+(\.\d+)?)/);
+    if (numMatch && numMatch[1]) {
+      return parseFloat(numMatch[1]) || defaultValue;
+    }
   }
   return defaultValue;
 };
@@ -112,7 +126,102 @@ export const debugTableSchema = async (tableName: string) => {
   }
 };
 
-// Helper to process property data for consistent structure
+// Helper to find step ID by pattern in new JSON structure
+export const findStepIdByPattern = (steps: any, patterns: string[]): string | undefined => {
+  if (!steps || typeof steps !== 'object') return undefined;
+  
+  // Try each pattern in order of preference
+  for (const pattern of patterns) {
+    const matchingKey = Object.keys(steps).find(key => 
+      key.toLowerCase().includes(pattern.toLowerCase())
+    );
+    
+    if (matchingKey) return matchingKey;
+  }
+  
+  return undefined;
+};
+
+// Get all possible price fields
+export const getAllPriceFields = () => {
+  return [
+    'price',
+    'rentAmount',
+    'expectedPrice',
+    'seatPrice',
+    'amount',
+    'totalPrice',
+    'totalAmount',
+    'pricePerSqft',
+    'perSqftPrice',
+    'rent',
+    'salePrice',
+    'value',
+    'cost',
+    'fee'
+  ];
+};
+
+// Extensive recursive search for price in any part of the object
+export const findPriceInObject = (obj: any, depth = 0, maxDepth = 5): number => {
+  if (!obj || typeof obj !== 'object' || depth > maxDepth) return 0;
+  
+  // Get all possible price field names
+  const priceFields = getAllPriceFields();
+  
+  // Try direct fields at this level
+  for (const field of priceFields) {
+    const value = safeParseNumber(obj[field], 0);
+    if (value > 0) return value;
+  }
+  
+  // Try case variations (PascalCase, camelCase)
+  const capitalizedFields = priceFields.map(f => f.charAt(0).toUpperCase() + f.slice(1));
+  for (const field of capitalizedFields) {
+    const value = safeParseNumber(obj[field], 0);
+    if (value > 0) return value;
+  }
+  
+  // For objects identified as likely price containers, check all fields
+  if (Object.keys(obj).some(key => 
+    key.toLowerCase().includes('price') || 
+    key.toLowerCase().includes('rent') || 
+    key.toLowerCase().includes('sale') ||
+    key.toLowerCase().includes('amount')
+  )) {
+    for (const key in obj) {
+      const value = safeParseNumber(obj[key], 0);
+      if (value > 0) return value;
+    }
+  }
+  
+  // Look for price in nested objects
+  for (const key in obj) {
+    if (typeof obj[key] === 'object' && obj[key] !== null) {
+      const nestedValue = findPriceInObject(obj[key], depth + 1, maxDepth);
+      if (nestedValue > 0) return nestedValue;
+    }
+  }
+  
+  // If still nothing found, look for any numeric value in promising fields
+  const potentialFields = Object.keys(obj).filter(key => 
+    key.toLowerCase().includes('price') || 
+    key.toLowerCase().includes('amount') || 
+    key.toLowerCase().includes('rent') || 
+    key.toLowerCase().includes('cost') ||
+    key.toLowerCase().includes('value')
+  );
+  
+  for (const field of potentialFields) {
+    const value = safeParseNumber(obj[field], 0);
+    if (value > 0) return value;
+  }
+  
+  // If nothing found, return 0
+  return 0;
+};
+
+// Helper to process property data for consistent structure - UPDATED for new JSON structure
 export const processPropertyData = (property: any) => {
   try {
     if (!property) {
@@ -120,89 +229,412 @@ export const processPropertyData = (property: any) => {
       return null;
     }
     
+    // Make sure the property has an ID for logging purposes
+    const propertyId = property.id || 'unknown';
+    
     // Check if property_details exists
-    const details = property.property_details || {};
+    let details = property.property_details || {};
     
     if (typeof details === 'string') {
       try {
         // Try to parse if it's a JSON string
         const parsedDetails = JSON.parse(details);
-        console.log('Successfully parsed property_details from string to object');
+        console.log(`Property ${propertyId}: Successfully parsed property_details from string to object`);
+        details = parsedDetails;
         property.property_details = parsedDetails;
       } catch (e) {
-        console.error('Failed to parse property_details string:', e);
+        console.error(`Property ${propertyId}: Failed to parse property_details string:`, e);
       }
     }
     
-    // Extract data from property_details - use getNestedValue for safety
-    const basicDetails = getNestedValue(property, 'property_details.basicDetails', {});
-    const location = getNestedValue(property, 'property_details.location', {});
-    const flow = getNestedValue(property, 'property_details.flow', {});
-    const rental = getNestedValue(property, 'property_details.rental', {});
-    const sale = getNestedValue(property, 'property_details.sale', {});
+    // Check if this is the new structure with meta, flow, steps format
+    const hasMeta = !!getNestedValue(details, 'meta', null);
+    const hasFlow = !!getNestedValue(details, 'flow', null);
+    const hasSteps = !!getNestedValue(details, 'steps', null);
+    const isNewStructure = hasMeta && hasFlow && hasSteps;
     
-    // Price - try different potential locations
-    const price = getNestedValue(rental, 'rentAmount', 0) || 
-                  getNestedValue(sale, 'expectedPrice', 0) || 
-                  getNestedValue(property, 'property_details.price', 0) || 
-                  0;
+    console.log(`Property ${propertyId} structure detection: isNewStructure=${isNewStructure}`);
     
-    // Calculate bedrooms from bhkType or directly from property
+    let price = 0;
     let bedrooms = 0;
-    const bhkType = getNestedValue(basicDetails, 'bhkType', '');
-    if (bhkType) {
-      const match = bhkType.match(/^(\d+)/);
-      if (match && match[1]) {
-        bedrooms = parseInt(match[1], 10);
-      }
-    }
-    
-    // Get coordinates from various possible locations
+    let bathrooms = 0;
+    let squareFeet = 0;
+    let address = '';
+    let city = '';
+    let state = '';
+    let zipCode = '';
     let latitude = null;
     let longitude = null;
+    let propertyType = '';
+    let title = '';
+    let listingType = '';
     
-    // Try location.coordinates
-    const coordinates = getNestedValue(location, 'coordinates', null);
-    if (coordinates) {
-      latitude = getNestedValue(coordinates, 'latitude', null) || getNestedValue(coordinates, 'lat', null);
-      longitude = getNestedValue(coordinates, 'longitude', null) || getNestedValue(coordinates, 'lng', null);
+    // First, check for top-level price field
+    price = safeParseNumber(property.price, 0);
+    if (price > 0) {
+      console.log(`Property ${propertyId}: Found top-level price: ${price}`);
     }
     
-    // If not found, try direct property_details coordinates
-    if (!latitude || !longitude) {
-      const directCoords = getNestedValue(property, 'property_details.coordinates', null);
-      if (directCoords) {
-        latitude = getNestedValue(directCoords, 'latitude', null) || getNestedValue(directCoords, 'lat', null);
-        longitude = getNestedValue(directCoords, 'longitude', null) || getNestedValue(directCoords, 'lng', null);
+    // Process based on the detected structure
+    if (isNewStructure) {
+      // New structure with steps and flow
+      const flow = getNestedValue(details, 'flow', {});
+      const steps = getNestedValue(details, 'steps', {});
+      
+      // Extract category and listing type from flow
+      const category = getNestedValue(flow, 'category', 'residential');
+      listingType = getNestedValue(flow, 'listingType', 'rent');
+      
+      console.log(`Property ${propertyId} flow information: category=${category}, listingType=${listingType}`);
+      
+      // Find relevant step IDs based on the flow
+      const basicDetailsStepId = findStepIdByPattern(steps, ['basic_details', 'basicdetails']);
+      const locationStepId = findStepIdByPattern(steps, ['location']);
+      
+      // Determine step ID patterns for price based on flow
+      let priceStepPatterns: string[] = [];
+      
+      if (category === 'residential') {
+        if (listingType.includes('sale')) {
+          priceStepPatterns = ['sale', 'price', 'saledetails'];
+        } else if (listingType.includes('flatmates')) {
+          priceStepPatterns = ['flatmate', 'rental', 'rent'];
+        } else if (listingType.includes('pghostel') || listingType.includes('pg')) {
+          priceStepPatterns = ['pg', 'pgdetails', 'rental', 'rent'];
+        } else {
+          priceStepPatterns = ['rental', 'rent', 'rentaldetails', 'price'];
+        }
+      } else if (category === 'commercial') {
+        if (listingType.includes('sale')) {
+          priceStepPatterns = ['sale', 'price', 'commercialsale'];
+        } else if (listingType.includes('coworking')) {
+          priceStepPatterns = ['coworking', 'coworkingdetails', 'price'];
+        } else {
+          priceStepPatterns = ['rental', 'rent', 'commercialrent', 'price'];
+        }
+      } else if (category === 'land') {
+        priceStepPatterns = ['sale', 'landsale', 'price', 'landdetails'];
+      }
+      
+      const priceStepId = findStepIdByPattern(steps, priceStepPatterns);
+      
+      console.log(`Property ${propertyId} step IDs found - Basic: ${basicDetailsStepId}, Location: ${locationStepId}, Price: ${priceStepId}`);
+      
+      // Extract basic details
+      if (basicDetailsStepId && steps[basicDetailsStepId]) {
+        const basicDetails = steps[basicDetailsStepId];
+        title = getNestedValue(basicDetails, 'title', '');
+        propertyType = getNestedValue(basicDetails, 'propertyType', 'Apartment');
+        
+        // Extract bedrooms from bhkType
+        const bhkType = getNestedValue(basicDetails, 'bhkType', '');
+        if (bhkType) {
+          const match = bhkType.match(/^(\d+)/);
+          if (match && match[1]) {
+            bedrooms = parseInt(match[1], 10);
+          }
+        } else {
+          // Try direct bedrooms field
+          bedrooms = safeParseNumber(getNestedValue(basicDetails, 'bedrooms', 0));
+        }
+        
+        bathrooms = safeParseNumber(getNestedValue(basicDetails, 'bathrooms', 0));
+        squareFeet = safeParseNumber(getNestedValue(basicDetails, 'builtUpArea', 0));
+        
+        // If no price found yet, check for price-like field in basicDetails
+        if (price === 0) {
+          price = findPriceInObject(basicDetails);
+          if (price > 0) {
+            console.log(`Property ${propertyId}: Found price in basicDetails: ${price}`);
+          }
+        }
+      }
+      
+      // Extract location details
+      if (locationStepId && steps[locationStepId]) {
+        const location = steps[locationStepId];
+        address = getNestedValue(location, 'address', '');
+        city = getNestedValue(location, 'city', '');
+        state = getNestedValue(location, 'state', '');
+        zipCode = getNestedValue(location, 'pinCode', '');
+        
+        // Extract coordinates
+        const coordinates = getNestedValue(location, 'coordinates', null);
+        if (coordinates) {
+          latitude = getNestedValue(coordinates, 'latitude', null) || 
+                    getNestedValue(coordinates, 'lat', null);
+          longitude = getNestedValue(coordinates, 'longitude', null) || 
+                    getNestedValue(coordinates, 'lng', null);
+        }
+      }
+      
+      // Look for price in specific step if not found yet
+      if (price === 0 && priceStepId && steps[priceStepId]) {
+        const priceStep = steps[priceStepId];
+        
+        // Try all possible price fields
+        const priceFields = getAllPriceFields();
+        for (const field of priceFields) {
+          const fieldValue = safeParseNumber(getNestedValue(priceStep, field, 0));
+          if (fieldValue > 0) {
+            price = fieldValue;
+            console.log(`Property ${propertyId}: Found price in field '${field}': ${price}`);
+            break;
+          }
+        }
+        
+        // If still no price, try deep search within the step
+        if (price === 0) {
+          price = findPriceInObject(priceStep);
+          if (price > 0) {
+            console.log(`Property ${propertyId}: Found price through deep search in priceStep: ${price}`);
+          }
+        }
+      }
+      
+      // If still no price, search through all steps
+      if (price === 0) {
+        console.log(`Property ${propertyId}: No price found in primary step, searching all steps...`);
+        
+        // First check steps that are likely to contain price info
+        for (const stepId in steps) {
+          if (price > 0) break;
+          
+          if (stepId.toLowerCase().includes('price') || 
+              stepId.toLowerCase().includes('rent') || 
+              stepId.toLowerCase().includes('sale') || 
+              stepId.toLowerCase().includes('payment')) {
+                
+            const step = steps[stepId];
+            price = findPriceInObject(step);
+            if (price > 0) {
+              console.log(`Property ${propertyId}: Found price in targeted step '${stepId}': ${price}`);
+            }
+          }
+        }
+        
+        // If still not found, check all remaining steps
+        if (price === 0) {
+          for (const stepId in steps) {
+            if (price > 0) break;
+            
+            // Skip steps we already checked
+            if (stepId.toLowerCase().includes('price') || 
+                stepId.toLowerCase().includes('rent') || 
+                stepId.toLowerCase().includes('sale') || 
+                stepId.toLowerCase().includes('payment')) {
+              continue;
+            }
+            
+            const step = steps[stepId];
+            price = findPriceInObject(step);
+            if (price > 0) {
+              console.log(`Property ${propertyId}: Found price in step '${stepId}': ${price}`);
+            }
+          }
+        }
+      }
+      
+      // If still no price, check meta and flow sections
+      if (price === 0) {
+        // Check meta section
+        price = findPriceInObject(details.meta || {});
+        if (price > 0) {
+          console.log(`Property ${propertyId}: Found price in meta section: ${price}`);
+        }
+        
+        // Check flow section
+        if (price === 0) {
+          price = findPriceInObject(details.flow || {});
+          if (price > 0) {
+            console.log(`Property ${propertyId}: Found price in flow section: ${price}`);
+          }
+        }
+      }
+      
+      // If still no price, search entire property_details object
+      if (price === 0) {
+        price = findPriceInObject(details);
+        if (price > 0) {
+          console.log(`Property ${propertyId}: Found price in full property_details: ${price}`);
+        }
+      }
+      
+      // Generate title if not present
+      if (!title) {
+        title = `${bedrooms > 0 ? bedrooms + ' BHK ' : ''}${propertyType} for ${listingType} in ${city || 'your city'}`;
+      }
+    } else {
+      // Legacy structure processing
+      
+      // Check if property_details has a valid values structure
+      const basicDetails = getNestedValue(property, 'property_details.basicDetails', {});
+      const location = getNestedValue(property, 'property_details.location', {});
+      const flow = getNestedValue(property, 'property_details.flow', {});
+      const rental = getNestedValue(property, 'property_details.rental', {});
+      const sale = getNestedValue(property, 'property_details.sale', {});
+      
+      // Try to determine the flow type from legacy structure
+      const category = getNestedValue(flow, 'category', 
+        getNestedValue(property, 'property_details.category', 'residential'));
+      listingType = getNestedValue(flow, 'listingType', 
+        getNestedValue(property, 'property_details.listingType', 
+        getNestedValue(property, 'property_details.for', 'rent')));
+      
+      console.log(`Property ${propertyId} legacy flow detection: category=${category}, listingType=${listingType}`);
+      
+      // If top-level price is not found yet, try direct property_details price field
+      if (price === 0) {
+        price = safeParseNumber(getNestedValue(property, 'property_details.price', 0));
+        if (price > 0) {
+          console.log(`Property ${propertyId}: Found direct property_details.price: ${price}`);
+        }
+      }
+      
+      // If still no price, try flow-specific locations
+      if (price === 0) {
+        // First try the appropriate section
+        let priceContainer = null;
+        
+        if (listingType.includes('sale')) {
+          priceContainer = sale;
+        } else if (listingType.includes('coworking')) {
+          // Try coworking specific container
+          priceContainer = getNestedValue(property, 'property_details.coworking', {});
+        } else {
+          priceContainer = rental;
+        }
+        
+        if (priceContainer && typeof priceContainer === 'object') {
+          // Try all possible price fields in the container
+          price = findPriceInObject(priceContainer);
+          if (price > 0) {
+            console.log(`Property ${propertyId}: Found price in appropriate container: ${price}`);
+          }
+        }
+        
+        // If still no price, do a deep search through all property_details
+        if (price === 0) {
+          price = findPriceInObject(property.property_details);
+          if (price > 0) {
+            console.log(`Property ${propertyId}: Found price through deep search in property_details: ${price}`);
+          }
+        }
+      }
+      
+      // Calculate bedrooms from bhkType or directly from property
+      const bhkType = getNestedValue(basicDetails, 'bhkType', '');
+      if (bhkType) {
+        const match = bhkType.match(/^(\d+)/);
+        if (match && match[1]) {
+          bedrooms = parseInt(match[1], 10);
+        }
+      } else {
+        // Try direct bedrooms field
+        bedrooms = safeParseNumber(getNestedValue(basicDetails, 'bedrooms', 0)) ||
+                  safeParseNumber(getNestedValue(property, 'property_details.bedrooms', 0)) ||
+                  safeParseNumber(getNestedValue(property, 'bedrooms', 0));
+      }
+      
+      bathrooms = safeParseNumber(getNestedValue(basicDetails, 'bathrooms', 0)) ||
+                 safeParseNumber(getNestedValue(property, 'property_details.bathrooms', 0)) ||
+                 safeParseNumber(getNestedValue(property, 'bathrooms', 0));
+      
+      squareFeet = safeParseNumber(getNestedValue(basicDetails, 'builtUpArea', 0)) ||
+                  safeParseNumber(getNestedValue(property, 'property_details.square_feet', 0)) ||
+                  safeParseNumber(getNestedValue(property, 'square_feet', 0));
+      
+      address = getNestedValue(location, 'address', '') ||
+               getNestedValue(property, 'property_details.address', '') ||
+               getNestedValue(property, 'address', '');
+      
+      city = getNestedValue(location, 'city', '') ||
+            getNestedValue(property, 'property_details.city', '') ||
+            getNestedValue(property, 'city', '');
+      
+      state = getNestedValue(location, 'state', '') ||
+             getNestedValue(property, 'property_details.state', '') ||
+             getNestedValue(property, 'state', '');
+      
+      zipCode = getNestedValue(location, 'pinCode', '') ||
+               getNestedValue(property, 'property_details.zip_code', '') ||
+               getNestedValue(property, 'zip_code', '');
+      
+      // Get coordinates from various possible locations
+      const coordinates = getNestedValue(location, 'coordinates', null);
+      if (coordinates) {
+        latitude = getNestedValue(coordinates, 'latitude', null) || getNestedValue(coordinates, 'lat', null);
+        longitude = getNestedValue(coordinates, 'longitude', null) || getNestedValue(coordinates, 'lng', null);
+      }
+      
+      // If not found, try direct property_details coordinates
+      if (!latitude || !longitude) {
+        const directCoords = getNestedValue(property, 'property_details.coordinates', null);
+        if (directCoords) {
+          latitude = getNestedValue(directCoords, 'latitude', null) || getNestedValue(directCoords, 'lat', null);
+          longitude = getNestedValue(directCoords, 'longitude', null) || getNestedValue(directCoords, 'lng', null);
+        }
+      }
+      
+      title = getNestedValue(basicDetails, 'title', '') || 
+             getNestedValue(property, 'property_details.title', '') || 
+             getNestedValue(property, 'title', '');
+      
+      propertyType = getNestedValue(basicDetails, 'propertyType', 'Apartment') ||
+                    getNestedValue(property, 'property_details.propertyType', 'Apartment');
+    }
+    
+    // FINAL FALLBACK: Try to extract price from title if it contains price information
+    if (price === 0 && property.title) {
+      if (property.title.includes('Cr') || property.title.includes('L')) {
+        price = safeParseNumber(property.title, 0);
+        if (price > 0) {
+          console.log(`Property ${propertyId}: Extracted price from title: ${price}`);
+        }
+      }
+    }
+    
+    // As an extreme fallback, try to extract from all fields in the property
+    if (price === 0) {
+      price = findPriceInObject(property);
+      if (price > 0) {
+        console.log(`Property ${propertyId}: Found price in root property object: ${price}`);
       }
     }
     
     // Create a standardized property object with normalized data
-    return {
+    const normalizedProperty = {
       ...property,
       // Extract fields from property_details for compatibility with UI components
-      title: getNestedValue(basicDetails, 'title', 'Property Listing'),
+      title: title || 'Property Listing',
       price: safeParseNumber(price),
-      bedrooms: bedrooms || safeParseNumber(getNestedValue(property, 'property_details.bedrooms', 0)),
-      bathrooms: safeParseNumber(getNestedValue(basicDetails, 'bathrooms', 0)),
-      square_feet: safeParseNumber(getNestedValue(basicDetails, 'builtUpArea', 0)),
-      address: getNestedValue(location, 'address', ''),
-      city: getNestedValue(location, 'city', ''),
-      state: getNestedValue(location, 'state', ''),
-      zip_code: getNestedValue(location, 'pinCode', ''),
+      bedrooms: bedrooms || safeParseNumber(getNestedValue(property, 'property_details.bedrooms', 0)) || safeParseNumber(getNestedValue(property, 'bedrooms', 0)),
+      bathrooms: bathrooms || safeParseNumber(getNestedValue(property, 'property_details.bathrooms', 0)) || safeParseNumber(getNestedValue(property, 'bathrooms', 0)),
+      square_feet: squareFeet || safeParseNumber(getNestedValue(property, 'property_details.square_feet', 0)) || safeParseNumber(getNestedValue(property, 'square_feet', 0)),
+      address: address || getNestedValue(property, 'address', ''),
+      city: city || getNestedValue(property, 'city', ''),
+      state: state || getNestedValue(property, 'state', ''),
+      zip_code: zipCode || getNestedValue(property, 'zip_code', ''),
+      // Add extra properties derived from the JSON
+      property_type: propertyType,
+      listing_type: listingType,
       // Add coordinates to top level for map usage
       latitude: latitude !== null ? safeParseNumber(latitude) : null,
       longitude: longitude !== null ? safeParseNumber(longitude) : null,
       // Keep property_details as is
       property_details: property.property_details
     };
+    
+    console.log(`Property ${propertyId} processing complete: Price=${normalizedProperty.price}, Bedrooms=${normalizedProperty.bedrooms}, Type=${normalizedProperty.property_type}, Listing=${normalizedProperty.listing_type}`);
+    
+    return normalizedProperty;
   } catch (error) {
-    console.error('Error in processPropertyData:', error);
+    console.error(`Error in processPropertyData for property ${property?.id || 'unknown'}:`, error);
     return property; // Return original property on error
   }
 };
 
-// Helper to extract images from property_details
+// Helper to extract images from property_details - UPDATED for new JSON structure
 export const extractImagesFromProperty = (property: any) => {
   try {
     // Initialize images array
@@ -214,13 +646,29 @@ export const extractImagesFromProperty = (property: any) => {
     
     const details = property.property_details;
     
-    // Try various paths where images might be stored in property_details
-    if (details.images && Array.isArray(details.images)) {
-      images = details.images;
-    } else if (details.photos?.images && Array.isArray(details.photos.images)) {
-      images = details.photos.images;
-    } else if (details.media?.images && Array.isArray(details.media.images)) {
-      images = details.media.images;
+    // Check if this is the new structure with meta, flow, steps format
+    const hasMeta = !!getNestedValue(details, 'meta', null);
+    const hasFlow = !!getNestedValue(details, 'flow', null);
+    const hasSteps = !!getNestedValue(details, 'steps', null);
+    const isNewStructure = hasMeta && hasFlow && hasSteps;
+    
+    if (isNewStructure) {
+      // First try to get images from the media section (new structure)
+      const mediaImages = getNestedValue(details, 'media.photos.images', []);
+      if (mediaImages && Array.isArray(mediaImages) && mediaImages.length > 0) {
+        images = mediaImages;
+      }
+    } else {
+      // Try various paths where images might be stored in property_details (legacy structure)
+      if (details.images && Array.isArray(details.images)) {
+        images = details.images;
+      } else if (details.photos?.images && Array.isArray(details.photos.images)) {
+        images = details.photos.images;
+      } else if (details.media?.images && Array.isArray(details.media.images)) {
+        images = details.media.images;
+      } else if (details.imageFiles && Array.isArray(details.imageFiles)) {
+        images = details.imageFiles;
+      }
     }
     
     // If images were found, process them to have consistent properties

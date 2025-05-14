@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/LocationDetails/index.tsx
-// Version: 5.4.0
-// Last Modified: 14-05-2025 17:00 IST
-// Purpose: Fixed map display while maintaining resequenced fields
+// Version: 5.9.0
+// Last Modified: 14-05-2025 21:30 IST
+// Purpose: Fixed import errors and simplified coordinate capture
 
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { FormSection } from '@/components/FormSection';
@@ -37,6 +37,15 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
     return value ?? defaultValue;
   }, [form, stepId]);
 
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const [isGeolocating, setIsGeolocating] = useState(false);
+  const [isGeocoding, setIsGeocoding] = useState(false);
+  const [mapInstance, setMapInstance] = useState<any>(null);
+  const [markerInstance, setMarkerInstance] = useState<any>(null);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [coordinatesVerified, setCoordinatesVerified] = useState(false);
+  const [showCoordinateSuccess, setShowCoordinateSuccess] = useState(false);
+
   // Ensure step structure exists
   useEffect(() => {
     if (!stepId) return;
@@ -50,16 +59,11 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
       });
     }
   }, [stepId, form]);
-
-  const mapContainerRef = useRef<HTMLDivElement>(null);
-  const [isGeolocating, setIsGeolocating] = useState(false);
-  const [isGeocoding, setIsGeocoding] = useState(false);
-  const [mapInstance, setMapInstance] = useState<any>(null);
-  const [markerInstance, setMarkerInstance] = useState<any>(null);
-  const [locationError, setLocationError] = useState<string | null>(null);
   
   // Get form values
   const address = getField('address', '');
+  const locality = getField('locality', '');
+  const city = getField('city', '');
   const latitude = getField('latitude', '');
   const longitude = getField('longitude', '');
   
@@ -119,6 +123,11 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
         // Update form coordinates
         saveField('latitude', event.latLng.lat());
         saveField('longitude', event.latLng.lng());
+        setCoordinatesVerified(true);
+        
+        // Show success message
+        setShowCoordinateSuccess(true);
+        setTimeout(() => setShowCoordinateSuccess(false), 3000);
         
         // Update marker
         updateMarkerPosition(event.latLng);
@@ -138,6 +147,7 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
         
         map.setCenter(position);
         updateMarkerPosition(position);
+        setCoordinatesVerified(true);
       }
     } catch (error) {
       console.error('Error initializing map:', error);
@@ -170,6 +180,11 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
         // Update form coordinates
         saveField('latitude', newPosition.lat());
         saveField('longitude', newPosition.lng());
+        setCoordinatesVerified(true);
+        
+        // Show success message
+        setShowCoordinateSuccess(true);
+        setTimeout(() => setShowCoordinateSuccess(false), 3000);
         
         // Optionally reverse geocode
         reverseGeocode(newPosition);
@@ -190,13 +205,18 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
     setIsGeocoding(true);
     setLocationError(null);
     
+    let fullAddress = addressText;
+    if (locality) fullAddress += `, ${locality}`;
+    if (city) fullAddress += `, ${city}`;
+    fullAddress += ', Telangana, India';
+    
     try {
       if (process.env.NODE_ENV === 'development') {
-        console.log('Geocoding address:', addressText);
+        console.log('Geocoding address:', fullAddress);
       }
       
       const geocoder = new window.google.maps.Geocoder();
-      geocoder.geocode({ address: addressText }, (results: any, status: string) => {
+      geocoder.geocode({ address: fullAddress }, (results: any, status: string) => {
         setIsGeocoding(false);
         
         if (status === 'OK' && results && results.length > 0) {
@@ -205,6 +225,11 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
           // Update form
           saveField('latitude', location.lat());
           saveField('longitude', location.lng());
+          setCoordinatesVerified(true);
+          
+          // Show success message
+          setShowCoordinateSuccess(true);
+          setTimeout(() => setShowCoordinateSuccess(false), 3000);
           
           // Update map and marker
           if (mapInstance) {
@@ -372,6 +397,11 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
         // Update form
         saveField('latitude', latitude);
         saveField('longitude', longitude);
+        setCoordinatesVerified(true);
+        
+        // Show success message
+        setShowCoordinateSuccess(true);
+        setTimeout(() => setShowCoordinateSuccess(false), 3000);
         
         // Update map
         const latlng = { lat: latitude, lng: longitude };
@@ -454,6 +484,67 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
     const value = e.target.value.replace(/\D/g, '').slice(0, 6);
     saveField('pinCode', value);
   };
+  
+  // Intercept Next button click
+  useEffect(() => {
+    // Find the Next button by its role in the form
+    const nextButton = Array.from(document.querySelectorAll('button')).find(
+      btn => btn.textContent?.trim() === 'Next' || 
+             btn.getAttribute('aria-label') === 'Next' ||
+             btn.getAttribute('type') === 'submit'
+    );
+    
+    if (!nextButton) return;
+    
+    // Save the original click handler
+    const originalClickHandler = nextButton.onclick;
+    
+    // Replace with our handler
+    const clickHandler = (e: MouseEvent) => {
+      // If we don't have coordinates, try to get them from the address
+      if (!coordinatesVerified && address) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        // If the "Find on Map" functionality is available, use it
+        findAddressOnMap();
+        
+        // Check if coordinates were captured
+        if (!coordinatesVerified) {
+          // Show error
+          setLocationError('Please mark your property location on the map before continuing');
+          // Scroll to map
+          mapContainerRef.current?.scrollIntoView({ behavior: 'smooth' });
+          return false;
+        }
+      }
+      
+      // If we don't have coordinates at all, prevent moving forward
+      if (!latitude || !longitude) {
+        e.preventDefault();
+        e.stopPropagation();
+        setLocationError('Please mark your property location on the map before continuing');
+        mapContainerRef.current?.scrollIntoView({ behavior: 'smooth' });
+        return false;
+      }
+      
+      // Allow the original handler to run if we have coordinates
+      if (originalClickHandler) {
+        return originalClickHandler.call(nextButton, e);
+      }
+      
+      return true;
+    };
+    
+    nextButton.onclick = clickHandler;
+    
+    // Cleanup
+    return () => {
+      if (nextButton) {
+        nextButton.onclick = originalClickHandler;
+      }
+    };
+  }, [address, latitude, longitude, coordinatesVerified]);
 
   // Create a modified form object to pass to child components
   // This ensures child components use the flow-based architecture
@@ -487,6 +578,16 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
       description="Where is your property located?"
     >
       <div className="space-y-4">
+        {/* Success notification when coordinates are captured */}
+        {showCoordinateSuccess && (
+          <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded relative">
+            <strong className="font-medium">Coordinates captured!</strong>
+            <p className="text-sm">
+              Location coordinates have been captured: {latitude ? parseFloat(String(latitude)).toFixed(6) : ''}, {longitude ? parseFloat(String(longitude)).toFixed(6) : ''}
+            </p>
+          </div>
+        )}
+        
         {/* Flat No/Plot No Field - Placed first as requested */}
         <FlatPlotInput form={modifiedForm} />
         
@@ -686,6 +787,13 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
             </p>
           </ErrorBoundary>
         </div>
+        
+        {/* Hidden field to track if coordinates are verified */}
+        <input 
+          type="hidden" 
+          {...modifiedForm.register('coordinates_verified')} 
+          value={coordinatesVerified ? 'true' : 'false'}
+        />
       </div>
     </FormSection>
   );
