@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/LocationDetails/index.tsx
-// Version: 5.1.0
-// Last Modified: 11-05-2025 19:30 IST
-// Purpose: Removed inline debug information while maintaining all functionality
+// Version: 5.4.0
+// Last Modified: 14-05-2025 17:00 IST
+// Purpose: Fixed map display while maintaining resequenced fields
 
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { FormSection } from '@/components/FormSection';
@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { MapPin, Navigation } from 'lucide-react';
 import { RequiredLabel } from '@/components/ui/RequiredLabel';
 import ErrorBoundary from '@/components/ui/ErrorBoundary';
+import { Input } from '@/components/ui/input';
 
 export function LocationDetails({ form, stepId }: FormSectionProps) {
   // Custom hooks for step data handling
@@ -266,27 +267,25 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
             saveField('city', cityComponent.long_name);
           }
           
-          // Extract area/neighborhood
-          const areaComponent = addressComponents.find(
+          // Extract locality
+          const localityComponent = addressComponents.find(
             (component: any) => 
               component.types.includes('sublocality_level_1') || 
               component.types.includes('sublocality') ||
               component.types.includes('neighborhood')
           );
           
-          if (areaComponent && areaComponent.long_name) {
-            saveField('area', areaComponent.long_name);
-          }
-          
-          // Extract locality
-          const localityComponent = addressComponents.find(
-            (component: any) => 
-              component.types.includes('sublocality_level_2') || 
-              component.types.includes('political')
-          );
-          
           if (localityComponent && localityComponent.long_name) {
             saveField('locality', localityComponent.long_name);
+          }
+          
+          // Extract state
+          const stateComponent = addressComponents.find(
+            (component: any) => component.types.includes('administrative_area_level_1')
+          );
+          
+          if (stateComponent && stateComponent.long_name) {
+            saveField('state', stateComponent.long_name);
           }
         }
       });
@@ -488,7 +487,7 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
       description="Where is your property located?"
     >
       <div className="space-y-4">
-        {/* Flat No/Plot No Field */}
+        {/* Flat No/Plot No Field - Placed first as requested */}
         <FlatPlotInput form={modifiedForm} />
         
         {/* Address with Map Controls */}
@@ -522,22 +521,71 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
           </div>
         </div>
 
-        {/* Landmark and PIN Code */}
-        <LandmarkPincodeInputs 
-          form={modifiedForm} 
-          handlePinCodeChange={handlePinCodeChange} 
-        />
+        {/* Locality Field */}
+        <div>
+          <RequiredLabel required>Locality</RequiredLabel>
+          <Input
+            {...modifiedForm.register('locality')}
+            placeholder="Enter locality"
+            className="h-11 text-base"
+          />
+        </div>
+
+        {/* City Field */}
+        <div>
+          <RequiredLabel required>City</RequiredLabel>
+          <Input
+            {...modifiedForm.register('city')}
+            placeholder="Enter city"
+            className="h-11 text-base"
+            defaultValue="Hyderabad"
+          />
+        </div>
+
+        {/* State Field */}
+        <div>
+          <RequiredLabel required>State</RequiredLabel>
+          <Input
+            value="Telangana"
+            readOnly
+            className="h-11 text-base bg-slate-50"
+          />
+          <input type="hidden" {...modifiedForm.register('state')} value="Telangana" />
+        </div>
+
+        {/* PIN Code and Landmark */}
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <RequiredLabel required>PIN Code</RequiredLabel>
+            <Input
+              {...modifiedForm.register('pinCode')}
+              placeholder="Enter 6-digit PIN code"
+              className="h-11 text-base"
+              maxLength={6}
+              onChange={handlePinCodeChange}
+            />
+          </div>
+          
+          <div>
+            <RequiredLabel>Landmark</RequiredLabel>
+            <Input
+              {...modifiedForm.register('landmark')}
+              placeholder="Enter a nearby landmark"
+              className="h-11 text-base"
+            />
+          </div>
+        </div>
 
         {/* Map Container - Wrapped in ErrorBoundary */}
-        <ErrorBoundary
-          fallback={
-            <div className="h-64 w-full bg-slate-100 flex items-center justify-center text-red-500 p-4 text-center rounded-xl border border-slate-200">
-              <p>There was an error loading the map. Please refresh the page and try again.</p>
-            </div>
-          }
-        >
-          <div className="space-y-2">
-            <RequiredLabel>Location on Map</RequiredLabel>
+        <div className="space-y-2">
+          <RequiredLabel>Location on Map</RequiredLabel>
+          <ErrorBoundary
+            fallback={
+              <div className="h-64 w-full bg-slate-100 flex items-center justify-center text-red-500 p-4 text-center rounded-xl border border-slate-200">
+                <p>There was an error loading the map. Please refresh the page and try again.</p>
+              </div>
+            }
+          >
             <div className="relative rounded-xl border border-slate-200 overflow-hidden">
               {/* Map Container */}
               <div className="h-64 w-full">
@@ -633,11 +681,11 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
               </div>
             )}
             
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-500 mt-1">
               * Click on the map to mark your property location or use the "Find on Map" button
             </p>
-          </div>
-        </ErrorBoundary>
+          </ErrorBoundary>
+        </div>
       </div>
     </FormSection>
   );
