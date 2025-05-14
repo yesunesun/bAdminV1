@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/SaleDetails.tsx
-// Version: 4.0.0
-// Last Modified: 07-03-2025 21:00 IST
-// Purpose: Fixed pricing data loading with direct database access
+// Version: 4.1.0
+// Last Modified: 14-05-2025 10:30 IST
+// Purpose: Removed debug panel from UI while maintaining core functionality
 
 import React, { useEffect, useState } from 'react';
 import { FormSection } from '@/components/FormSection';
@@ -29,13 +29,6 @@ export function SaleDetails({ form, adType }: FormSectionProps) {
   // Initialize local state from form values
   useEffect(() => {
     const formValues = form.getValues();
-    console.log('Initial form values in SaleDetails:', {
-      expectedPrice: formValues.expectedPrice,
-      maintenanceCost: formValues.maintenanceCost,
-      kitchenType: formValues.kitchenType,
-      priceNegotiable: formValues.priceNegotiable,
-      id: formValues.id
-    });
     
     // Set local state from form
     setExpectedPriceValue(formValues.expectedPrice || '');
@@ -186,31 +179,6 @@ export function SaleDetails({ form, adType }: FormSectionProps) {
       description="Specify your property sale details"
     >
       <div className="space-y-4">
-        {/* Debug panel */}
-        <div className="bg-gray-100 p-3 rounded-lg mb-3">
-          <div className="flex space-x-2 mb-2">
-            <button
-              type="button"
-              onClick={debugFields}
-              className="px-3 py-1 bg-blue-500 text-white rounded text-sm"
-            >
-              Debug Fields
-            </button>
-            <button
-              type="button"
-              onClick={loadPriceData}
-              disabled={isLoading}
-              className={`px-3 py-1 ${isLoading ? 'bg-gray-400' : 'bg-green-500 text-white'} rounded text-sm`}
-            >
-              {isLoading ? 'Loading...' : 'Load Price Data'}
-            </button>
-          </div>
-          <div className="mt-2 text-xs">
-            <p>Expected Price: {expectedPriceValue || 'empty'}</p>
-            <p>Maintenance Cost: {maintenanceCostValue || 'empty'}</p>
-          </div>
-        </div>
-
         {/* Expected Price and Maintenance Cost - Two Column */}
         <div className="grid grid-cols-2 gap-4">
           <div>
