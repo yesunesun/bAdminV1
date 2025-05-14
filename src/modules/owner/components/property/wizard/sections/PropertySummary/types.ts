@@ -1,9 +1,10 @@
 // src/modules/owner/components/property/wizard/sections/PropertySummary/types.ts
-// Version: 1.0.0
-// Last Modified: 19-02-2025 10:30 IST
-// Purpose: Type definitions for PropertySummary module
+// Version: 2.0.0
+// Last Modified: 14-05-2025 17:10 IST
+// Purpose: Extended type definitions for PropertySummary module
 
 import { FormData } from '../types';
+import { ReactNode } from 'react';
 
 export interface PropertySummaryProps {
   formData: FormData;
@@ -19,7 +20,8 @@ export interface PropertySummaryProps {
 export interface SummarySectionProps {
   title: string;
   icon: React.ReactNode;
-  items: SummaryItem[];
+  items?: SummaryItem[];
+  children?: ReactNode;
 }
 
 export interface SummaryItem {
@@ -43,4 +45,10 @@ export interface PropertyDerivedValues {
   flowInfo: string;
   coordinates: string;
   fullAddress: string;
+}
+
+export interface SectionComponentProps {
+  data: any;
+  flowType?: string;
+  listingType?: string;
 }
