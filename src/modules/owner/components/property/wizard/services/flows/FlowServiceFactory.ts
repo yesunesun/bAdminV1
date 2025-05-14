@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/services/flows/FlowServiceFactory.ts
-// Version: 1.1.0
-// Last Modified: 18-05-2025 17:40 IST
-// Purpose: Fixed flow service detection order to prioritize commercial and specific flows
+// Version: 1.2.0
+// Last Modified: 14-05-2025 17:40 IST
+// Purpose: Fixed flow service detection priority to ensure specialized flows are checked before general ones
 
 import { FlowServiceInterface, FlowContext } from './FlowServiceInterface';
 import { ResidentialRentFlowService } from './ResidentialRentFlowService';
@@ -16,17 +16,19 @@ import { ResidentialFlatmatesFlowService } from './ResidentialFlatmatesFlowServi
 export class FlowServiceFactory {
   // Order matters - more specific flows should be checked first
   private static flowServices: FlowServiceInterface[] = [
-    // Check commercial flows first before residential
-    new CommercialSaleFlowService(),
-    new CommercialRentFlowService(),
-    new CoworkingFlowService(),
-    
-    // Then check specific residential flows
-    new ResidentialFlatmatesFlowService(),
+    // Check specialized flows first (most specific)
     new PGHostelFlowService(),
+    new CoworkingFlowService(),
     new LandSaleFlowService(),
     
-    // Finally check generic residential flows
+    // Then check other specific flows
+    new ResidentialFlatmatesFlowService(),
+    
+    // Then check commercial flows
+    new CommercialSaleFlowService(),
+    new CommercialRentFlowService(),
+    
+    // Finally check generic residential flows (most general)
     new ResidentialSaleFlowService(),
     new ResidentialRentFlowService()
   ];
@@ -41,9 +43,36 @@ export class FlowServiceFactory {
     console.log('Detecting flow service for:', {
       urlPath: flowContext.urlPath,
       adType: flowContext.adType,
-      formFlow: formData.flow
+      formFlow: formData.flow,
+      isPGHostelMode: flowContext.isPGHostelMode
     });
     
+    // If we have direct information that this is a PG/Hostel, use that flow
+    if (flowContext.isPGHostelMode) {
+      const pgHostelService = this.flowServices.find(s => s instanceof PGHostelFlowService);
+      if (pgHostelService) {
+        console.log(`Detected PG/Hostel flow from context flag`);
+        return pgHostelService;
+      }
+    }
+    
+    // Check data structure for more direct flow indicators
+    if (formData.flow?.category && formData.flow?.listingType) {
+      const explicitFlowType = `${formData.flow.category}_${formData.flow.listingType}`.toLowerCase();
+      
+      // Special handling for PG/Hostel
+      if (explicitFlowType.includes('pghostel') || 
+          formData.flow.listingType.toLowerCase().includes('pg') || 
+          formData.flow.listingType.toLowerCase().includes('hostel')) {
+        const pgHostelService = this.flowServices.find(s => s instanceof PGHostelFlowService);
+        if (pgHostelService) {
+          console.log(`Detected PG/Hostel flow from explicit flow type: ${explicitFlowType}`);
+          return pgHostelService;
+        }
+      }
+    }
+    
+    // Standard detection loop through all services
     for (const service of this.flowServices) {
       if (service.detectFlow(formData, flowContext)) {
         console.log(`Detected flow type: ${service.getFlowType()}`);
@@ -75,6 +104,17 @@ export class FlowServiceFactory {
    * Used when we have these details directly
    */
   public static getService(category: string, listingType: string): FlowServiceInterface {
+    // Handle PG/Hostel special case
+    if (listingType.toLowerCase().includes('pg') || 
+        listingType.toLowerCase().includes('hostel') || 
+        listingType.toLowerCase() === 'pghostel') {
+      const pgHostelService = this.flowServices.find(s => s instanceof PGHostelFlowService);
+      if (pgHostelService) {
+        console.log(`Using PG/Hostel flow service for category: ${category}, listingType: ${listingType}`);
+        return pgHostelService;
+      }
+    }
+    
     const flowType = `${category}_${listingType}`;
     
     // Map common variations
@@ -105,6 +145,8 @@ export class FlowServiceFactory {
       'residential_sell': 'residential_sale',
       'residential_flatmates': 'residential_flatmates',
       'residential_pghostel': 'residential_pghostel',
+      'residential_pg': 'residential_pghostel',
+      'residential_hostel': 'residential_pghostel',
       'land_sale': 'land_sale',
       'land_sell': 'land_sale'
     };

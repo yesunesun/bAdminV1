@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/utils/propertyDataAdapter.ts
-// Version: 3.3.0
-// Last Modified: 04-05-2025 21:15 IST
-// Purpose: Refactored to support only v3 data structure and export all necessary constants
+// Version: 3.4.0
+// Last Modified: 14-05-2025 11:30 IST
+// Purpose: Modified initial property data structure to start with blank values instead of hardcoded examples
 
 /**
  * Data structure version constants
@@ -69,11 +69,11 @@ export const detectSpecializedPropertyType = (data: any): {
 };
 
 /**
- * Creates a new clean property data structure in v3 format
+ * Creates a new clean property data structure in v3 format with blank values
  */
 export const createNewPropertyData = (
-  category: string = 'residential',
-  listingType: string = 'rent'
+  category: string = '',
+  listingType: string = ''
 ): any => {
   const now = new Date().toISOString();
   
@@ -90,40 +90,40 @@ export const createNewPropertyData = (
     },
     details: {
       basicDetails: {
-        title: 'Spacious Apartment in Prime Location',
-        propertyType: 'Apartment',
-        bhkType: '2BHK',
-        floor: 3,
-        totalFloors: 5,
-        builtUpArea: 1200,
+        title: '',
+        propertyType: '',
+        bhkType: '',
+        floor: null,
+        totalFloors: null,
+        builtUpArea: null,
         builtUpAreaUnit: 'sqft',
-        bathrooms: 2,
-        balconies: 1,
-        facing: 'East',
-        propertyAge: '5-10 years'
+        bathrooms: null,
+        balconies: null,
+        facing: '',
+        propertyAge: ''
       },
       location: {
-        address: '123 Main Street',
-        flatPlotNo: 'A-101',
-        landmark: 'Near Central Park',
-        locality: 'Indiranagar',
-        city: 'Bengaluru',
-        state: 'Karnataka',
-        pinCode: '560038',
+        address: '',
+        flatPlotNo: '',
+        landmark: '',
+        locality: '',
+        city: '',
+        state: '',
+        pinCode: '',
         coordinates: {
-          latitude: 12.9716,
-          longitude: 77.5946
+          latitude: null,
+          longitude: null
         }
       },
       features: {
-        amenities: ['Lift', 'Gym', 'Swimming Pool', '24x7 Security'],
-        parking: 'Covered',
-        petFriendly: true,
-        nonVegAllowed: true,
-        waterSupply: '24x7',
-        powerBackup: 'Full',
-        gatedSecurity: true,
-        description: 'Well-maintained apartment with modern amenities and great location.'
+        amenities: [],
+        parking: '',
+        petFriendly: false,
+        nonVegAllowed: false,
+        waterSupply: '',
+        powerBackup: '',
+        gatedSecurity: false,
+        description: ''
       },
       media: {
         photos: {
@@ -296,8 +296,8 @@ export const ensureV3Structure = (data: any): any => {
   // Ensure flow section exists
   if (!cleanData.flow) {
     cleanData.flow = {
-      category: 'residential',
-      listingType: 'rent'
+      category: '',
+      listingType: ''
     };
   }
   
