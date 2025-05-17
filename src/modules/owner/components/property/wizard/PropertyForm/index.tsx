@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/PropertyForm/index.tsx
-// Version: 7.1.0
-// Last Modified: 17-05-2025 12:15 IST
-// Purpose: Using separate DebugPanel component for better code organization
+// Version: 9.0.0
+// Last Modified: 19-05-2025 14:30 IST
+// Purpose: Removed all debugging components and related code
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -20,11 +20,13 @@ import StatusIndicator from './components/StatusIndicator';
 import LoginPrompt from './components/LoginPrompt';
 import PropertyTypeSelection from '../components/PropertyTypeSelection';
 import WizardBreadcrumbs from '../components/WizardBreadcrumbs';
-import { FormNavigation } from '../components/FormNavigation'; // Changed to named import
-import DebugPanel from '../components/DebugPanel'; // Import the new DebugPanel component
+import { FormNavigation } from '../components/FormNavigation';
 
 // Hooks
 import { useStepNavigation } from './hooks/useStepNavigation';
+
+// Utils
+import { cleanFormData } from '../utils/formCleaningUtils';
 
 interface PropertyFormProps {
  initialData?: FormData;
@@ -38,7 +40,8 @@ interface PropertyFormProps {
  currentStep?: string;
 }
 
-export function PropertyForm({ 
+// Export as both named export and default export for backward compatibility
+export function PropertyForm({
  initialData, 
  propertyId, 
  mode = 'create',
@@ -49,28 +52,51 @@ export function PropertyForm({
  selectedAdType: passedAdType,
  currentStep: urlStep
 }: PropertyFormProps) {
+ console.log('[PropertyForm] Initializing with props:', {
+   initialData: initialData ? { ...initialData, steps: Object.keys(initialData.steps || {}) } : undefined,
+   propertyId,
+   mode,
+   initialStatus,
+   showTypeSelection,
+   passedCategory,
+   passedAdType,
+   urlStep,
+   path: window.location.pathname
+ });
+ 
  const navigate = useNavigate();
  
  // State for tracking custom save operation results
  const [saveInProgress, setSaveInProgress] = useState(false);
  const [propertyIdAfterSave, setPropertyIdAfterSave] = useState<string | null>(null);
  
- // State for debug panel (moved from FormContent)
- const [showDebugInfo, setShowDebugInfo] = useState(false);
- 
  // Extract property type and listing type from initialData if in edit mode
  const derivedCategory = useMemo(() => {
-   if (mode === 'edit' && initialData?.propertyType) {
-     return initialData.propertyType;
-   }
-   return passedCategory;
+   const result = mode === 'edit' && initialData?.propertyType 
+     ? initialData.propertyType 
+     : passedCategory;
+   
+   console.log('[PropertyForm] Derived category:', result, {
+     mode,
+     'initialData?.propertyType': initialData?.propertyType,
+     passedCategory
+   });
+   
+   return result;
  }, [mode, initialData, passedCategory]);
  
  const derivedAdType = useMemo(() => {
-   if (mode === 'edit' && initialData?.listingType) {
-     return initialData.listingType;
-   }
-   return passedAdType;
+   const result = mode === 'edit' && initialData?.listingType 
+     ? initialData.listingType 
+     : passedAdType;
+   
+   console.log('[PropertyForm] Derived ad type:', result, {
+     mode,
+     'initialData?.listingType': initialData?.listingType,
+     passedAdType
+   });
+   
+   return result;
  }, [mode, initialData, passedAdType]);
  
  // Determine whether to show type selection
@@ -84,6 +110,7 @@ export function PropertyForm({
 
  // Determine if we're in PG/Hostel mode
  const isPGHostelMode = useMemo(() => {
+   // Check if the ad type specifically indicates PG/Hostel
    if (derivedAdType) {
      return derivedAdType.toLowerCase() === 'pghostel';
    }
@@ -129,12 +156,30 @@ export function PropertyForm({
    if (derivedAdType && derivedCategory) {
      const isCoworkingType = derivedAdType.toLowerCase() === 'coworking' && 
                            derivedCategory.toLowerCase() === 'commercial';
-     return isCoworkingType;
+     
+     // Also check if either of the keys indicates coworking
+     const isCoworkingAdType = derivedAdType.toLowerCase() === 'coworking';
+     const result = isCoworkingType || isCoworkingAdType;
+     
+     console.log('[PropertyForm] Coworking detection:', result, {
+       derivedAdType,
+       derivedCategory,
+       isCoworkingType,
+       isCoworkingAdType
+     });
+     
+     return result;
    }
    
    // Check URL path for co-working keywords
    const urlPath = window.location.pathname.toLowerCase();
-   return urlPath.includes('coworking') || urlPath.includes('co-working');
+   const pathHasCoworking = urlPath.includes('coworking') || urlPath.includes('co-working');
+   
+   console.log('[PropertyForm] Coworking detection (URL):', pathHasCoworking, {
+     urlPath
+   });
+   
+   return pathHasCoworking;
  }, [derivedAdType, derivedCategory]);
  
  // Determine if we're in Land/Plot Sale mode
@@ -142,12 +187,25 @@ export function PropertyForm({
    // Check if the category indicates land
    if (derivedCategory) {
      const isLandType = derivedCategory.toLowerCase() === 'land';
-     return isLandType;
+     const result = isLandType;
+     
+     console.log('[PropertyForm] Land sale detection (category):', result, {
+       derivedCategory,
+       isLandType
+     });
+     
+     return result;
    }
    
    // Check URL path for land keywords
    const urlPath = window.location.pathname.toLowerCase();
-   return urlPath.includes('land') || urlPath.includes('plot');
+   const pathHasLand = urlPath.includes('land') || urlPath.includes('plot');
+   
+   console.log('[PropertyForm] Land sale detection (URL):', pathHasLand, {
+     urlPath
+   });
+   
+   return pathHasLand;
  }, [derivedCategory]);
  
  // Determine if we're in Residential Flatmates mode
@@ -166,23 +224,37 @@ export function PropertyForm({
 
  // Determine which flow steps to use based on property type
  const flowSteps = useMemo(() => {
+   let result;
+   
    if (isPGHostelMode) {
-     return FLOW_STEP_SEQUENCES.residential_pghostel;
+     result = FLOW_STEP_SEQUENCES.residential_pghostel;
    } else if (isCommercialRentMode) {
-     return FLOW_STEP_SEQUENCES.commercial_rent;
+     result = FLOW_STEP_SEQUENCES.commercial_rent;
    } else if (isCommercialSaleMode) {
-     return FLOW_STEP_SEQUENCES.commercial_sale;
+     result = FLOW_STEP_SEQUENCES.commercial_sale;
    } else if (isCoworkingMode) {
-     return FLOW_STEP_SEQUENCES.commercial_coworking;
+     result = FLOW_STEP_SEQUENCES.commercial_coworking;
    } else if (isLandSaleMode) {
-     return FLOW_STEP_SEQUENCES.land_sale;
+     result = FLOW_STEP_SEQUENCES.land_sale;
    } else if (isFlatmatesMode) {
-     return FLOW_STEP_SEQUENCES.residential_flatmates;
+     result = FLOW_STEP_SEQUENCES.residential_flatmates;
    } else if (derivedAdType?.toLowerCase() === 'sale' || derivedAdType?.toLowerCase() === 'sell') {
-     return FLOW_STEP_SEQUENCES.residential_sale;
+     result = FLOW_STEP_SEQUENCES.residential_sale;
    } else {
-     return FLOW_STEP_SEQUENCES.residential_rent;
+     result = FLOW_STEP_SEQUENCES.residential_rent;
    }
+   
+   console.log('[PropertyForm] Determined flow steps:', result?.map(step => step.id), {
+     isPGHostelMode,
+     isCommercialRentMode,
+     isCommercialSaleMode,
+     isCoworkingMode,
+     isLandSaleMode,
+     isFlatmatesMode,
+     derivedAdType
+   });
+   
+   return result;
  }, [
    derivedAdType, 
    isPGHostelMode, 
@@ -230,6 +302,60 @@ export function PropertyForm({
    city: selectedCity || initialData?.locality || ''
  });
 
+ // Force update flow type and category on initialization
+ useEffect(() => {
+   // Make sure we're actually in a specific detected mode that needs the correct flow
+   if (isLandSaleMode || isCoworkingMode) {
+     console.log(`[PropertyForm] Special mode detected (Land Sale: ${isLandSaleMode}, Coworking: ${isCoworkingMode}), updating flow data`);
+     
+     try {
+       const formData = form.getValues();
+       console.log('[PropertyForm] Current form data before flow update:', formData);
+       
+       // Clean the form data first
+       const cleanedData = cleanFormData(formData);
+       
+       // Set the correct flow values
+       if (isLandSaleMode) {
+         cleanedData.flow = {
+           category: 'land',
+           listingType: 'sale',
+           flowType: 'land_sale'
+         };
+         
+         // Also update root level values
+         cleanedData.category = 'land';
+         cleanedData.listingType = 'sale';
+         cleanedData.propertyType = 'land';
+         cleanedData.adType = 'sale';
+         
+         console.log("[PropertyForm] Set Land Sale flow data");
+       } else if (isCoworkingMode) {
+         cleanedData.flow = {
+           category: 'commercial',
+           listingType: 'coworking',
+           flowType: 'commercial_coworking'
+         };
+         
+         // Also update root level values
+         cleanedData.category = 'commercial';
+         cleanedData.listingType = 'coworking';
+         cleanedData.propertyType = 'commercial';
+         cleanedData.adType = 'coworking';
+         
+         console.log("[PropertyForm] Set Coworking flow data");
+       }
+       
+       // Reset with updated data
+       form.reset(cleanedData);
+       
+       console.log("[PropertyForm] Initialized form with updated flow data:", cleanedData);
+     } catch (error) {
+       console.error("[PropertyForm] Error updating flow on init:", error);
+     }
+   }
+ }, [form, isLandSaleMode, isCoworkingMode]);
+
  // Update propertyIdAfterSave when savedPropertyId changes
  useEffect(() => {
    if (savedPropertyId) {
@@ -264,6 +390,29 @@ export function PropertyForm({
    STEPS: flowSteps // Use flow-specific steps
  });
 
+ // Log when the navigation hook properties change
+ useEffect(() => {
+   console.log('[PropertyForm] Step navigation properties:', {
+     isSaleMode,
+     detectedPGHostelMode,
+     detectedCommercialRentMode,
+     detectedCommercialSaleMode,
+     detectedCoworkingMode,
+     detectedLandSaleMode,
+     detectedFlatmatesMode,
+     visibleSteps: getVisibleSteps()?.map(step => step.id)
+   });
+ }, [
+   isSaleMode,
+   detectedPGHostelMode,
+   detectedCommercialRentMode,
+   detectedCommercialSaleMode,
+   detectedCoworkingMode,
+   detectedLandSaleMode,
+   detectedFlatmatesMode,
+   getVisibleSteps
+ ]);
+
  // Define a safe handlePreviousStep function that won't cause reference errors
  const safePreviousStep = () => {
    if (typeof handlePreviousStep === 'function') {
@@ -282,33 +431,77 @@ export function PropertyForm({
    try {
      // Ensure minimal required data
      const formData = form.getValues();
+     console.log('[PropertyForm] Form data before save:', formData);
+     
+     // Clean the form data to remove invalid sections
+     const cleanedData = cleanFormData(formData);
      
      // Set flow information from URL if available
      const pathParts = window.location.pathname.split('/');
      const urlPropertyType = pathParts.length > 2 ? pathParts[pathParts.length - 3] : '';
      const urlListingType = pathParts.length > 2 ? pathParts[pathParts.length - 2] : '';
      
-     if (urlPropertyType && !formData.flow_property_type) {
-       formData.flow_property_type = urlPropertyType;
+     console.log('[PropertyForm] URL path parts:', {
+       pathParts,
+       urlPropertyType,
+       urlListingType
+     });
+     
+     if (urlPropertyType && !cleanedData.flow_property_type) {
+       cleanedData.flow_property_type = urlPropertyType;
      }
      
-     if (urlListingType && !formData.flow_listing_type) {
-       formData.flow_listing_type = urlListingType;
+     if (urlListingType && !cleanedData.flow_listing_type) {
+       cleanedData.flow_listing_type = urlListingType;
      }
      
      // Make sure we have a title
-     if (!formData.title) {
-       if (formData.propertyType) {
-         formData.title = `${formData.propertyType} Property`;
+     if (!cleanedData.title) {
+       if (cleanedData.propertyType) {
+         cleanedData.title = `${cleanedData.propertyType} Property`;
        } else {
-         formData.title = "New Property";
+         cleanedData.title = "New Property";
        }
      }
      
+     // Set correct flow for special modes
+     if (isLandSaleMode) {
+       console.log('[PropertyForm] Setting land sale flow before save');
+       
+       cleanedData.flow = {
+         category: 'land',
+         listingType: 'sale',
+         flowType: 'land_sale'
+       };
+       
+       // Also update root level values
+       cleanedData.category = 'land';
+       cleanedData.listingType = 'sale';
+       cleanedData.propertyType = 'land';
+       cleanedData.adType = 'sale';
+     }
+     else if (isCoworkingMode) {
+       console.log('[PropertyForm] Setting coworking flow before save');
+       
+       cleanedData.flow = {
+         category: 'commercial',
+         listingType: 'coworking',
+         flowType: 'commercial_coworking'
+       };
+       
+       // Also update root level values
+       cleanedData.category = 'commercial';
+       cleanedData.listingType = 'coworking';
+       cleanedData.propertyType = 'commercial';
+       cleanedData.adType = 'coworking';
+     }
+     
      // Apply the form changes
-     form.reset(formData);
+     console.log('[PropertyForm] Resetting form with updated data before save:', cleanedData);
+     form.reset(cleanedData);
      
      // Call the original save function
+     console.log('[PropertyForm] Calling handleSaveAsDraft');
      await handleSaveAsDraft();
      
      // Wait a bit for the state to update
@@ -317,10 +510,10 @@ export function PropertyForm({
      // Return the savedPropertyId or propertyId
      const effectivePropertyId = savedPropertyId || propertyId || propertyIdAfterSave;
      
-     console.log("Enhanced save function complete, property ID:", effectivePropertyId);
+     console.log("[PropertyForm] Enhanced save function complete, property ID:", effectivePropertyId);
      return effectivePropertyId;
    } catch (error) {
-     console.error("Error in enhanced save function:", error);
+     console.error("[PropertyForm] Error in enhanced save function:", error);
      throw error;
    } finally {
      setSaveInProgress(false);
@@ -334,46 +527,84 @@ export function PropertyForm({
      
      // Ensure minimal required data
      const formData = form.getValues();
+     console.log('[PropertyForm] Form data before publish:', formData);
+     
+     // Clean the form data to remove invalid sections
+     const cleanedData = cleanFormData(formData);
      
      // Set flow information from URL if available
      const pathParts = window.location.pathname.split('/');
      const urlPropertyType = pathParts.length > 2 ? pathParts[pathParts.length - 3] : '';
      const urlListingType = pathParts.length > 2 ? pathParts[pathParts.length - 2] : '';
      
-     if (urlPropertyType && !formData.flow_property_type) {
-       formData.flow_property_type = urlPropertyType;
+     if (urlPropertyType && !cleanedData.flow_property_type) {
+       cleanedData.flow_property_type = urlPropertyType;
      }
      
-     if (urlListingType && !formData.flow_listing_type) {
-       formData.flow_listing_type = urlListingType;
+     if (urlListingType && !cleanedData.flow_listing_type) {
+       cleanedData.flow_listing_type = urlListingType;
      }
      
      // Make sure we have a title
-     if (!formData.title) {
-       if (formData.propertyType) {
-         formData.title = `${formData.propertyType} Property`;
+     if (!cleanedData.title) {
+       if (cleanedData.propertyType) {
+         cleanedData.title = `${cleanedData.propertyType} Property`;
        } else {
-         formData.title = "New Property";
+         cleanedData.title = "New Property";
        }
      }
      
      // Ensure we have a city
-     if (!formData.city && !formData.locality) {
-       formData.city = "Hyderabad";
+     if (!cleanedData.city && !cleanedData.locality) {
+       cleanedData.city = "Hyderabad";
      }
      
      // Make sure there's a description
-     if (!formData.description) {
-       formData.description = `${formData.title} - A quality property listing.`;
+     if (!cleanedData.description) {
+       cleanedData.description = `${cleanedData.title} - A quality property listing.`;
+     }
+     
+     // Set correct flow for Land Sale mode
+     if (isLandSaleMode) {
+       console.log('[PropertyForm] Setting land sale flow before publish');
+       
+       cleanedData.flow = {
+         category: 'land',
+         listingType: 'sale',
+         flowType: 'land_sale'
+       };
+       
+       // Also update root level values
+       cleanedData.category = 'land';
+       cleanedData.listingType = 'sale';
+       cleanedData.propertyType = 'land';
+       cleanedData.adType = 'sale';
+     }
+     else if (isCoworkingMode) {
+       console.log('[PropertyForm] Setting coworking flow before publish');
+       
+       cleanedData.flow = {
+         category: 'commercial',
+         listingType: 'coworking',
+         flowType: 'commercial_coworking'
+       };
+       
+       // Also update root level values
+       cleanedData.category = 'commercial';
+       cleanedData.listingType = 'coworking';
+       cleanedData.propertyType = 'commercial';
+       cleanedData.adType = 'coworking';
      }
      
      // Apply the form changes
-     form.reset(formData);
+     console.log('[PropertyForm] Resetting form with updated data before publish:', cleanedData);
+     form.reset(cleanedData);
      
      // Directly use handleSaveAndPublish
+     console.log('[PropertyForm] Calling handleSaveAndPublish');
      const publishedPropertyId = await handleSaveAndPublish();
      
-     console.log("Property published successfully with ID:", publishedPropertyId);
+     console.log("[PropertyForm] Property published successfully with ID:", publishedPropertyId);
      
      if (!publishedPropertyId) {
        throw new Error("No property ID returned after publishing");
@@ -381,7 +612,7 @@ export function PropertyForm({
      
      return publishedPropertyId;
    } catch (error) {
-     console.error("Error in direct save and publish:", error);
+     console.error("[PropertyForm] Error in direct save and publish:", error);
      throw error;
    } finally {
      setSaveInProgress(false);
@@ -390,29 +621,19 @@ export function PropertyForm({
 
  // Function to handle type selection completion
  const handleTypeSelectionComplete = (category: string, adType: string, city: string) => {
-   console.log('Type selection complete:', { category, adType, city });
+   console.log('[PropertyForm] Type selection complete:', { category, adType, city });
    
    if (onTypeSelect) {
      onTypeSelect(category, adType, city);
    } else {
      // Ensure proper URL structure
      const path = `/properties/list/${category.toLowerCase()}/${adType.toLowerCase()}/details`;
-     console.log('Navigating to:', path);
+     console.log('[PropertyForm] Navigating to:', path);
      navigate(path);
    }
    
    setSelectedCity(city);
    setShowTypeSelectionState(false);
- };
-
- // Handle debug button click
- const handleDebugClick = () => {
-   setShowDebugInfo(!showDebugInfo);
- };
- 
- // Handle closing the debug panel
- const handleCloseDebugPanel = () => {
-   setShowDebugInfo(false);
  };
 
  // If user is not logged in, show login prompt
@@ -438,141 +659,124 @@ export function PropertyForm({
  }
 
  // Ensure we have category and type either from props or initialData
-const effectiveCategory = derivedCategory || initialData?.propertyType || '';
-const effectiveAdType = derivedAdType || initialData?.listingType || '';
+ const effectiveCategory = derivedCategory || initialData?.propertyType || '';
+ const effectiveAdType = derivedAdType || initialData?.listingType || '';
 
-// Debug check for valid property parameters
-if (!effectiveCategory || !effectiveAdType) {
-  console.error('Missing required parameters:', { 
-    effectiveCategory, 
-    effectiveAdType,
-    derivedCategory,
-    derivedAdType,
-    'initialData?.propertyType': initialData?.propertyType,
-    'initialData?.listingType': initialData?.listingType
-  });
+ // Debug check for valid property parameters
+ if (!effectiveCategory || !effectiveAdType) {
+   console.error('[PropertyForm] Missing required parameters:', { 
+     effectiveCategory, 
+     effectiveAdType,
+     derivedCategory,
+     derivedAdType,
+     'initialData?.propertyType': initialData?.propertyType,
+     'initialData?.listingType': initialData?.listingType
+   });
+ }
+
+ // Get the filtered steps for the form navigation
+ const visibleSteps = getVisibleSteps();
+
+ // Determine the effective property ID for use in the UI
+ const effectivePropertyId = savedPropertyId || propertyId || propertyIdAfterSave;
+
+ // Check if current step is the review step - safely access flowSteps array
+ const isReviewStep = flowSteps && flowSteps[formStep - 1] ? flowSteps[formStep - 1].id.includes('review') : false;
+
+ console.log('[PropertyForm] Rendering with:', {
+   effectiveCategory,
+   effectiveAdType,
+   isLandSaleMode,
+   isCoworkingMode,
+   formStep,
+   currentStepId: flowSteps && flowSteps[formStep - 1] ? flowSteps[formStep - 1].id : 'unknown',
+   visibleSteps: visibleSteps?.map(step => step.id),
+   isReviewStep
+ });
+
+ return (
+   <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+     <div className="bg-card rounded-xl shadow-lg">
+       {/* Form Header with Status Indicator */}
+       <FormHeader 
+         status={status}
+         handleAutoFill={handleAutoFill}
+       />
+
+       <div className="px-6 pt-4">
+         <WizardBreadcrumbs
+           category={effectiveCategory}
+           adType={effectiveAdType}
+           currentStep={flowSteps && flowSteps[formStep - 1] ? flowSteps[formStep - 1].label : ''}
+         />
+       </div>
+
+       <FormNavigation 
+         currentStep={formStep} 
+         onStepChange={setCurrentStep}
+         propertyId={effectivePropertyId}
+         mode={mode}
+         category={effectiveCategory}
+         adType={effectiveAdType}
+         steps={visibleSteps}
+       />
+
+       <div className="p-6">
+         {/* Only show error message if NOT on the review step */}
+         {error && !isReviewStep && (
+           <div className="mb-4 bg-destructive/10 border border-destructive/20 p-3 rounded-xl">
+             <p className="text-sm text-destructive">{error}</p>
+           </div>
+         )}
+
+         {/* Main content area */}
+         <div className="w-full">
+           <div className="space-y-6">
+             {/* Form Content for the current step */}
+             <FormContent 
+               form={form}
+               formStep={formStep}
+               STEPS={flowSteps || STEPS}
+               effectiveCategory={effectiveCategory}
+               effectiveAdType={effectiveAdType}
+               mode={mode}
+               selectedCity={selectedCity || initialData?.locality || ''}
+               isSaleMode={isSaleMode}
+               isPGHostelMode={isPGHostelMode}
+               isCommercialRentMode={isCommercialRentMode}
+               isCommercialSaleMode={isCommercialSaleMode}
+               isCoworkingMode={isCoworkingMode}
+               isLandSaleMode={isLandSaleMode}
+               isFlatmatesMode={isFlatmatesMode}
+               handlePreviousStep={safePreviousStep}
+               handleSaveAsDraft={handleSaveAsDraft}
+               handleSaveAndPublish={handleSaveAndPublish}
+               handleUpdate={handleUpdate}
+               saving={saving}
+               status={status}
+               savedPropertyId={effectivePropertyId}
+               handleImageUploadComplete={handleImageUploadComplete}
+             />
+             
+             {/* Step Navigation (Previous/Next buttons) */}
+             <StepNavigation 
+               formStep={formStep}
+               STEPS={flowSteps || STEPS}
+               handlePreviousStep={safePreviousStep}
+               handleNextStep={handleNextStep}
+               savedPropertyId={effectivePropertyId}
+               onSave={enhancedSaveFunction}
+               onPublish={handleDirectSaveAndPublish}
+               isLastStep={isReviewStep}
+               disablePrevious={saving || saveInProgress}
+             />
+           </div>
+         </div>
+       </div>
+     </div>
+   </div>
+ );
 }
 
-// Get the filtered steps for the form navigation
-const visibleSteps = getVisibleSteps();
-
-// Determine the effective property ID for use in the UI
-const effectivePropertyId = savedPropertyId || propertyId || propertyIdAfterSave;
-
-// Check if current step is the review step - safely access flowSteps array
-const isReviewStep = flowSteps && flowSteps[formStep - 1] ? flowSteps[formStep - 1].id.includes('review') : false;
-
-return (
-  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    <div className="bg-card rounded-xl shadow-lg">
-      {/* Form Header with Status Indicator */}
-      <FormHeader 
-        status={status}
-        handleAutoFill={handleAutoFill}
-        onDebugClick={handleDebugClick}
-      />
-
-      <div className="px-6 pt-4">
-        <WizardBreadcrumbs
-          category={effectiveCategory}
-          adType={effectiveAdType}
-          currentStep={flowSteps && flowSteps[formStep - 1] ? flowSteps[formStep - 1].label : ''}
-        />
-      </div>
-
-      <FormNavigation 
-        currentStep={formStep} 
-        onStepChange={setCurrentStep}
-        propertyId={effectivePropertyId}
-        mode={mode}
-        category={effectiveCategory}
-        adType={effectiveAdType}
-        steps={visibleSteps}
-      />
-
-      <div className="p-6">
-        {/* Only show error message if NOT on the review step */}
-        {error && !isReviewStep && (
-          <div className="mb-4 bg-destructive/10 border border-destructive/20 p-3 rounded-xl">
-            <p className="text-sm text-destructive">{error}</p>
-          </div>
-        )}
-
-        {/* Main content area with flex layout for side panel */}
-        <div className={`flex ${showDebugInfo ? 'space-x-4' : ''}`}>
-          {/* Main form content - responsive width */}
-          <div className={`${showDebugInfo ? 'w-2/3' : 'w-full'} transition-all duration-300`}>
-            <div className="space-y-6">
-              {/* Form Content for the current step */}
-              <FormContent 
-                form={form}
-                formStep={formStep}
-                STEPS={flowSteps || STEPS}
-                effectiveCategory={effectiveCategory}
-                effectiveAdType={effectiveAdType}
-                mode={mode}
-                selectedCity={selectedCity || initialData?.locality || ''}
-                isSaleMode={isSaleMode}
-                isPGHostelMode={isPGHostelMode}
-                isCommercialRentMode={isCommercialRentMode}
-                isCommercialSaleMode={isCommercialSaleMode}
-                isCoworkingMode={isCoworkingMode}
-                isLandSaleMode={isLandSaleMode}
-                isFlatmatesMode={isFlatmatesMode}
-                handlePreviousStep={safePreviousStep}
-                handleSaveAsDraft={handleSaveAsDraft}
-                handleSaveAndPublish={handleSaveAndPublish}
-                handleUpdate={handleUpdate}
-                saving={saving}
-                status={status}
-                savedPropertyId={effectivePropertyId}
-                handleImageUploadComplete={handleImageUploadComplete}
-                showDebugInfo={showDebugInfo}
-                setShowDebugInfo={setShowDebugInfo}
-              />
-              
-              {/* Step Navigation (Previous/Next buttons) */}
-              <StepNavigation 
-                formStep={formStep}
-                STEPS={flowSteps || STEPS}
-                handlePreviousStep={safePreviousStep}
-                handleNextStep={handleNextStep}
-                savedPropertyId={effectivePropertyId}
-                onSave={enhancedSaveFunction}
-                onPublish={handleDirectSaveAndPublish} // Use our direct save function
-                isLastStep={isReviewStep} // Flag to indicate this is the review step
-                disablePrevious={saving || saveInProgress}
-              />
-            </div>
-          </div>
-          
-          {/* Debug side panel - only visible when showDebugInfo is true */}
-          {showDebugInfo && (
-            <div className="w-1/3 transition-all duration-300 h-[calc(100vh-240px)] overflow-auto">
-              <DebugPanel
-                form={form}
-                formStep={formStep}
-                flowSteps={flowSteps || STEPS}
-                effectiveCategory={effectiveCategory}
-                effectiveAdType={effectiveAdType}
-                mode={mode}
-                isSaleMode={isSaleMode}
-                isPGHostelMode={isPGHostelMode}
-                isCommercialRentMode={isCommercialRentMode}
-                isCommercialSaleMode={isCommercialSaleMode}
-                isCoworkingMode={isCoworkingMode}
-                isLandSaleMode={isLandSaleMode}
-                isFlatmatesMode={isFlatmatesMode}
-                effectivePropertyId={effectivePropertyId}
-                onClose={handleCloseDebugPanel}
-              />
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  </div>
-);
-}
-
+// Make sure to add this default export to fix compatibility with existing imports
 export default PropertyForm;

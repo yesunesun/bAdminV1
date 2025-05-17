@@ -1,62 +1,85 @@
 // src/modules/owner/components/property/wizard/PropertyForm/components/FormHeader.tsx
-// Version: 1.2.0
-// Last Modified: 13-05-2025 14:45 IST
-// Purpose: Header component for property form with status, debug functionality moved from bottom
+// Version: 1.3.0
+// Last Modified: 18-05-2025 19:40 IST
+// Purpose: Updated to use tabbed debug interface
 
 import React from 'react';
-import { cn } from '@/lib/utils';
-import { Wand2, Bug } from 'lucide-react';
 import StatusIndicator from './StatusIndicator';
+import { cn } from '@/lib/utils';
 
 interface FormHeaderProps {
   status: 'draft' | 'published';
-  handleAutoFill: () => void;
+  handleAutoFill?: () => void;
   onDebugClick?: () => void;
+  onFormDebugClick?: () => void;
+  onFlowDebugClick?: () => void;
+  showDebugButtons?: boolean;
 }
 
 const FormHeader: React.FC<FormHeaderProps> = ({ 
   status, 
-  handleAutoFill,
-  onDebugClick
+  handleAutoFill, 
+  onDebugClick,
+  onFormDebugClick,
+  onFlowDebugClick,
+  // Force buttons to display during development with fallback check
+  showDebugButtons = process.env.NODE_ENV === 'development' || window.location.hostname === 'localhost'
 }) => {
   return (
-    <div className="p-3 border-b border-border">
-      <div className="flex justify-between items-center">
-        <div className="flex items-center space-x-2">
-          {process.env.NODE_ENV === 'development' && (
-            <>
-              <button
-                type="button"
-                onClick={handleAutoFill}
-                className={cn(
-                  "flex items-center px-3 py-1.5 text-sm font-medium rounded-lg",
-                  "bg-success text-success-foreground",
-                  "hover:bg-success/90 transition-colors",
-                  "focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring"
-                )}
-              >
-                <Wand2 className="h-3.5 w-3.5 mr-1.5" />
-                Auto Fill
-              </button>
-              {onDebugClick && (
-                <button
-                  type="button"
-                  onClick={onDebugClick}
-                  className={cn(
-                    "flex items-center px-3 py-1.5 text-sm font-medium rounded-lg",
-                    "bg-muted text-muted-foreground",
-                    "hover:bg-muted/90 transition-colors",
-                    "focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring"
-                  )}
-                >
-                  <Bug className="h-3.5 w-3.5 mr-1.5" />
-                  Debug
-                </button>
-              )}
-            </>
-          )}
-        </div>
+    <div className="flex justify-between items-center p-6 border-b bg-card">
+      <div className="flex items-center space-x-2">
+        <h1 className="text-xl font-semibold text-primary">List Your Property</h1>
         <StatusIndicator status={status} />
+      </div>
+      
+      <div className="flex items-center space-x-2">
+        {handleAutoFill && (
+          <button
+            onClick={handleAutoFill}
+            className={cn(
+              "px-3 py-1.5 bg-secondary text-secondary-foreground text-xs rounded-md hover:bg-secondary/80",
+              showDebugButtons ? "block" : "hidden"
+            )}
+          >
+            Auto-Fill
+          </button>
+        )}
+        
+        {onDebugClick && (
+          <button
+            onClick={onDebugClick}
+            className={cn(
+              "px-3 py-1.5 bg-secondary text-secondary-foreground text-xs rounded-md hover:bg-secondary/80",
+              showDebugButtons ? "block" : "hidden"
+            )}
+          >
+            Debug
+          </button>
+        )}
+        
+        {onFormDebugClick && (
+          <button
+            onClick={onFormDebugClick}
+            className={cn(
+              "px-3 py-1.5 bg-secondary text-secondary-foreground text-xs rounded-md hover:bg-secondary/80",
+              showDebugButtons ? "block" : "hidden"
+            )}
+          >
+            Form Debug
+          </button>
+        )}
+        
+        {onFlowDebugClick && (
+          <button
+            onClick={onFlowDebugClick}
+            className={cn(
+              "px-3 py-1.5 bg-secondary text-secondary-foreground text-xs rounded-md hover:bg-secondary/80",
+              showDebugButtons ? "block" : "hidden"
+            )}
+          >
+            Flow Debug
+          </button>
+        )}
       </div>
     </div>
   );

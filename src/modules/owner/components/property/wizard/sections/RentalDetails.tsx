@@ -1,15 +1,15 @@
 // src/modules/owner/components/property/wizard/sections/RentalDetails.tsx
-// Version: 2.1.0
-// Last Modified: 11-04-2025 00:15 IST
-// Purpose: Fixed import for furnishing options
+// Version: 2.2.0
+// Last Modified: 17-05-2025 16:45 IST
+// Purpose: Fixed form field registration to save data in step object structure
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { FormData, FormSectionProps } from '../types';
 import { 
   RENTAL_TYPES, 
   MAINTENANCE_OPTIONS,
   TENANT_PREFERENCES,
-  FURNISHING_OPTIONS, // Fixed import - removing apostrophe
+  FURNISHING_OPTIONS,
   PARKING_OPTIONS 
 } from '../constants';
 import { FormSection } from '@/components/FormSection';
@@ -28,20 +28,42 @@ import {
   Checkbox 
 } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
+import { useStepForm } from '../hooks/useStepForm';
 
 export const RentalDetails: React.FC<FormSectionProps> = ({ 
   form,
   mode = 'create',
-  adType
+  adType,
+  stepId = 'res_rent_rental' // Explicitly set the step ID
 }) => {
   const isEditMode = mode === 'edit';
   
-  // Get form methods
-  const { register, formState: { errors }, setValue, getValues, watch } = form;
+  // Use the useStepForm hook for proper step-based registration
+  const { 
+    registerField, 
+    getFieldError, 
+    setFieldValue, 
+    getFieldValue, 
+    watchField,
+    getFieldId,
+    migrateRootFields
+  } = useStepForm(form, stepId);
   
-  // Watch for dependencies
-  const rentalType = watch('rentalType');
-  const rentNegotiable = watch('rentNegotiable');
+  // Migrate existing data from root to step object on component mount
+  useEffect(() => {
+    const fieldsToMigrate = [
+      'rentalType', 'rentAmount', 'rentNegotiable', 'securityDeposit', 
+      'availableFrom', 'maintenance', 'furnishing', 'parking', 
+      'preferredTenants', 'nonVegAllowed', 'petsAllowed', 
+      'hasLockInPeriod', 'lockInPeriod'
+    ];
+    
+    migrateRootFields(fieldsToMigrate);
+  }, [migrateRootFields]);
+  
+  // Watch for dependencies using the step structure
+  const rentalType = watchField('rentalType');
+  const rentNegotiable = watchField('rentNegotiable');
 
   return (
     <FormSection
@@ -51,17 +73,17 @@ export const RentalDetails: React.FC<FormSectionProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Rental Type */}
         <div className="space-y-2">
-          <RequiredLabel htmlFor="rentalType">Rental Type</RequiredLabel>
+          <RequiredLabel htmlFor={getFieldId('rentalType')}>Rental Type</RequiredLabel>
           <Select
-            value={getValues('rentalType') || 'rent'}
-            onValueChange={(value) => setValue('rentalType', value as 'rent' | 'lease', { shouldValidate: true })}
+            value={getFieldValue('rentalType') || 'rent'}
+            onValueChange={(value) => setFieldValue('rentalType', value as 'rent' | 'lease')}
             disabled={isEditMode}
           >
             <SelectTrigger 
-              id="rentalType"
+              id={getFieldId('rentalType')}
               className={cn(
                 "w-full",
-                errors.rentalType && "border-destructive focus-visible:ring-destructive"
+                getFieldError('rentalType') && "border-destructive focus-visible:ring-destructive"
               )}
             >
               <SelectValue placeholder="Select Type" />
@@ -74,74 +96,74 @@ export const RentalDetails: React.FC<FormSectionProps> = ({
               ))}
             </SelectContent>
           </Select>
-          {errors.rentalType && (
-            <p className="text-sm text-destructive mt-1">{errors.rentalType.message as string}</p>
+          {getFieldError('rentalType') && (
+            <p className="text-sm text-destructive mt-1">{getFieldError('rentalType')?.message as string}</p>
           )}
         </div>
 
         {/* Rent Amount */}
         <div className="space-y-2">
-          <RequiredLabel htmlFor="rentAmount">
+          <RequiredLabel htmlFor={getFieldId('rentAmount')}>
             {rentalType === 'lease' ? 'Lease Amount (₹)' : 'Rent Amount (₹) per month'}
           </RequiredLabel>
           <div className="relative">
             <Input
-              id="rentAmount"
+              id={getFieldId('rentAmount')}
               type="text"
-              {...register('rentAmount')}
+              {...registerField('rentAmount')}
               placeholder="e.g. 15000"
               className={cn(
-                errors.rentAmount && "border-destructive focus-visible:ring-destructive"
+                getFieldError('rentAmount') && "border-destructive focus-visible:ring-destructive"
               )}
             />
             <div className="absolute right-3 top-2.5">
               <Checkbox
-                id="rentNegotiable"
+                id={getFieldId('rentNegotiable')}
                 checked={rentNegotiable}
-                onCheckedChange={(checked) => setValue('rentNegotiable', !!checked, { shouldValidate: true })}
+                onCheckedChange={(checked) => setFieldValue('rentNegotiable', !!checked)}
               />
               <label
-                htmlFor="rentNegotiable"
+                htmlFor={getFieldId('rentNegotiable')}
                 className="ml-1.5 text-xs font-medium text-muted-foreground cursor-pointer"
               >
                 Negotiable
               </label>
             </div>
           </div>
-          {errors.rentAmount && (
-            <p className="text-sm text-destructive mt-1">{errors.rentAmount.message as string}</p>
+          {getFieldError('rentAmount') && (
+            <p className="text-sm text-destructive mt-1">{getFieldError('rentAmount')?.message as string}</p>
           )}
         </div>
 
         {/* Security Deposit */}
         <div className="space-y-2">
-          <RequiredLabel htmlFor="securityDeposit">Security Deposit (₹)</RequiredLabel>
+          <RequiredLabel htmlFor={getFieldId('securityDeposit')}>Security Deposit (₹)</RequiredLabel>
           <Input
-            id="securityDeposit"
+            id={getFieldId('securityDeposit')}
             type="text"
-            {...register('securityDeposit')}
+            {...registerField('securityDeposit')}
             placeholder="e.g. 50000"
             className={cn(
-              errors.securityDeposit && "border-destructive focus-visible:ring-destructive"
+              getFieldError('securityDeposit') && "border-destructive focus-visible:ring-destructive"
             )}
           />
-          {errors.securityDeposit && (
-            <p className="text-sm text-destructive mt-1">{errors.securityDeposit.message as string}</p>
+          {getFieldError('securityDeposit') && (
+            <p className="text-sm text-destructive mt-1">{getFieldError('securityDeposit')?.message as string}</p>
           )}
         </div>
 
         {/* Maintenance */}
         <div className="space-y-2">
-          <RequiredLabel htmlFor="maintenance">Maintenance</RequiredLabel>
+          <RequiredLabel htmlFor={getFieldId('maintenance')}>Maintenance</RequiredLabel>
           <Select
-            value={getValues('maintenance') || ''}
-            onValueChange={(value) => setValue('maintenance', value, { shouldValidate: true })}
+            value={getFieldValue('maintenance') || ''}
+            onValueChange={(value) => setFieldValue('maintenance', value)}
           >
             <SelectTrigger 
-              id="maintenance"
+              id={getFieldId('maintenance')}
               className={cn(
                 "w-full",
-                errors.maintenance && "border-destructive focus-visible:ring-destructive"
+                getFieldError('maintenance') && "border-destructive focus-visible:ring-destructive"
               )}
             >
               <SelectValue placeholder="Select Maintenance Option" />
@@ -154,39 +176,39 @@ export const RentalDetails: React.FC<FormSectionProps> = ({
               ))}
             </SelectContent>
           </Select>
-          {errors.maintenance && (
-            <p className="text-sm text-destructive mt-1">{errors.maintenance.message as string}</p>
+          {getFieldError('maintenance') && (
+            <p className="text-sm text-destructive mt-1">{getFieldError('maintenance')?.message as string}</p>
           )}
         </div>
 
         {/* Available From */}
         <div className="space-y-2">
-          <RequiredLabel htmlFor="availableFrom">Available From</RequiredLabel>
+          <RequiredLabel htmlFor={getFieldId('availableFrom')}>Available From</RequiredLabel>
           <Input
-            id="availableFrom"
+            id={getFieldId('availableFrom')}
             type="date"
-            {...register('availableFrom')}
+            {...registerField('availableFrom')}
             className={cn(
-              errors.availableFrom && "border-destructive focus-visible:ring-destructive"
+              getFieldError('availableFrom') && "border-destructive focus-visible:ring-destructive"
             )}
           />
-          {errors.availableFrom && (
-            <p className="text-sm text-destructive mt-1">{errors.availableFrom.message as string}</p>
+          {getFieldError('availableFrom') && (
+            <p className="text-sm text-destructive mt-1">{getFieldError('availableFrom')?.message as string}</p>
           )}
         </div>
 
         {/* Furnishing Status */}
         <div className="space-y-2">
-          <RequiredLabel htmlFor="furnishing">Furnishing Status</RequiredLabel>
+          <RequiredLabel htmlFor={getFieldId('furnishing')}>Furnishing Status</RequiredLabel>
           <Select
-            value={getValues('furnishing') || ''}
-            onValueChange={(value) => setValue('furnishing', value, { shouldValidate: true })}
+            value={getFieldValue('furnishing') || ''}
+            onValueChange={(value) => setFieldValue('furnishing', value)}
           >
             <SelectTrigger 
-              id="furnishing"
+              id={getFieldId('furnishing')}
               className={cn(
                 "w-full",
-                errors.furnishing && "border-destructive focus-visible:ring-destructive"
+                getFieldError('furnishing') && "border-destructive focus-visible:ring-destructive"
               )}
             >
               <SelectValue placeholder="Select Furnishing Status" />
@@ -199,23 +221,23 @@ export const RentalDetails: React.FC<FormSectionProps> = ({
               ))}
             </SelectContent>
           </Select>
-          {errors.furnishing && (
-            <p className="text-sm text-destructive mt-1">{errors.furnishing.message as string}</p>
+          {getFieldError('furnishing') && (
+            <p className="text-sm text-destructive mt-1">{getFieldError('furnishing')?.message as string}</p>
           )}
         </div>
 
         {/* Parking */}
         <div className="space-y-2">
-          <RequiredLabel htmlFor="parking">Parking</RequiredLabel>
+          <RequiredLabel htmlFor={getFieldId('parking')}>Parking</RequiredLabel>
           <Select
-            value={getValues('parking') || ''}
-            onValueChange={(value) => setValue('parking', value, { shouldValidate: true })}
+            value={getFieldValue('parking') || ''}
+            onValueChange={(value) => setFieldValue('parking', value)}
           >
             <SelectTrigger 
-              id="parking"
+              id={getFieldId('parking')}
               className={cn(
                 "w-full",
-                errors.parking && "border-destructive focus-visible:ring-destructive"
+                getFieldError('parking') && "border-destructive focus-visible:ring-destructive"
               )}
             >
               <SelectValue placeholder="Select Parking Option" />
@@ -228,8 +250,8 @@ export const RentalDetails: React.FC<FormSectionProps> = ({
               ))}
             </SelectContent>
           </Select>
-          {errors.parking && (
-            <p className="text-sm text-destructive mt-1">{errors.parking.message as string}</p>
+          {getFieldError('parking') && (
+            <p className="text-sm text-destructive mt-1">{getFieldError('parking')?.message as string}</p>
           )}
         </div>
       </div>
@@ -241,23 +263,22 @@ export const RentalDetails: React.FC<FormSectionProps> = ({
           {TENANT_PREFERENCES.map((preference) => (
             <div key={preference} className="flex items-start space-x-2">
               <Checkbox
-                id={`tenantPref-${preference}`}
-                checked={(getValues('preferredTenants') || []).includes(preference)}
+                id={getFieldId(`tenantPref-${preference}`)}
+                checked={(getFieldValue('preferredTenants') || []).includes(preference)}
                 onCheckedChange={(checked) => {
-                  const currentPreferences = getValues('preferredTenants') || [];
+                  const currentPreferences = getFieldValue('preferredTenants') || [];
                   if (checked) {
-                    setValue('preferredTenants', [...currentPreferences, preference], { shouldValidate: true });
+                    setFieldValue('preferredTenants', [...currentPreferences, preference]);
                   } else {
-                    setValue(
+                    setFieldValue(
                       'preferredTenants',
-                      currentPreferences.filter((item) => item !== preference),
-                      { shouldValidate: true }
+                      currentPreferences.filter((item) => item !== preference)
                     );
                   }
                 }}
               />
               <label
-                htmlFor={`tenantPref-${preference}`}
+                htmlFor={getFieldId(`tenantPref-${preference}`)}
                 className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
               >
                 {preference}
@@ -265,8 +286,8 @@ export const RentalDetails: React.FC<FormSectionProps> = ({
             </div>
           ))}
         </div>
-        {errors.preferredTenants && (
-          <p className="text-sm text-destructive mt-2">{errors.preferredTenants.message as string}</p>
+        {getFieldError('preferredTenants') && (
+          <p className="text-sm text-destructive mt-2">{getFieldError('preferredTenants')?.message as string}</p>
         )}
       </div>
 
@@ -276,12 +297,12 @@ export const RentalDetails: React.FC<FormSectionProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="flex items-start space-x-2">
             <Checkbox
-              id="nonVegAllowed"
-              checked={getValues('nonVegAllowed') || false}
-              onCheckedChange={(checked) => setValue('nonVegAllowed', !!checked, { shouldValidate: true })}
+              id={getFieldId('nonVegAllowed')}
+              checked={getFieldValue('nonVegAllowed') || false}
+              onCheckedChange={(checked) => setFieldValue('nonVegAllowed', !!checked)}
             />
             <label
-              htmlFor="nonVegAllowed"
+              htmlFor={getFieldId('nonVegAllowed')}
               className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
             >
               Non-Veg Allowed
@@ -290,12 +311,12 @@ export const RentalDetails: React.FC<FormSectionProps> = ({
           
           <div className="flex items-start space-x-2">
             <Checkbox
-              id="petsAllowed"
-              checked={getValues('petsAllowed') || false}
-              onCheckedChange={(checked) => setValue('petsAllowed', !!checked, { shouldValidate: true })}
+              id={getFieldId('petsAllowed')}
+              checked={getFieldValue('petsAllowed') || false}
+              onCheckedChange={(checked) => setFieldValue('petsAllowed', !!checked)}
             />
             <label
-              htmlFor="petsAllowed"
+              htmlFor={getFieldId('petsAllowed')}
               className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
             >
               Pets Allowed
@@ -304,17 +325,17 @@ export const RentalDetails: React.FC<FormSectionProps> = ({
           
           <div className="flex items-start space-x-2">
             <Checkbox
-              id="lockInPeriod"
-              checked={getValues('hasLockInPeriod') || false}
+              id={getFieldId('hasLockInPeriod')}
+              checked={getFieldValue('hasLockInPeriod') || false}
               onCheckedChange={(checked) => {
-                setValue('hasLockInPeriod', !!checked, { shouldValidate: true });
+                setFieldValue('hasLockInPeriod', !!checked);
                 if (!checked) {
-                  setValue('lockInPeriod', '', { shouldValidate: true });
+                  setFieldValue('lockInPeriod', '');
                 }
               }}
             />
             <label
-              htmlFor="lockInPeriod"
+              htmlFor={getFieldId('hasLockInPeriod')}
               className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
             >
               Has Lock-in Period
@@ -322,22 +343,22 @@ export const RentalDetails: React.FC<FormSectionProps> = ({
           </div>
         </div>
         
-        {getValues('hasLockInPeriod') && (
+        {getFieldValue('hasLockInPeriod') && (
           <div className="mt-4 max-w-xs">
-            <RequiredLabel htmlFor="lockInPeriod">Lock-in Period (months)</RequiredLabel>
+            <RequiredLabel htmlFor={getFieldId('lockInPeriod')}>Lock-in Period (months)</RequiredLabel>
             <Input
-              id="lockInPeriod"
+              id={getFieldId('lockInPeriod')}
               type="number"
               min={1}
               max={36}
-              {...register('lockInPeriod')}
+              {...registerField('lockInPeriod')}
               placeholder="e.g. 6"
               className={cn(
-                errors.lockInPeriod && "border-destructive focus-visible:ring-destructive"
+                getFieldError('lockInPeriod') && "border-destructive focus-visible:ring-destructive"
               )}
             />
-            {errors.lockInPeriod && (
-              <p className="text-sm text-destructive mt-1">{errors.lockInPeriod.message as string}</p>
+            {getFieldError('lockInPeriod') && (
+              <p className="text-sm text-destructive mt-1">{getFieldError('lockInPeriod')?.message as string}</p>
             )}
           </div>
         )}

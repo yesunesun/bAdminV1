@@ -1,7 +1,7 @@
 // src/lib/utils.ts
-// Version: 2.0.0
-// Last Modified: 26-02-2025 17:15 IST
-// Purpose: Updated utility functions to include formatCurrency
+// Version: 2.1.0
+// Last Modified: 17-05-2025 15:45 IST
+// Purpose: Added slugify function and utils object export
 
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
@@ -22,3 +22,27 @@ export function formatCurrency(value: number): string {
     maximumFractionDigits: 0
   }).format(value);
 }
+
+/**
+ * Converts a string to a URL-friendly slug
+ * @param text - The text to convert to a slug
+ * @returns A URL-friendly slug
+ */
+export function slugify(text: string): string {
+  return text
+    .toString()
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '-')     // Replace spaces with -
+    .replace(/[^\w\-]+/g, '') // Remove all non-word characters
+    .replace(/\-\-+/g, '-')   // Replace multiple - with single -
+    .replace(/^-+/, '')       // Trim - from start of text
+    .replace(/-+$/, '');      // Trim - from end of text
+}
+
+// Export individual functions and also as a utils object for backward compatibility
+export const utils = {
+  cn,
+  formatCurrency,
+  slugify
+};

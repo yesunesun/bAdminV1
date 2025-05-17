@@ -1,6 +1,6 @@
 // src/modules/owner/components/property/wizard/constants/coworkingDetails.ts
-// Version: 1.0.0
-// Last Modified: 10-04-2025 22:45 IST
+// Version: 1.3.0
+// Last Modified: 17-05-2025 15:15 IST
 // Purpose: Constants for Commercial Co-working property flow
 
 export const COWORKING_SPACE_TYPES = [
@@ -51,6 +51,9 @@ export const BOOKING_OPTIONS = [
   'Through Website'
 ] as const;
 
+// Add the properly named constant that matches what the code is trying to import
+export const COWORKING_BOOKING_OPTIONS = BOOKING_OPTIONS;
+
 export const PRICING_STRUCTURES = [
   'Per Seat',
   'Per Office',
@@ -58,6 +61,9 @@ export const PRICING_STRUCTURES = [
   'Per Hour',
   'Package Deal'
 ] as const;
+
+// Add the properly named constant that matches what the code is trying to import
+export const COWORKING_PRICING_STRUCTURES = PRICING_STRUCTURES;
 
 export const ACCESS_POLICY_OPTIONS = [
   'Business Hours Only',
@@ -72,3 +78,6 @@ export const INTERNET_SPEED_OPTIONS = [
   '500-1000 Mbps',
   '1+ Gbps'
 ] as const;
+
+// Add the properly named constant that matches what the code is trying to import
+export const COWORKING_INTERNET_SPEEDS = INTERNET_SPEED_OPTIONS;

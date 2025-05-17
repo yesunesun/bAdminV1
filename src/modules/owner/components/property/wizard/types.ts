@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/types.ts
-// Version: 6.0.0
-// Last Modified: 18-05-2025 15:40 IST
-// Purpose: Updated to support flow-specific step identifiers in data structure
+// Version: 7.0.0
+// Last Modified: 18-05-2025 18:30 IST
+// Purpose: Removed backward compatibility fields and simplified the FormData interface
 
 import { UseFormReturn } from 'react-hook-form';
 
@@ -29,6 +29,7 @@ export interface FormData {
   flow?: {
     category: "residential" | "commercial" | "land";
     listingType: string;
+    flowType?: string;
   };
   
   // Steps container with flow-specific identifiers
@@ -94,19 +95,7 @@ export interface FormData {
     };
   };
   
-  // Top-level sections (mapped from steps for backward compatibility)
-  details?: any;
-  location?: any;
-  rental?: any;
-  sale?: any;
-  features?: any;
-  flatmate_details?: any;
-  pg_details?: any;
-  coworking?: any;
-  commercial_details?: any;
-  land_features?: any;
-  
-  // Legacy support for direct fields
+  // Enable compatibility with any properties that might be added dynamically
   [key: string]: any;
 }
 
