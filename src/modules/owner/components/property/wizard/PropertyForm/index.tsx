@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/PropertyForm/index.tsx
-// Version: 6.8.0
-// Last Modified: 13-05-2025 16:45 IST
-// Purpose: Removed validation error message on Review tab
+// Version: 7.1.0
+// Last Modified: 17-05-2025 12:15 IST
+// Purpose: Using separate DebugPanel component for better code organization
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -21,6 +21,7 @@ import LoginPrompt from './components/LoginPrompt';
 import PropertyTypeSelection from '../components/PropertyTypeSelection';
 import WizardBreadcrumbs from '../components/WizardBreadcrumbs';
 import { FormNavigation } from '../components/FormNavigation'; // Changed to named import
+import DebugPanel from '../components/DebugPanel'; // Import the new DebugPanel component
 
 // Hooks
 import { useStepNavigation } from './hooks/useStepNavigation';
@@ -406,7 +407,12 @@ export function PropertyForm({
 
  // Handle debug button click
  const handleDebugClick = () => {
-   setShowDebugInfo(true);
+   setShowDebugInfo(!showDebugInfo);
+ };
+ 
+ // Handle closing the debug panel
+ const handleCloseDebugPanel = () => {
+   setShowDebugInfo(false);
  };
 
  // If user is not logged in, show login prompt
@@ -457,7 +463,7 @@ const effectivePropertyId = savedPropertyId || propertyId || propertyIdAfterSave
 const isReviewStep = flowSteps && flowSteps[formStep - 1] ? flowSteps[formStep - 1].id.includes('review') : false;
 
 return (
-  <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <div className="bg-card rounded-xl shadow-lg">
       {/* Form Header with Status Indicator */}
       <FormHeader 
@@ -492,47 +498,76 @@ return (
           </div>
         )}
 
-        <div className="space-y-6">
-          {/* Form Content for the current step */}
-          <FormContent 
-            form={form}
-            formStep={formStep}
-            STEPS={flowSteps || STEPS}
-            effectiveCategory={effectiveCategory}
-            effectiveAdType={effectiveAdType}
-            mode={mode}
-            selectedCity={selectedCity || initialData?.locality || ''}
-            isSaleMode={isSaleMode}
-            isPGHostelMode={isPGHostelMode}
-            isCommercialRentMode={isCommercialRentMode}
-            isCommercialSaleMode={isCommercialSaleMode}
-            isCoworkingMode={isCoworkingMode}
-            isLandSaleMode={isLandSaleMode}
-            isFlatmatesMode={isFlatmatesMode}
-            handlePreviousStep={safePreviousStep}
-            handleSaveAsDraft={handleSaveAsDraft}
-            handleSaveAndPublish={handleSaveAndPublish}
-            handleUpdate={handleUpdate}
-            saving={saving}
-            status={status}
-            savedPropertyId={effectivePropertyId}
-            handleImageUploadComplete={handleImageUploadComplete}
-            showDebugInfo={showDebugInfo}
-            setShowDebugInfo={setShowDebugInfo}
-          />
+        {/* Main content area with flex layout for side panel */}
+        <div className={`flex ${showDebugInfo ? 'space-x-4' : ''}`}>
+          {/* Main form content - responsive width */}
+          <div className={`${showDebugInfo ? 'w-2/3' : 'w-full'} transition-all duration-300`}>
+            <div className="space-y-6">
+              {/* Form Content for the current step */}
+              <FormContent 
+                form={form}
+                formStep={formStep}
+                STEPS={flowSteps || STEPS}
+                effectiveCategory={effectiveCategory}
+                effectiveAdType={effectiveAdType}
+                mode={mode}
+                selectedCity={selectedCity || initialData?.locality || ''}
+                isSaleMode={isSaleMode}
+                isPGHostelMode={isPGHostelMode}
+                isCommercialRentMode={isCommercialRentMode}
+                isCommercialSaleMode={isCommercialSaleMode}
+                isCoworkingMode={isCoworkingMode}
+                isLandSaleMode={isLandSaleMode}
+                isFlatmatesMode={isFlatmatesMode}
+                handlePreviousStep={safePreviousStep}
+                handleSaveAsDraft={handleSaveAsDraft}
+                handleSaveAndPublish={handleSaveAndPublish}
+                handleUpdate={handleUpdate}
+                saving={saving}
+                status={status}
+                savedPropertyId={effectivePropertyId}
+                handleImageUploadComplete={handleImageUploadComplete}
+                showDebugInfo={showDebugInfo}
+                setShowDebugInfo={setShowDebugInfo}
+              />
+              
+              {/* Step Navigation (Previous/Next buttons) */}
+              <StepNavigation 
+                formStep={formStep}
+                STEPS={flowSteps || STEPS}
+                handlePreviousStep={safePreviousStep}
+                handleNextStep={handleNextStep}
+                savedPropertyId={effectivePropertyId}
+                onSave={enhancedSaveFunction}
+                onPublish={handleDirectSaveAndPublish} // Use our direct save function
+                isLastStep={isReviewStep} // Flag to indicate this is the review step
+                disablePrevious={saving || saveInProgress}
+              />
+            </div>
+          </div>
           
-          {/* Step Navigation (Previous/Next buttons) */}
-          <StepNavigation 
-            formStep={formStep}
-            STEPS={flowSteps || STEPS}
-            handlePreviousStep={safePreviousStep}
-            handleNextStep={handleNextStep}
-            savedPropertyId={effectivePropertyId}
-            onSave={enhancedSaveFunction}
-            onPublish={handleDirectSaveAndPublish} // Use our direct save function
-            isLastStep={isReviewStep} // Flag to indicate this is the review step
-            disablePrevious={saving || saveInProgress}
-          />
+          {/* Debug side panel - only visible when showDebugInfo is true */}
+          {showDebugInfo && (
+            <div className="w-1/3 transition-all duration-300 h-[calc(100vh-240px)] overflow-auto">
+              <DebugPanel
+                form={form}
+                formStep={formStep}
+                flowSteps={flowSteps || STEPS}
+                effectiveCategory={effectiveCategory}
+                effectiveAdType={effectiveAdType}
+                mode={mode}
+                isSaleMode={isSaleMode}
+                isPGHostelMode={isPGHostelMode}
+                isCommercialRentMode={isCommercialRentMode}
+                isCommercialSaleMode={isCommercialSaleMode}
+                isCoworkingMode={isCoworkingMode}
+                isLandSaleMode={isLandSaleMode}
+                isFlatmatesMode={isFlatmatesMode}
+                effectivePropertyId={effectivePropertyId}
+                onClose={handleCloseDebugPanel}
+              />
+            </div>
+          )}
         </div>
       </div>
     </div>

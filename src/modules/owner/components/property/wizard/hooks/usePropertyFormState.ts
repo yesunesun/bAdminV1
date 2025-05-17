@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/hooks/usePropertyFormState.ts
-// Version: 4.0.0
-// Last Modified: 04-05-2025 17:45 IST
-// Purpose: Updated to only support v3 data structure
+// Version: 5.0.0
+// Last Modified: 18-05-2025 11:45 IST
+// Purpose: Fix form state initialization to prevent infinite renders
 
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
@@ -43,6 +43,8 @@ export function usePropertyFormState({
   const [savedPropertyId, setSavedPropertyId] = useState<string | null>(existingPropertyId || null);
   const [status, setStatus] = useState(initialStatus);
   const [isFormReady, setIsFormReady] = useState(false);
+  
+  // Special property type flags - determined from the form data
   const [isPGHostelMode, setIsPGHostelMode] = useState(false);
 
   // Extract property type and listing type from URL path

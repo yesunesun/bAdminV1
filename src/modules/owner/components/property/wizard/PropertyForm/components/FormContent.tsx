@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/PropertyForm/components/FormContent.tsx
-// Version: 6.2.0
-// Last Modified: 13-05-2025 14:45 IST
-// Purpose: Removed debug button from bottom, moving it to header instead
+// Version: 6.3.0
+// Last Modified: 17-05-2025 10:30 IST
+// Purpose: Replaced debug popup with toggleable side panel
 
 import React, { useState } from 'react';
 import { UseFormReturn } from 'react-hook-form';
@@ -199,65 +199,61 @@ const FormContent = ({
     }
   };
   
-  // Debug panel as popup/modal
+  // Side debug panel 
   const debugPanel = () => {
     if (!showDebugInfo || process.env.NODE_ENV !== 'development') return null;
     
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-lg shadow-lg p-6 max-w-2xl w-full max-h-[80vh] overflow-auto">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold">Debug Information</h3>
-            <button 
-              onClick={() => setShowDebugInfo && setShowDebugInfo(false)}
-              className="text-gray-500 hover:text-gray-700"
-            >
-              ✕
-            </button>
+      <div className="bg-white rounded-lg shadow-lg p-4 w-full h-full overflow-auto">
+        <div className="flex justify-between items-center mb-3">
+          <h3 className="text-lg font-semibold">Debug Information</h3>
+          <button 
+            onClick={() => setShowDebugInfo && setShowDebugInfo(false)}
+            className="text-gray-500 hover:text-gray-700 h-6 w-6 flex items-center justify-center rounded-full hover:bg-gray-100"
+          >
+            ✕
+          </button>
+        </div>
+        
+        <div className="space-y-3">
+          <div>
+            <h4 className="font-medium mb-1 text-sm">Form Information</h4>
+            <div className="bg-gray-50 p-2 rounded text-xs">
+              <div><strong>Current Step:</strong> {currentStepObj?.id}</div>
+              <div><strong>Flow Type:</strong> {flowType}</div>
+              <div><strong>Step Progress:</strong> {formStep}/{STEPS.length}</div>
+              <div><strong>Property Category:</strong> {effectiveCategory}</div>
+              <div><strong>Listing Type:</strong> {effectiveAdType}</div>
+              <div><strong>Mode:</strong> {mode}</div>
+              <div><strong>Sale Mode:</strong> {isSaleMode ? 'Yes' : 'No'}</div>
+              <div><strong>Property ID:</strong> {savedPropertyId || 'Not saved yet'}</div>
+            </div>
           </div>
           
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <h4 className="font-medium mb-1">Form Information</h4>
-                <div className="bg-gray-100 p-3 rounded text-xs">
-                  <div><strong>Current Step:</strong> {currentStepObj?.id}</div>
-                  <div><strong>Flow Type:</strong> {flowType}</div>
-                  <div><strong>Step Progress:</strong> {formStep}/{STEPS.length}</div>
-                  <div><strong>Property Category:</strong> {effectiveCategory}</div>
-                  <div><strong>Listing Type:</strong> {effectiveAdType}</div>
-                  <div><strong>Mode:</strong> {mode}</div>
-                  <div><strong>Sale Mode:</strong> {isSaleMode ? 'Yes' : 'No'}</div>
-                  <div><strong>Property ID:</strong> {savedPropertyId || 'Not saved yet'}</div>
-                </div>
-              </div>
-              
-              <div>
-                <h4 className="font-medium mb-1">Property Type Flags</h4>
-                <div className="bg-gray-100 p-3 rounded text-xs">
-                  <div><strong>isPGHostelMode:</strong> {isPGHostelMode ? 'Yes' : 'No'}</div>
-                  <div><strong>isCommercialRentMode:</strong> {isCommercialRentMode ? 'Yes' : 'No'}</div>
-                  <div><strong>isCommercialSaleMode:</strong> {isCommercialSaleMode ? 'Yes' : 'No'}</div>
-                  <div><strong>isCoworkingMode:</strong> {isCoworkingMode ? 'Yes' : 'No'}</div>
-                  <div><strong>isLandSaleMode:</strong> {isLandSaleMode ? 'Yes' : 'No'}</div>
-                  <div><strong>isFlatmatesMode:</strong> {isFlatmatesMode ? 'Yes' : 'No'}</div>
-                </div>
-              </div>
+          <div>
+            <h4 className="font-medium mb-1 text-sm">Property Type Flags</h4>
+            <div className="bg-gray-50 p-2 rounded text-xs">
+              <div><strong>isPGHostelMode:</strong> {isPGHostelMode ? 'Yes' : 'No'}</div>
+              <div><strong>isCommercialRentMode:</strong> {isCommercialRentMode ? 'Yes' : 'No'}</div>
+              <div><strong>isCommercialSaleMode:</strong> {isCommercialSaleMode ? 'Yes' : 'No'}</div>
+              <div><strong>isCoworkingMode:</strong> {isCoworkingMode ? 'Yes' : 'No'}</div>
+              <div><strong>isLandSaleMode:</strong> {isLandSaleMode ? 'Yes' : 'No'}</div>
+              <div><strong>isFlatmatesMode:</strong> {isFlatmatesMode ? 'Yes' : 'No'}</div>
             </div>
-            
-            <div>
-              <h4 className="font-medium mb-1">Steps Data</h4>
-              <pre className="text-xs overflow-auto max-h-60 bg-gray-100 p-3 rounded">
-                {JSON.stringify(form.getValues('steps'), null, 2)}
-              </pre>
-            </div>
-            
-            <div>
-              <h4 className="font-medium mb-1">All Form Values</h4>
-              <pre className="text-xs overflow-auto max-h-60 bg-gray-100 p-3 rounded">
-                {JSON.stringify(form.getValues(), null, 2)}
-              </pre>
-            </div>
+          </div>
+          
+          <div>
+            <h4 className="font-medium mb-1 text-sm">Steps Data</h4>
+            <pre className="text-xs overflow-auto max-h-36 bg-gray-50 p-2 rounded">
+              {JSON.stringify(form.getValues('steps'), null, 2)}
+            </pre>
+          </div>
+          
+          <div>
+            <h4 className="font-medium mb-1 text-sm">All Form Values</h4>
+            <pre className="text-xs overflow-auto max-h-48 bg-gray-50 p-2 rounded">
+              {JSON.stringify(form.getValues(), null, 2)}
+            </pre>
           </div>
         </div>
       </div>
@@ -265,11 +261,11 @@ const FormContent = ({
   };
   
   return (
-    <div className="space-y-6 relative">
-      {renderFormSection()}
-      
-      {/* Debug modal/popup */}
-      {debugPanel()}
+    <div className="relative">
+      {/* Main content with responsive flex layout */}
+      <div className="space-y-6">
+        {renderFormSection()}
+      </div>
     </div>
   );
 };

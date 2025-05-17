@@ -1,7 +1,9 @@
 // src/modules/owner/components/property/wizard/utils/propertyDataAdapter.ts
-// Version: 3.4.0
-// Last Modified: 14-05-2025 11:30 IST
-// Purpose: Modified initial property data structure to start with blank values instead of hardcoded examples
+// Version: 4.3.0
+// Last Modified: 18-05-2025 11:45 IST
+// Purpose: Fix steps initialization based on flow type without causing re-renders
+
+import { FLOW_TYPES, FLOW_STEPS } from '../constants/flows';
 
 /**
  * Data structure version constants
@@ -22,12 +24,12 @@ export const detectDataVersion = (data: any): string => {
     return data.meta._version;
   }
   
-  // Check for v3 structure (meta, flow, details sections)
-  if (data.meta && data.flow && data.details) {
+  // Check for v3 structure (meta, flow, steps sections)
+  if (data.meta && data.flow && data.steps) {
     return DATA_VERSION_V3;
   }
   
-  // Default to v3 since we're phasing out older versions
+  // Default to v3
   return CURRENT_DATA_VERSION;
 };
 
@@ -52,10 +54,10 @@ export const detectSpecializedPropertyType = (data: any): {
   // For v3 format
   if (data.flow) {
     return {
-      isCoworking: data.flow.listingType === 'coworking',
-      isPGHostel: data.flow.listingType === 'pghostel',
-      isFlatmate: data.flow.listingType === 'flatmates',
-      isLand: data.flow.category === 'land'
+      isCoworking: data.flow.listingType === 'coworking' || data.flow.flowType === FLOW_TYPES.COMMERCIAL_COWORKING,
+      isPGHostel: data.flow.listingType === 'pghostel' || data.flow.flowType === FLOW_TYPES.RESIDENTIAL_PGHOSTEL,
+      isFlatmate: data.flow.listingType === 'flatmates' || data.flow.flowType === FLOW_TYPES.RESIDENTIAL_FLATMATES,
+      isLand: data.flow.category === 'land' || data.flow.flowType === FLOW_TYPES.LAND_SALE
     };
   }
   
@@ -69,7 +71,93 @@ export const detectSpecializedPropertyType = (data: any): {
 };
 
 /**
- * Creates a new clean property data structure in v3 format with blank values
+ * Determines the appropriate flow type based on category and listing type
+ * @param category Property category (residential, commercial, land)
+ * @param listingType Listing type (rent, sale, pghostel, flatmates, coworking)
+ * @returns Flow type key from FLOW_TYPES
+ */
+export const determineFlowType = (
+  category: string = '',
+  listingType: string = ''
+): string => {
+  const normalizedCategory = (category || '').toLowerCase();
+  const normalizedListingType = (listingType || '').toLowerCase();
+  
+  // Map to the appropriate flow type
+  if (normalizedCategory === 'residential') {
+    if (normalizedListingType === 'rent') return FLOW_TYPES.RESIDENTIAL_RENT;
+    if (normalizedListingType === 'sale') return FLOW_TYPES.RESIDENTIAL_SALE;
+    if (normalizedListingType === 'flatmates') return FLOW_TYPES.RESIDENTIAL_FLATMATES;
+    if (normalizedListingType === 'pghostel') return FLOW_TYPES.RESIDENTIAL_PGHOSTEL;
+  } else if (normalizedCategory === 'commercial') {
+    if (normalizedListingType === 'rent') return FLOW_TYPES.COMMERCIAL_RENT;
+    if (normalizedListingType === 'sale') return FLOW_TYPES.COMMERCIAL_SALE;
+    if (normalizedListingType === 'coworking') return FLOW_TYPES.COMMERCIAL_COWORKING;
+  } else if (normalizedCategory === 'land') {
+    return FLOW_TYPES.LAND_SALE;
+  }
+  
+  // Handle the case of empty or invalid inputs
+  if (!normalizedCategory && !normalizedListingType) {
+    return FLOW_TYPES.DEFAULT;
+  }
+  
+  // Special handling for just listingType
+  if (!normalizedCategory) {
+    if (normalizedListingType === 'rent') return FLOW_TYPES.RESIDENTIAL_RENT;
+    if (normalizedListingType === 'sale') return FLOW_TYPES.RESIDENTIAL_SALE;
+    if (normalizedListingType === 'flatmates') return FLOW_TYPES.RESIDENTIAL_FLATMATES;
+    if (normalizedListingType === 'pghostel') return FLOW_TYPES.RESIDENTIAL_PGHOSTEL;
+    if (normalizedListingType === 'coworking') return FLOW_TYPES.COMMERCIAL_COWORKING;
+  }
+  
+  // Fallback to default flow
+  return FLOW_TYPES.DEFAULT;
+};
+
+/**
+ * Normalizes category and listing type based on flow type for consistency
+ * @param flowType The flow type from FLOW_TYPES
+ * @returns Normalized category and listing type
+ */
+export const normalizeFlowValues = (
+  flowType: string
+): { category: string, listingType: string } => {
+  switch(flowType) {
+    case FLOW_TYPES.RESIDENTIAL_RENT:
+      return { category: 'residential', listingType: 'rent' };
+    
+    case FLOW_TYPES.RESIDENTIAL_SALE:
+      return { category: 'residential', listingType: 'sale' };
+      
+    case FLOW_TYPES.RESIDENTIAL_FLATMATES:
+      return { category: 'residential', listingType: 'flatmates' };
+      
+    case FLOW_TYPES.RESIDENTIAL_PGHOSTEL:
+      return { category: 'residential', listingType: 'pghostel' };
+      
+    case FLOW_TYPES.COMMERCIAL_RENT:
+      return { category: 'commercial', listingType: 'rent' };
+      
+    case FLOW_TYPES.COMMERCIAL_SALE:
+      return { category: 'commercial', listingType: 'sale' };
+      
+    case FLOW_TYPES.COMMERCIAL_COWORKING:
+      return { category: 'commercial', listingType: 'coworking' };
+      
+    case FLOW_TYPES.LAND_SALE:
+      return { category: 'land', listingType: 'sale' };
+      
+    default:
+      return { category: 'residential', listingType: 'rent' };
+  }
+};
+
+/**
+ * Creates a new clean property data structure in v3 format with the new steps-based approach
+ * @param category Property category (residential, commercial, land)
+ * @param listingType Listing type (rent, sale, pghostel, flatmates, coworking)
+ * @returns New v3 property data structure with steps for the appropriate flow
  */
 export const createNewPropertyData = (
   category: string = '',
@@ -77,7 +165,18 @@ export const createNewPropertyData = (
 ): any => {
   const now = new Date().toISOString();
   
-  return {
+  // Determine the flow type based on category and listing type
+  const flowType = determineFlowType(category, listingType);
+  
+  // Normalize category and listing type to ensure consistency with flowType
+  const normalizedValues = normalizeFlowValues(flowType);
+  
+  // Get the appropriate steps for this flow type
+  const flowStepsKey = flowType.toLowerCase();
+  const flowSteps = FLOW_STEPS[flowStepsKey] || FLOW_STEPS.default;
+  
+  // Build the v3 structure with steps
+  const result = {
     meta: {
       _version: CURRENT_DATA_VERSION,
       created_at: now,
@@ -85,53 +184,29 @@ export const createNewPropertyData = (
       status: 'draft'
     },
     flow: {
-      category: category,
-      listingType: listingType
+      category: normalizedValues.category,
+      listingType: normalizedValues.listingType,
+      flowType: flowType
     },
-    details: {
-      basicDetails: {
-        title: '',
-        propertyType: '',
-        bhkType: '',
-        floor: null,
-        totalFloors: null,
-        builtUpArea: null,
-        builtUpAreaUnit: 'sqft',
-        bathrooms: null,
-        balconies: null,
-        facing: '',
-        propertyAge: ''
+    steps: {},
+    media: {
+      photos: {
+        images: []
       },
-      location: {
-        address: '',
-        flatPlotNo: '',
-        landmark: '',
-        locality: '',
-        city: '',
-        state: '',
-        pinCode: '',
-        coordinates: {
-          latitude: null,
-          longitude: null
-        }
-      },
-      features: {
-        amenities: [],
-        parking: '',
-        petFriendly: false,
-        nonVegAllowed: false,
-        waterSupply: '',
-        powerBackup: '',
-        gatedSecurity: false,
-        description: ''
-      },
-      media: {
-        photos: {
-          images: []
-        }
+      videos: {
+        urls: []
       }
     }
   };
+  
+  // Initialize each step with empty object (excluding review steps)
+  flowSteps.forEach(stepId => {
+    if (!stepId.includes('_review')) {
+      result.steps[stepId] = {};
+    }
+  });
+  
+  return result;
 };
 
 /**
@@ -142,203 +217,86 @@ export const createNewPropertyData = (
 export const ensureV3Structure = (data: any): any => {
   if (!data) return createNewPropertyData();
   
-  // Detect the data version
-  const version = detectDataVersion(data);
+  // Clone the data to avoid mutations
+  const result = JSON.parse(JSON.stringify(data));
   
-  // Handle the mixed structure case (fields at root level and in details)
-  if (version === DATA_VERSION_V3 && data.details && 
-      (data.basicDetails || data.rental || data.features || 
-       data.address || data.bhkType || data.builtUpArea)) {
-    
-    // Create a clean v3 structure
-    const cleanData = {
-      meta: { ...data.meta },
-      flow: { ...data.flow },
-      details: { ...data.details }
+  // Determine flow type - read it directly or derive it
+  const flowType = result.flow?.flowType || determineFlowType(result.flow?.category, result.flow?.listingType);
+  const normalizedValues = normalizeFlowValues(flowType);
+  
+  // Update flow values to ensure consistency
+  if (!result.flow) {
+    result.flow = {
+      category: normalizedValues.category,
+      listingType: normalizedValues.listingType,
+      flowType: flowType
     };
-    
-    // Ensure meta section is properly set
-    cleanData.meta = cleanData.meta || {
-      _version: CURRENT_DATA_VERSION,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      status: 'draft'
-    };
-    cleanData.meta._version = CURRENT_DATA_VERSION;
-    
-    // Move root level basicDetails into details.basicDetails if they exist
-    if (data.basicDetails && (!data.details.basicDetails || Object.keys(data.details.basicDetails).length === 0)) {
-      cleanData.details.basicDetails = { ...data.basicDetails };
-    }
-    // Or populate from individual fields
-    else if (!data.details.basicDetails || Object.keys(data.details.basicDetails).length === 0) {
-      cleanData.details.basicDetails = {
-        title: data.title || "",
-        propertyType: data.propertyType || "",
-        bhkType: data.bhkType || "",
-        floor: data.floor ? parseInt(data.floor) : null,
-        totalFloors: data.totalFloors ? parseInt(data.totalFloors) : null,
-        builtUpArea: data.builtUpArea ? parseFloat(data.builtUpArea) : null,
-        builtUpAreaUnit: data.builtUpAreaUnit || "sqft",
-        bathrooms: data.bathrooms ? parseInt(data.bathrooms) : null,
-        balconies: data.balconies ? parseInt(data.balconies) : null,
-        facing: data.facing || "",
-        propertyAge: data.propertyAge || ""
-      };
-    }
-    
-    // Move root level location fields into details.location if needed
-    if (!data.details.location || Object.keys(data.details.location).length === 0) {
-      cleanData.details.location = {
-        address: data.address || "",
-        flatPlotNo: data.flatPlotNo || "",
-        landmark: data.landmark || "",
-        locality: data.locality || "",
-        city: data.city || "",
-        state: data.state || "",
-        pinCode: data.pinCode || "",
-        coordinates: {
-          latitude: data.latitude || null,
-          longitude: data.longitude || null
-        }
-      };
-    }
-    
-    // Move rental information to the right place
-    if (data.rental && (!data.details.rentalInfo || Object.keys(data.details.rentalInfo).length === 0)) {
-      cleanData.details.rentalInfo = {
-        rentAmount: data.rental.rentAmount || null,
-        securityDeposit: data.rental.securityDeposit || null,
-        maintenanceCharges: data.rental.maintenanceCharges || null,
-        rentNegotiable: data.rental.rentNegotiable || false,
-        availableFrom: data.rental.availableFrom || "",
-        preferredTenants: data.rental.preferredTenants || [],
-        leaseDuration: data.rental.leaseDuration || "",
-        furnishingStatus: data.rental.furnishingStatus || ""
-      };
-    } 
-    // Or from individual fields
-    else if (!data.details.rentalInfo || Object.keys(data.details.rentalInfo).length === 0) {
-      cleanData.details.rentalInfo = {
-        rentAmount: data.rentAmount ? parseFloat(data.rentAmount) : null,
-        securityDeposit: data.securityDeposit ? parseFloat(data.securityDeposit) : null,
-        maintenanceCharges: data.maintenance ? parseFloat(data.maintenance) : null,
-        rentNegotiable: data.rentNegotiable || false,
-        availableFrom: data.availableFrom || "",
-        preferredTenants: data.preferredTenants || [],
-        leaseDuration: data.leaseDuration || "",
-        furnishingStatus: data.furnishing || ""
-      };
-    }
-    
-    // Move features to the right place
-    if (data.features && (!data.details.features || Object.keys(data.details.features).length === 0)) {
-      cleanData.details.features = {
-        amenities: data.features.amenities || [],
-        parking: data.features.parking || "",
-        petFriendly: data.features.petFriendly || false,
-        nonVegAllowed: data.features.nonVegAllowed || false,
-        waterSupply: data.features.waterSupply || "",
-        powerBackup: data.features.powerBackup || "",
-        gatedSecurity: data.features.gatedSecurity || false,
-        description: data.features.description || ""
-      };
-    }
-    // Or from individual fields
-    else if (!data.details.features || Object.keys(data.details.features).length === 0) {
-      cleanData.details.features = {
-        amenities: data.amenities || [],
-        parking: data.parking || "",
-        petFriendly: data.petFriendly || false,
-        nonVegAllowed: data.nonVegAllowed || false,
-        waterSupply: data.waterSupply || "",
-        powerBackup: data.powerBackup || "",
-        gatedSecurity: data.gatedSecurity || false,
-        description: data.description || ""
-      };
-    }
-    
-    // Ensure media section exists
-    if (!cleanData.details.media) {
-      cleanData.details.media = {
-        photos: {
-          images: data.images || []
-        }
-      };
-    }
-    
-    // Check for root-level media section
-    if (data.media && data.media.photos && 
-        (!cleanData.details.media || !cleanData.details.media.photos)) {
-      cleanData.details.media = {
-        photos: { ...data.media.photos }
-      };
-    }
-    
-    return cleanData;
+  } else {
+    result.flow.category = normalizedValues.category;
+    result.flow.listingType = normalizedValues.listingType;
+    result.flow.flowType = flowType;
   }
   
-  // If it's already v3, ensure all required sections exist
-  const cleanData = { ...data };
-  
   // Ensure meta section exists
-  if (!cleanData.meta) {
-    cleanData.meta = {
+  if (!result.meta) {
+    result.meta = {
       _version: CURRENT_DATA_VERSION,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       status: 'draft'
     };
   } else {
-    cleanData.meta._version = CURRENT_DATA_VERSION;
+    result.meta._version = CURRENT_DATA_VERSION;
+    result.meta.updated_at = new Date().toISOString();
   }
   
-  // Ensure flow section exists
-  if (!cleanData.flow) {
-    cleanData.flow = {
-      category: '',
-      listingType: ''
-    };
+  // If no steps, create an empty steps object
+  if (!result.steps) {
+    result.steps = {};
   }
   
-  // Ensure details section exists
-  if (!cleanData.details) {
-    cleanData.details = {
-      basicDetails: {},
-      location: {},
-      features: {},
-      media: { photos: { images: [] } }
-    };
+  // Get the expected steps for this flow type
+  const flowStepsKey = flowType.toLowerCase();
+  const expectedSteps = FLOW_STEPS[flowStepsKey] || FLOW_STEPS.default;
+  
+  // Check if we need to rebuild steps
+  let needsRebuild = false;
+  
+  // Check if any expected steps are missing
+  for (const stepId of expectedSteps) {
+    if (!stepId.includes('_review') && !result.steps[stepId]) {
+      needsRebuild = true;
+      break;
+    }
   }
   
-  // Ensure required subsections exist
-  if (!cleanData.details.basicDetails) cleanData.details.basicDetails = {};
-  if (!cleanData.details.location) cleanData.details.location = {};
-  if (!cleanData.details.features) cleanData.details.features = {};
-  if (!cleanData.details.media) cleanData.details.media = { photos: { images: [] } };
-  else if (!cleanData.details.media.photos) cleanData.details.media.photos = { images: [] };
-  
-  // Add specific sections based on listing type
-  if (cleanData.flow.listingType === 'rent' && !cleanData.details.rentalInfo) {
-    cleanData.details.rentalInfo = {
-      rentAmount: null,
-      securityDeposit: null,
-      maintenanceCharges: null,
-      rentNegotiable: false,
-      availableFrom: "",
-      preferredTenants: [],
-      leaseDuration: "",
-      furnishingStatus: ""
-    };
-  } else if (cleanData.flow.listingType === 'sale' && !cleanData.details.saleInfo) {
-    cleanData.details.saleInfo = {
-      expectedPrice: null,
-      priceNegotiable: false,
-      possessionDate: ""
-    };
+  // If steps need to be rebuilt, create new ones
+  if (needsRebuild) {
+    // Create fresh steps
+    const newSteps = {};
+    
+    // Initialize each expected step
+    expectedSteps.forEach(stepId => {
+      if (!stepId.includes('_review')) {
+        newSteps[stepId] = {};
+      }
+    });
+    
+    result.steps = newSteps;
   }
   
-  return cleanData;
+  // Ensure media section exists
+  if (!result.media) {
+    result.media = {
+      photos: { images: [] },
+      videos: { urls: [] }
+    };
+  } else {
+    if (!result.media.photos) result.media.photos = { images: [] };
+    if (!result.media.videos) result.media.videos = { urls: [] };
+  }
+  
+  return result;
 };
 
 /**
@@ -352,28 +310,50 @@ export const convertToDbFormat = (data: any): any => {
   // Ensure data is in v3 format
   const cleanData = ensureV3Structure(data);
   
-  // Extract values for database columns
-  const basicDetails = cleanData.details.basicDetails || {};
-  const location = cleanData.details.location || {};
+  // Extract title and location based on flow type
+  let title = "";
+  let address = "";
+  let city = "";
+  let state = "";
+  let zipCode = "";
+  let price = 0;
+  
+  // Try to extract data from steps regardless of flow type
+  for (const stepId in cleanData.steps) {
+    const step = cleanData.steps[stepId];
+    if (step) {
+      // Title might be in any step with a title field
+      if (step.title && !title) {
+        title = step.title;
+      }
+      
+      // Location info might be in any location step
+      if (stepId.includes('_location')) {
+        address = step.address || address;
+        city = step.city || city;
+        state = step.state || state;
+        zipCode = step.pinCode || zipCode;
+      }
+      
+      // Price info might be in rental or sale details
+      if (stepId.includes('_rental') && step.rentAmount) {
+        price = step.rentAmount;
+      } else if (stepId.includes('_sale_details') && step.expectedPrice) {
+        price = step.expectedPrice;
+      }
+    }
+  }
   
   // Create a database-ready object with essential fields at root level
   const dbData: any = {
-    title: basicDetails.title || "",
-    address: location.address || "",
-    city: location.city || "",
-    state: location.state || "",
-    zip_code: location.pinCode || "",
+    title: title,
+    address: address,
+    city: city,
+    state: state,
+    zip_code: zipCode,
+    price: price,
     status: cleanData.meta.status || "draft"
   };
-  
-  // Add price based on listing type
-  if (cleanData.flow.listingType === 'rent' && cleanData.details.rentalInfo) {
-    dbData.price = cleanData.details.rentalInfo.rentAmount || 0;
-  } else if (cleanData.flow.listingType === 'sale' && cleanData.details.saleInfo) {
-    dbData.price = cleanData.details.saleInfo.expectedPrice || 0;
-  } else {
-    dbData.price = 0;
-  }
   
   // Add property ID if it exists in metadata
   if (cleanData.meta.id) {
