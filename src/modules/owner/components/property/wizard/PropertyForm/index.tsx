@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/PropertyForm/index.tsx
-// Version: 9.0.0
-// Last Modified: 19-05-2025 14:30 IST
-// Purpose: Removed all debugging components and related code
+// Version: 9.1.0
+// Last Modified: 19-05-2025 21:00 IST
+// Purpose: Added FormDataDebug component for development environment
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -21,12 +21,15 @@ import LoginPrompt from './components/LoginPrompt';
 import PropertyTypeSelection from '../components/PropertyTypeSelection';
 import WizardBreadcrumbs from '../components/WizardBreadcrumbs';
 import { FormNavigation } from '../components/FormNavigation';
+import FormDataDebug from '../components/FormDataDebug';
 
 // Hooks
 import { useStepNavigation } from './hooks/useStepNavigation';
 
 // Utils
 import { cleanFormData } from '../utils/formCleaningUtils';
+
+import { useFormDataChangeTracking } from '../hooks/useFormDataChangeTracking';
 
 interface PropertyFormProps {
  initialData?: FormData;
@@ -301,6 +304,9 @@ export function PropertyForm({
    adType: derivedAdType,
    city: selectedCity || initialData?.locality || ''
  });
+
+ // Track form data changes to detect old structure issues
+ useFormDataChangeTracking(form);
 
  // Force update flow type and category on initialization
  useEffect(() => {
@@ -774,6 +780,15 @@ export function PropertyForm({
          </div>
        </div>
      </div>
+
+     {/* FormDataDebug component - only visible in development environment */}
+     {process.env.NODE_ENV === 'development' && (
+       <FormDataDebug 
+         form={form} 
+         currentStepId={flowSteps && flowSteps[formStep - 1] ? flowSteps[formStep - 1].id : undefined}
+         position="right"
+       />
+     )}
    </div>
  );
 }
