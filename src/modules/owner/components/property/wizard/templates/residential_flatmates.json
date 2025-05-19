@@ -1,0 +1,28 @@
+{
+    "meta": {
+      "_version": "v3.1",
+      "created_at": "",
+      "updated_at": "",
+      "status": "draft"
+    },
+    "flow": {
+      "category": "residential",
+      "listingType": "flatmates",
+      "flowType": "residential_flatmates"
+    },
+    "steps": {
+      "res_flat_basic_details": {},
+      "res_flat_location": {},
+      "res_flat_flatmate_details": {},
+      "res_flat_features": {},
+      "res_flat_review": {}
+    },
+    "media": {
+      "photos": {
+        "images": []
+      },
+      "videos": {
+        "urls": []
+      }
+    }
+  }

@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/services/flows/FlowServiceFactory.ts
-// Version: 1.2.0
-// Last Modified: 14-05-2025 17:40 IST
-// Purpose: Fixed flow service detection priority to ensure specialized flows are checked before general ones
+// Version: 1.3.0
+// Last Modified: 19-05-2025 14:20 IST
+// Purpose: Enhanced PG/Hostel flow detection to ensure correct flow initialization
 
 import { FlowServiceInterface, FlowContext } from './FlowServiceInterface';
 import { ResidentialRentFlowService } from './ResidentialRentFlowService';
@@ -39,36 +39,61 @@ export class FlowServiceFactory {
    * Detect the appropriate flow service for the given form data and context
    */
   public static getFlowService(formData: any, flowContext: FlowContext): FlowServiceInterface {
-    // Log for debugging
+    // Enhanced debug logging
     console.log('Detecting flow service for:', {
       urlPath: flowContext.urlPath,
       adType: flowContext.adType,
       formFlow: formData.flow,
-      isPGHostelMode: flowContext.isPGHostelMode
+      isPGHostelMode: flowContext.isPGHostelMode,
+      isPgOrHostelInUrl: flowContext.urlPath?.toLowerCase().includes('pghostel') || 
+                          flowContext.urlPath?.toLowerCase().includes('pg-hostel') || 
+                          flowContext.urlPath?.toLowerCase().includes('/pg/') || 
+                          flowContext.urlPath?.toLowerCase().includes('/hostel/')
     });
+    
+    // Special handling for PG/Hostel flow
+    // If URL indicates PG/Hostel, always use PG/Hostel flow
+    if (flowContext.urlPath?.toLowerCase().includes('pghostel') || 
+        flowContext.urlPath?.toLowerCase().includes('pg-hostel') || 
+        flowContext.urlPath?.toLowerCase().includes('/pg/') || 
+        flowContext.urlPath?.toLowerCase().includes('/hostel/')) {
+      const pgHostelService = this.flowServices.find(s => s instanceof PGHostelFlowService);
+      if (pgHostelService) {
+        console.log(`Using PG/Hostel flow from URL path: ${flowContext.urlPath}`);
+        return pgHostelService;
+      }
+    }
     
     // If we have direct information that this is a PG/Hostel, use that flow
     if (flowContext.isPGHostelMode) {
       const pgHostelService = this.flowServices.find(s => s instanceof PGHostelFlowService);
       if (pgHostelService) {
-        console.log(`Detected PG/Hostel flow from context flag`);
+        console.log(`Using PG/Hostel flow from context flag`);
         return pgHostelService;
       }
     }
     
     // Check data structure for more direct flow indicators
     if (formData.flow?.category && formData.flow?.listingType) {
-      const explicitFlowType = `${formData.flow.category}_${formData.flow.listingType}`.toLowerCase();
-      
       // Special handling for PG/Hostel
-      if (explicitFlowType.includes('pghostel') || 
+      if (formData.flow.listingType.toLowerCase() === 'pghostel' || 
           formData.flow.listingType.toLowerCase().includes('pg') || 
           formData.flow.listingType.toLowerCase().includes('hostel')) {
         const pgHostelService = this.flowServices.find(s => s instanceof PGHostelFlowService);
         if (pgHostelService) {
-          console.log(`Detected PG/Hostel flow from explicit flow type: ${explicitFlowType}`);
+          console.log(`Using PG/Hostel flow from flow.listingType: ${formData.flow.listingType}`);
           return pgHostelService;
         }
+      }
+    }
+    
+    // Special check for adType parameter
+    if (flowContext.adType?.toLowerCase().includes('pg') || 
+        flowContext.adType?.toLowerCase().includes('hostel')) {
+      const pgHostelService = this.flowServices.find(s => s instanceof PGHostelFlowService);
+      if (pgHostelService) {
+        console.log(`Using PG/Hostel flow from adType: ${flowContext.adType}`);
+        return pgHostelService;
       }
     }
     
@@ -89,6 +114,18 @@ export class FlowServiceFactory {
    * Used when we know exactly which flow service we need (e.g., for creating or updating properties)
    */
   public static getFlowServiceByType(flowType: string): FlowServiceInterface {
+    // Special case: handle 'pghostel' and variations
+    if (flowType.toLowerCase().includes('pghostel') || 
+        flowType.toLowerCase().includes('pg') || 
+        flowType.toLowerCase().includes('hostel')) {
+      const pgHostelService = this.flowServices.find(s => s instanceof PGHostelFlowService);
+      if (pgHostelService) {
+        console.log(`Using PG/Hostel flow for type "${flowType}"`);
+        return pgHostelService;
+      }
+    }
+    
+    // Standard lookup by flow type
     const service = this.flowServices.find(s => s.getFlowType() === flowType);
     
     if (!service) {
@@ -104,10 +141,10 @@ export class FlowServiceFactory {
    * Used when we have these details directly
    */
   public static getService(category: string, listingType: string): FlowServiceInterface {
-    // Handle PG/Hostel special case
-    if (listingType.toLowerCase().includes('pg') || 
-        listingType.toLowerCase().includes('hostel') || 
-        listingType.toLowerCase() === 'pghostel') {
+    // Handle PG/Hostel special case with enhanced detection
+    if (listingType.toLowerCase() === 'pghostel' || 
+        listingType.toLowerCase().includes('pg') || 
+        listingType.toLowerCase().includes('hostel')) {
       const pgHostelService = this.flowServices.find(s => s instanceof PGHostelFlowService);
       if (pgHostelService) {
         console.log(`Using PG/Hostel flow service for category: ${category}, listingType: ${listingType}`);

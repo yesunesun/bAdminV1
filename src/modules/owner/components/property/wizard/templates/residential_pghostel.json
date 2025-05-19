@@ -1,0 +1,28 @@
+{
+    "meta": {
+      "_version": "v3.1",
+      "created_at": "",
+      "updated_at": "",
+      "status": "draft"
+    },
+    "flow": {
+      "category": "residential",
+      "listingType": "pghostel",
+      "flowType": "residential_pghostel"
+    },
+    "steps": {
+      "res_pg_basic_details": {},
+      "res_pg_location": {},
+      "res_pg_pg_details": {},
+      "res_pg_features": {},
+      "res_pg_review": {}
+    },
+    "media": {
+      "photos": {
+        "images": []
+      },
+      "videos": {
+        "urls": []
+      }
+    }
+  }

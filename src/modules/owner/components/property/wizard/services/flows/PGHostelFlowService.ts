@@ -1,14 +1,22 @@
 // src/modules/owner/components/property/wizard/services/flows/PGHostelFlowService.ts
-// Version: 1.0.0
-// Last Modified: 12-05-2025 17:15 IST
-// Purpose: Specialized service for PG/Hostel flow handling
+// Version: 1.3.0
+// Last Modified: 19-05-2025 17:00 IST
+// Purpose: Added final step cleanup for PG/Hostel flow before data storage
 
 import { BaseFlowService } from './BaseFlowService';
 import { FlowContext } from './FlowServiceInterface';
+import { FLOW_TYPES, FLOW_STEPS } from '../../constants/flows';
 
 export class PGHostelFlowService extends BaseFlowService {
   protected category: string = 'residential';
   protected listingType: string = 'pghostel';
+  
+  /**
+   * Get the flow type
+   */
+  getFlowType(): string {
+    return FLOW_TYPES.RESIDENTIAL_PGHOSTEL;
+  }
   
   /**
    * Detect if this is a PG/Hostel flow
@@ -16,13 +24,15 @@ export class PGHostelFlowService extends BaseFlowService {
   detectFlow(formData: any, flowContext: FlowContext): boolean {
     // Check for explicit PG mode prop
     if (flowContext.isPGHostelMode) {
+      console.log("Detected PG/Hostel from isPGHostelMode flag");
       return true;
     }
     
-    // Check URL path
-    const urlPath = flowContext.urlPath.toLowerCase();
+    // Check URL path for PG/Hostel indicators
+    const urlPath = flowContext.urlPath?.toLowerCase() || '';
     if (urlPath.includes('pghostel') || urlPath.includes('pg-hostel') || 
-        urlPath.includes('pg') || urlPath.includes('hostel')) {
+        urlPath.includes('/pg/') || urlPath.includes('/hostel/')) {
+      console.log("Detected PG/Hostel from URL path");
       return true;
     }
     
@@ -30,18 +40,32 @@ export class PGHostelFlowService extends BaseFlowService {
     if (formData.flow?.listingType === 'pghostel' || 
         (formData.flow?.listingType || '').toLowerCase().includes('pg') || 
         (formData.flow?.listingType || '').toLowerCase().includes('hostel')) {
+      console.log("Detected PG/Hostel from flow.listingType");
       return true;
     }
     
-    // Check for PG-specific fields
-    if (formData.steps?.pg_details && Object.keys(formData.steps.pg_details).length > 0) {
-      return true;
+    // Check for PG-specific steps
+    const pgSteps = [
+      'res_pg_basic_details',
+      'res_pg_location',
+      'res_pg_pg_details',
+      'res_pg_features'
+    ];
+    
+    if (formData.steps) {
+      for (const step of pgSteps) {
+        if (formData.steps[step] && Object.keys(formData.steps[step]).length > 0) {
+          console.log(`Detected PG/Hostel from step: ${step}`);
+          return true;
+        }
+      }
     }
     
     // Check if adType parameter includes 'pg' or 'hostel'
     if (flowContext.adType) {
       const adTypeLower = flowContext.adType.toLowerCase();
       if (adTypeLower.includes('pg') || adTypeLower.includes('hostel')) {
+        console.log("Detected PG/Hostel from adType");
         return true;
       }
     }
@@ -50,112 +74,142 @@ export class PGHostelFlowService extends BaseFlowService {
   }
   
   /**
-   * Add PG-specific sections to the output
+   * Format form data for database storage
    */
-  protected addFlowSpecificSections(output: any, formData: any): void {
-    // Add pg_details section
-    output.pg_details = this.formatPGDetailsSection(formData);
+  formatForStorage(formData: any): any {
+    // First, let the base class do its work
+    const output = super.formatForStorage(formData);
+    
+    // Set the correct flow information
+    output.flow = {
+      category: 'residential',
+      listingType: 'pghostel',
+      flowType: FLOW_TYPES.RESIDENTIAL_PGHOSTEL
+    };
+    
+    // Clean up the steps to ensure only PG/Hostel steps exist
+    this.cleanupPGHostelSteps(output);
+    
+    // Collect fields that are at root level
+    this.moveRootFieldsToSteps(output);
+    
+    return output;
   }
   
   /**
-   * Format PG details section
+   * Clean up steps to ensure only PG/Hostel steps exist
    */
-  private formatPGDetailsSection(formData: any): any {
-    const pgDetails = {};
+  private cleanupPGHostelSteps(data: any): void {
+    if (!data || !data.steps) return;
     
-    // Get data from the steps container first
-    if (formData.steps?.pg_details) {
-      Object.assign(pgDetails, formData.steps.pg_details);
+    // Get the PG/Hostel steps
+    const pgSteps = FLOW_STEPS[FLOW_TYPES.RESIDENTIAL_PGHOSTEL];
+    
+    // First, migrate any data from other steps
+    this.migrateStepDataToPG(data);
+    
+    // Then create a new steps object with only PG steps
+    const oldSteps = data.steps;
+    const newSteps = {};
+    
+    // Copy only the PG steps
+    pgSteps.forEach(stepId => {
+      newSteps[stepId] = oldSteps[stepId] || {};
+    });
+    
+    // Replace the steps object
+    data.steps = newSteps;
+  }
+  
+  /**
+   * Migrate data from other steps to PG/Hostel steps
+   */
+  private migrateStepDataToPG(data: any): void {
+    if (!data.steps) {
+      data.steps = {};
     }
     
-    // Check for PG data at root level
-    if (formData.pg_details) {
-      Object.assign(pgDetails, formData.pg_details);
-    }
+    // Map from residential rent steps to PG steps
+    const stepMapping = {
+      'res_rent_basic_details': 'res_pg_basic_details',
+      'res_rent_location': 'res_pg_location',
+      'res_rent_rental': 'res_pg_pg_details',
+      'res_rent_features': 'res_pg_features',
+      'res_rent_review': 'res_pg_review'
+    };
     
-    // Special handling for specific PG Hostel fields
-    const pgFields = [
-      // Gender preference
-      'gender', 'genderPreference', 
-      
-      // Guest preferences
-      'preferredGuests', 'preferredTenantType', 
-      
-      // Food options
-      'foodIncluded', 'mealOptions', 'includedMeals',
-      
-      // Rules
-      'pgRules', 'rules', 'noSmoking', 'noDrinking', 'noGuardians', 'noGirlsEntry', 'noNonVeg',
-      
-      // Operational details
-      'gateClosingTime', 'availableFrom',
-      
-      // Room details
-      'roomType', 'bathroomType', 'totalCapacity', 'roomSize',
-      'expectedRent', 'expectedDeposit', 'roomFeatures',
-      
-      // Additional info
-      'pgType', 'occupancyTypes', 'facilities', 'noticePolicy', 'description'
-    ];
-    
-    // Check for PG specific fields at root level
-    pgFields.forEach(field => {
-      if (formData[field] !== undefined) {
-        pgDetails[field] = formData[field];
+    // Create PG steps if they don't exist
+    Object.values(stepMapping).forEach(pgStep => {
+      if (!data.steps[pgStep]) {
+        data.steps[pgStep] = {};
       }
     });
     
-    // Also check in the basic_details section (some fields might end up there)
-    if (formData.steps?.basic_details) {
-      pgFields.forEach(field => {
-        if (formData.steps.basic_details[field] !== undefined) {
-          pgDetails[field] = formData.steps.basic_details[field];
-        }
-      });
+    // Transfer data from old steps to new steps
+    for (const [oldStep, newStep] of Object.entries(stepMapping)) {
+      if (data.steps[oldStep] && Object.keys(data.steps[oldStep]).length > 0) {
+        // Copy all fields from old step to new step
+        Object.entries(data.steps[oldStep]).forEach(([key, value]) => {
+          data.steps[newStep][key] = value;
+        });
+      }
+    }
+  }
+  
+  /**
+   * Move fields from root level to their appropriate steps
+   */
+  private moveRootFieldsToSteps(data: any): void {
+    // Basic details fields that might be at root level
+    const basicDetailsFields = [
+      'roomType', 'bathroomType', 'totalRooms', 'roomCapacity', 'totalOccupancy',
+      'expectedRent', 'expectedDeposit', 'roomSize', 'builtUpArea',
+      'builtUpAreaUnit', 'roomFeatures', 'hasAttachedBathroom',
+      'hasBalcony', 'hasAC', 'hasFan', 'hasTV', 'hasFurniture', 'hasGeyser', 'hasWiFi'
+    ];
+    
+    // PG details specific fields
+    const pgDetailsFields = [
+      'genderPreference', 'gender', 'occupantType', 'preferredGuests',
+      'mealOption', 'foodIncluded', 'mealOptions', 'rules',
+      'noSmoking', 'noDrinking', 'noNonVeg', 'noGuardians', 'noGirlsEntry',
+      'gateClosingTime', 'availableFrom', 'description'
+    ];
+    
+    // Move basic details fields to proper step
+    basicDetailsFields.forEach(field => {
+      if (data[field] !== undefined) {
+        data.steps.res_pg_basic_details[field] = data[field];
+      }
+    });
+    
+    // Move PG details fields to proper step
+    pgDetailsFields.forEach(field => {
+      if (data[field] !== undefined) {
+        data.steps.res_pg_pg_details[field] = data[field];
+      }
+    });
+    
+    // Special handling for rules which may be checkboxes
+    const ruleMappings = {
+      'noSmoking': 'No Smoking',
+      'noDrinking': 'No Drinking',
+      'noNonVeg': 'No Non-veg',
+      'noGuardians': 'No Guardians Stay',
+      'noGirlsEntry': 'No Girl\'s Entry'
+    };
+    
+    // Build rules array from individual checkboxes
+    const rules = [];
+    for (const [key, value] of Object.entries(ruleMappings)) {
+      if (data[key] === true) {
+        rules.push(value);
+      }
     }
     
-    // Special handling for radio button fields (gender, food)
-    if (formData.gender || formData.genderPreference) {
-      pgDetails.genderPreference = formData.gender || formData.genderPreference;
+    // If we found rules, add them to the output
+    if (rules.length > 0) {
+      data.steps.res_pg_pg_details.rules = rules;
     }
-    
-    if (formData.foodIncluded !== undefined) {
-      pgDetails.foodIncluded = formData.foodIncluded;
-    }
-    
-    // Handle checkboxes for rules
-    const pgRules = [];
-    if (formData.noSmoking) pgRules.push('No Smoking');
-    if (formData.noDrinking) pgRules.push('No Drinking');
-    if (formData.noGuardians) pgRules.push('No Guardians Stay');
-    if (formData.noGirlsEntry) pgRules.push('No Girl\'s Entry');
-    if (formData.noNonVeg) pgRules.push('No Non-veg');
-    
-    if (pgRules.length > 0) {
-      pgDetails.rules = pgRules;
-    }
-    
-    // Specifically look for room details data from the form
-    if (formData.roomType) pgDetails.roomType = formData.roomType;
-    if (formData.totalCapacity) pgDetails.totalCapacity = formData.totalCapacity;
-    if (formData.expectedRent) pgDetails.expectedRent = formData.expectedRent;
-    if (formData.expectedDeposit) pgDetails.expectedDeposit = formData.expectedDeposit;
-    if (formData.bathroomType) pgDetails.bathroomType = formData.bathroomType;
-    if (formData.roomSize) pgDetails.roomSize = formData.roomSize;
-    
-    // Room features from checkboxes
-    const roomFeatures = [];
-    if (formData.airConditioner || formData.hasAC) roomFeatures.push('Air Conditioner');
-    if (formData.fan) roomFeatures.push('Fan');
-    if (formData.wiFi) roomFeatures.push('Wi-Fi');
-    if (formData.tv) roomFeatures.push('TV');
-    if (formData.furniture) roomFeatures.push('Furniture');
-    if (formData.geyser) roomFeatures.push('Geyser');
-    
-    if (roomFeatures.length > 0) {
-      pgDetails.roomFeatures = roomFeatures;
-    }
-    
-    return pgDetails;
   }
 }

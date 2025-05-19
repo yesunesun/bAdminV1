@@ -1,13 +1,15 @@
 // src/modules/owner/components/property/wizard/hooks/usePropertyForm.ts
-// Version: 5.0.0
-// Last Modified: 04-05-2025 19:30 IST
-// Purpose: Updated to only support v3 data structure
+// Version: 5.3.0
+// Last Modified: 19-05-2025 17:30 IST
+// Purpose: Fixed syntax error and improved PG/Hostel flow handling
 
+import { useEffect } from 'react';
 import { usePropertyFormState } from './usePropertyFormState';
 import { usePropertyFormNavigation } from './usePropertyFormNavigation';
 import { usePropertyFormOperations } from './usePropertyFormOperations';
 import { usePropertyFormValidation } from './usePropertyFormValidation';
 import { FormData } from '../types';
+import { FLOW_TYPES, FLOW_STEPS } from '../constants/flows';
 import { 
   detectDataVersion, 
   DATA_VERSION_V3
@@ -46,7 +48,10 @@ export function usePropertyForm({
     setStatus,
     isSaleMode,
     isPGHostelMode,
-    user
+    user,
+    migrateDataBetweenSteps,
+    cleanupSteps,
+    isFormReady
   } = usePropertyFormState({
     initialData,
     propertyCategory,
@@ -102,6 +107,21 @@ export function usePropertyForm({
   // Get the current data version of the form
   const formData = form.getValues();
   const dataVersion = detectDataVersion(formData);
+  
+  // Clean up steps after form is ready
+  useEffect(() => {
+    if (!isFormReady) return;
+    
+    // If we're in PG/Hostel mode, ensure we clean up steps
+    if (isPGHostelMode) {
+      console.log('Cleaning up steps for PG/Hostel flow');
+      try {
+        cleanupSteps();
+      } catch (err) {
+        console.error('Error cleaning up steps:', err);
+      }
+    }
+  }, [isFormReady, isPGHostelMode, cleanupSteps]);
   
   /**
    * Function to auto-fill the form with test data for the current step

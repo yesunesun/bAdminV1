@@ -1,21 +1,37 @@
 // src/modules/owner/components/property/wizard/hooks/usePropertyFormState.ts
-// Version: 5.0.0
-// Last Modified: 18-05-2025 11:45 IST
-// Purpose: Fix form state initialization to prevent infinite renders
+// Version: 8.2.0
+// Last Modified: 19-05-2025 22:00 IST
+// Purpose: Fix template loading to ensure correct template is loaded for each flow
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
-import { useParams } from 'react-router-dom';
+import { useParams, useLocation } from 'react-router-dom';
 import { FormData } from '../types';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { 
-  detectDataVersion, 
-  detectSpecializedPropertyType,
-  DATA_VERSION_V3,
-  ensureV3Structure,
-  createNewPropertyData
-} from '../utils/propertyDataAdapter';
+import { FLOW_TYPES } from '../constants/flows';
+
+// Import JSON templates
+import residentialRentTemplate from '../templates/residential_rent.json';
+import residentialSaleTemplate from '../templates/residential_sale.json';
+import residentialPGHostelTemplate from '../templates/residential_pghostel.json';
+import residentialFlatmatesTemplate from '../templates/residential_flatmates.json';
+import commercialRentTemplate from '../templates/commercial_rent.json';
+import commercialSaleTemplate from '../templates/commercial_sale.json';
+import commercialCoworkingTemplate from '../templates/commercial_coworking.json';
+import landSaleTemplate from '../templates/land_sale.json';
+
+// Template lookup by flow type
+const FLOW_TEMPLATES = {
+  [FLOW_TYPES.RESIDENTIAL_RENT]: residentialRentTemplate,
+  [FLOW_TYPES.RESIDENTIAL_SALE]: residentialSaleTemplate,
+  [FLOW_TYPES.RESIDENTIAL_PGHOSTEL]: residentialPGHostelTemplate,
+  [FLOW_TYPES.RESIDENTIAL_FLATMATES]: residentialFlatmatesTemplate,
+  [FLOW_TYPES.COMMERCIAL_RENT]: commercialRentTemplate,
+  [FLOW_TYPES.COMMERCIAL_SALE]: commercialSaleTemplate,
+  [FLOW_TYPES.COMMERCIAL_COWORKING]: commercialCoworkingTemplate,
+  [FLOW_TYPES.LAND_SALE]: landSaleTemplate
+};
 
 interface UsePropertyFormStateProps {
   initialData?: FormData;
@@ -37,118 +53,222 @@ export function usePropertyFormState({
   mode = 'create'
 }: UsePropertyFormStateProps) {
   const { category, type } = useParams();
+  const location = useLocation();
   const { user } = useAuth();
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [savedPropertyId, setSavedPropertyId] = useState<string | null>(existingPropertyId || null);
   const [status, setStatus] = useState(initialStatus);
   const [isFormReady, setIsFormReady] = useState(false);
-  
-  // Special property type flags - determined from the form data
   const [isPGHostelMode, setIsPGHostelMode] = useState(false);
 
-  // Extract property type and listing type from URL path
-  const getFlowFromURL = (): { urlPropertyType: string; urlListingType: string } => {
-    const pathParts = window.location.pathname.split('/');
-    
-    // Extract the last two path components that would indicate property type and listing type
-    const urlPropertyType = pathParts.length > 2 ? pathParts[pathParts.length - 3] : '';
-    const urlListingType = pathParts.length > 2 ? pathParts[pathParts.length - 2] : '';
-    
-    return { urlPropertyType, urlListingType };
-  };
+  // Get the current URL path for flow detection
+  const currentPath = location.pathname;
+  
+  // Log current parameters for debugging
+  console.log('UsePropertyFormState initialized with:', {
+    propertyCategory,
+    adType,
+    category,
+    type,
+    path: currentPath,
+    initialData: initialData ? 'Present' : 'None'
+  });
 
-  // Enhanced logic to determine if we're in a specialized mode
-  const { urlPropertyType, urlListingType } = getFlowFromURL();
-  
-  // Determine if we're in sale mode
-  const isSaleMode = 
-    adType?.toLowerCase() === 'sale' || 
-    type?.toLowerCase() === 'sale' || 
-    urlListingType?.toLowerCase() === 'sale' ||
-    (initialData && 
-     detectDataVersion(initialData) === DATA_VERSION_V3 &&
-     initialData.flow?.listingType === 'sale');
-  
-  // Determine if we're in PG/Hostel mode
-  const isURLPGHostelMode = urlListingType?.toLowerCase() === 'pghostel';
-  
-  // Update the PG/Hostel mode flag based on URL
-  useEffect(() => {
-    if (isURLPGHostelMode) {
-      setIsPGHostelMode(true);
+  // Determine the flow type based on parameters, URL, or initialData
+  const flowType = useMemo(() => {
+    // First, check initialData for flow type if in edit mode
+    if (mode === 'edit' && initialData?.flow?.flowType && FLOW_TEMPLATES[initialData.flow.flowType]) {
+      console.log(`Using flow type from initialData: ${initialData.flow.flowType}`);
+      return initialData.flow.flowType;
     }
-  }, [isURLPGHostelMode]);
-  
-  // Determine the actual property category and listing type to use
-  const determinePropertyTypeAndListingType = (): { 
-    propertyTypeToUse: string, 
-    listingTypeToUse: string 
-  } => {
-    // Prioritize URL values
-    let propertyTypeToUse = 
-      urlPropertyType || 
-      propertyCategory || 
-      category || 
-      'residential';
+
+    // Extract path segments to determine flow type
+    const pathSegments = currentPath.toLowerCase().split('/');
+    console.log('Path segments:', pathSegments);
     
-    let listingTypeToUse = 
-      urlListingType || 
-      adType || 
-      type || 
-      (isSaleMode ? 'sale' : 'rent');
+    // Look for category and type in URL path segments
+    let urlCategory = '';
+    let urlType = '';
     
-    // Normalize the values
-    propertyTypeToUse = propertyTypeToUse.toLowerCase();
-    listingTypeToUse = listingTypeToUse.toLowerCase();
-    
-    // Check for special cases
-    if (isPGHostelMode) {
-      listingTypeToUse = 'pghostel';
-    }
-    
-    if (initialData) {
-      // If we have initial data, extract values from it
-      const { isCoworking, isPGHostel, isFlatmate, isLand } = 
-        detectSpecializedPropertyType(initialData);
-      
-      if (isCoworking) {
-        propertyTypeToUse = 'commercial';
-        listingTypeToUse = 'coworking';
-      } else if (isPGHostel) {
-        propertyTypeToUse = 'residential';
-        listingTypeToUse = 'pghostel';
-      } else if (isFlatmate) {
-        propertyTypeToUse = 'residential';
-        listingTypeToUse = 'flatmates';
-      } else if (isLand) {
-        propertyTypeToUse = 'land';
-        listingTypeToUse = 'sale';
+    // Look for patterns like /residential/sale/ or /properties/list/residential/sale/
+    for (let i = 0; i < pathSegments.length - 1; i++) {
+      const segment = pathSegments[i];
+      if (
+        segment === 'residential' || 
+        segment === 'commercial' || 
+        segment === 'land'
+      ) {
+        urlCategory = segment;
+        // Next segment should be the type
+        if (i + 1 < pathSegments.length) {
+          urlType = pathSegments[i + 1];
+        }
+        break;
       }
     }
     
-    return { propertyTypeToUse, listingTypeToUse };
-  };
-
-  // Function to create basic form values 
-  const getBasicFormValues = () => {
-    const { propertyTypeToUse, listingTypeToUse } = determinePropertyTypeAndListingType();
+    console.log('Detected from URL path:', { urlCategory, urlType });
     
-    // For brand new forms, create a default structure
-    if (!initialData) {
-      return createNewPropertyData(propertyTypeToUse, listingTypeToUse);
+    // If we found category and type in URL, use them
+    if (urlCategory && urlType) {
+      if (urlCategory === 'residential') {
+        if (urlType.includes('sale') || urlType.includes('sell')) {
+          console.log('Detected residential sale from URL');
+          return FLOW_TYPES.RESIDENTIAL_SALE;
+        }
+        if (urlType.includes('flatmate')) {
+          console.log('Detected flatmates from URL');
+          return FLOW_TYPES.RESIDENTIAL_FLATMATES;
+        }
+        if (urlType.includes('pg') || urlType.includes('hostel')) {
+          console.log('Detected PG/Hostel from URL');
+          return FLOW_TYPES.RESIDENTIAL_PGHOSTEL;
+        }
+        // Default residential is rent
+        console.log('Detected residential rent from URL');
+        return FLOW_TYPES.RESIDENTIAL_RENT;
+      }
+      else if (urlCategory === 'commercial') {
+        if (urlType.includes('sale') || urlType.includes('sell')) {
+          console.log('Detected commercial sale from URL');
+          return FLOW_TYPES.COMMERCIAL_SALE;
+        }
+        if (urlType.includes('coworking') || urlType.includes('co-working')) {
+          console.log('Detected coworking from URL');
+          return FLOW_TYPES.COMMERCIAL_COWORKING;
+        }
+        // Default commercial is rent
+        console.log('Detected commercial rent from URL');
+        return FLOW_TYPES.COMMERCIAL_RENT;
+      }
+      else if (urlCategory === 'land') {
+        console.log('Detected land sale from URL');
+        return FLOW_TYPES.LAND_SALE;
+      }
     }
     
-    // If we have initialData, ensure it's in v3 format
-    return ensureV3Structure(initialData);
-  };
+    // If not found in URL, try props and route params
+    const effectiveCategory = (propertyCategory || category || '').toLowerCase();
+    const effectiveType = (adType || type || '').toLowerCase();
+    
+    console.log('Using from props/params:', { effectiveCategory, effectiveType });
+    
+    if (effectiveCategory && effectiveType) {
+      if (effectiveCategory === 'residential') {
+        if (effectiveType.includes('sale') || effectiveType.includes('sell')) {
+          console.log('Using residential sale from props/params');
+          return FLOW_TYPES.RESIDENTIAL_SALE;
+        }
+        if (effectiveType.includes('flatmate')) {
+          console.log('Using flatmates from props/params');
+          return FLOW_TYPES.RESIDENTIAL_FLATMATES;
+        }
+        if (effectiveType.includes('pg') || effectiveType.includes('hostel')) {
+          console.log('Using PG/Hostel from props/params');
+          return FLOW_TYPES.RESIDENTIAL_PGHOSTEL;
+        }
+        console.log('Using residential rent from props/params');
+        return FLOW_TYPES.RESIDENTIAL_RENT;
+      }
+      else if (effectiveCategory === 'commercial') {
+        if (effectiveType.includes('sale') || effectiveType.includes('sell')) {
+          console.log('Using commercial sale from props/params');
+          return FLOW_TYPES.COMMERCIAL_SALE;
+        }
+        if (effectiveType.includes('coworking') || effectiveType.includes('co-working')) {
+          console.log('Using coworking from props/params');
+          return FLOW_TYPES.COMMERCIAL_COWORKING;
+        }
+        console.log('Using commercial rent from props/params');
+        return FLOW_TYPES.COMMERCIAL_RENT;
+      }
+      else if (effectiveCategory === 'land') {
+        console.log('Using land sale from props/params');
+        return FLOW_TYPES.LAND_SALE;
+      }
+    }
+    
+    // Check for PG/Hostel explicit indicators in URL
+    if (currentPath.toLowerCase().includes('pghostel') || 
+        currentPath.toLowerCase().includes('pg-hostel')) {
+      console.log('Detected PG/Hostel from URL keyword');
+      return FLOW_TYPES.RESIDENTIAL_PGHOSTEL;
+    }
+    
+    // Check for flatmates explicit indicators
+    if (currentPath.toLowerCase().includes('flatmate')) {
+      console.log('Detected flatmates from URL keyword');
+      return FLOW_TYPES.RESIDENTIAL_FLATMATES;
+    }
+    
+    // Check for coworking explicit indicators
+    if (currentPath.toLowerCase().includes('coworking') || 
+        currentPath.toLowerCase().includes('co-working')) {
+      console.log('Detected coworking from URL keyword');
+      return FLOW_TYPES.COMMERCIAL_COWORKING;
+    }
+    
+    // Check for land explicit indicators
+    if (currentPath.toLowerCase().includes('land') || 
+        currentPath.toLowerCase().includes('plot')) {
+      console.log('Detected land from URL keyword');
+      return FLOW_TYPES.LAND_SALE;
+    }
 
-  // Initialize form with processed values
+    // Default fallback to residential rent if nothing else matched
+    console.log('No specific flow detected, using default residential rent');
+    return FLOW_TYPES.RESIDENTIAL_RENT;
+  }, [currentPath, initialData, mode, propertyCategory, adType, category, type]);
+
+  // Set isPGHostelMode based on flow type
+  useEffect(() => {
+    if (flowType === FLOW_TYPES.RESIDENTIAL_PGHOSTEL) {
+      setIsPGHostelMode(true);
+    }
+  }, [flowType]);
+
+  // Determine if we're in sale mode
+  const isSaleMode = useMemo(() => {
+    return flowType === FLOW_TYPES.RESIDENTIAL_SALE || 
+           flowType === FLOW_TYPES.COMMERCIAL_SALE || 
+           flowType === FLOW_TYPES.LAND_SALE;
+  }, [flowType]);
+
+  // Get the initial form values based on the detected flow type
+  const getInitialFormValues = useCallback((): FormData => {
+    // If we have existing data (edit mode), use it
+    if (initialData && mode === 'edit') {
+      console.log('Using initial data for edit mode');
+      return JSON.parse(JSON.stringify(initialData));
+    }
+    
+    // Otherwise use the appropriate template without modification
+    const template = FLOW_TEMPLATES[flowType];
+    if (!template) {
+      console.warn(`No template found for flow type: ${flowType}, using default`);
+      return JSON.parse(JSON.stringify(FLOW_TEMPLATES[FLOW_TYPES.RESIDENTIAL_RENT]));
+    }
+    
+    // Create a clean copy of the template
+    const newFormData = JSON.parse(JSON.stringify(template));
+    
+    // Only update timestamps and status
+    const now = new Date().toISOString();
+    newFormData.meta.created_at = now;
+    newFormData.meta.updated_at = now;
+    newFormData.meta.status = initialStatus;
+    
+    console.log(`Created new form with template for: ${flowType}`, newFormData);
+    return newFormData;
+  }, [flowType, initialData, mode, initialStatus]);
+
+  // Initialize form with the default values
   const form = useForm<FormData>({
-    defaultValues: getBasicFormValues()
+    defaultValues: getInitialFormValues()
   });
 
-  // Directly query the database for property details in edit mode
+  // Fetch property details from database if in edit mode
   useEffect(() => {
     const fetchPropertyDetails = async () => {
       // Only run this for existing properties in edit mode
@@ -158,9 +278,9 @@ export function usePropertyFormState({
       }
 
       try {
-        console.log('Directly querying database for property:', existingPropertyId);
+        console.log('Fetching property details:', existingPropertyId);
         
-        // Query the entire property record
+        // Query the property record
         const { data, error } = await supabase
           .from('properties')
           .select('*')
@@ -173,29 +293,14 @@ export function usePropertyFormState({
           return;
         }
         
-        console.log('Direct database query result:', data);
-        
-        if (data) {
-          // Get the property details and ensure v3 structure
-          let propertyDetails = data.property_details;
+        if (data && data.property_details) {
+          console.log('Property details fetched:', data.property_details);
           
-          // Detect specialized property types
-          const { isPGHostel } = detectSpecializedPropertyType(propertyDetails);
+          // Get property details
+          const propertyDetails = data.property_details;
           
-          // Update PG/Hostel mode flag
-          setIsPGHostelMode(isPGHostel);
-          
-          // Convert to v3 format if needed
-          const formData = ensureV3Structure(propertyDetails);
-          
-          // Make sure city is set if we have one from props
-          if (city && formData.details?.location && !formData.details.location.city) {
-            formData.details.location.city = city;
-          }
-          
-          // Update all form fields
-          console.log('Setting form values:', formData);
-          form.reset(formData);
+          // Reset the form with the database data
+          form.reset(propertyDetails);
         }
       } catch (err) {
         console.error('Error fetching property details:', err);
@@ -205,7 +310,18 @@ export function usePropertyFormState({
     };
 
     fetchPropertyDetails();
-  }, [existingPropertyId, mode, form, isSaleMode, city]);
+  }, [existingPropertyId, mode, form]);
+
+  // These functions are kept as stubs for compatibility but don't do anything
+  const migrateDataBetweenSteps = useCallback(() => {
+    console.log('Data migration is disabled to preserve template structure');
+    return; // Do nothing
+  }, []);
+
+  const cleanupSteps = useCallback(() => {
+    console.log('Step cleanup is disabled to preserve template structure');
+    return; // Do nothing
+  }, []);
 
   return {
     form,
@@ -220,6 +336,9 @@ export function usePropertyFormState({
     isSaleMode,
     isPGHostelMode,
     user,
-    isFormReady
+    isFormReady,
+    migrateDataBetweenSteps,
+    cleanupSteps,
+    flowType
   };
 }

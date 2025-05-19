@@ -1,0 +1,28 @@
+{
+    "meta": {
+      "_version": "v3.1",
+      "created_at": "",
+      "updated_at": "",
+      "status": "draft"
+    },
+    "flow": {
+      "category": "commercial",
+      "listingType": "rent",
+      "flowType": "commercial_rent"
+    },
+    "steps": {
+      "com_rent_basic_details": {},
+      "com_rent_location": {},
+      "com_rent_rental": {},
+      "com_rent_features": {},
+      "com_rent_review": {}
+    },
+    "media": {
+      "photos": {
+        "images": []
+      },
+      "videos": {
+        "urls": []
+      }
+    }
+  }

@@ -1,0 +1,28 @@
+{
+    "meta": {
+      "_version": "v3.1",
+      "created_at": "",
+      "updated_at": "",
+      "status": "draft"
+    },
+    "flow": {
+      "category": "commercial",
+      "listingType": "sale",
+      "flowType": "commercial_sale"
+    },
+    "steps": {
+      "com_sale_basic_details": {},
+      "com_sale_location": {},
+      "com_sale_sale_details": {},
+      "com_sale_features": {},
+      "com_sale_review": {}
+    },
+    "media": {
+      "photos": {
+        "images": []
+      },
+      "videos": {
+        "urls": []
+      }
+    }
+  }
