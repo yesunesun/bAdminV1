@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/LocationDetails/index.tsx
-// Version: 5.9.0
-// Last Modified: 14-05-2025 21:30 IST
-// Purpose: Fixed import errors and simplified coordinate capture
+// Version: 6.0.0
+// Last Modified: 19-05-2025 18:45 IST
+// Purpose: Remove pre-populated City/State and ensure coordinates + location fields are populated on all actions
 
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { FormSection } from '@/components/FormSection';
@@ -131,6 +131,9 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
         
         // Update marker
         updateMarkerPosition(event.latLng);
+
+        // Perform reverse geocoding to populate address fields
+        reverseGeocode(event.latLng);
       });
       
       // Auto-load address if in edit mode
@@ -186,7 +189,7 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
         setShowCoordinateSuccess(true);
         setTimeout(() => setShowCoordinateSuccess(false), 3000);
         
-        // Optionally reverse geocode
+        // Reverse geocode to get address details
         reverseGeocode(newPosition);
       });
       
@@ -206,8 +209,9 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
     setLocationError(null);
     
     let fullAddress = addressText;
+    // Don't append location data by default to avoid biasing the result
     if (locality) fullAddress += `, ${locality}`;
-    if (city) fullAddress += `, ${city}`;
+    // Add Telangana, India as a default region to help with geocoding
     fullAddress += ', Telangana, India';
     
     try {
@@ -237,14 +241,48 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
             updateMarkerPosition(location);
           }
           
-          // Extract PIN code if available
+          // Extract address components and update form fields
           const addressComponents = results[0].address_components || [];
+          
+          // Extract PIN code
           const postalCodeComponent = addressComponents.find(
             (component: any) => component.types.includes('postal_code')
           );
           
           if (postalCodeComponent && postalCodeComponent.long_name) {
             saveField('pinCode', postalCodeComponent.long_name);
+          }
+          
+          // Extract city
+          const cityComponent = addressComponents.find(
+            (component: any) => 
+              component.types.includes('locality') || 
+              component.types.includes('administrative_area_level_2')
+          );
+          
+          if (cityComponent && cityComponent.long_name) {
+            saveField('city', cityComponent.long_name);
+          }
+          
+          // Extract locality
+          const localityComponent = addressComponents.find(
+            (component: any) => 
+              component.types.includes('sublocality_level_1') || 
+              component.types.includes('sublocality') ||
+              component.types.includes('neighborhood')
+          );
+          
+          if (localityComponent && localityComponent.long_name) {
+            saveField('locality', localityComponent.long_name);
+          }
+          
+          // Extract state
+          const stateComponent = addressComponents.find(
+            (component: any) => component.types.includes('administrative_area_level_1')
+          );
+          
+          if (stateComponent && stateComponent.long_name) {
+            saveField('state', stateComponent.long_name);
           }
         } else {
           console.error('Geocoding failed with status:', status);
@@ -632,26 +670,24 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
           />
         </div>
 
-        {/* City Field */}
+        {/* City Field - Removed default value */}
         <div>
           <RequiredLabel required>City</RequiredLabel>
           <Input
             {...modifiedForm.register('city')}
             placeholder="Enter city"
             className="h-11 text-base"
-            defaultValue="Hyderabad"
           />
         </div>
 
-        {/* State Field */}
+        {/* State Field - Changed to use regular Input (not pre-populated) */}
         <div>
           <RequiredLabel required>State</RequiredLabel>
           <Input
-            value="Telangana"
-            readOnly
-            className="h-11 text-base bg-slate-50"
+            {...modifiedForm.register('state')}
+            placeholder="Enter state"
+            className="h-11 text-base"
           />
-          <input type="hidden" {...modifiedForm.register('state')} value="Telangana" />
         </div>
 
         {/* PIN Code and Landmark */}
