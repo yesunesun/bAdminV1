@@ -1,11 +1,11 @@
 // src/modules/owner/components/property/wizard/sections/RoomDetails.tsx
-// Version: 2.2.0
-// Last Modified: 19-05-2025 19:30 IST
-// Purpose: Fixed input fields for PG/Hostel Room Details
+// Version: 2.3.0
+// Last Modified: 19-05-2025 20:45 IST
+// Purpose: Added missing fields for PG/Hostel Room Details including meal options and room features
 
 import React, { useEffect } from 'react';
 import { FormData, FormSectionProps } from '../types';
-import { ROOM_TYPES, BATHROOM_TYPES } from '../constants/pgDetails';
+import { ROOM_TYPES, BATHROOM_TYPES, MEAL_OPTIONS, PG_AMENITIES_LIST } from '../constants/pgDetails';
 import { FormSection } from '@/components/FormSection';
 import { RequiredLabel } from '@/components/ui/RequiredLabel';
 import { 
@@ -82,12 +82,28 @@ const RoomDetails: React.FC<FormSectionProps> = ({
     setValue(field, value, options);
   };
 
+  // Get array values (for checkboxes)
+  const getArrayValue = (field: string): string[] => {
+    const value = getValue(field);
+    return Array.isArray(value) ? value : [];
+  };
+
+  // Toggle array value helper (for checkboxes)
+  const toggleArrayValue = (field: string, value: string) => {
+    const currentValues = getArrayValue(field);
+    const newValues = currentValues.includes(value)
+      ? currentValues.filter(v => v !== value)
+      : [...currentValues, value];
+    
+    setStepValue(field, newValues, { shouldValidate: true });
+  };
+
   // When component mounts, ensure fields are registered in the correct step path
   useEffect(() => {
     // Check if any of the fields are at root level but should be in step
     const fieldsToCheck = [
       'roomType', 'roomCapacity', 'expectedRent', 'expectedDeposit', 
-      'bathroomType', 'roomSize'
+      'bathroomType', 'roomSize', 'mealOption', 'roomFeatures'
     ];
     
     fieldsToCheck.forEach(field => {
@@ -271,12 +287,64 @@ const RoomDetails: React.FC<FormSectionProps> = ({
         </div>
       </div>
 
-      {/* Room Features section remains unchanged */}
+      {/* Meal Options - Added as a new field */}
+      <div className="mb-6">
+        <div className="space-y-2">
+          <RequiredLabel htmlFor={getFieldPath("mealOption")}>Meal Options</RequiredLabel>
+          <Select
+            value={getValue('mealOption') || ''}
+            onValueChange={(value) => setStepValue('mealOption', value, { shouldValidate: true })}
+          >
+            <SelectTrigger 
+              id={getFieldPath("mealOption")}
+              className={cn(
+                "w-full",
+                errors.steps?.[actualStepId]?.mealOption && "border-destructive focus-visible:ring-destructive"
+              )}
+            >
+              <SelectValue placeholder="Select Meal Option" />
+            </SelectTrigger>
+            <SelectContent>
+              {MEAL_OPTIONS.map(option => (
+                <SelectItem key={option} value={option}>{option}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {errors.steps?.[actualStepId]?.mealOption && (
+            <p className="text-sm text-destructive mt-1">
+              {errors.steps?.[actualStepId]?.mealOption?.message as string}
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Room Features section with checkboxes */}
       <div className="mb-6">
         <h3 className="text-base font-medium mb-4">Room Features</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-          {/* Keep the existing checkbox code, which should work fine */}
-          {/* ... */}
+          {PG_AMENITIES_LIST.map(amenity => {
+            const amenityId = `${getFieldPath("roomFeatures")}-${amenity}`;
+            const isChecked = getArrayValue('roomFeatures').includes(amenity);
+            
+            return (
+              <div 
+                key={amenityId} 
+                className="flex items-center space-x-2"
+              >
+                <Checkbox 
+                  id={amenityId}
+                  checked={isChecked}
+                  onCheckedChange={() => toggleArrayValue('roomFeatures', amenity)}
+                />
+                <label
+                  htmlFor={amenityId}
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  {amenity}
+                </label>
+              </div>
+            );
+          })}
         </div>
       </div>
     </FormSection>

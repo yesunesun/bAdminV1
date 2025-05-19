@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/FlatmateDetails.tsx
-// Version: 2.3.0
-// Last Modified: 11-05-2025 00:45 IST
-// Purpose: Fixed data handling using custom hook that works with passed form prop
+// Version: 2.4.0
+// Last Modified: 19-05-2025 22:15 IST
+// Purpose: Removed inline debug information from Flatmate Details component
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { FormSection } from '@/components/FormSection';
@@ -291,21 +291,6 @@ const FlatmateDetails: React.FC<FormSectionProps> = ({
             onChange={(e) => saveField('about', e.target.value)}
           />
         </div>
-
-        {/* Debug info in development */}
-        {process.env.NODE_ENV === 'development' && (
-          <div className="mt-4 p-2 bg-gray-100 rounded text-xs space-y-2">
-            <div>Step ID: {stepId}</div>
-            <div>Current step data:</div>
-            <pre className="text-xs overflow-auto max-h-40 bg-white p-2 rounded border">
-              {JSON.stringify(form.getValues(`steps.${stepId}`), null, 2)}
-            </pre>
-            <div>All form data:</div>
-            <pre className="text-xs overflow-auto max-h-40 bg-white p-2 rounded border">
-              {JSON.stringify(form.getValues(), null, 2)}
-            </pre>
-          </div>
-        )}
       </div>
     </FormSection>
   );
