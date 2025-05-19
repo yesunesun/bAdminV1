@@ -1,11 +1,11 @@
 // src/modules/seeker/components/MapPanel.tsx
-// Version: 2.1.0
-// Last Modified: 14-05-2025 12:50 IST
-// Purpose: Improved error handling for Google Maps API configuration issues
+// Version: 2.7.0
+// Last Modified: 20-05-2025 01:15 IST
+// Purpose: Simplified marker implementation to ensure reliable display
 
 import React, { useCallback, useState, useEffect } from 'react';
 import { useGoogleMaps, DEFAULT_MAP_CENTER } from '../hooks/useGoogleMaps';
-import { GoogleMap, useLoadScript, InfoWindow, Marker } from '@react-google-maps/api';
+import { GoogleMap, InfoWindow, Marker } from '@react-google-maps/api';
 import { Button } from '@/components/ui/button';
 import { Property } from '@/modules/owner/components/property/types';
 import { useNavigate } from 'react-router-dom';
@@ -30,7 +30,7 @@ interface MapPanelProps {
   loadError: Error | null;
   activeProperty: Property | null;
   setActiveProperty: (property: Property | null) => void;
-  hoveredProperty: Property | null;
+  hoveredPropertyId: string | null;
 }
 
 const MapPanel: React.FC<MapPanelProps> = ({
@@ -39,29 +39,69 @@ const MapPanel: React.FC<MapPanelProps> = ({
   loadError,
   activeProperty,
   setActiveProperty,
-  hoveredProperty,
+  hoveredPropertyId,
 }) => {
   const navigate = useNavigate();
   const [map, setMap] = useState<google.maps.Map | null>(null);
-  const [markers, setMarkers] = useState<Record<string, google.maps.Marker>>({});
+  const [mapReady, setMapReady] = useState(false);
+  const [displayedMarkers, setDisplayedMarkers] = useState<string[]>([]);
   
-  // Get coordinates for a property
-  const getPropertyCoordinates = useCallback((property: Property) => {
-    // Check for coordinates in various places
-    const coordinates = 
-      property.property_details?.coordinates ||
-      property.property_details?.mapCoordinates;
+  // Extract coordinates from property
+  const extractCoordinates = (property: Property) => {
+    try {
+      // Check property_details.coordinates
+      if (property.property_details?.coordinates) {
+        const coords = property.property_details.coordinates;
+        if (typeof coords === 'object' && coords !== null) {
+          if ('lat' in coords && 'lng' in coords) {
+            const lat = parseFloat(String(coords.lat));
+            const lng = parseFloat(String(coords.lng));
+            
+            if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+              return { lat, lng };
+            }
+          }
+        }
+      }
       
-    if (coordinates && typeof coordinates === 'object' && 'lat' in coordinates && 'lng' in coordinates) {
-      return {
-        lat: Number(coordinates.lat),
-        lng: Number(coordinates.lng)
-      };
+      // Check property_details.mapCoordinates
+      if (property.property_details?.mapCoordinates) {
+        const coords = property.property_details.mapCoordinates;
+        if (typeof coords === 'object' && coords !== null) {
+          if ('lat' in coords && 'lng' in coords) {
+            const lat = parseFloat(String(coords.lat));
+            const lng = parseFloat(String(coords.lng));
+            
+            if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+              return { lat, lng };
+            }
+          }
+        }
+      }
+      
+      // Generate random coordinates (for testing only)
+      if (process.env.NODE_ENV === 'development') {
+        // Generate a consistent random coordinate based on property ID
+        // This makes the coordinates consistent across renders
+        const hash = property.id.split('').reduce((acc, char) => {
+          return acc + char.charCodeAt(0);
+        }, 0);
+        
+        const latOffset = (hash % 100) / 1000;
+        const lngOffset = ((hash * 2) % 100) / 1000;
+        
+        return {
+          lat: DEFAULT_MAP_CENTER.lat + latOffset,
+          lng: DEFAULT_MAP_CENTER.lng + lngOffset
+        };
+      }
+    } catch (error) {
+      console.error(`Error extracting coordinates for property ${property.id}:`, error);
     }
     
-    // Fallback to default center if no coordinates
+    // Fallback to default center
     return DEFAULT_MAP_CENTER;
-  }, []);
+  };
 
   // Navigate to property detail page
   const handlePropertyClick = useCallback((property: Property) => {
@@ -70,8 +110,43 @@ const MapPanel: React.FC<MapPanelProps> = ({
 
   // Handle map load
   const onMapLoad = useCallback((map: google.maps.Map) => {
+    console.log('Map loaded successfully');
     setMap(map);
-  }, []);
+    setMapReady(true);
+    
+    // Add bounds if we have properties
+    if (properties.length > 0) {
+      try {
+        const bounds = new google.maps.LatLngBounds();
+        let validPoints = 0;
+        
+        properties.forEach(property => {
+          const coords = extractCoordinates(property);
+          bounds.extend(coords);
+          validPoints++;
+        });
+        
+        if (validPoints > 0) {
+          setTimeout(() => {
+            map.fitBounds(bounds);
+            if (validPoints === 1) {
+              map.setZoom(15); // Closer zoom for single property
+            }
+          }, 100);
+        }
+      } catch (e) {
+        console.error('Error fitting bounds:', e);
+      }
+    }
+  }, [properties]);
+
+  // Log markers for debugging
+  useEffect(() => {
+    if (isLoaded && mapReady) {
+      console.log(`Displaying ${properties.length} markers, hovered: ${hoveredPropertyId}`);
+      setDisplayedMarkers(properties.map(p => p.id));
+    }
+  }, [properties, isLoaded, mapReady, hoveredPropertyId]);
 
   // If there's a configuration error, show a more helpful message
   if (loadError) {
@@ -91,14 +166,9 @@ const MapPanel: React.FC<MapPanelProps> = ({
               <li>Make sure the domain restrictions for your API key include this website</li>
             </ul>
           </div>
-          <div className="flex gap-3 justify-center">
-            <Button variant="outline" onClick={() => window.location.reload()}>
-              Reload Page
-            </Button>
-            <Button onClick={() => navigate('/home')}>
-              Go to Home
-            </Button>
-          </div>
+          <Button onClick={() => window.location.reload()}>
+            Reload Page
+          </Button>
         </div>
       </div>
     );
@@ -119,33 +189,30 @@ const MapPanel: React.FC<MapPanelProps> = ({
     <div className="w-full h-full">
       <GoogleMap
         mapContainerStyle={mapContainerStyle}
-        center={activeProperty ? getPropertyCoordinates(activeProperty) : DEFAULT_MAP_CENTER}
-        zoom={activeProperty ? 15 : 12}
+        center={DEFAULT_MAP_CENTER}
+        zoom={12}
         options={mapOptions}
         onLoad={onMapLoad}
       >
-        {properties.map((property) => (
-          <Marker
-            key={property.id}
-            position={getPropertyCoordinates(property)}
-            onClick={() => setActiveProperty(property)}
-            animation={
-              hoveredProperty?.id === property.id || activeProperty?.id === property.id
-                ? google.maps.Animation.BOUNCE
-                : undefined
-            }
-            icon={{
-              url: hoveredProperty?.id === property.id || activeProperty?.id === property.id
-                ? '/map-marker-active.png'
-                : '/map-marker.png',
-              scaledSize: new google.maps.Size(32, 32),
-            }}
-          />
-        ))}
+        {properties.map((property) => {
+          const isActive = hoveredPropertyId === property.id || activeProperty?.id === property.id;
+          const position = extractCoordinates(property);
+          
+          return (
+            <Marker
+              key={property.id}
+              position={position}
+              onClick={() => setActiveProperty(property)}
+              animation={isActive ? google.maps.Animation.BOUNCE : undefined}
+              // No icon property - let Google Maps use its default marker
+              title={property.title || `Property ${property.id}`}
+            />
+          );
+        })}
 
         {activeProperty && (
           <InfoWindow
-            position={getPropertyCoordinates(activeProperty)}
+            position={extractCoordinates(activeProperty)}
             onCloseClick={() => setActiveProperty(null)}
           >
             <div className="p-2">
@@ -169,6 +236,15 @@ const MapPanel: React.FC<MapPanelProps> = ({
           </InfoWindow>
         )}
       </GoogleMap>
+      
+      {/* Debug information - remove in production */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="absolute bottom-2 left-2 bg-white/80 text-xs p-2 rounded border shadow max-w-xs">
+          <div>Properties: {properties.length}</div>
+          <div>Displayed markers: {displayedMarkers.length}</div>
+          <div>Hover ID: {hoveredPropertyId || 'none'}</div>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyMapHomeView.tsx
-// Version: 3.13.0
-// Last Modified: 01-05-2025 14:05 IST
-// Purpose: Fixed Google Maps loading issue by using centralized hook
+// Version: 3.14.0
+// Last Modified: 19-05-2025 21:40 IST
+// Purpose: Fixed property marker highlighting when hovering over properties in the list
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { usePropertyMapData } from '../hooks/usePropertyMapData';
@@ -228,7 +228,7 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
               loadError={loadError}
               activeProperty={activeProperty}
               setActiveProperty={setActiveProperty}
-              hoveredProperty={hoveredProperty}
+              hoveredPropertyId={hoveredProperty} // Changed from hoveredProperty to hoveredPropertyId
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-muted">
