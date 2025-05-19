@@ -1,12 +1,13 @@
 // src/modules/seeker/components/PropertyDetails/PropertyLocationSection.tsx
-// Version: 9.0.0
-// Last Modified: 13-05-2025 16:30 IST
-// Purpose: Complete rewrite to fix Google Maps display issues
+// Version: 9.5.0
+// Last Modified: 19-05-2025 14:00 IST
+// Purpose: Removed duplicate buttons below the map, keeping only the ones within the map
 
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { MapPinIcon, LandmarkIcon, MapIcon } from 'lucide-react';
 import PropertyLocationMap from './PropertyLocationMap';
+import NearbyPropertiesDialog from './NearbyPropertiesDialog';
 
 interface PropertyLocationSectionProps {
   property: any;
@@ -32,6 +33,8 @@ const PropertyLocationSection: React.FC<PropertyLocationSectionProps> = ({
   // Process property data once when component mounts or property changes
   useEffect(() => {
     if (!property) return;
+    
+    console.log("Property data for location extraction:", property);
 
     // Extract coordinates from property data
     const extractCoordinates = () => {
@@ -45,6 +48,17 @@ const PropertyLocationSection: React.FC<PropertyLocationSectionProps> = ({
         }
       } else if (!details) {
         details = {};
+      }
+
+      // Check steps directly
+      if (details.steps?.res_rent_location) {
+        const loc = details.steps.res_rent_location;
+        if (loc.latitude && loc.longitude) {
+          return {
+            lat: parseFloat(loc.latitude),
+            lng: parseFloat(loc.longitude)
+          };
+        }
       }
 
       // Try all possible coordinate locations
@@ -107,21 +121,37 @@ const PropertyLocationSection: React.FC<PropertyLocationSectionProps> = ({
       };
       
       // Parse property_details if needed
-      let details = {};
-      if (property.property_details) {
-        if (typeof property.property_details === 'string') {
-          try {
-            details = JSON.parse(property.property_details);
-          } catch (e) {
-            details = {};
-          }
-        } else {
-          details = property.property_details;
+      let details = property.property_details || {};
+      if (typeof details === 'string') {
+        try {
+          details = JSON.parse(details);
+        } catch (e) {
+          console.error("Failed to parse property_details string:", e);
+          details = {};
         }
+      }
+      
+      // First try to get location from steps
+      if (details.steps && details.steps.res_rent_location) {
+        const loc = details.steps.res_rent_location;
+        console.log("Found location in steps.res_rent_location:", loc);
+        
+        data.address = loc.address || '';
+        data.locality = loc.locality || '';
+        data.city = loc.city || '';
+        data.state = loc.state || '';
+        data.pinCode = loc.pinCode || '';
+        data.landmark = loc.landmark || '';
+        data.flatPlotNo = loc.flatPlotNo || '';
+        
+        // Return early since we found good data
+        return data;
       }
       
       // Check for location in property (v2 format)
       if (property.location) {
+        console.log("Found location in property.location:", property.location);
+        
         data.address = property.location.address || '';
         data.locality = property.location.locality || '';
         data.city = property.location.city || '';
@@ -132,6 +162,8 @@ const PropertyLocationSection: React.FC<PropertyLocationSectionProps> = ({
       } 
       // Fallback to property fields and details
       else {
+        console.log("Using fallback location extraction");
+        
         data.address = property.address || details.address || '';
         data.locality = property.locality || details.locality || '';
         data.city = property.city || details.city || '';
@@ -141,6 +173,7 @@ const PropertyLocationSection: React.FC<PropertyLocationSectionProps> = ({
         data.flatPlotNo = property.flatPlotNo || details.flatPlotNo || '';
       }
       
+      console.log("Extracted location data:", data);
       return data;
     };
 
@@ -190,32 +223,54 @@ const PropertyLocationSection: React.FC<PropertyLocationSectionProps> = ({
     return parts.join(', ');
   };
 
+  // Get formatted address and check if we have coordinates
+  const formattedAddress = getFormattedAddress();
+  const hasCoordinates = locationData.coordinates !== null;
+
   return (
     <Card className="overflow-hidden">
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between pb-2">
         <CardTitle className="flex items-center gap-2">
           <MapPinIcon className="h-5 w-5 text-primary" />
           <span>Location</span>
         </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Map Component */}
-        <PropertyLocationMap 
-          coordinates={locationData.coordinates}
-          address={locationData.address}
-          locality={locationData.locality}
-          city={locationData.city}
-        />
         
-        {/* Address and Details */}
-        <div className="space-y-4">
-          <div className="pt-2">
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              {getFormattedAddress()}
+        {/* Add Nearby Properties button */}
+        {hasCoordinates && (
+          <NearbyPropertiesDialog 
+            propertyId={property.id}
+            coordinates={locationData.coordinates}
+            radius={5}
+          />
+        )}
+      </CardHeader>
+      
+      <CardContent className="space-y-4 pt-2">
+        {/* Map Component */}
+        <div className="rounded-lg overflow-hidden border">
+          <PropertyLocationMap 
+            coordinates={locationData.coordinates}
+            address={locationData.address}
+            locality={locationData.locality}
+            city={locationData.city}
+          />
+        </div>
+        
+        {/* Address Display - Show prominently with icon */}
+        {formattedAddress !== "Address not available" ? (
+          <div className="flex items-start gap-2 mt-4">
+            <MapPinIcon className="h-5 w-5 text-muted-foreground mt-0.5 flex-shrink-0" />
+            <p className="text-sm leading-relaxed">
+              {formattedAddress}
             </p>
           </div>
-          
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        ) : (
+          <p className="text-sm text-muted-foreground mt-4">Address not available</p>
+        )}
+        
+        {/* Additional Location Details - Icons and values in a grid */}
+        {(locationData.landmark || locationData.locality || locationData.flatPlotNo) && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 mt-2 border-t border-gray-200">
             {locationData.landmark && (
               <div className="flex items-start gap-2">
                 <LandmarkIcon className="h-4 w-4 text-muted-foreground mt-0.5" />
@@ -246,7 +301,7 @@ const PropertyLocationSection: React.FC<PropertyLocationSectionProps> = ({
               </div>
             )}
           </div>
-        </div>
+        )}
       </CardContent>
     </Card>
   );

@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyDetails/index.tsx
-// Version: 12.0.0
-// Last Modified: 14-05-2025 14:30 IST
-// Purpose: Fixed map display by integrating PropertyLocationMap component
+// Version: 12.1.0
+// Last Modified: 19-05-2025 11:15 IST
+// Purpose: Updated to use PropertyLocationSection component with nearby properties
 
 import React, { useState, useEffect } from 'react';
 import { PropertyDetails as PropertyDetailsType } from '../../hooks/usePropertyDetails';
@@ -23,7 +23,8 @@ import PropertyNotFound from './PropertyNotFound';
 import { PropertyDetailsSkeleton } from './PropertyDetailsSkeleton';
 import { extractImagesFromJson } from './utils/propertyDataUtils';
 import PropertyGalleryCard from './PropertyGalleryCard';
-import PropertyLocationMap from './PropertyLocationMap'; // Import the PropertyLocationMap component
+import PropertyLocationMap from './PropertyLocationMap'; // Keep this import
+import PropertyLocationSection from './PropertyLocationSection'; // Import the PropertyLocationSection component
 
 // Define static data for similar properties
 const SIMILAR_PROPERTIES_DATA = [
@@ -288,7 +289,7 @@ const BasicDetailsSection: React.FC<{
   );
 };
 
-// Location section component
+// Keep the original LocationSection component for backward compatibility
 const LocationSection: React.FC<{
   location: any;
   address?: string;
@@ -679,14 +680,8 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
             />
           )}
           
-          {/* Section 2: Location */}
-          <LocationSection 
-            location={location}
-            address={property.address}
-            city={property.city}
-            state={property.state}
-            zipCode={property.zip_code}
-          />
+          {/* Section 2: Location - Use the PropertyLocationSection component */}
+          <PropertyLocationSection property={property} />
           
           {/* Section 3: Sale/Rental Details */}
           {priceDetails && (

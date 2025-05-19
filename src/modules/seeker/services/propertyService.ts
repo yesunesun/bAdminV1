@@ -1,7 +1,7 @@
 // src/modules/seeker/services/propertyService.ts
-// Version: 1.1.0
-// Last Modified: 09-05-2025 16:15 IST
-// Purpose: Property-related functions for fetching and processing properties
+// Version: 1.2.0
+// Last Modified: 19-05-2025 10:30 IST
+// Purpose: Added function to fetch nearby properties
 
 import { supabase } from '@/lib/supabase';
 import { PropertyFilters } from './seekerService'; // Import from seekerService instead of constants
@@ -335,6 +335,157 @@ export const fetchSimilarProperties = async (options: SimilarPropertiesOptions) 
     // Return empty array instead of throwing to prevent component errors
     return [];
   }
+};
+
+// New function to fetch nearby properties
+export const fetchNearbyProperties = async (
+  currentPropertyId: string,
+  latitude: number,
+  longitude: number,
+  radiusKm: number = 5,
+  limit: number = 6
+) => {
+  try {
+    console.log(`[fetchNearbyProperties] Starting with coordinates: ${latitude}, ${longitude}, radius: ${radiusKm}km`);
+
+    if (!currentPropertyId || !latitude || !longitude) {
+      console.error('[fetchNearbyProperties] Missing required parameters');
+      return [];
+    }
+
+    // Calculate approximate bounding box for initial filtering
+    // 0.01 degree is roughly 1.11km at the equator, adjust based on radius
+    const degreePerKm = 0.00904371; // Approximate degree per km (at equator)
+    const latDelta = radiusKm * degreePerKm;
+    const lngDelta = radiusKm * degreePerKm;
+
+    const latMin = latitude - latDelta;
+    const latMax = latitude + latDelta;
+    const lngMin = longitude - lngDelta;
+    const lngMax = longitude + lngDelta;
+
+    console.log(`[fetchNearbyProperties] Bounding box: lat(${latMin} to ${latMax}), lng(${lngMin} to ${lngMax})`);
+    
+    // Base query to fetch properties
+    const { data, error } = await supabase
+      .from('properties_v2')
+      .select('*')
+      .neq('id', currentPropertyId) // Exclude current property
+      .or(`property_details->coordinates->lat.gte.${latMin},property_details->coordinates->latitude.gte.${latMin}`)
+      .or(`property_details->coordinates->lat.lte.${latMax},property_details->coordinates->latitude.lte.${latMax}`)
+      .or(`property_details->coordinates->lng.gte.${lngMin},property_details->coordinates->longitude.gte.${lngMin}`)
+      .or(`property_details->coordinates->lng.lte.${lngMax},property_details->coordinates->longitude.lte.${lngMax}`)
+      .order('created_at', { ascending: false })
+      .limit(limit + 10); // Fetch extra to allow for post-filtering
+    
+    if (error) {
+      console.error('[fetchNearbyProperties] Error fetching properties:', error);
+      return [];
+    }
+    
+    console.log(`[fetchNearbyProperties] Found ${data?.length || 0} properties in bounding box`);
+    
+    if (!data || data.length === 0) {
+      return [];
+    }
+    
+    // Process properties and calculate exact distances
+    const nearbyProperties = data.map(property => {
+      try {
+        // Process property data
+        const processedProperty = processPropertyData(property);
+        
+        if (!processedProperty) {
+          console.warn(`Failed to process property ${property.id} for nearby properties`);
+          return null;
+        }
+        
+        // Extract coordinates from property
+        const details = processedProperty.property_details || {};
+        let propLat = null;
+        let propLng = null;
+        
+        // Try to find coordinates in various possible locations
+        if (details.coordinates) {
+          propLat = parseFloat(details.coordinates.lat || details.coordinates.latitude);
+          propLng = parseFloat(details.coordinates.lng || details.coordinates.longitude);
+        } else if (details.location?.coordinates) {
+          propLat = parseFloat(details.location.coordinates.lat || details.location.coordinates.latitude);
+          propLng = parseFloat(details.location.coordinates.lng || details.location.coordinates.longitude);
+        } else if (details.lat && details.lng) {
+          propLat = parseFloat(details.lat);
+          propLng = parseFloat(details.lng);
+        } else if (details.latitude && details.longitude) {
+          propLat = parseFloat(details.latitude);
+          propLng = parseFloat(details.longitude);
+        }
+        
+        // Skip properties without coordinates
+        if (!propLat || !propLng) {
+          return null;
+        }
+        
+        // Calculate distance using Haversine formula
+        const distance = calculateDistance(latitude, longitude, propLat, propLng);
+        
+        // Skip properties outside the exact radius
+        if (distance > radiusKm) {
+          return null;
+        }
+        
+        // Extract images
+        const extractedImages = extractImagesFromProperty(processedProperty);
+        
+        // Find primary image or first image
+        let primaryImage = '/noimage.png';
+        if (extractedImages.length > 0) {
+          const primary = extractedImages.find(img => img.is_primary);
+          primaryImage = primary ? primary.url : extractedImages[0].url;
+        }
+        
+        // Add distance and primary image to property
+        return {
+          ...processedProperty,
+          distance,
+          property_details: {
+            ...processedProperty.property_details,
+            primaryImage
+          }
+        };
+      } catch (error) {
+        console.error(`Error processing nearby property ${property.id}:`, error);
+        return null;
+      }
+    })
+    .filter(Boolean) // Remove null entries
+    .filter(prop => prop.distance <= radiusKm) // Ensure all properties are within radius
+    .sort((a, b) => a.distance - b.distance) // Sort by distance
+    .slice(0, limit); // Limit to requested number of properties
+    
+    console.log(`[fetchNearbyProperties] Returning ${nearbyProperties.length} nearby properties`);
+    return nearbyProperties;
+  } catch (error) {
+    console.error('[fetchNearbyProperties] Error:', error);
+    return [];
+  }
+};
+
+// Haversine formula to calculate distance between two coordinates in kilometers
+const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+  const R = 6371; // Radius of the earth in km
+  const dLat = deg2rad(lat2 - lat1);
+  const dLon = deg2rad(lon2 - lon1);
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2); 
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+  const distance = R * c; // Distance in km
+  return parseFloat(distance.toFixed(1));
+};
+
+const deg2rad = (deg: number) => {
+  return deg * (Math.PI/180);
 };
 
 // Helper function for processing similar properties
