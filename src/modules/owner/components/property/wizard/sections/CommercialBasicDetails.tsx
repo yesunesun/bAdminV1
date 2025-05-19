@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/CommercialBasicDetails.tsx
-// Version: 1.3.0
-// Last Modified: 13-05-2025 16:45 IST
-// Purpose: Removed debug information display while keeping Debug button functionality
+// Version: 1.4.0
+// Last Modified: 19-05-2025 23:15 IST
+// Purpose: Fixed to store values in the correct step structure (com_rent_basic_details)
 
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { FormSection } from '@/components/FormSection';
@@ -16,7 +16,7 @@ import {
   COMMERCIAL_AGE_OPTIONS
 } from '../constants/commercialDetails';
 
-export function CommercialBasicDetails({ form, mode = 'create', category, adType }: FormSectionProps) {
+export function CommercialBasicDetails({ form, mode = 'create', category, adType, stepId = 'com_rent_basic_details' }: FormSectionProps) {
   // Track mount status to avoid updates after unmount
   const isMounted = useRef(true);
   
@@ -25,23 +25,24 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
   
   // Get initial form values directly
   const initialValues = form.getValues();
+  const initialStepValues = initialValues.steps?.[stepId] || {};
   
   // Use component state to render values with proper initialization
   const [values, setValues] = useState({
-    propertyType: initialValues.propertyType || '',
-    buildingType: initialValues.buildingType || '',
-    ageOfProperty: initialValues.ageOfProperty || '',
-    builtUpArea: initialValues.builtUpArea || '',
-    builtUpAreaUnit: initialValues.builtUpAreaUnit || 'sqft', // Always default to sqft
-    floor: initialValues.floor || '',
-    totalFloors: initialValues.totalFloors || '',
-    cabins: initialValues.cabins || '',
-    conferenceRooms: initialValues.conferenceRooms || '',
-    receptionArea: initialValues.receptionArea || 'Yes',
-    furnishing: initialValues.furnishing || '',
-    carParking: initialValues.carParking || '',
-    bikeParking: initialValues.bikeParking || '',
-    title: initialValues.title || ''
+    propertyType: initialStepValues.propertyType || initialValues.propertyType || '',
+    buildingType: initialStepValues.buildingType || initialValues.buildingType || '',
+    ageOfProperty: initialStepValues.ageOfProperty || initialValues.ageOfProperty || '',
+    builtUpArea: initialStepValues.builtUpArea || initialValues.builtUpArea || '',
+    builtUpAreaUnit: initialStepValues.builtUpAreaUnit || initialValues.builtUpAreaUnit || 'sqft', // Always default to sqft
+    floor: initialStepValues.floor || initialValues.floor || '',
+    totalFloors: initialStepValues.totalFloors || initialValues.totalFloors || '',
+    cabins: initialStepValues.cabins || initialValues.cabins || '',
+    conferenceRooms: initialStepValues.conferenceRooms || initialValues.conferenceRooms || '',
+    receptionArea: initialStepValues.receptionArea || initialValues.receptionArea || 'Yes',
+    furnishing: initialStepValues.furnishing || initialValues.furnishing || '',
+    carParking: initialStepValues.carParking || initialValues.carParking || '',
+    bikeParking: initialStepValues.bikeParking || initialValues.bikeParking || '',
+    title: initialStepValues.title || initialValues.title || ''
   });
   
   // Get available building types based on selected property type
@@ -65,6 +66,26 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
       isMounted.current = false;
     };
   }, []);
+
+  // Helper function to get field value from the correct path
+  const getFieldValue = (fieldName: string, defaultValue: any = '') => {
+    // First try to get from the step
+    const stepValue = form.getValues(`steps.${stepId}.${fieldName}`);
+    if (stepValue !== undefined) return stepValue;
+    
+    // Fall back to root level value
+    const rootValue = form.getValues(fieldName);
+    return rootValue !== undefined ? rootValue : defaultValue;
+  };
+  
+  // Helper function to set field in both step and root (for backwards compatibility)
+  const setFieldValue = (fieldName: string, value: any, validate = false) => {
+    // Set in step structure
+    form.setValue(`steps.${stepId}.${fieldName}`, value, { shouldValidate: validate });
+    
+    // Set at root level for backward compatibility
+    form.setValue(fieldName, value, { shouldValidate: validate });
+  };
   
   // Subscribe to form changes with improved handling
   useEffect(() => {
@@ -86,8 +107,8 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
       'carParking', 
       'bikeParking', 
       'title',
-      // Also watch v2 nested structure fields
-      'basicDetails'
+      // Also watch step structure
+      `steps.${stepId}`
     ];
     
     // Subscribe to form changes for specific fields
@@ -98,45 +119,10 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
       console.log(`[${count}] Form update - Changed field: ${name}, Type: ${type}`);
       
       // If specific fields we care about change, update our state
-      if (watchFields.includes(name as string) || name === undefined) {
+      if (watchFields.includes(name as string) || name === undefined || 
+          name?.startsWith(`steps.${stepId}`)) {
         console.log(`[${count}] Updating component state from form values`);
         updateStateFromForm(true, `subscription-${count}`);
-      }
-      
-      // For nested structure changes (v2 format)
-      if (name === 'basicDetails') {
-        console.log(`[${count}] Updating from nested basicDetails structure`);
-        const basicDetails = form.getValues('basicDetails');
-        if (basicDetails) {
-          // Update flat fields from nested structure
-          const nestedValues = {
-            title: basicDetails.title || values.title,
-            propertyType: basicDetails.propertyType || values.propertyType,
-            buildingType: basicDetails.buildingType || values.buildingType,
-            ageOfProperty: basicDetails.ageOfProperty || values.ageOfProperty,
-            builtUpArea: basicDetails.builtUpArea?.toString() || values.builtUpArea,
-            builtUpAreaUnit: basicDetails.builtUpAreaUnit || values.builtUpAreaUnit,
-            floor: basicDetails.floor?.toString() || values.floor,
-            totalFloors: basicDetails.totalFloors?.toString() || values.totalFloors,
-            furnishing: basicDetails.furnishing || values.furnishing
-          };
-          
-          console.log(`[${count}] Updating flat fields from nested values:`, nestedValues);
-          
-          // Set local state
-          if (isMounted.current) {
-            setValues(prev => ({...prev, ...nestedValues}));
-          }
-          
-          // Also set flat fields in form if they're not already set
-          Object.entries(nestedValues).forEach(([field, value]) => {
-            const currentValue = form.getValues(field);
-            if (!currentValue && value) {
-              console.log(`[${count}] Setting flat field ${field} from nested structure:`, value);
-              form.setValue(field, value, { shouldValidate: false });
-            }
-          });
-        }
       }
     });
     
@@ -145,78 +131,67 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
       console.log('First-time processing of initial values');
       initialProcessDone.current = true;
       
-      // Ensure builtUpAreaUnit has a default value of 'sqft'
-      if (!form.getValues().builtUpAreaUnit) {
-        console.log('Setting default builtUpAreaUnit to sqft');
-        form.setValue('builtUpAreaUnit', 'sqft', { shouldValidate: false });
+      // Ensure step structure exists
+      const currentSteps = form.getValues('steps') || {};
+      if (!currentSteps[stepId]) {
+        console.log(`Creating steps.${stepId} structure`);
+        form.setValue('steps', {
+          ...currentSteps,
+          [stepId]: {}
+        }, { shouldValidate: false });
       }
       
-      // Process nested structure (v2 format)
-      const basicDetails = form.getValues('basicDetails');
-      if (basicDetails) {
-        console.log('Processing nested basicDetails:', basicDetails);
-        
-        // Map nested values to flat fields if they're not set
-        if (basicDetails.propertyType && !form.getValues('propertyType')) {
-          form.setValue('propertyType', basicDetails.propertyType, { shouldValidate: false });
-        }
-        if (basicDetails.buildingType && !form.getValues('buildingType')) {
-          form.setValue('buildingType', basicDetails.buildingType, { shouldValidate: false });
-        }
-        if (basicDetails.ageOfProperty && !form.getValues('ageOfProperty')) {
-          form.setValue('ageOfProperty', basicDetails.ageOfProperty, { shouldValidate: false });
-        }
-        if (basicDetails.builtUpArea && !form.getValues('builtUpArea')) {
-          form.setValue('builtUpArea', basicDetails.builtUpArea.toString(), { shouldValidate: false });
-        }
-        if (basicDetails.builtUpAreaUnit && !form.getValues('builtUpAreaUnit')) {
-          form.setValue('builtUpAreaUnit', basicDetails.builtUpAreaUnit, { shouldValidate: false });
-        }
-        if (basicDetails.floor && !form.getValues('floor')) {
-          form.setValue('floor', basicDetails.floor.toString(), { shouldValidate: false });
-        }
-        if (basicDetails.totalFloors && !form.getValues('totalFloors')) {
-          form.setValue('totalFloors', basicDetails.totalFloors.toString(), { shouldValidate: false });
-        }
-        if (basicDetails.furnishing && !form.getValues('furnishing')) {
-          form.setValue('furnishing', basicDetails.furnishing, { shouldValidate: false });
-        }
+      // Ensure builtUpAreaUnit has a default value of 'sqft'
+      if (!getFieldValue('builtUpAreaUnit')) {
+        console.log('Setting default builtUpAreaUnit to sqft');
+        setFieldValue('builtUpAreaUnit', 'sqft', false);
       }
+      
+      // Move root level values to step structure if they exist
+      const fieldsToMove = [
+        'propertyType', 'buildingType', 'ageOfProperty', 'builtUpArea',
+        'builtUpAreaUnit', 'floor', 'totalFloors', 'cabins', 'conferenceRooms',
+        'receptionArea', 'furnishing', 'carParking', 'bikeParking', 'title'
+      ];
+      
+      fieldsToMove.forEach(field => {
+        const rootValue = form.getValues(field);
+        if (rootValue !== undefined && rootValue !== '') {
+          console.log(`Moving root field ${field} to step structure:`, rootValue);
+          setFieldValue(field, rootValue, false);
+        }
+      });
       
       // Update state after processing initial values
       updateStateFromForm(false, 'initial-process');
     }
     
     return () => subscription.unsubscribe();
-  }, [form, category]);
+  }, [form, stepId, category]);
   
   // Function to update component state from form values
   const updateStateFromForm = (validateAfter = false, source = 'unknown') => {
     if (!isMounted.current) return;
     
-    const formValues = form.getValues();
-    console.log(`Updating state from form values (source: ${source})`, formValues);
-    
-    // Ensure builtUpAreaUnit has a value
-    const areaUnit = formValues.builtUpAreaUnit || 'sqft';
-    
-    // Create new state object based on current form values
+    // Get values from step structure first, then fall back to root level
     const newValues = {
-      propertyType: formValues.propertyType || '',
-      buildingType: formValues.buildingType || '',
-      ageOfProperty: formValues.ageOfProperty || '',
-      builtUpArea: formValues.builtUpArea || '',
-      builtUpAreaUnit: areaUnit,
-      floor: formValues.floor || '',
-      totalFloors: formValues.totalFloors || '',
-      cabins: formValues.cabins || '',
-      conferenceRooms: formValues.conferenceRooms || '',
-      receptionArea: formValues.receptionArea || 'Yes',
-      furnishing: formValues.furnishing || '',
-      carParking: formValues.carParking || '',
-      bikeParking: formValues.bikeParking || '',
-      title: formValues.title || ''
+      propertyType: getFieldValue('propertyType', ''),
+      buildingType: getFieldValue('buildingType', ''),
+      ageOfProperty: getFieldValue('ageOfProperty', ''),
+      builtUpArea: getFieldValue('builtUpArea', ''),
+      builtUpAreaUnit: getFieldValue('builtUpAreaUnit', 'sqft'),
+      floor: getFieldValue('floor', ''),
+      totalFloors: getFieldValue('totalFloors', ''),
+      cabins: getFieldValue('cabins', ''),
+      conferenceRooms: getFieldValue('conferenceRooms', ''),
+      receptionArea: getFieldValue('receptionArea', 'Yes'),
+      furnishing: getFieldValue('furnishing', ''),
+      carParking: getFieldValue('carParking', ''),
+      bikeParking: getFieldValue('bikeParking', ''),
+      title: getFieldValue('title', '')
     };
+    
+    console.log(`Updating state from form values (source: ${source})`, newValues);
     
     // Only update state if any values have changed
     const hasChanges = Object.entries(newValues).some(([key, value]) => {
@@ -247,31 +222,8 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
       [field]: value
     }));
     
-    // Update form flat field
-    form.setValue(field, value, { shouldValidate: true });
-    
-    // Also update nested structure if it exists (v2 format)
-    const basicDetails = form.getValues('basicDetails');
-    if (basicDetails) {
-      console.log(`Also updating nested basicDetails.${field}:`, value);
-      
-      // Convert value format for nested structure if needed
-      let structuredValue = value;
-      if (field === 'floor' || field === 'totalFloors' || field === 'builtUpArea' || 
-          field === 'cabins' || field === 'conferenceRooms' || field === 'carParking' || 
-          field === 'bikeParking') {
-        const numValue = parseInt(value);
-        structuredValue = !isNaN(numValue) ? numValue : null;
-      }
-      
-      // Update the nested field
-      const updatedBasicDetails = {
-        ...basicDetails,
-        [field]: structuredValue
-      };
-      
-      form.setValue('basicDetails', updatedBasicDetails, { shouldValidate: false });
-    }
+    // Update form field in both step structure and root level
+    setFieldValue(field, value, true);
     
     // Debug log
     console.log(`Updated ${field} to:`, value);
@@ -310,6 +262,9 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
     
     // Update property type
     updateFormAndState('propertyType', value);
+    
+    // Store as commercialPropertyType for review section compatibility
+    setFieldValue('commercialPropertyType', value, false);
   };
 
   return (
@@ -344,7 +299,10 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
             <RequiredLabel required className="text-base">Building Type</RequiredLabel>
             <Select 
               value={values.buildingType}
-              onValueChange={(value) => updateFormAndState('buildingType', value)}
+              onValueChange={(value) => {
+                updateFormAndState('buildingType', value);
+                setFieldValue('subType', value, false);
+              }}
               disabled={!values.propertyType}
             >
               <SelectTrigger className="h-11 text-base">
@@ -367,7 +325,10 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
             <RequiredLabel required className="text-base">Age of Property</RequiredLabel>
             <Select 
               value={values.ageOfProperty}
-              onValueChange={(value) => updateFormAndState('ageOfProperty', value)}
+              onValueChange={(value) => {
+                updateFormAndState('ageOfProperty', value);
+                setFieldValue('constructionAge', value, false);
+              }}
             >
               <SelectTrigger className="h-11 text-base">
                 <SelectValue placeholder="Select" />
@@ -500,7 +461,10 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
               <RequiredLabel className="text-base">Reception Area</RequiredLabel>
               <Select 
                 value={values.receptionArea}
-                onValueChange={(value) => updateFormAndState('receptionArea', value)}
+                onValueChange={(value) => {
+                  updateFormAndState('receptionArea', value);
+                  setFieldValue('hasPantry', value === 'Yes', false);
+                }}
               >
                 <SelectTrigger className="h-11 text-base">
                   <SelectValue placeholder="Has reception area?" />
@@ -521,7 +485,10 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
             <RequiredLabel required className="text-base">Furnishing</RequiredLabel>
             <Select 
               value={values.furnishing}
-              onValueChange={(value) => updateFormAndState('furnishing', value)}
+              onValueChange={(value) => {
+                updateFormAndState('furnishing', value);
+                setFieldValue('furnishingStatus', value, false);
+              }}
             >
               <SelectTrigger className="h-11 text-base">
                 <SelectValue placeholder="Furnishing status?" />
@@ -547,7 +514,16 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
               className="h-11 text-base"
               value={values.carParking}
               placeholder="Number of car parking spots"
-              onChange={(e) => handleNumberInput(e.target.value, 'carParking')}
+              onChange={(e) => {
+                handleNumberInput(e.target.value, 'carParking');
+                // Also set parking field for review section
+                if (e.target.value) {
+                  const value = parseInt(e.target.value);
+                  if (!isNaN(value) && value > 0) {
+                    setFieldValue('parking', `${value} car spot(s)`, false);
+                  }
+                }
+              }}
             />
           </div>
 
@@ -559,7 +535,11 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
               className="h-11 text-base"
               value={values.bikeParking}
               placeholder="Number of bike parking spots"
-              onChange={(e) => handleNumberInput(e.target.value, 'bikeParking')}
+              onChange={(e) => {
+                handleNumberInput(e.target.value, 'bikeParking');
+                // Update washrooms field for compatibility with review section
+                setFieldValue('washrooms', values.totalFloors, false);
+              }}
             />
           </div>
         </div>

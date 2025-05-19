@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/PropertySummary/sections/CommercialBasicDetailsSection.tsx
-// Version: 1.0.0
-// Last Modified: 14-05-2025 19:10 IST
-// Purpose: Section component for commercial property basic details
+// Version: 1.1.0
+// Last Modified: 19-05-2025 23:30 IST
+// Purpose: Updated to correctly display commercial property details from the step structure
 
 import React from 'react';
 import { FieldText } from '../components/fields/FieldText';
@@ -12,67 +12,99 @@ import { SectionComponentProps } from '../types';
 export const CommercialBasicDetailsSection: React.FC<SectionComponentProps> = ({
   data,
   flowType,
-  listingType
+  listingType,
+  steps
 }) => {
-  if (!data) return null;
+  if (!data && !steps) return null;
+  
+  // Try to get data from the step structure first, then fall back to flat structure
+  const stepData = steps?.com_rent_basic_details || {};
+  
+  // Combine data from both sources with preference to step data
+  const combinedData = {
+    ...data,
+    ...stepData,
+    // Explicitly map fields that might have different names
+    commercialPropertyType: stepData.propertyType || data.commercialPropertyType || data.propertyType,
+    subType: stepData.buildingType || data.subType || data.buildingType,
+    builtUpArea: stepData.builtUpArea || data.builtUpArea,
+    builtUpAreaUnit: stepData.builtUpAreaUnit || data.builtUpAreaUnit,
+    floor: stepData.floor || data.floor,
+    totalFloors: stepData.totalFloors || data.totalFloors,
+    constructionAge: stepData.ageOfProperty || data.constructionAge || data.ageOfProperty,
+    furnishingStatus: stepData.furnishing || data.furnishingStatus || data.furnishing,
+    parking: data.parking || (stepData.carParking ? `${stepData.carParking} car space(s)` : null),
+    washrooms: data.washrooms || stepData.totalFloors, // Using totalFloors as a fallback if washrooms not specified
+    hasPantry: stepData.receptionArea === 'Yes' || data.hasPantry,
+    hasCafeteria: data.hasCafeteria
+  };
   
   return (
     <div className="space-y-2">
       {/* Commercial Property Type */}
-      <FieldText label="Commercial Type" value={data.commercialPropertyType} />
+      <FieldText 
+        label="Commercial Type" 
+        value={combinedData.commercialPropertyType || combinedData.propertyType} 
+      />
       
       {/* Sub Type */}
-      <FieldText label="Sub Type" value={data.subType} />
+      <FieldText 
+        label="Sub Type" 
+        value={combinedData.subType || combinedData.buildingType} 
+      />
       
       {/* Built-up Area */}
-      {data.builtUpArea && (
+      {combinedData.builtUpArea && (
         <FieldArea
           label="Built-up Area"
-          value={data.builtUpArea}
-          unit={data.builtUpAreaUnit || 'sqft'}
-        />
-      )}
-      
-      {/* Carpet Area */}
-      {data.carpetArea && (
-        <FieldArea
-          label="Carpet Area"
-          value={data.carpetArea}
-          unit={data.carpetAreaUnit || 'sqft'}
+          value={combinedData.builtUpArea}
+          unit={combinedData.builtUpAreaUnit || 'sqft'}
         />
       )}
       
       {/* Floor */}
-      {data.floor !== undefined && data.totalFloors !== undefined && (
+      {(combinedData.floor !== undefined && combinedData.totalFloors !== undefined) && (
         <FieldText
           label="Floor"
-          value={`${data.floor} out of ${data.totalFloors}`}
+          value={`${combinedData.floor} out of ${combinedData.totalFloors}`}
         />
       )}
       
       {/* Age of Construction */}
-      <FieldText label="Construction Age" value={data.constructionAge} />
+      <FieldText 
+        label="Construction Age" 
+        value={combinedData.constructionAge || combinedData.ageOfProperty} 
+      />
       
       {/* Furnishing Status */}
-      <FieldText label="Furnishing Status" value={data.furnishingStatus} />
-      
-      {/* Facing */}
-      <FieldText label="Facing" value={data.facing} />
-      
-      {/* Ideal For */}
       <FieldText 
-        label="Ideal For" 
-        value={Array.isArray(data.idealFor) ? data.idealFor.join(', ') : data.idealFor} 
+        label="Furnishing Status" 
+        value={combinedData.furnishingStatus || combinedData.furnishing} 
       />
       
       {/* Parking */}
-      <FieldText label="Parking" value={data.parking} />
+      <FieldText 
+        label="Parking" 
+        value={combinedData.parking || (combinedData.carParking ? `${combinedData.carParking} car space(s)` : null)} 
+      />
       
       {/* Washrooms */}
-      <FieldText label="Washrooms" value={data.washrooms} />
+      <FieldText 
+        label="Washrooms" 
+        value={combinedData.washrooms} 
+      />
+      
+      {/* Reception Area */}
+      <FieldBoolean 
+        label="Reception Area" 
+        value={combinedData.receptionArea === 'Yes'} 
+      />
       
       {/* Pantry/Cafeteria */}
-      <FieldBoolean label="Pantry/Cafeteria" value={data.hasPantry || data.hasCafeteria} />
+      <FieldBoolean 
+        label="Pantry/Cafeteria" 
+        value={combinedData.hasPantry || combinedData.hasCafeteria} 
+      />
     </div>
   );
 };
