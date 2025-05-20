@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyDetails/PropertyTitleEditor.tsx
 // Version: 1.0.0
-// Last Modified: 21-05-2025 18:00 IST
-// Purpose: Inline title editor for property details page
+// Last Modified: 21-05-2025 18:30 IST
+// Purpose: Inline title editor for property details page that updates only flow.title
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
@@ -82,22 +82,19 @@ const PropertyTitleEditor: React.FC<PropertyTitleEditorProps> = ({
         throw new Error('Property data not found');
       }
       
-      // Update the flow.title in the property_details
-      const updatedDetails = { ...propertyData.property_details };
+      // Create a deep copy of the property_details to avoid mutations
+      const updatedDetails = JSON.parse(JSON.stringify(propertyData.property_details));
       
-      // Ensure flow object exists
+      // Ensure flow object exists and update only flow.title
       if (!updatedDetails.flow) {
         updatedDetails.flow = { title: newTitle };
       } else {
         updatedDetails.flow.title = newTitle;
       }
       
-      // Update the root level title as well if it exists
-      if (updatedDetails.title) {
-        updatedDetails.title = newTitle;
-      }
+      // Do NOT update root level title - only flow.title should be updated
       
-      // Update meta.updated_at timestamp
+      // Update meta.updated_at timestamp if it exists
       if (updatedDetails.meta) {
         updatedDetails.meta.updated_at = new Date().toISOString();
       }

@@ -1,17 +1,16 @@
 // src/modules/owner/components/property/wizard/sections/PropertySummary/PropertySummary.tsx
-// Version: 2.9.2
-// Last Modified: 21-05-2025 14:30 IST
-// Purpose: Put Previous and Save buttons in the same row
+// Version: 3.1.0
+// Last Modified: 21-05-2025 17:15 IST
+// Purpose: Removed references to deleted files while maintaining functionality
 
-import React, { useEffect, useState } from 'react';
-import { Info, Home, MapPin, Check, Clock, Wallet, Wrench, Layers, Briefcase, Save, ArrowLeft } from 'lucide-react';
+import React, { useEffect, useState, useCallback } from 'react';
+import { Info, Home, MapPin, Check, Clock, Wallet, Wrench, Layers, Briefcase, Save, ArrowLeft, Edit } from 'lucide-react';
 import { PropertySummaryProps } from './types';
 import { useFlowDetection } from './hooks/useFlowDetection';
-import { usePropertyTitle } from './hooks/usePropertyTitle';
-import { PropertyTitleEditor } from './components/PropertyTitleEditor';
 import { SummarySection } from './components/SummarySection';
 import { DescriptionSection } from './components/DescriptionSection';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/lib/supabase';
 import { useContext } from 'react';
@@ -20,6 +19,8 @@ import { useNavigate } from 'react-router-dom';
 // Corrected import path
 import { prepareFormDataForSubmission } from '@/modules/owner/components/property/wizard/utils/formDataFormatter';
 import { formatCurrency, formatArea, formatBoolean } from './services/dataFormatter';
+// Import the seeker's title generator directly
+import { generatePropertyTitle } from '@/modules/seeker/utils/propertyTitleUtils';
 
 // Helper function to clean up the JSON structure
 const cleanupJsonStructure = (data: any) => {
@@ -192,6 +193,83 @@ export const PropertySummary: React.FC<PropertySummaryProps> = (props) => {
 
   // Detect flow type and get step IDs
   const { flowType, stepIds } = useFlowDetection(formData);
+  
+  // Simple title management (replacing usePropertyTitle hook)
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [editedTitle, setEditedTitle] = useState('');
+  
+  // Initialize title when formData or flow changes
+  useEffect(() => {
+    if (!formData) return;
+    
+    // Get title directly from flow.title or generate a new one
+    const existingTitle = formData.flow?.title || '';
+    
+    if (existingTitle && existingTitle !== "New Property") {
+      setEditedTitle(existingTitle);
+    } else {
+      try {
+        // Format formData for the seeker's title generator
+        const propertyData = {
+          property_details: formData,
+          address: formData.steps?.[stepIds.location || '']?.address || '',
+          city: formData.steps?.[stepIds.location || '']?.city || '',
+          locality: formData.steps?.[stepIds.location || '']?.locality || '',
+          bedrooms: formData.steps?.[stepIds.basicDetails || '']?.bhkType?.replace('BHK', '').trim() || '',
+        };
+        
+        // Generate a title using the seeker's generator
+        const generatedTitle = generatePropertyTitle(propertyData);
+        console.log('Generated title using seeker utility:', generatedTitle);
+        
+        // Update only flow.title
+        if (formData.flow) {
+          formData.flow.title = generatedTitle.trim();
+        } else {
+          formData.flow = { title: generatedTitle.trim() };
+        }
+        
+        setEditedTitle(generatedTitle);
+      } catch (error) {
+        console.error('Error generating title:', error);
+        // Set a generic title as fallback
+        const fallbackTitle = 'New Property Listing';
+        
+        // Update only flow.title
+        if (formData.flow) {
+          formData.flow.title = fallbackTitle;
+        } else {
+          formData.flow = { title: fallbackTitle };
+        }
+        
+        setEditedTitle(fallbackTitle);
+      }
+    }
+  }, [formData, stepIds, flowType]);
+  
+  // Handle title edit completion
+  const handleTitleEditComplete = useCallback(() => {
+    if (editedTitle.trim()) {
+      // Update only flow.title
+      if (formData.flow) {
+        formData.flow.title = editedTitle.trim();
+      } else {
+        formData.flow = { title: editedTitle.trim() };
+      }
+    }
+    setIsEditingTitle(false);
+  }, [editedTitle, formData]);
+  
+  // Handle keyboard events
+  const handleTitleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleTitleEditComplete();
+    } else if (e.key === 'Escape') {
+      const currentTitle = formData.flow?.title || '';
+      setEditedTitle(currentTitle);
+      setIsEditingTitle(false);
+    }
+  }, [formData, handleTitleEditComplete]);
 
   // Transform data on initial render
   useEffect(() => {
@@ -230,16 +308,6 @@ export const PropertySummary: React.FC<PropertySummaryProps> = (props) => {
       setIsLoading(false);
     }
   }, [formData, flowType]); // Re-run if formData or flowType changes
-
-  // Use the title from the transformed data or from the property title hook
-  const {
-    isEditingTitle,
-    setIsEditingTitle,
-    editedTitle,
-    setEditedTitle,
-    handleTitleEditComplete,
-    handleTitleKeyDown
-  } = usePropertyTitle(formData, stepIds, flowType);
 
   // Function to save the raw formData to properties_v2 table and navigate
   const saveOriginalData = async () => {
@@ -368,21 +436,8 @@ export const PropertySummary: React.FC<PropertySummaryProps> = (props) => {
   const flowListingType = dataToRender?.flow?.listingType || '';
   const flowInfo = `${capitalizeEachWord(flowCategory)} ${capitalizeEachWord(flowListingType)}`;
 
-  // Find the title from the data
-  let propertyTitle = '';
-
-  // Search for title in all steps
-  for (const stepId in dataToRender?.steps) {
-    if (dataToRender.steps[stepId]?.title) {
-      propertyTitle = dataToRender.steps[stepId].title;
-      break;
-    }
-  }
-
-  // If not found, use the editedTitle or a default
-  if (!propertyTitle) {
-    propertyTitle = editedTitle || 'Property Details';
-  }
+  // Get property title directly from flow.title or fall back to editedTitle
+  const propertyTitle = dataToRender?.flow?.title || editedTitle || 'Property Details';
 
   // Get address information from the location step
   let address = '';
@@ -504,7 +559,43 @@ export const PropertySummary: React.FC<PropertySummaryProps> = (props) => {
     <div className="space-y-6 py-4">
       {/* 1. HEADER: Property Title and Address */}
       <div className="border-b border-border pb-4">
-        <h2 className="text-2xl font-bold">{propertyTitle}</h2>
+        {/* Inline title editor (replacing PropertyTitleEditor component) */}
+        <div className="mb-2">
+          {isEditingTitle ? (
+            <div className="flex items-center gap-2">
+              <Input
+                type="text"
+                value={editedTitle}
+                onChange={(e) => setEditedTitle(e.target.value)}
+                onKeyDown={handleTitleKeyDown}
+                autoFocus
+                className="text-lg font-semibold h-10"
+                placeholder="Enter property title"
+              />
+              <Button 
+                size="sm" 
+                variant="ghost" 
+                onClick={handleTitleEditComplete}
+                className="p-2 h-10 w-10"
+              >
+                <Check className="h-5 w-5" />
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <h2 className="text-2xl font-bold">{propertyTitle}</h2>
+              <Button 
+                size="sm" 
+                variant="ghost" 
+                onClick={() => setIsEditingTitle(true)}
+                className="p-1 h-8 w-8 ml-1"
+                title="Edit property title"
+              >
+                <Edit className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+        </div>
         {address && <p className="text-sm text-gray-600 mt-1">{address}</p>}
       </div>
 
