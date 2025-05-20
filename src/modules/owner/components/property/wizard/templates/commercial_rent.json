@@ -1,6 +1,6 @@
 {
     "meta": {
-      "_version": "v3.1",
+      "_version": "v3.2",
       "created_at": "",
       "updated_at": "",
       "status": "draft"
@@ -8,7 +8,8 @@
     "flow": {
       "category": "commercial",
       "listingType": "rent",
-      "flowType": "commercial_rent"
+      "flowType": "commercial_rent",
+      "title": ""
     },
     "steps": {
       "com_rent_basic_details": {},

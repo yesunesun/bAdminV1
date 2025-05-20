@@ -1,6 +1,6 @@
 {
     "meta": {
-      "_version": "v3.1",
+      "_version": "v3.2",
       "created_at": "",
       "updated_at": "",
       "status": "draft"
@@ -8,7 +8,8 @@
     "flow": {
       "category": "residential",
       "listingType": "sale",
-      "flowType": "residential_sale"
+      "flowType": "residential_sale",
+      "title": ""
     },
     "steps": {
       "res_sale_basic_details": {},

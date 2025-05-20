@@ -1,6 +1,6 @@
 {
     "meta": {
-      "_version": "v3.1",
+      "_version": "v3.2",
       "created_at": "",
       "updated_at": "",
       "status": "draft"
@@ -8,7 +8,8 @@
     "flow": {
       "category": "residential",
       "listingType": "flatmates",
-      "flowType": "residential_flatmates"
+      "flowType": "residential_flatmates",
+      "title": ""
     },
     "steps": {
       "res_flat_basic_details": {},
