@@ -1,10 +1,10 @@
 // src/modules/owner/components/property/wizard/sections/PropertySummary/PropertySummary.tsx
-// Version: 2.8.4
-// Last Modified: 20-05-2025 22:15 IST
-// Purpose: Added navigation to property details page after saving
+// Version: 2.9.2
+// Last Modified: 21-05-2025 14:30 IST
+// Purpose: Put Previous and Save buttons in the same row
 
 import React, { useEffect, useState } from 'react';
-import { Info, Home, MapPin, Check, Clock, Wallet, Wrench, Layers, Briefcase, Save } from 'lucide-react';
+import { Info, Home, MapPin, Check, Clock, Wallet, Wrench, Layers, Briefcase, Save, ArrowLeft } from 'lucide-react';
 import { PropertySummaryProps } from './types';
 import { useFlowDetection } from './hooks/useFlowDetection';
 import { usePropertyTitle } from './hooks/usePropertyTitle';
@@ -24,7 +24,7 @@ import { formatCurrency, formatArea, formatBoolean } from './services/dataFormat
 // Helper function to clean up the JSON structure
 const cleanupJsonStructure = (data: any) => {
   if (!data) return data;
-  
+
   // Create a new object with only the standard sections
   const cleanedData = {
     meta: data.meta || {},
@@ -32,7 +32,7 @@ const cleanupJsonStructure = (data: any) => {
     steps: data.steps || {},
     media: data.media || {}
   };
-  
+
   return cleanedData;
 };
 
@@ -50,7 +50,7 @@ const formatFieldLabel = (key: string): string => {
   const cleanKey = key
     .replace(/^has/, '')
     .replace(/^is/, '');
-  
+
   // Convert camelCase to spaces
   return cleanKey
     .replace(/([A-Z])/g, ' $1')
@@ -63,46 +63,46 @@ const formatFieldValue = (key: string, value: any): string => {
   if (value === undefined || value === null || value === '') {
     return '-';
   }
-  
+
   // Format boolean values
   if (typeof value === 'boolean') {
     return value ? 'Yes' : 'No';
   }
-  
+
   // Format array values
   if (Array.isArray(value)) {
     return value.join(', ');
   }
-  
+
   // Format price/monetary values
-  if ((key.toLowerCase().includes('price') || 
-      key.toLowerCase().includes('deposit') || 
-      key.toLowerCase().includes('cost') || 
-      key.toLowerCase().includes('amount')) && 
-      !isNaN(Number(value))) {
+  if ((key.toLowerCase().includes('price') ||
+    key.toLowerCase().includes('deposit') ||
+    key.toLowerCase().includes('cost') ||
+    key.toLowerCase().includes('amount')) &&
+    !isNaN(Number(value))) {
     return `₹${parseInt(value).toLocaleString('en-IN')}`;
   }
-  
+
   // Format area values
   if (key.toLowerCase().includes('area') && !key.toLowerCase().includes('areaunit')) {
     return `${value} ${key.toLowerCase().includes('builtup') ? 'sq. ft.' : ''}`;
   }
-  
+
   // Format floor values
   if (key === 'floor' && value && typeof value === 'string') {
     return value;
   }
-  
+
   // Format date values
   if (key.toLowerCase().includes('date') || key.toLowerCase().includes('from') || key.toLowerCase().includes('until')) {
     // Check if it's a valid date string
     if (/^\d{4}-\d{2}-\d{2}/.test(value)) {
       try {
         const date = new Date(value);
-        return date.toLocaleDateString('en-IN', { 
-          day: '2-digit', 
-          month: '2-digit', 
-          year: 'numeric' 
+        return date.toLocaleDateString('en-IN', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric'
         });
       } catch (e) {
         // If date parsing fails, return the original value
@@ -110,7 +110,7 @@ const formatFieldValue = (key: string, value: any): string => {
       }
     }
   }
-  
+
   return String(value);
 };
 
@@ -139,7 +139,7 @@ const getSectionTitle = (stepId: string): string => {
   if (stepId.includes('coworking_details')) return 'Coworking Details';
   if (stepId.includes('flatmate_details')) return 'Flatmate Details';
   if (stepId.includes('pg_details')) return 'PG Details';
-  
+
   // If not a known step, create a title from the step ID
   return stepId
     .replace(/_/g, ' ')
@@ -162,7 +162,7 @@ const getSectionIcon = (stepId: string) => {
   if (stepId.includes('land_features')) return <Layers className="h-4 w-4" />;
   if (stepId.includes('sale')) return <Wallet className="h-4 w-4" />;
   if (stepId.includes('rental')) return <Wallet className="h-4 w-4" />;
-  
+
   // Default icon
   return <Info className="h-4 w-4" />;
 };
@@ -172,7 +172,6 @@ export const PropertySummary: React.FC<PropertySummaryProps> = (props) => {
     formData,
     onPrevious,
     onSaveAsDraft,
-    onSaveAndPublish,
     onUpdate,
     saving,
     status = 'draft',
@@ -182,7 +181,7 @@ export const PropertySummary: React.FC<PropertySummaryProps> = (props) => {
   const { toast } = useToast();
   const { user } = useContext(AuthContext);
   const navigate = useNavigate();
-  
+
   // State for saving original data
   const [savingOriginal, setSavingOriginal] = useState(false);
 
@@ -190,38 +189,38 @@ export const PropertySummary: React.FC<PropertySummaryProps> = (props) => {
   const [transformedData, setTransformedData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Detect flow type and get step IDs
   const { flowType, stepIds } = useFlowDetection(formData);
-  
+
   // Transform data on initial render
   useEffect(() => {
     if (!formData) return;
-    
+
     setIsLoading(true);
     setError(null);
-    
+
     // Create context params for the data transformation
     const contextParams = {
       urlPath: window.location.pathname,
-      isSaleMode: formData?.propertyDetails?.adType === 'Sale' || 
-                 flowType?.includes('sale') || 
-                 false,
+      isSaleMode: formData?.propertyDetails?.adType === 'Sale' ||
+        flowType?.includes('sale') ||
+        false,
       isPGHostelMode: formData?.propertyDetails?.propertyType === 'PG/Hostel' || false,
-      adType: formData?.propertyDetails?.adType || 
-             (flowType?.includes('sale') ? 'sale' : 'rent')
+      adType: formData?.propertyDetails?.adType ||
+        (flowType?.includes('sale') ? 'sale' : 'rent')
     };
-    
+
     try {
       // Transform the data using the utility function
       const transformed = prepareFormDataForSubmission(formData, contextParams);
-      
+
       // Clean up the JSON structure to only include standard sections
       const cleanedData = cleanupJsonStructure(transformed);
-      
+
       // Log for debugging
       console.log('Transformed & cleaned JSON:', cleanedData);
-      
+
       // Set the transformed data to state for rendering
       setTransformedData(cleanedData);
     } catch (error) {
@@ -231,7 +230,7 @@ export const PropertySummary: React.FC<PropertySummaryProps> = (props) => {
       setIsLoading(false);
     }
   }, [formData, flowType]); // Re-run if formData or flowType changes
-  
+
   // Use the title from the transformed data or from the property title hook
   const {
     isEditingTitle,
@@ -254,17 +253,17 @@ export const PropertySummary: React.FC<PropertySummaryProps> = (props) => {
     }
 
     setSavingOriginal(true);
-    
+
     try {
       // Use the ORIGINAL formData directly without any transformation
       const originalData = formData;
-      
+
       console.log('Saving original form data:', originalData);
-      
+
       // Create new property or update existing one
       const now = new Date().toISOString();
       let savedPropertyId: string;
-      
+
       if (propertyId) {
         // Update existing property
         const { data, error } = await supabase
@@ -277,12 +276,12 @@ export const PropertySummary: React.FC<PropertySummaryProps> = (props) => {
           .eq('id', propertyId)
           .eq('owner_id', user.id)
           .select();
-          
+
         if (error) throw error;
-        
+
         savedPropertyId = propertyId;
         console.log('Updated property with ID:', savedPropertyId);
-        
+
         toast({
           title: "Success",
           description: `Property updated with ID: ${savedPropertyId}`,
@@ -300,25 +299,25 @@ export const PropertySummary: React.FC<PropertySummaryProps> = (props) => {
             status: 'draft'
           }])
           .select();
-          
+
         if (error) throw error;
-        
+
         savedPropertyId = data[0].id;
         console.log('Created new property with ID:', savedPropertyId);
-        
+
         toast({
           title: "Success",
           description: `Property created with ID: ${savedPropertyId}`,
           variant: "default"
         });
       }
-      
+
       // Short delay to ensure toast is visible
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
+
       // Navigate to the property details page
       navigate(`/seeker/property/${savedPropertyId}`);
-      
+
     } catch (error) {
       console.error('Error saving original data:', error);
       toast({
@@ -349,7 +348,7 @@ export const PropertySummary: React.FC<PropertySummaryProps> = (props) => {
         <div className="flex justify-center items-center h-48 text-red-500">
           <div className="text-center">
             <p className="text-lg font-semibold mb-4">Something went wrong</p>
-            <button 
+            <button
               className="px-4 py-2 bg-blue-500 text-white rounded-md"
               onClick={() => window.location.reload()}
             >
@@ -363,15 +362,15 @@ export const PropertySummary: React.FC<PropertySummaryProps> = (props) => {
 
   // Use the transformed data for display, but we'll save the original formData
   const dataToRender = transformedData || formData;
-  
+
   // Get flow information
   const flowCategory = dataToRender?.flow?.category || '';
   const flowListingType = dataToRender?.flow?.listingType || '';
   const flowInfo = `${capitalizeEachWord(flowCategory)} ${capitalizeEachWord(flowListingType)}`;
-  
+
   // Find the title from the data
   let propertyTitle = '';
-  
+
   // Search for title in all steps
   for (const stepId in dataToRender?.steps) {
     if (dataToRender.steps[stepId]?.title) {
@@ -379,15 +378,15 @@ export const PropertySummary: React.FC<PropertySummaryProps> = (props) => {
       break;
     }
   }
-  
+
   // If not found, use the editedTitle or a default
   if (!propertyTitle) {
     propertyTitle = editedTitle || 'Property Details';
   }
-  
+
   // Get address information from the location step
   let address = '';
-  
+
   // Search for address in all location steps
   for (const stepId in dataToRender?.steps) {
     if (stepId.toLowerCase().includes('location')) {
@@ -395,11 +394,11 @@ export const PropertySummary: React.FC<PropertySummaryProps> = (props) => {
       if (locationStep?.address) {
         address = locationStep.address;
       }
-      
+
       break;
     }
   }
-  
+
   // Get description from any step
   let description = '';
   for (const stepId in dataToRender?.steps) {
@@ -417,13 +416,13 @@ export const PropertySummary: React.FC<PropertySummaryProps> = (props) => {
       break;
     }
   }
-  
+
   // Dynamically create sections based on step IDs
   const sections = [];
-  
+
   // Log all steps for debugging
   console.log("Processing steps:", Object.keys(dataToRender?.steps || {}));
-  
+
   // Process each step as its own section
   for (const stepId in dataToRender?.steps) {
     // Skip empty steps
@@ -431,23 +430,23 @@ export const PropertySummary: React.FC<PropertySummaryProps> = (props) => {
       console.log(`Skipping empty step: ${stepId}`);
       continue;
     }
-    
+
     console.log(`Processing step: ${stepId} with ${Object.keys(dataToRender.steps[stepId]).length} fields`);
-    
+
     // Get the section title and icon
     const sectionTitle = getSectionTitle(stepId);
     const icon = getSectionIcon(stepId);
-    
+
     // Create items for this section
     const items = [];
-    
+
     // Process each field in the step
     for (const key in dataToRender.steps[stepId]) {
       // Skip title and description fields as they are handled separately
       if (key === 'title' || key === 'description' || key === '__typename') {
         continue;
       }
-      
+
       // Special handling for floor + totalFloors
       if (key === 'floor' && dataToRender.steps[stepId]['totalFloors']) {
         items.push({
@@ -456,37 +455,36 @@ export const PropertySummary: React.FC<PropertySummaryProps> = (props) => {
         });
         continue;
       }
-      
+
       // Skip totalFloors as it's handled with floor
       if (key === 'totalFloors' && dataToRender.steps[stepId]['floor']) {
         continue;
       }
-      
+
       // Special handling for builtUpArea + builtUpAreaUnit
       if (key === 'builtUpArea' && dataToRender.steps[stepId]['builtUpAreaUnit']) {
         items.push({
           label: 'Built-up Area',
-          value: `${dataToRender.steps[stepId]['builtUpArea']} ${
-            dataToRender.steps[stepId]['builtUpAreaUnit'] === 'sqft' ? 'sq. ft.' : 
-            dataToRender.steps[stepId]['builtUpAreaUnit'] === 'sqyd' ? 'sq. yd.' : 
-            dataToRender.steps[stepId]['builtUpAreaUnit']
-          }`
+          value: `${dataToRender.steps[stepId]['builtUpArea']} ${dataToRender.steps[stepId]['builtUpAreaUnit'] === 'sqft' ? 'sq. ft.' :
+              dataToRender.steps[stepId]['builtUpAreaUnit'] === 'sqyd' ? 'sq. yd.' :
+                dataToRender.steps[stepId]['builtUpAreaUnit']
+            }`
         });
         continue;
       }
-      
+
       // Skip builtUpAreaUnit as it's handled with builtUpArea
       if (key === 'builtUpAreaUnit' && dataToRender.steps[stepId]['builtUpArea']) {
         continue;
       }
-      
+
       // Add standard field
       items.push({
         label: formatFieldLabel(key),
         value: formatFieldValue(key, dataToRender.steps[stepId][key])
       });
     }
-    
+
     // Only add sections with items
     if (items.length > 0) {
       sections.push({
@@ -498,10 +496,10 @@ export const PropertySummary: React.FC<PropertySummaryProps> = (props) => {
       });
     }
   }
-  
+
   // Sort sections by priority
   sections.sort((a, b) => a.priority - b.priority);
-  
+
   return (
     <div className="space-y-6 py-4">
       {/* 1. HEADER: Property Title and Address */}
@@ -509,29 +507,7 @@ export const PropertySummary: React.FC<PropertySummaryProps> = (props) => {
         <h2 className="text-2xl font-bold">{propertyTitle}</h2>
         {address && <p className="text-sm text-gray-600 mt-1">{address}</p>}
       </div>
-      
-      {/* "Save Original" Button - Changed to save raw formData */}
-      <div className="flex justify-end mb-4">
-        <Button 
-          onClick={saveOriginalData}
-          disabled={savingOriginal || saving}
-          variant="outline"
-          className="flex items-center gap-2 bg-amber-50 text-amber-700 border-amber-300 hover:bg-amber-100 hover:text-amber-800"
-        >
-          {savingOriginal ? (
-            <>
-              <div className="animate-spin h-4 w-4 border-b-2 border-current rounded-full"></div>
-              <span>Saving Raw Data...</span>
-            </>
-          ) : (
-            <>
-              <Save className="h-4 w-4" />
-              <span>Save Original</span>
-            </>
-          )}
-        </Button>
-      </div>
-      
+
       {/* 2. ALWAYS FIRST: Listing Information */}
       <div className="bg-blue-50 rounded-lg p-4 shadow-sm">
         <h3 className="text-lg font-semibold text-primary mb-3">Listing Information</h3>
@@ -544,7 +520,7 @@ export const PropertySummary: React.FC<PropertySummaryProps> = (props) => {
           ]}
         />
       </div>
-      
+
       {/* 3. CONTENT: All other property details sections */}
       <div className="mt-6">
         <h3 className="text-lg font-semibold text-primary mb-3">Property Details</h3>
@@ -567,6 +543,41 @@ export const PropertySummary: React.FC<PropertySummaryProps> = (props) => {
           <DescriptionSection description={description} />
         </div>
       )}
+
+      {/* 5. ACTIONS: Previous and Save buttons in the same row */}
+      <div className="mt-8 border-t border-border pt-6 flex justify-between items-center">
+        {/* Previous button */}
+        <Button
+          onClick={onPrevious}
+          disabled={saving || savingOriginal}
+          variant="outline"
+          className="flex items-center gap-2"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Previous
+        </Button>
+
+        {/* Save Original as primary action button */}
+        <Button
+          onClick={saveOriginalData}
+          disabled={savingOriginal || saving}
+          variant="default"
+          size="lg"
+          className="flex items-center gap-2 bg-primary text-primary-foreground hover:bg-primary/90"
+        >
+          {savingOriginal ? (
+            <>
+              <div className="animate-spin h-4 w-4 border-2 border-b-transparent border-white rounded-full"></div>
+              <span>Saving & Publishing...</span>
+            </>
+          ) : (
+            <>
+              <Save className="h-5 w-5" />
+              <span>Save & View Property</span>
+            </>
+          )}
+        </Button>
+      </div>
     </div>
   );
 };

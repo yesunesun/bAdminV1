@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/PropertyForm/index.tsx
-// Version: 9.1.0
-// Last Modified: 19-05-2025 21:00 IST
-// Purpose: Added FormDataDebug component for development environment
+// Version: 9.2.0
+// Last Modified: 21-05-2025 10:30 IST
+// Purpose: Removed "Save and Continue" functionality and related functions
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -291,7 +291,6 @@ export function PropertyForm({
    handleNextStep: originalHandleNextStep,
    handlePreviousStep,
    handleSaveAsDraft,
-   handleSaveAndPublish,
    handleUpdate,
    handleImageUploadComplete,
    setCurrentStep,
@@ -525,105 +524,6 @@ export function PropertyForm({
      setSaveInProgress(false);
    }
  };
- 
- // Direct save and navigate function with no popups
- const handleDirectSaveAndPublish = async (): Promise<string> => {
-   try {
-     setSaveInProgress(true);
-     
-     // Ensure minimal required data
-     const formData = form.getValues();
-     console.log('[PropertyForm] Form data before publish:', formData);
-     
-     // Clean the form data to remove invalid sections
-     const cleanedData = cleanFormData(formData);
-     
-     // Set flow information from URL if available
-     const pathParts = window.location.pathname.split('/');
-     const urlPropertyType = pathParts.length > 2 ? pathParts[pathParts.length - 3] : '';
-     const urlListingType = pathParts.length > 2 ? pathParts[pathParts.length - 2] : '';
-     
-     if (urlPropertyType && !cleanedData.flow_property_type) {
-       cleanedData.flow_property_type = urlPropertyType;
-     }
-     
-     if (urlListingType && !cleanedData.flow_listing_type) {
-       cleanedData.flow_listing_type = urlListingType;
-     }
-     
-     // Make sure we have a title
-     if (!cleanedData.title) {
-       if (cleanedData.propertyType) {
-         cleanedData.title = `${cleanedData.propertyType} Property`;
-       } else {
-         cleanedData.title = "New Property";
-       }
-     }
-     
-     // Ensure we have a city
-     if (!cleanedData.city && !cleanedData.locality) {
-       cleanedData.city = "Hyderabad";
-     }
-     
-     // Make sure there's a description
-     if (!cleanedData.description) {
-       cleanedData.description = `${cleanedData.title} - A quality property listing.`;
-     }
-     
-     // Set correct flow for Land Sale mode
-     if (isLandSaleMode) {
-       console.log('[PropertyForm] Setting land sale flow before publish');
-       
-       cleanedData.flow = {
-         category: 'land',
-         listingType: 'sale',
-         flowType: 'land_sale'
-       };
-       
-       // Also update root level values
-       cleanedData.category = 'land';
-       cleanedData.listingType = 'sale';
-       cleanedData.propertyType = 'land';
-       cleanedData.adType = 'sale';
-     }
-     else if (isCoworkingMode) {
-       console.log('[PropertyForm] Setting coworking flow before publish');
-       
-       cleanedData.flow = {
-         category: 'commercial',
-         listingType: 'coworking',
-         flowType: 'commercial_coworking'
-       };
-       
-       // Also update root level values
-       cleanedData.category = 'commercial';
-       cleanedData.listingType = 'coworking';
-       cleanedData.propertyType = 'commercial';
-       cleanedData.adType = 'coworking';
-     }
-     
-     // Apply the form changes
-     console.log('[PropertyForm] Resetting form with updated data before publish:', cleanedData);
-     form.reset(cleanedData);
-     
-     // Directly use handleSaveAndPublish
-     console.log('[PropertyForm] Calling handleSaveAndPublish');
-     const publishedPropertyId = await handleSaveAndPublish();
-     
-     console.log("[PropertyForm] Property published successfully with ID:", publishedPropertyId);
-     
-     if (!publishedPropertyId) {
-       throw new Error("No property ID returned after publishing");
-     }
-     
-     return publishedPropertyId;
-   } catch (error) {
-     console.error("[PropertyForm] Error in direct save and publish:", error);
-     throw error;
-   } finally {
-     setSaveInProgress(false);
-   }
- };
 
  // Function to handle type selection completion
  const handleTypeSelectionComplete = (category: string, adType: string, city: string) => {
@@ -756,7 +656,6 @@ export function PropertyForm({
                isFlatmatesMode={isFlatmatesMode}
                handlePreviousStep={safePreviousStep}
                handleSaveAsDraft={handleSaveAsDraft}
-               handleSaveAndPublish={handleSaveAndPublish}
                handleUpdate={handleUpdate}
                saving={saving}
                status={status}
@@ -770,9 +669,6 @@ export function PropertyForm({
                STEPS={flowSteps || STEPS}
                handlePreviousStep={safePreviousStep}
                handleNextStep={handleNextStep}
-               savedPropertyId={effectivePropertyId}
-               onSave={enhancedSaveFunction}
-               onPublish={handleDirectSaveAndPublish}
                isLastStep={isReviewStep}
                disablePrevious={saving || saveInProgress}
              />

@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/PropertyForm/components/FormContent.tsx
-// Version: 6.3.0
-// Last Modified: 17-05-2025 10:30 IST
-// Purpose: Replaced debug popup with toggleable side panel
+// Version: 6.4.0
+// Last Modified: 21-05-2025 11:00 IST
+// Purpose: Removed Save and Continue functionality from PropertySummary rendering
 
 import React, { useState } from 'react';
 import { UseFormReturn } from 'react-hook-form';
@@ -44,7 +44,6 @@ interface FormContentProps {
   isFlatmatesMode: boolean;
   handlePreviousStep: () => void;
   handleSaveAsDraft: () => Promise<void>;
-  handleSaveAndPublish: () => Promise<void>;
   handleUpdate: () => Promise<void>;
   saving: boolean;
   status: 'draft' | 'published';
@@ -71,7 +70,6 @@ const FormContent = ({
   isFlatmatesMode,
   handlePreviousStep,
   handleSaveAsDraft,
-  handleSaveAndPublish,
   handleUpdate,
   saving,
   status,
@@ -166,7 +164,6 @@ const FormContent = ({
           formData={formData}
           onPrevious={handlePreviousStep}
           onSaveAsDraft={handleSaveAsDraft}
-          onSaveAndPublish={handleSaveAndPublish}
           onUpdate={handleUpdate}
           saving={saving}
           status={status}
