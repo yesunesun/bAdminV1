@@ -1,16 +1,22 @@
 // src/modules/owner/components/property/wizard/sections/PropertySummary/PropertySummary.tsx
-// Version: 2.7.0
-// Last Modified: 14-05-2025 14:45 IST
-// Purpose: Enhanced Commercial flow handling to correctly display all sections in review tab
+// Version: 2.8.4
+// Last Modified: 20-05-2025 22:15 IST
+// Purpose: Added navigation to property details page after saving
 
 import React, { useEffect, useState } from 'react';
-import { Info, Home, MapPin, Check, Clock, Wallet, Wrench, Layers, Briefcase } from 'lucide-react';
+import { Info, Home, MapPin, Check, Clock, Wallet, Wrench, Layers, Briefcase, Save } from 'lucide-react';
 import { PropertySummaryProps } from './types';
 import { useFlowDetection } from './hooks/useFlowDetection';
 import { usePropertyTitle } from './hooks/usePropertyTitle';
 import { PropertyTitleEditor } from './components/PropertyTitleEditor';
 import { SummarySection } from './components/SummarySection';
 import { DescriptionSection } from './components/DescriptionSection';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/components/ui/use-toast';
+import { supabase } from '@/lib/supabase';
+import { useContext } from 'react';
+import { AuthContext } from '@/contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 // Corrected import path
 import { prepareFormDataForSubmission } from '@/modules/owner/components/property/wizard/utils/formDataFormatter';
 import { formatCurrency, formatArea, formatBoolean } from './services/dataFormatter';
@@ -173,6 +179,13 @@ export const PropertySummary: React.FC<PropertySummaryProps> = (props) => {
     propertyId
   } = props;
 
+  const { toast } = useToast();
+  const { user } = useContext(AuthContext);
+  const navigate = useNavigate();
+  
+  // State for saving original data
+  const [savingOriginal, setSavingOriginal] = useState(false);
+
   // State to hold the transformed data
   const [transformedData, setTransformedData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -229,6 +242,95 @@ export const PropertySummary: React.FC<PropertySummaryProps> = (props) => {
     handleTitleKeyDown
   } = usePropertyTitle(formData, stepIds, flowType);
 
+  // Function to save the raw formData to properties_v2 table and navigate
+  const saveOriginalData = async () => {
+    if (!user?.id) {
+      toast({
+        title: "Authentication Error",
+        description: "You must be logged in to save properties.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setSavingOriginal(true);
+    
+    try {
+      // Use the ORIGINAL formData directly without any transformation
+      const originalData = formData;
+      
+      console.log('Saving original form data:', originalData);
+      
+      // Create new property or update existing one
+      const now = new Date().toISOString();
+      let savedPropertyId: string;
+      
+      if (propertyId) {
+        // Update existing property
+        const { data, error } = await supabase
+          .from('properties_v2')
+          .update({
+            property_details: originalData,
+            updated_at: now,
+            status: 'draft'
+          })
+          .eq('id', propertyId)
+          .eq('owner_id', user.id)
+          .select();
+          
+        if (error) throw error;
+        
+        savedPropertyId = propertyId;
+        console.log('Updated property with ID:', savedPropertyId);
+        
+        toast({
+          title: "Success",
+          description: `Property updated with ID: ${savedPropertyId}`,
+          variant: "default"
+        });
+      } else {
+        // Create new property
+        const { data, error } = await supabase
+          .from('properties_v2')
+          .insert([{
+            owner_id: user.id,
+            created_at: now,
+            updated_at: now,
+            property_details: originalData,
+            status: 'draft'
+          }])
+          .select();
+          
+        if (error) throw error;
+        
+        savedPropertyId = data[0].id;
+        console.log('Created new property with ID:', savedPropertyId);
+        
+        toast({
+          title: "Success",
+          description: `Property created with ID: ${savedPropertyId}`,
+          variant: "default"
+        });
+      }
+      
+      // Short delay to ensure toast is visible
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Navigate to the property details page
+      navigate(`/seeker/property/${savedPropertyId}`);
+      
+    } catch (error) {
+      console.error('Error saving original data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save property. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setSavingOriginal(false);
+    }
+  };
+
   // Show loading state while data is being transformed
   if (isLoading) {
     return (
@@ -259,21 +361,21 @@ export const PropertySummary: React.FC<PropertySummaryProps> = (props) => {
     );
   }
 
-  // Use the transformed data if available, otherwise fall back to formData
-  const data = transformedData || formData;
+  // Use the transformed data for display, but we'll save the original formData
+  const dataToRender = transformedData || formData;
   
   // Get flow information
-  const flowCategory = data?.flow?.category || '';
-  const flowListingType = data?.flow?.listingType || '';
+  const flowCategory = dataToRender?.flow?.category || '';
+  const flowListingType = dataToRender?.flow?.listingType || '';
   const flowInfo = `${capitalizeEachWord(flowCategory)} ${capitalizeEachWord(flowListingType)}`;
   
   // Find the title from the data
   let propertyTitle = '';
   
   // Search for title in all steps
-  for (const stepId in data?.steps) {
-    if (data.steps[stepId]?.title) {
-      propertyTitle = data.steps[stepId].title;
+  for (const stepId in dataToRender?.steps) {
+    if (dataToRender.steps[stepId]?.title) {
+      propertyTitle = dataToRender.steps[stepId].title;
       break;
     }
   }
@@ -287,9 +389,9 @@ export const PropertySummary: React.FC<PropertySummaryProps> = (props) => {
   let address = '';
   
   // Search for address in all location steps
-  for (const stepId in data?.steps) {
+  for (const stepId in dataToRender?.steps) {
     if (stepId.toLowerCase().includes('location')) {
-      const locationStep = data.steps[stepId];
+      const locationStep = dataToRender.steps[stepId];
       if (locationStep?.address) {
         address = locationStep.address;
       }
@@ -300,18 +402,18 @@ export const PropertySummary: React.FC<PropertySummaryProps> = (props) => {
   
   // Get description from any step
   let description = '';
-  for (const stepId in data?.steps) {
-    if (data.steps[stepId]?.description) {
-      description = data.steps[stepId].description;
+  for (const stepId in dataToRender?.steps) {
+    if (dataToRender.steps[stepId]?.description) {
+      description = dataToRender.steps[stepId].description;
       break;
-    } else if (data.steps[stepId]?.additionalDetails) {
-      description = data.steps[stepId].additionalDetails;
+    } else if (dataToRender.steps[stepId]?.additionalDetails) {
+      description = dataToRender.steps[stepId].additionalDetails;
       break;
-    } else if (data.steps[stepId]?.nearbyLandmarks) {
-      description = data.steps[stepId].nearbyLandmarks;
+    } else if (dataToRender.steps[stepId]?.nearbyLandmarks) {
+      description = dataToRender.steps[stepId].nearbyLandmarks;
       break;
-    } else if (data.steps[stepId]?.directionsTip) {
-      description = data.steps[stepId].directionsTip;
+    } else if (dataToRender.steps[stepId]?.directionsTip) {
+      description = dataToRender.steps[stepId].directionsTip;
       break;
     }
   }
@@ -320,17 +422,17 @@ export const PropertySummary: React.FC<PropertySummaryProps> = (props) => {
   const sections = [];
   
   // Log all steps for debugging
-  console.log("Processing steps:", Object.keys(data?.steps || {}));
+  console.log("Processing steps:", Object.keys(dataToRender?.steps || {}));
   
   // Process each step as its own section
-  for (const stepId in data?.steps) {
+  for (const stepId in dataToRender?.steps) {
     // Skip empty steps
-    if (!data.steps[stepId] || Object.keys(data.steps[stepId]).length === 0) {
+    if (!dataToRender.steps[stepId] || Object.keys(dataToRender.steps[stepId]).length === 0) {
       console.log(`Skipping empty step: ${stepId}`);
       continue;
     }
     
-    console.log(`Processing step: ${stepId} with ${Object.keys(data.steps[stepId]).length} fields`);
+    console.log(`Processing step: ${stepId} with ${Object.keys(dataToRender.steps[stepId]).length} fields`);
     
     // Get the section title and icon
     const sectionTitle = getSectionTitle(stepId);
@@ -340,48 +442,48 @@ export const PropertySummary: React.FC<PropertySummaryProps> = (props) => {
     const items = [];
     
     // Process each field in the step
-    for (const key in data.steps[stepId]) {
+    for (const key in dataToRender.steps[stepId]) {
       // Skip title and description fields as they are handled separately
       if (key === 'title' || key === 'description' || key === '__typename') {
         continue;
       }
       
       // Special handling for floor + totalFloors
-      if (key === 'floor' && data.steps[stepId]['totalFloors']) {
+      if (key === 'floor' && dataToRender.steps[stepId]['totalFloors']) {
         items.push({
           label: 'Floor',
-          value: `${data.steps[stepId]['floor']} out of ${data.steps[stepId]['totalFloors']}`
+          value: `${dataToRender.steps[stepId]['floor']} out of ${dataToRender.steps[stepId]['totalFloors']}`
         });
         continue;
       }
       
       // Skip totalFloors as it's handled with floor
-      if (key === 'totalFloors' && data.steps[stepId]['floor']) {
+      if (key === 'totalFloors' && dataToRender.steps[stepId]['floor']) {
         continue;
       }
       
       // Special handling for builtUpArea + builtUpAreaUnit
-      if (key === 'builtUpArea' && data.steps[stepId]['builtUpAreaUnit']) {
+      if (key === 'builtUpArea' && dataToRender.steps[stepId]['builtUpAreaUnit']) {
         items.push({
           label: 'Built-up Area',
-          value: `${data.steps[stepId]['builtUpArea']} ${
-            data.steps[stepId]['builtUpAreaUnit'] === 'sqft' ? 'sq. ft.' : 
-            data.steps[stepId]['builtUpAreaUnit'] === 'sqyd' ? 'sq. yd.' : 
-            data.steps[stepId]['builtUpAreaUnit']
+          value: `${dataToRender.steps[stepId]['builtUpArea']} ${
+            dataToRender.steps[stepId]['builtUpAreaUnit'] === 'sqft' ? 'sq. ft.' : 
+            dataToRender.steps[stepId]['builtUpAreaUnit'] === 'sqyd' ? 'sq. yd.' : 
+            dataToRender.steps[stepId]['builtUpAreaUnit']
           }`
         });
         continue;
       }
       
       // Skip builtUpAreaUnit as it's handled with builtUpArea
-      if (key === 'builtUpAreaUnit' && data.steps[stepId]['builtUpArea']) {
+      if (key === 'builtUpAreaUnit' && dataToRender.steps[stepId]['builtUpArea']) {
         continue;
       }
       
       // Add standard field
       items.push({
         label: formatFieldLabel(key),
-        value: formatFieldValue(key, data.steps[stepId][key])
+        value: formatFieldValue(key, dataToRender.steps[stepId][key])
       });
     }
     
@@ -408,6 +510,28 @@ export const PropertySummary: React.FC<PropertySummaryProps> = (props) => {
         {address && <p className="text-sm text-gray-600 mt-1">{address}</p>}
       </div>
       
+      {/* "Save Original" Button - Changed to save raw formData */}
+      <div className="flex justify-end mb-4">
+        <Button 
+          onClick={saveOriginalData}
+          disabled={savingOriginal || saving}
+          variant="outline"
+          className="flex items-center gap-2 bg-amber-50 text-amber-700 border-amber-300 hover:bg-amber-100 hover:text-amber-800"
+        >
+          {savingOriginal ? (
+            <>
+              <div className="animate-spin h-4 w-4 border-b-2 border-current rounded-full"></div>
+              <span>Saving Raw Data...</span>
+            </>
+          ) : (
+            <>
+              <Save className="h-4 w-4" />
+              <span>Save Original</span>
+            </>
+          )}
+        </Button>
+      </div>
+      
       {/* 2. ALWAYS FIRST: Listing Information */}
       <div className="bg-blue-50 rounded-lg p-4 shadow-sm">
         <h3 className="text-lg font-semibold text-primary mb-3">Listing Information</h3>
@@ -416,7 +540,7 @@ export const PropertySummary: React.FC<PropertySummaryProps> = (props) => {
           icon={<Clock className="h-4 w-4" />}
           items={[
             { label: 'Flow Type', value: flowInfo },
-            { label: 'Status', value: data?.meta?.status || status }
+            { label: 'Status', value: dataToRender?.meta?.status || status }
           ]}
         />
       </div>
