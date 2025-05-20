@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyDetails/index.tsx
-// Version: 12.1.0
-// Last Modified: 19-05-2025 11:15 IST
-// Purpose: Updated to use PropertyLocationSection component with nearby properties
+// Version: 12.3.0
+// Last Modified: 21-05-2025 18:15 IST
+// Purpose: Added inline title editing capability from flow.title field
 
 import React, { useState, useEffect } from 'react';
 import { PropertyDetails as PropertyDetailsType } from '../../hooks/usePropertyDetails';
@@ -23,8 +23,9 @@ import PropertyNotFound from './PropertyNotFound';
 import { PropertyDetailsSkeleton } from './PropertyDetailsSkeleton';
 import { extractImagesFromJson } from './utils/propertyDataUtils';
 import PropertyGalleryCard from './PropertyGalleryCard';
-import PropertyLocationMap from './PropertyLocationMap'; // Keep this import
-import PropertyLocationSection from './PropertyLocationSection'; // Import the PropertyLocationSection component
+import PropertyLocationMap from './PropertyLocationMap';
+import PropertyLocationSection from './PropertyLocationSection';
+import PropertyTitleEditor from './PropertyTitleEditor'; // Import the new title editor
 
 // Define static data for similar properties
 const SIMILAR_PROPERTIES_DATA = [
@@ -460,6 +461,7 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
   const { toast } = useToast();
   const [visitDialogOpen, setVisitDialogOpen] = useState(false);
   const [propertyImages, setPropertyImages] = useState<any[]>([]);
+  const [displayTitle, setDisplayTitle] = useState('');
   
   // Use effect to extract and process images
   useEffect(() => {
@@ -508,6 +510,14 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
     }
   };
   
+  // Handle title update
+  const handleTitleUpdated = (newTitle: string) => {
+    setDisplayTitle(newTitle);
+    if (onRefresh) {
+      onRefresh();
+    }
+  };
+  
   // Loading state
   if (isLoading) {
     return <PropertyDetailsSkeleton />;
@@ -524,7 +534,8 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
   // Get flow information (category and listing type)
   const flow = propertyDetails.flow || { 
     category: 'residential', 
-    listingType: 'rent' 
+    listingType: 'rent',
+    title: 'Property Listing'
   };
   
   // Get steps from property_details if available
@@ -552,8 +563,8 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
   
   const basicDetails = basicDetailsStepKey ? steps[basicDetailsStepKey] : null;
   
-  // Get property title
-  const propertyTitle = basicDetails?.title || property.title || 'Property';
+  // Get property title - use the display title if available (from editing), otherwise use flow.title
+  const propertyTitle = displayTitle || flow.title || (basicDetails?.title || property.title || 'Property Listing');
   
   // Get location information
   const locationStepKey = Object.keys(steps).find(key => 
@@ -634,128 +645,134 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
       {/* Property Title Section with Listing Type Badge */}
       <div className="mb-6">
         <div className="flex flex-wrap items-center gap-3 mb-2">
-          <h1 className="text-2xl sm:text-3xl font-bold">{propertyTitle}</h1>
-          <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-            isSaleProperty ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
-          }`}>
-            For {isSaleProperty ? 'Sale' : 'Rent'}
-          </span>
-          <span className="px-3 py-1 rounded-full bg-purple-100 text-purple-800 text-sm font-medium capitalize">
-            {flow.category}
-          </span>
-        </div>
-        <p className="text-muted-foreground">{locationString}</p>
-      </div>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main Content Column */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Image Gallery - Using PropertyGalleryCard with direct blob URLs */}
-          <PropertyGalleryCard 
-            images={propertyImages} 
-            propertyId={propertyId}
-            directUrls={directUrls}
-          />
-          
-          {/* Image Upload Component (only shown to authorized users) */}
-          <PropertyImageUpload 
-            property={property} 
-            onImageUploaded={handleImageUploaded} 
-          />
-          
-          {/* Quick Actions */}
-          <PropertyActionButtons
-            isLiked={isLiked}
-            onToggleLike={onToggleLike}
-            onShare={handleShare}
-            onScheduleVisit={() => setVisitDialogOpen(true)}
-          />
-          
-          {/* Section 1: Basic Details */}
-          {basicDetails && (
-            <BasicDetailsSection 
-              basicDetails={basicDetails}
-              price={price}
-              listingType={flow.listingType}
-            />
-          )}
-          
-          {/* Section 2: Location - Use the PropertyLocationSection component */}
-          <PropertyLocationSection property={property} />
-          
-          {/* Section 3: Sale/Rental Details */}
-          {priceDetails && (
-            <PricingDetailsSection 
-              listingType={flow.listingType}
-              pricingDetails={priceDetails}
-            />
-          )}
-          
-          {/* Section 4: Features/Amenities */}
-          {featuresDetails && (
-            <StepSection 
-              stepId={featuresStepKey!}
-              stepData={featuresDetails}
-              title="Features & Amenities"
-            />
-          )}
-          
-          {/* Remaining sections in original order */}
-          {remainingStepKeys.map(stepId => (
-            <StepSection 
-              key={stepId}
-              stepId={stepId}
-              stepData={steps[stepId]}
-            />
-          ))}
-        </div>
-        
-        {/* Sidebar Column */}
-        <div className="space-y-6">
-          <ContactOwnerCard
-            propertyTitle={propertyTitle}
-            propertyId={propertyId}
-            ownerId={ownerId}
-            ownerInfo={property.ownerInfo}
-          />
-          
-          {property.property_details?.highlights && (
-            <PropertyHighlightsCard 
-              highlights={property.property_details.highlights} 
-            />
-          )}
-          
-          <SimilarProperties 
-            properties={SIMILAR_PROPERTIES_DATA.map(prop => ({
-              id: prop.id,
-              title: prop.title,
-              city: prop.city,
-              state: prop.state,
-              price: prop.price,
-              bedrooms: prop.bedrooms,
-              bathrooms: prop.bathrooms,
-              square_feet: prop.square_feet
-            }))} 
-          />
-          
-          <NearbyAmenities
-            address={location?.address || property.address}
-            city={location?.city || property.city}
-            state={location?.state || property.state}
-            coordinates={coordinates}
-            radius={1500}
-          />
-        </div>
-      </div>
-      
-      {/* Visit Request Dialog */}
-      <VisitRequestDialog
-        propertyId={propertyId}
-        open={visitDialogOpen}
-        onOpenChange={setVisitDialogOpen}
-      />
-    </div>
-  );
+         {/* Replace static title with editable title component */}
+         <PropertyTitleEditor
+           propertyId={propertyId}
+           title={propertyTitle}
+           ownerId={ownerId}
+           onTitleUpdated={handleTitleUpdated}
+         />
+         <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+           isSaleProperty ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
+         }`}>
+           For {isSaleProperty ? 'Sale' : 'Rent'}
+         </span>
+         <span className="px-3 py-1 rounded-full bg-purple-100 text-purple-800 text-sm font-medium capitalize">
+           {flow.category}
+         </span>
+       </div>
+       <p className="text-muted-foreground">{locationString}</p>
+     </div>
+     
+     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+       {/* Main Content Column */}
+       <div className="lg:col-span-2 space-y-6">
+         {/* Image Gallery - Using PropertyGalleryCard with direct blob URLs */}
+         <PropertyGalleryCard 
+           images={propertyImages} 
+           propertyId={propertyId}
+           directUrls={directUrls}
+         />
+         
+         {/* Image Upload Component (only shown to authorized users) */}
+         <PropertyImageUpload 
+           property={property} 
+           onImageUploaded={handleImageUploaded} 
+         />
+         
+         {/* Quick Actions */}
+         <PropertyActionButtons
+           isLiked={isLiked}
+           onToggleLike={onToggleLike}
+           onShare={handleShare}
+           onScheduleVisit={() => setVisitDialogOpen(true)}
+         />
+         
+         {/* Section 1: Basic Details */}
+         {basicDetails && (
+           <BasicDetailsSection 
+             basicDetails={basicDetails}
+             price={price}
+             listingType={flow.listingType}
+           />
+         )}
+         
+         {/* Section 2: Location - Use the PropertyLocationSection component */}
+         <PropertyLocationSection property={property} />
+         
+         {/* Section 3: Sale/Rental Details */}
+         {priceDetails && (
+           <PricingDetailsSection 
+             listingType={flow.listingType}
+             pricingDetails={priceDetails}
+           />
+         )}
+         
+         {/* Section 4: Features/Amenities */}
+         {featuresDetails && (
+           <StepSection 
+             stepId={featuresStepKey!}
+             stepData={featuresDetails}
+             title="Features & Amenities"
+           />
+         )}
+         
+         {/* Remaining sections in original order */}
+         {remainingStepKeys.map(stepId => (
+           <StepSection 
+             key={stepId}
+             stepId={stepId}
+             stepData={steps[stepId]}
+           />
+         ))}
+       </div>
+       
+       {/* Sidebar Column */}
+       <div className="space-y-6">
+         <ContactOwnerCard
+           propertyTitle={propertyTitle}
+           propertyId={propertyId}
+           ownerId={ownerId}
+           ownerInfo={property.ownerInfo}
+         />
+         
+         {property.property_details?.highlights && (
+           <PropertyHighlightsCard 
+             highlights={property.property_details.highlights} 
+           />
+         )}
+         
+         <SimilarProperties 
+           properties={SIMILAR_PROPERTIES_DATA.map(prop => ({
+             id: prop.id,
+             title: prop.title,
+             city: prop.city,
+             state: prop.state,
+             price: prop.price,
+             bedrooms: prop.bedrooms,
+             bathrooms: prop.bathrooms,
+             square_feet: prop.square_feet
+           }))} 
+         />
+         
+         <NearbyAmenities
+           address={location?.address || property.address}
+           city={location?.city || property.city}
+           state={location?.state || property.state}
+           coordinates={coordinates}
+           radius={1500}
+         />
+       </div>
+     </div>
+     
+     {/* Visit Request Dialog */}
+     <VisitRequestDialog
+       propertyId={propertyId}
+       open={visitDialogOpen}
+       onOpenChange={setVisitDialogOpen}
+     />
+   </div>
+ );
 };
 
 export default PropertyDetails;

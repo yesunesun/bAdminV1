@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyItem.tsx
-// Version: 4.0.0
-// Last Modified: 21-05-2025 10:15 IST
-// Purpose: Updated to use the propertyTitleUtils for consistent title generation
+// Version: 4.1.0
+// Last Modified: 21-05-2025 17:00 IST
+// Purpose: Updated to use property title from flow.title only, without fallbacks
 
 import React from 'react';
 import { Link } from 'react-router-dom';
@@ -14,7 +14,6 @@ import FavoriteButton from './FavoriteButton';
 import { formatPrice } from '../services/seekerService';
 import { FLOW_TYPES } from '@/modules/owner/components/property/wizard/constants/flows';
 import { 
-  cleanupPropertyTitle, 
   formatDetailedLocation,
   detectPropertyFlowType
 } from '../utils/propertyTitleUtils';
@@ -43,9 +42,11 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
   // Extract details from property
   const details = property.property_details || {};
   
-  // Use utility functions to determine flow type and generate title
+  // Use utility functions to determine flow type
   const flowType = detectPropertyFlowType(property);
-  const title = cleanupPropertyTitle(property);
+  
+  // Use title directly from flow.title only - no fallbacks to root title
+  const title = details.flow?.title || 'Property Listing';
   const detailedLocation = formatDetailedLocation(property);
   
   // Get display data specific to the flow type
@@ -61,7 +62,7 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
         onMouseLeave={() => onHover(property.id, false)}
         onClick={() => onSelect(property)}
       >
-        {/* Property Name at the top with blue text - using standardized template */}
+        {/* Property Name at the top with blue text - using only flow.title */}
         <div className="mb-2">
           <Link
             to={`/seeker/property/${property.id}`}
