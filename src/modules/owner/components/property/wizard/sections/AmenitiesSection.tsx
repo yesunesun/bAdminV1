@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/AmenitiesSection.tsx
-// Version: 1.5.0
-// Last Modified: 2025-05-09T14:15:00+05:30 (IST)
-// Purpose: Updated to support structured steps hierarchy
+// Version: 2.0.0
+// Last Modified: 20-05-2025 17:45 IST
+// Purpose: Fix field duplication and incorrect section creation in Amenities section
 
 import React from 'react';
 import { FormSection } from '@/components/FormSection';
@@ -50,20 +50,72 @@ import {
   PROPERTY_CONDITION_OPTIONS 
 } from '../constants';
 
-export function AmenitiesSection({ form }: FormSectionProps) {
+export function AmenitiesSection({ form, stepId = 'features' }: FormSectionProps) {
   const { watch, setValue, register, formState: { errors } } = form;
 
-  // Updated to use steps structure
+  // Initialize steps structure if needed
+  React.useEffect(() => {
+    // Create the features step if it doesn't exist
+    const steps = form.getValues('steps') || {};
+    if (!steps[stepId]) {
+      form.setValue('steps', {
+        ...steps,
+        [stepId]: {}
+      }, { shouldValidate: false });
+    }
+    
+    // Migrate any existing root level fields to the step structure
+    const fieldsToMigrate = [
+      'bathrooms', 'balconies', 'hasGym', 'gatedSecurity', 
+      'propertyShowOption', 'propertyCondition', 'secondaryNumber',
+      'hasSimilarUnits', 'amenities'
+    ];
+    
+    fieldsToMigrate.forEach(field => {
+      const rootValue = form.getValues(field);
+      const stepValue = form.getValues(`steps.${stepId}.${field}`);
+      
+      if (rootValue !== undefined && stepValue === undefined) {
+        console.log(`Migrating ${field} from root to features step:`, rootValue);
+        form.setValue(`steps.${stepId}.${field}`, rootValue, { shouldValidate: false });
+      }
+    });
+  }, [form, stepId]);
+
+  // Helper to get field value from the correct location
+  const getFieldValue = (fieldName: string, defaultValue: any = undefined) => {
+    // First try to get from the step
+    const stepPath = `steps.${stepId}.${fieldName}`;
+    const stepValue = form.getValues(stepPath);
+    
+    // If not found in the step, try root level for backward compatibility
+    if (stepValue === undefined) {
+      return form.getValues(fieldName) ?? defaultValue;
+    }
+    
+    return stepValue ?? defaultValue;
+  };
+  
+  // Helper to set field value ONLY in the step structure
+  const setFieldValue = (fieldName: string, value: any) => {
+    const stepPath = `steps.${stepId}.${fieldName}`;
+    form.setValue(stepPath, value, { shouldValidate: true });
+    
+    // No longer duplicating to root level
+  };
+
+  // Updated to only update the steps structure
   const handleNumberChange = (type: 'bathrooms' | 'balconies', action: 'increment' | 'decrement') => {
-    // For backward compatibility, keep the original field paths working
-    // while also updating the new structured paths
-    const fieldPath = `steps.basic_details.${type}`;
-    const current = parseInt(watch(type) || watch(fieldPath) || '0');
+    const fieldPath = `steps.${stepId}.${type}`;
+    // Get current value, first from step, fallback to root
+    const stepValue = form.getValues(fieldPath);
+    const rootValue = form.getValues(type);
+    const current = parseInt(stepValue !== undefined ? stepValue : (rootValue || '0'));
+    
     const newValue = (action === 'increment') ? (current + 1) : (current > 0 ? current - 1 : 0);
     
-    // Update both paths
-    setValue(type, newValue.toString());
-    setValue(fieldPath, newValue);
+    // Update only in step structure
+    form.setValue(fieldPath, newValue.toString(), { shouldValidate: true });
   };
 
   // Removed "Non-Veg Allowed" from quick amenities
@@ -97,17 +149,6 @@ export function AmenitiesSection({ form }: FormSectionProps) {
     'House Keeping': HomeIcon               // Home icon for house keeping
   };
 
-  // Helper to get value from both old and new structure
-  const getFieldValue = (oldPath: string, newPath: string) => {
-    return watch(oldPath) || watch(newPath);
-  };
-
-  // Helper to set value in both old and new structure
-  const setFieldValue = (oldPath: string, newPath: string, value: any) => {
-    setValue(oldPath, value);
-    setValue(newPath, value);
-  };
-
   return (
     <FormSection
       title="Amenities & Features"
@@ -123,7 +164,7 @@ export function AmenitiesSection({ form }: FormSectionProps) {
               <button
                 type="button"
                 onClick={() => handleNumberChange('bathrooms', 'decrement')}
-                disabled={parseInt(getFieldValue('bathrooms', 'steps.basic_details.bathrooms') || '0') <= 0}
+                disabled={parseInt(getFieldValue('bathrooms', '0')) <= 0}
                 className="w-12 flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-50"
               >
                 <Minus className="h-4 w-4" />
@@ -131,7 +172,7 @@ export function AmenitiesSection({ form }: FormSectionProps) {
               <Input
                 type="text"
                 className="flex-1 text-center border-x rounded-none h-full"
-                value={getFieldValue('bathrooms', 'steps.basic_details.bathrooms') || '0'}
+                value={getFieldValue('bathrooms', '0')}
                 readOnly
               />
               <button
@@ -151,7 +192,7 @@ export function AmenitiesSection({ form }: FormSectionProps) {
               <button
                 type="button"
                 onClick={() => handleNumberChange('balconies', 'decrement')}
-                disabled={parseInt(getFieldValue('balconies', 'steps.basic_details.balconies') || '0') <= 0}
+                disabled={parseInt(getFieldValue('balconies', '0')) <= 0}
                 className="w-12 flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-50"
               >
                 <Minus className="h-4 w-4" />
@@ -159,7 +200,7 @@ export function AmenitiesSection({ form }: FormSectionProps) {
               <Input
                 type="text"
                 className="flex-1 text-center border-x rounded-none h-full"
-                value={getFieldValue('balconies', 'steps.basic_details.balconies') || '0'}
+                value={getFieldValue('balconies', '0')}
                 readOnly
               />
               <button
@@ -182,9 +223,9 @@ export function AmenitiesSection({ form }: FormSectionProps) {
             >
               <Checkbox
                 id={id}
-                checked={getFieldValue(id, `steps.features.${id}`)}
+                checked={getFieldValue(id, false)}
                 onCheckedChange={(checked) => {
-                  setFieldValue(id, `steps.features.${id}`, checked);
+                  setFieldValue(id, checked);
                 }}
               />
               <label
@@ -203,8 +244,8 @@ export function AmenitiesSection({ form }: FormSectionProps) {
           <div>
             <RequiredLabel required>Who Shows Property?</RequiredLabel>
             <Select 
-              value={getFieldValue('propertyShowOption', 'steps.features.propertyShowOption')} 
-              onValueChange={value => setFieldValue('propertyShowOption', 'steps.features.propertyShowOption', value)}
+              value={getFieldValue('propertyShowOption', '')} 
+              onValueChange={value => setFieldValue('propertyShowOption', value)}
             >
               <SelectTrigger className="h-12">
                 <SelectValue placeholder="Select who shows" />
@@ -215,9 +256,9 @@ export function AmenitiesSection({ form }: FormSectionProps) {
                 ))}
               </SelectContent>
             </Select>
-            {(errors.propertyShowOption || errors.steps?.features?.propertyShowOption) && (
+            {errors.steps?.[stepId]?.propertyShowOption && (
               <p className="text-sm text-red-500 mt-1">
-                {errors.propertyShowOption?.message || errors.steps?.features?.propertyShowOption?.message}
+                {errors.steps?.[stepId]?.propertyShowOption?.message}
               </p>
             )}
           </div>
@@ -225,8 +266,8 @@ export function AmenitiesSection({ form }: FormSectionProps) {
           <div>
             <RequiredLabel required>Property Condition</RequiredLabel>
             <Select 
-              value={getFieldValue('propertyCondition', 'steps.basic_details.propertyCondition')} 
-              onValueChange={value => setFieldValue('propertyCondition', 'steps.basic_details.propertyCondition', value)}
+              value={getFieldValue('propertyCondition', '')} 
+              onValueChange={value => setFieldValue('propertyCondition', value)}
             >
               <SelectTrigger className="h-12">
                 <SelectValue placeholder="Select condition" />
@@ -237,9 +278,9 @@ export function AmenitiesSection({ form }: FormSectionProps) {
                 ))}
               </SelectContent>
             </Select>
-            {(errors.propertyCondition || errors.steps?.basic_details?.propertyCondition) && (
+            {errors.steps?.[stepId]?.propertyCondition && (
               <p className="text-sm text-red-500 mt-1">
-                {errors.propertyCondition?.message || errors.steps?.basic_details?.propertyCondition?.message}
+                {errors.steps?.[stepId]?.propertyCondition?.message}
               </p>
             )}
           </div>
@@ -259,11 +300,8 @@ export function AmenitiesSection({ form }: FormSectionProps) {
               type="tel"
               className="h-12 pl-16"
               maxLength={10}
-              {...register('secondaryNumber')}
-              onChange={(e) => {
-                // Also update the new structured path
-                setValue('steps.features.secondaryNumber', e.target.value);
-              }}
+              value={getFieldValue('secondaryNumber', '')}
+              onChange={(e) => setFieldValue('secondaryNumber', e.target.value)}
               placeholder="Additional contact number"
             />
           </div>
@@ -273,8 +311,8 @@ export function AmenitiesSection({ form }: FormSectionProps) {
         <div className="flex items-center gap-3 p-4 rounded-lg border border-gray-200 bg-white">
           <Checkbox
             id="hasSimilarUnits"
-            checked={getFieldValue('hasSimilarUnits', 'steps.features.hasSimilarUnits')}
-            onCheckedChange={(checked) => setFieldValue('hasSimilarUnits', 'steps.features.hasSimilarUnits', checked)}
+            checked={getFieldValue('hasSimilarUnits', false)}
+            onCheckedChange={(checked) => setFieldValue('hasSimilarUnits', checked)}
           />
           <label
             htmlFor="hasSimilarUnits"
@@ -297,19 +335,17 @@ export function AmenitiesSection({ form }: FormSectionProps) {
                 >
                   <Checkbox
                     id={`amenity-${amenity}`}
-                    checked={(getFieldValue('amenities', 'steps.features.amenities') || []).includes(amenity)}
+                    checked={(getFieldValue('amenities', []) || []).includes(amenity)}
                     onCheckedChange={(checked) => {
-                      // Update old structure
-                      const currentOld = watch('amenities') || [];
-                      // Update new structure
-                      const currentNew = watch('steps.features.amenities') || [];
+                      const currentAmenities = getFieldValue('amenities', []) || [];
                       
                       if (checked) {
-                        setValue('amenities', [...currentOld, amenity]);
-                        setValue('steps.features.amenities', [...currentNew, amenity]);
+                        setFieldValue('amenities', [...currentAmenities, amenity]);
                       } else {
-                        setValue('amenities', currentOld.filter(a => a !== amenity));
-                        setValue('steps.features.amenities', currentNew.filter(a => a !== amenity));
+                        setFieldValue(
+                          'amenities', 
+                          currentAmenities.filter((a: string) => a !== amenity)
+                        );
                       }
                     }}
                   />
@@ -324,9 +360,9 @@ export function AmenitiesSection({ form }: FormSectionProps) {
               );
             })}
           </div>
-          {(errors.amenities || errors.steps?.features?.amenities) && (
+          {errors.steps?.[stepId]?.amenities && (
             <p className="text-sm text-red-500 mt-1">
-              {errors.amenities?.message || errors.steps?.features?.amenities?.message}
+              {errors.steps?.[stepId]?.amenities?.message}
             </p>
           )}
         </div>

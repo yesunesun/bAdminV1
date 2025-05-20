@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/hooks/useStepForm.ts
-// Version: 1.0.0
-// Last Modified: 17-05-2025 15:30 IST
-// Purpose: Hook to handle form field registration within step paths
+// Version: 2.0.0
+// Last Modified: 20-05-2025 17:30 IST
+// Purpose: Fix field duplication - store values only in step structure, not at root level
 
 import { useCallback } from 'react';
 import { UseFormReturn } from 'react-hook-form';
@@ -53,11 +53,10 @@ export function useStepForm(form: UseFormReturn<FormData>, stepId: string) {
       }, { shouldValidate: false });
     }
     
-    // Set the value in the step structure
+    // Set the value in the step structure only
     setValue(path, value, { shouldValidate: true });
     
-    // Also update root level for backward compatibility
-    setValue(fieldName, value, { shouldValidate: false });
+    // NO LONGER setting at root level to avoid duplication
   }, [setValue, getValues, stepId, form]);
   
   /**
@@ -104,18 +103,23 @@ export function useStepForm(form: UseFormReturn<FormData>, stepId: string) {
     return `steps_${stepId}_${fieldName}`;
   }, [stepId]);
   
-  // Initial field migration function
+  /**
+   * Migration function to move values from root to step structure
+   * @param fieldNames Array of field names to migrate
+   */
   const migrateRootFields = useCallback((fieldNames: string[]) => {
     fieldNames.forEach(field => {
-      const currentValue = getFieldValue(field);
       const rootValue = getValues(field);
+      const stepValue = getValues(`steps.${stepId}.${field}`);
       
       // If there's a value at the root but not in the step, migrate it
-      if (rootValue !== undefined && currentValue === undefined) {
-        setFieldValue(field, rootValue);
+      if (rootValue !== undefined && stepValue === undefined) {
+        console.log(`Migrating ${field} from root to step:`, rootValue);
+        const path = `steps.${stepId}.${field}`;
+        setValue(path, rootValue, { shouldValidate: false });
       }
     });
-  }, [getFieldValue, getValues, setFieldValue]);
+  }, [getValues, setValue, stepId]);
   
   return {
     registerField,

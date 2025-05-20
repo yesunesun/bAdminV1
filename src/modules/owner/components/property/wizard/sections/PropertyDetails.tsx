@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/PropertyDetails.tsx
-// Version: 4.1.0
-// Last Modified: 11-05-2025 18:30 IST
-// Purpose: Removed inline debug output and integrated with global debug panel
+// Version: 4.2.0
+// Last Modified: 20-05-2025 16:30 IST
+// Purpose: Fix field duplication - stop adding fields to root level when setting step values
 
 import React, { useEffect, useState, useRef } from 'react';
 import { FormSection } from '@/components/FormSection';
@@ -77,15 +77,21 @@ export function PropertyDetails({
     // Ensure the steps structure exists
     const steps = form.getValues('steps') || {};
     if (!steps[stepId]) {
-      steps[stepId] = {};
+      // Create the step object if it doesn't exist 
+      form.setValue('steps', {
+        ...steps,
+        [stepId]: {}
+      }, { shouldValidate: false });
     }
     
+    // Set the value in the step structure only
     form.setValue(path, value, { shouldValidate: true });
     
-    // Also update legacy flat structure for backward compatibility
-    form.setValue(fieldName, value, { shouldValidate: false });
+    // REMOVED: No longer update root level for backward compatibility
+    // form.setValue(fieldName, value, { shouldValidate: false });
     
     // Update nested basicDetails structure if it exists (v2 format)
+    // We keep this for backward compatibility with v2 formats
     const basicDetails = form.getValues('basicDetails');
     if (basicDetails) {
       // Convert value format for nested structure if needed
@@ -200,17 +206,16 @@ export function PropertyDetails({
             setValues(prev => ({...prev, ...nestedValues}));
           }
           
-          // Also set flat fields in form if they're not already set
+          // Also set fields in step structure if they're not already set
           Object.entries(nestedValues).forEach(([field, value]) => {
-            const currentValue = form.getValues(field);
-            if (!currentValue && value) {
+            const stepPath = `steps.${stepId}.${field}`;
+            const currentStepValue = form.getValues(stepPath);
+            
+            if (!currentStepValue && value) {
               if (process.env.NODE_ENV === 'development') {
-                console.log(`[${count}] Setting flat field ${field} from nested structure:`, value);
+                console.log(`[${count}] Setting field ${field} from nested structure to step:`, value);
               }
-              form.setValue(field, value, { shouldValidate: false });
-              
-              // Also update steps structure
-              const stepPath = `steps.${stepId}.${field}`;
+              // Only set in the step structure, not at root
               form.setValue(stepPath, value, { shouldValidate: false });
             }
           });
@@ -226,7 +231,7 @@ export function PropertyDetails({
       initialProcessDone.current = true;
       
       // Ensure builtUpAreaUnit has a default value of 'sqft'
-      if (!form.getValues().builtUpAreaUnit) {
+      if (!getField('builtUpAreaUnit')) {
         if (process.env.NODE_ENV === 'development') {
           console.log('Setting default builtUpAreaUnit to sqft');
         }
@@ -240,32 +245,54 @@ export function PropertyDetails({
           console.log('Processing nested basicDetails:', basicDetails);
         }
         
-        // Map nested values to flat fields if they're not set
-        if (basicDetails.propertyType && !form.getValues('propertyType')) {
+        // Map nested values to fields in the step structure if they're not set
+        if (basicDetails.propertyType && !getField('propertyType')) {
           saveField('propertyType', basicDetails.propertyType);
         }
-        if (basicDetails.bhkType && !form.getValues('bhkType')) {
+        if (basicDetails.bhkType && !getField('bhkType')) {
           saveField('bhkType', basicDetails.bhkType);
         }
-        if (basicDetails.floor && !form.getValues('floor')) {
+        if (basicDetails.floor && !getField('floor')) {
           saveField('floor', basicDetails.floor.toString());
         }
-        if (basicDetails.totalFloors && !form.getValues('totalFloors')) {
+        if (basicDetails.totalFloors && !getField('totalFloors')) {
           saveField('totalFloors', basicDetails.totalFloors.toString());
         }
-        if (basicDetails.propertyAge && !form.getValues('propertyAge')) {
+        if (basicDetails.propertyAge && !getField('propertyAge')) {
           saveField('propertyAge', basicDetails.propertyAge);
         }
-        if (basicDetails.facing && !form.getValues('facing')) {
+        if (basicDetails.facing && !getField('facing')) {
           saveField('facing', basicDetails.facing);
         }
-        if (basicDetails.builtUpArea && !form.getValues('builtUpArea')) {
+        if (basicDetails.builtUpArea && !getField('builtUpArea')) {
           saveField('builtUpArea', basicDetails.builtUpArea.toString());
         }
-        if (basicDetails.builtUpAreaUnit && !form.getValues('builtUpAreaUnit')) {
+        if (basicDetails.builtUpAreaUnit && !getField('builtUpAreaUnit')) {
           saveField('builtUpAreaUnit', basicDetails.builtUpAreaUnit);
         }
       }
+      
+      // Also handle migration from root to step structure for legacy data
+      const rootFields = [
+        'propertyType', 'bhkType', 'floor', 'totalFloors', 'propertyAge', 
+        'facing', 'builtUpArea', 'builtUpAreaUnit', 'possessionDate', 'title'
+      ];
+      
+      rootFields.forEach(field => {
+        const rootValue = form.getValues(field);
+        const stepValue = form.getValues(`steps.${stepId}.${field}`);
+        
+        // If value exists at root but not in step, migrate it
+        if (rootValue !== undefined && stepValue === undefined) {
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`Migrating ${field} from root to step:`, rootValue);
+          }
+          
+          // Set in step structure without updating root again
+          const path = `steps.${stepId}.${field}`;
+          form.setValue(path, rootValue, { shouldValidate: false });
+        }
+      });
       
       // Update state after processing initial values
       updateStateFromForm(false, 'initial-process');
