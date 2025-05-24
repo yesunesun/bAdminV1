@@ -1,9 +1,9 @@
 // src/modules/owner/components/property/wizard/sections/SaleDetails.tsx
-// Version: 4.1.0
-// Last Modified: 14-05-2025 10:30 IST
-// Purpose: Removed debug panel from UI while maintaining core functionality
+// Version: 5.0.0
+// Last Modified: 25-05-2025 23:45 IST
+// Purpose: Fix data storage to use step-based structure instead of root level
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { FormSection } from '@/components/FormSection';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -18,8 +18,74 @@ import {
   KITCHEN_TYPES,
 } from '../constants';
 
-export function SaleDetails({ form, adType }: FormSectionProps) {
+interface SaleDetailsProps extends FormSectionProps {
+  stepId?: string;
+}
+
+export function SaleDetails({ form, adType, stepId: providedStepId }: SaleDetailsProps) {
   const { watch, setValue, getValues, formState: { errors } } = form;
+  
+  // Track mount status to avoid updates after unmount
+  const isMounted = useRef(true);
+  
+  // Generate stepId based on current flow if not provided
+  const formFlow = form.getValues('flow');
+  const flowType = formFlow ? `${formFlow.category}_${formFlow.listingType}` : 'residential_sale';
+  
+  // Determine the appropriate stepId based on flow type
+  let stepId = providedStepId;
+  if (!stepId) {
+    // Generate step ID based on flow - for sale flows it should be sale_details
+    if (flowType.includes('sale')) {
+      const prefix = flowType.split('_').map(part => part.substring(0, 3)).join('_');
+      stepId = `${prefix}_sale_details`;
+    } else {
+      stepId = 'res_sale_sale_details'; // fallback
+    }
+  }
+  
+  console.log('[SaleDetails] Using stepId:', stepId, 'for flowType:', flowType);
+  
+  // Helper functions to work with the step-based form structure
+  const getField = (fieldName: string, defaultValue?: any) => {
+    const path = `steps.${stepId}.${fieldName}`;
+    
+    // First try to get from step structure
+    const stepValue = form.getValues(path);
+    if (stepValue !== undefined) {
+      return stepValue;
+    }
+    
+    // Fallback to legacy root structure (for migration)
+    const legacyValue = form.getValues(fieldName);
+    if (legacyValue !== undefined) {
+      // If we find data in root, migrate it to step structure
+      console.log(`[SaleDetails] Migrating ${fieldName} from root to step:`, legacyValue);
+      saveField(fieldName, legacyValue);
+      return legacyValue;
+    }
+    
+    return defaultValue;
+  };
+  
+  const saveField = (fieldName: string, value: any) => {
+    const path = `steps.${stepId}.${fieldName}`;
+    
+    // Ensure the steps structure exists
+    const steps = form.getValues('steps') || {};
+    if (!steps[stepId]) {
+      // Create the step object if it doesn't exist 
+      form.setValue('steps', {
+        ...steps,
+        [stepId]: {}
+      }, { shouldValidate: false });
+    }
+    
+    // Set the value in the step structure
+    form.setValue(path, value, { shouldValidate: true });
+    
+    console.log(`[SaleDetails] Saved ${fieldName} to step ${stepId}:`, value);
+  };
   
   // Component state
   const [expectedPriceValue, setExpectedPriceValue] = useState('');
@@ -28,55 +94,63 @@ export function SaleDetails({ form, adType }: FormSectionProps) {
   
   // Initialize local state from form values
   useEffect(() => {
-    const formValues = form.getValues();
+    const expectedPrice = getField('expectedPrice', '');
+    const maintenanceCost = getField('maintenanceCost', '');
     
-    // Set local state from form
-    setExpectedPriceValue(formValues.expectedPrice || '');
-    setMaintenanceCostValue(formValues.maintenanceCost || '');
-  }, [form]);
+    setExpectedPriceValue(expectedPrice);
+    setMaintenanceCostValue(maintenanceCost);
+    
+    console.log('[SaleDetails] Initialized with values:', {
+      expectedPrice,
+      maintenanceCost,
+      stepId
+    });
+  }, [form, stepId]);
   
-  // Update local state when form values change
+  // Clean up on unmount
   useEffect(() => {
-    const formExpectedPrice = form.getValues('expectedPrice');
-    const formMaintenanceCost = form.getValues('maintenanceCost');
-    
-    if (formExpectedPrice !== expectedPriceValue && formExpectedPrice) {
-      setExpectedPriceValue(formExpectedPrice);
-    }
-    
-    if (formMaintenanceCost !== maintenanceCostValue && formMaintenanceCost) {
-      setMaintenanceCostValue(formMaintenanceCost);
-    }
-  }, [form.watch('expectedPrice'), form.watch('maintenanceCost')]);
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
   
-  // Handle direct input changes
+  // Update form and local state
+  const updateFormAndState = (field: string, value: any) => {
+    // Update local state first
+    if (field === 'expectedPrice') {
+      setExpectedPriceValue(value);
+    } else if (field === 'maintenanceCost') {
+      setMaintenanceCostValue(value);
+    }
+    
+    // Save to step structure
+    saveField(field, value);
+    
+    console.log(`[SaleDetails] Updated ${field} to:`, value);
+  };
+  
+  // Handle direct input changes for price fields
   const handleExpectedPriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.replace(/[^0-9]/g, '');
-    setExpectedPriceValue(value);
-    setValue('expectedPrice', value, { shouldValidate: true, shouldDirty: true });
+    updateFormAndState('expectedPrice', value);
   };
   
   const handleMaintenanceCostChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.replace(/[^0-9]/g, '');
-    setMaintenanceCostValue(value);
-    setValue('maintenanceCost', value, { shouldValidate: true, shouldDirty: true });
+    updateFormAndState('maintenanceCost', value);
   };
   
   // Debug function to view current values
   const debugFields = () => {
     const values = form.getValues();
-    console.log('Current form values:', values);
-    console.log('Sale fields:', {
-      expectedPrice: values.expectedPrice,
-      maintenanceCost: values.maintenanceCost,
-      kitchenType: values.kitchenType,
-      priceNegotiable: values.priceNegotiable,
-      id: values.id,
-      price: values.price
-    });
-    console.log('Local state:', {
+    const stepData = form.getValues(`steps.${stepId}`) || {};
+    
+    console.log('[SaleDetails] Debug - Current form values:', values);
+    console.log('[SaleDetails] Debug - Step data:', stepData);
+    console.log('[SaleDetails] Debug - Local state:', {
       expectedPriceValue,
-      maintenanceCostValue
+      maintenanceCostValue,
+      stepId
     });
   };
   
@@ -85,14 +159,14 @@ export function SaleDetails({ form, adType }: FormSectionProps) {
     const propertyId = form.getValues('id');
     
     if (!propertyId) {
-      console.log('No property ID, cannot load from database');
+      console.log('[SaleDetails] No property ID, cannot load from database');
       return;
     }
     
     setIsLoading(true);
     
     try {
-      console.log('Loading price data from DB for property:', propertyId);
+      console.log('[SaleDetails] Loading price data from DB for property:', propertyId);
       
       // Query the database directly
       const { data, error } = await supabase
@@ -102,27 +176,35 @@ export function SaleDetails({ form, adType }: FormSectionProps) {
         .single();
       
       if (error) {
-        console.error('Error loading price data:', error);
+        console.error('[SaleDetails] Error loading price data:', error);
         return;
       }
       
-      console.log('DB query result:', data);
+      console.log('[SaleDetails] DB query result:', data);
       
-      // Prioritize price data from property_details
+      // Prioritize price data from property_details step structure
       let newExpectedPrice = '';
       let newMaintenanceCost = '';
       
-      if (data.property_details?.expectedPrice) {
+      // Check if data exists in step structure first
+      const stepData = data.property_details?.steps?.[stepId];
+      if (stepData?.expectedPrice) {
+        newExpectedPrice = stepData.expectedPrice;
+        console.log('[SaleDetails] Found expectedPrice in step data:', newExpectedPrice);
+      } else if (data.property_details?.expectedPrice) {
         newExpectedPrice = data.property_details.expectedPrice;
-        console.log('Found expectedPrice in property_details:', newExpectedPrice);
+        console.log('[SaleDetails] Found expectedPrice in property_details root:', newExpectedPrice);
       } else if (data.price) {
         newExpectedPrice = data.price.toString();
-        console.log('Using price for expectedPrice:', newExpectedPrice);
+        console.log('[SaleDetails] Using price for expectedPrice:', newExpectedPrice);
       }
       
-      if (data.property_details?.maintenanceCost) {
+      if (stepData?.maintenanceCost) {
+        newMaintenanceCost = stepData.maintenanceCost;
+        console.log('[SaleDetails] Found maintenanceCost in step data:', newMaintenanceCost);
+      } else if (data.property_details?.maintenanceCost) {
         newMaintenanceCost = data.property_details.maintenanceCost;
-        console.log('Found maintenanceCost in property_details:', newMaintenanceCost);
+        console.log('[SaleDetails] Found maintenanceCost in property_details root:', newMaintenanceCost);
       } else if (newExpectedPrice) {
         // Calculate default maintenance
         const priceValue = parseFloat(newExpectedPrice);
@@ -131,42 +213,38 @@ export function SaleDetails({ form, adType }: FormSectionProps) {
             Math.round(priceValue * 0.005),
             10000
           ).toString();
-          console.log('Calculated default maintenanceCost:', newMaintenanceCost);
+          console.log('[SaleDetails] Calculated default maintenanceCost:', newMaintenanceCost);
         }
       }
       
       // Update form and local state
       if (newExpectedPrice) {
-        setValue('expectedPrice', newExpectedPrice, { shouldValidate: false });
-        setExpectedPriceValue(newExpectedPrice);
+        updateFormAndState('expectedPrice', newExpectedPrice);
       }
       
       if (newMaintenanceCost) {
-        setValue('maintenanceCost', newMaintenanceCost, { shouldValidate: false });
-        setMaintenanceCostValue(newMaintenanceCost);
+        updateFormAndState('maintenanceCost', newMaintenanceCost);
       }
       
-      // Set sale property flags
-      setValue('isSaleProperty', true, { shouldValidate: false });
-      setValue('propertyPriceType', 'sale', { shouldValidate: false });
+      // Set sale property flags in step structure
+      saveField('isSaleProperty', true);
+      saveField('propertyPriceType', 'sale');
       
-      console.log('Updated form values after DB load:', {
-        expectedPrice: form.getValues('expectedPrice'),
-        maintenanceCost: form.getValues('maintenanceCost')
-      });
+      console.log('[SaleDetails] Updated form values after DB load');
     } catch (err) {
-      console.error('Error in loadPriceData:', err);
+      console.error('[SaleDetails] Error in loadPriceData:', err);
     } finally {
       setIsLoading(false);
     }
   };
   
-  // Watch other form fields
-  const kitchenType = watch('kitchenType') || '';
-  const availableFrom = watch('availableFrom') || '';
-  const furnishing = watch('furnishing') || '';
-  const parking = watch('parking') || '';
-  const priceNegotiable = watch('priceNegotiable') || false;
+  // Watch other form fields from step structure
+  const kitchenType = getField('kitchenType', '');
+  const availableFrom = getField('availableFrom', '');
+  const furnishing = getField('furnishing', '');
+  const parking = getField('parking', '');
+  const priceNegotiable = getField('priceNegotiable', false);
+  const description = getField('description', '');
   
   // Get tomorrow's date for date picker
   const tomorrow = new Date();
@@ -179,6 +257,30 @@ export function SaleDetails({ form, adType }: FormSectionProps) {
       description="Specify your property sale details"
     >
       <div className="space-y-4">
+        {/* Debug button in development */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="mb-4">
+            <button
+              type="button"
+              onClick={debugFields}
+              className="px-3 py-1 text-xs bg-blue-500 text-white rounded"
+            >
+              Debug Sale Details
+            </button>
+            <button
+              type="button"
+              onClick={loadPriceData}
+              className="ml-2 px-3 py-1 text-xs bg-green-500 text-white rounded"
+              disabled={isLoading}
+            >
+              {isLoading ? 'Loading...' : 'Load Price Data'}
+            </button>
+            <div className="text-xs text-gray-600 mt-1">
+              Step ID: {stepId} | Flow: {flowType}
+            </div>
+          </div>
+        )}
+
         {/* Expected Price and Maintenance Cost - Two Column */}
         <div className="grid grid-cols-2 gap-4">
           <div>
@@ -231,11 +333,7 @@ export function SaleDetails({ form, adType }: FormSectionProps) {
             <Checkbox
               id="priceNegotiable"
               checked={!!priceNegotiable}
-              onCheckedChange={(checked) => setValue('priceNegotiable', checked as boolean, {
-                shouldValidate: true,
-                shouldDirty: true,
-                shouldTouch: true
-              })}
+              onCheckedChange={(checked) => updateFormAndState('priceNegotiable', checked as boolean)}
             />
             <label htmlFor="priceNegotiable" className="text-base text-slate-700 cursor-pointer">
               Price Negotiable
@@ -246,11 +344,7 @@ export function SaleDetails({ form, adType }: FormSectionProps) {
             <RequiredLabel required>Kitchen Type</RequiredLabel>
             <Select 
               value={kitchenType}
-              onValueChange={value => setValue('kitchenType', value, {
-                shouldValidate: true,
-                shouldDirty: true,
-                shouldTouch: true
-              })}
+              onValueChange={value => updateFormAndState('kitchenType', value)}
             >
               <SelectTrigger className="h-11 text-base">
                 <SelectValue placeholder="Select kitchen type" />
@@ -278,11 +372,7 @@ export function SaleDetails({ form, adType }: FormSectionProps) {
               className="h-11 text-base"
               min={minDate}
               value={availableFrom}
-              onChange={(e) => setValue('availableFrom', e.target.value, { 
-                shouldValidate: true,
-                shouldDirty: true,
-                shouldTouch: true
-              })}
+              onChange={(e) => updateFormAndState('availableFrom', e.target.value)}
             />
             {errors.availableFrom && (
               <p className="text-sm text-red-600 mt-0.5">{errors.availableFrom.message}</p>
@@ -293,11 +383,7 @@ export function SaleDetails({ form, adType }: FormSectionProps) {
             <RequiredLabel required>Furnishing</RequiredLabel>
             <Select 
               value={furnishing}
-              onValueChange={value => setValue('furnishing', value, {
-                shouldValidate: true,
-                shouldDirty: true,
-                shouldTouch: true
-              })}
+              onValueChange={value => updateFormAndState('furnishing', value)}
             >
               <SelectTrigger className="h-11 text-base">
                 <SelectValue placeholder="Furnishing status?" />
@@ -321,11 +407,7 @@ export function SaleDetails({ form, adType }: FormSectionProps) {
           <RequiredLabel required>Parking</RequiredLabel>
           <Select 
             value={parking}
-            onValueChange={value => setValue('parking', value, {
-              shouldValidate: true,
-              shouldDirty: true,
-              shouldTouch: true
-            })}
+            onValueChange={value => updateFormAndState('parking', value)}
           >
             <SelectTrigger className="h-11 text-base">
               <SelectValue placeholder="Available parking?" />
@@ -347,11 +429,8 @@ export function SaleDetails({ form, adType }: FormSectionProps) {
         <div>
           <RequiredLabel>Description</RequiredLabel>
           <textarea
-            value={watch('description') || ''}
-            onChange={(e) => setValue('description', e.target.value, {
-              shouldValidate: true,
-              shouldDirty: true
-            })}
+            value={description}
+            onChange={(e) => updateFormAndState('description', e.target.value)}
             rows={3}
             className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base
               shadow-[0_2px_4px_rgba(0,0,0,0.02)] placeholder:text-slate-400

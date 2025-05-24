@@ -1,7 +1,7 @@
 // src/App.tsx 
-// Version: 9.2.0
-// Last Modified: 25-05-2025 22:00 IST
-// Purpose: Simplified routing to fix parameter passing issues
+// Version: 9.3.0
+// Last Modified: 25-05-2025 22:30 IST
+// Purpose: Fixed routing to keep property wizard in SeekerLayout with proper parameter handling
 
 import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
@@ -151,7 +151,7 @@ const PublicOrProtectedRoute = ({ children }: { children: React.ReactNode }) => 
   return <>{children}</>;
 };
 
-// Main app layout with Header - used for property owner routes
+// Main app layout with Header - used for property owner management routes
 function AppLayout() {
   const [isFavoritesOpen, setIsFavoritesOpen] = useState(false);
   
@@ -167,18 +167,15 @@ function AppLayout() {
     <div className="flex flex-col min-h-screen">
       <Header onFavoritesClick={handleFavoritesClick} />
       <FavoritesDrawer open={isFavoritesOpen} onClose={handleFavoritesClose} />
-      <main className="flex-grow bg-background">
-        {/* FIXED: Removed max-width constraint to let PropertyForm control its own width */}
-        <div className="py-6">
-          <Outlet />
-        </div>
+      <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex-grow">
+        <Outlet />
       </main>
       <Footer />
     </div>
   );
 }
 
-// Standardized Seeker layout
+// Standardized Seeker layout - FIXED: Now handles property wizard too
 function SeekerLayout() {
   const [isFavoritesOpen, setIsFavoritesOpen] = useState(false);
   
@@ -260,7 +257,7 @@ function App() {
                   );
                 })}
 
-                {/* Seeker Routes with SeekerLayout */}
+                {/* FIXED: SeekerLayout with proper property wizard routes */}
                 <Route element={<SeekerLayout />}>
                   <Route 
                     path="/" 
@@ -298,6 +295,7 @@ function App() {
                     } 
                   />
                   
+                  {/* Seeker routes */}
                   <Route path="/seeker">
                     <Route 
                       index
@@ -324,6 +322,34 @@ function App() {
                       } 
                     />
                   </Route>
+                  
+                  {/* FIXED: Property listing wizard routes - now in SeekerLayout with proper parameter handling */}
+                  <Route 
+                    path="/properties/list" 
+                    element={
+                      <PublicOrProtectedRoute>
+                        <ListYourProperty />
+                      </PublicOrProtectedRoute>
+                    } 
+                  />
+                  
+                  <Route 
+                    path="/properties/list/:category/:type" 
+                    element={
+                      <PublicOrProtectedRoute>
+                        <ListYourProperty />
+                      </PublicOrProtectedRoute>
+                    } 
+                  />
+                  
+                  <Route 
+                    path="/properties/list/:category/:type/:step" 
+                    element={
+                      <PublicOrProtectedRoute>
+                        <ListYourProperty />
+                      </PublicOrProtectedRoute>
+                    } 
+                  />
                   
                   {/* Property detail pages for seekers */}
                   <Route 
@@ -356,35 +382,7 @@ function App() {
                     } 
                   />
                   
-                  {/* SIMPLIFIED: Direct route definitions for property listing */}
-                  <Route 
-                    path="/properties/list" 
-                    element={
-                      <PublicOrProtectedRoute>
-                        <ListYourProperty />
-                      </PublicOrProtectedRoute>
-                    } 
-                  />
-                  
-                  <Route 
-                    path="/properties/list/:category/:type" 
-                    element={
-                      <PublicOrProtectedRoute>
-                        <ListYourProperty />
-                      </PublicOrProtectedRoute>
-                    } 
-                  />
-                  
-                  <Route 
-                    path="/properties/list/:category/:type/:step" 
-                    element={
-                      <PublicOrProtectedRoute>
-                        <ListYourProperty />
-                      </PublicOrProtectedRoute>
-                    } 
-                  />
-                  
-                  {/* Other property management routes */}
+                  {/* Property management routes */}
                   <Route 
                     path="/properties/:id/preview" 
                     element={

@@ -401,6 +401,8 @@ export function PropertyForm({
         <FormDataDebug 
           form={form} 
           currentStepId={flowSteps[formStep - 1]?.id}
+          currentStepNumber={formStep}
+          flowType={flowType}
           position="right"
         />
       )}
