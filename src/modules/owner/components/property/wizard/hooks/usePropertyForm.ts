@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/hooks/usePropertyForm.ts
-// Version: 5.3.0
-// Last Modified: 19-05-2025 17:30 IST
-// Purpose: Fixed syntax error and improved PG/Hostel flow handling
+// Version: 6.0.0
+// Last Modified: 25-05-2025 16:30 IST
+// Purpose: Remove edit mode functionality and residential rent fallback
 
 import { useEffect } from 'react';
 import { usePropertyFormState } from './usePropertyFormState';
@@ -19,7 +19,7 @@ import { AutoFillService } from '../services/autoFillService';
 interface UsePropertyFormProps {
   initialData?: FormData;
   propertyId?: string;
-  mode?: 'create' | 'edit';
+  mode?: 'create'; // Only create mode supported
   status?: 'draft' | 'published';
   propertyCategory?: string;
   adType?: string;
@@ -36,6 +36,16 @@ export function usePropertyForm({
   city
 }: UsePropertyFormProps) {
   // Initialize form state (form, errors, status, etc.)
+  const stateResult = usePropertyFormState({
+    initialData,
+    propertyCategory,
+    adType,
+    city,
+    existingPropertyId,
+    initialStatus,
+    mode
+  });
+
   const {
     form,
     error,
@@ -51,16 +61,33 @@ export function usePropertyForm({
     user,
     migrateDataBetweenSteps,
     cleanupSteps,
-    isFormReady
-  } = usePropertyFormState({
-    initialData,
-    propertyCategory,
-    adType,
-    city,
-    existingPropertyId,
-    initialStatus,
-    mode
-  });
+    isFormReady,
+    hasValidFlow
+  } = stateResult;
+
+  // Only proceed with other hooks if we have a valid flow and form
+  if (!hasValidFlow || !form) {
+    return {
+      form: null,
+      currentStep: 1,
+      error: 'Invalid flow type detected',
+      saving: false,
+      savedPropertyId: null,
+      user,
+      status: 'draft',
+      isSaleMode: false,
+      isPGHostelMode: false,
+      dataVersion: null,
+      handleAutoFill: () => {},
+      handleNextStep: () => {},
+      handlePreviousStep: () => {},
+      handleSaveAsDraft: async () => {},
+      handleSaveAndPublish: async () => {},
+      handleImageUploadComplete: () => {},
+      setCurrentStep: () => {},
+      setError: () => {}
+    };
+  }
   
   // Initialize validation
   const { validateCurrentStep } = usePropertyFormValidation(form);
@@ -86,8 +113,7 @@ export function usePropertyForm({
   // Initialize operations (save, update, etc.)
   const {
     handleSaveAsDraft,
-    handleSaveAndPublish,
-    handleUpdate
+    handleSaveAndPublish
   } = usePropertyFormOperations({
     form,
     user,
@@ -174,7 +200,6 @@ export function usePropertyForm({
     handlePreviousStep,
     handleSaveAsDraft,
     handleSaveAndPublish,
-    handleUpdate,
     handleImageUploadComplete,
     setCurrentStep: setCurrentStepWithPersistence,
     setError

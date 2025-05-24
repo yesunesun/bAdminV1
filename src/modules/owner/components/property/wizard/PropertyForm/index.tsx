@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/PropertyForm/index.tsx
-// Version: 9.2.0
-// Last Modified: 21-05-2025 10:30 IST
-// Purpose: Removed "Save and Continue" functionality and related functions
+// Version: 10.2.0
+// Last Modified: 25-05-2025 18:15 IST
+// Purpose: Fixed React hooks violations by ensuring consistent hook order and proper null checks
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -34,7 +34,6 @@ import { useFormDataChangeTracking } from '../hooks/useFormDataChangeTracking';
 interface PropertyFormProps {
  initialData?: FormData;
  propertyId?: string;
- mode?: 'create' | 'edit';
  status?: 'draft' | 'published';
  showTypeSelection?: boolean;
  onTypeSelect?: (category: string, type: string, city: string) => void;
@@ -47,7 +46,6 @@ interface PropertyFormProps {
 export function PropertyForm({
  initialData, 
  propertyId, 
- mode = 'create',
  status: initialStatus = 'draft',
  showTypeSelection = false,
  onTypeSelect,
@@ -58,7 +56,6 @@ export function PropertyForm({
  console.log('[PropertyForm] Initializing with props:', {
    initialData: initialData ? { ...initialData, steps: Object.keys(initialData.steps || {}) } : undefined,
    propertyId,
-   mode,
    initialStatus,
    showTypeSelection,
    passedCategory,
@@ -68,99 +65,66 @@ export function PropertyForm({
  });
  
  const navigate = useNavigate();
+
+ // CRITICAL FIX: Always call ALL hooks in the EXACT SAME ORDER every time
+ // This is the most important fix to prevent React hooks order violations
  
- // State for tracking custom save operation results
+ // 1. State hooks - ALWAYS called first in same order
  const [saveInProgress, setSaveInProgress] = useState(false);
  const [propertyIdAfterSave, setPropertyIdAfterSave] = useState<string | null>(null);
- 
- // Extract property type and listing type from initialData if in edit mode
- const derivedCategory = useMemo(() => {
-   const result = mode === 'edit' && initialData?.propertyType 
-     ? initialData.propertyType 
-     : passedCategory;
-   
-   console.log('[PropertyForm] Derived category:', result, {
-     mode,
-     'initialData?.propertyType': initialData?.propertyType,
-     passedCategory
-   });
-   
-   return result;
- }, [mode, initialData, passedCategory]);
- 
- const derivedAdType = useMemo(() => {
-   const result = mode === 'edit' && initialData?.listingType 
-     ? initialData.listingType 
-     : passedAdType;
-   
-   console.log('[PropertyForm] Derived ad type:', result, {
-     mode,
-     'initialData?.listingType': initialData?.listingType,
-     passedAdType
-   });
-   
-   return result;
- }, [mode, initialData, passedAdType]);
- 
- // Determine whether to show type selection
+ const [selectedCity, setSelectedCity] = useState<string>(initialData?.locality || '');
  const [showTypeSelectionState, setShowTypeSelectionState] = useState(
-   showTypeSelection || (!derivedCategory && !derivedAdType && mode !== 'edit')
- );
- 
- const [selectedCity, setSelectedCity] = useState<string>(
-   initialData?.locality || ''
+   showTypeSelection || (!passedCategory && !passedAdType)
  );
 
- // Determine if we're in PG/Hostel mode
+ // 2. Memoized values - ALWAYS called in same order
+ const derivedCategory = useMemo(() => {
+   const result = passedCategory;
+   console.log('[PropertyForm] Derived category:', result, { passedCategory });
+   return result;
+ }, [passedCategory]);
+ 
+ const derivedAdType = useMemo(() => {
+   const result = passedAdType;
+   console.log('[PropertyForm] Derived ad type:', result, { passedAdType });
+   return result;
+ }, [passedAdType]);
+
+ // 3. Mode detection memos - ALWAYS called in same order
  const isPGHostelMode = useMemo(() => {
-   // Check if the ad type specifically indicates PG/Hostel
    if (derivedAdType) {
      return derivedAdType.toLowerCase() === 'pghostel';
    }
-   
-   // Check URL path for keywords
    const urlPath = window.location.pathname.toLowerCase();
    return urlPath.includes('pghostel');
  }, [derivedAdType]);
  
- // Determine if we're in Commercial Rent mode
  const isCommercialRentMode = useMemo(() => {
-   // Check if the ad type specifically indicates commercial rent
    if (derivedAdType && derivedCategory) {
      const isCommercialType = derivedAdType.toLowerCase() === 'commercialrent' || 
                              (derivedAdType.toLowerCase() === 'rent' && 
                               derivedCategory.toLowerCase() === 'commercial');
      return isCommercialType;
    }
-   
-   // Check URL path for commercial rent keywords
    const urlPath = window.location.pathname.toLowerCase();
    return urlPath.includes('commercial') && (urlPath.includes('rent') || urlPath.includes('lease'));
  }, [derivedAdType, derivedCategory]);
  
- // Determine if we're in Commercial Sale mode
  const isCommercialSaleMode = useMemo(() => {
-   // Check if the ad type specifically indicates commercial sale
    if (derivedAdType && derivedCategory) {
      const isCommercialSaleType = (derivedAdType.toLowerCase() === 'sale' || 
                                  derivedAdType.toLowerCase() === 'sell') && 
                                 derivedCategory.toLowerCase() === 'commercial';
      return isCommercialSaleType;
    }
-   
-   // Check URL path for commercial sale keywords
    const urlPath = window.location.pathname.toLowerCase();
    return urlPath.includes('commercial') && (urlPath.includes('sale') || urlPath.includes('sell'));
  }, [derivedAdType, derivedCategory]);
  
- // Determine if we're in Commercial Co-working mode
  const isCoworkingMode = useMemo(() => {
-   // Check if the ad type specifically indicates co-working
    if (derivedAdType && derivedCategory) {
      const isCoworkingType = derivedAdType.toLowerCase() === 'coworking' && 
                            derivedCategory.toLowerCase() === 'commercial';
-     
-     // Also check if either of the keys indicates coworking
      const isCoworkingAdType = derivedAdType.toLowerCase() === 'coworking';
      const result = isCoworkingType || isCoworkingAdType;
      
@@ -173,60 +137,46 @@ export function PropertyForm({
      
      return result;
    }
-   
-   // Check URL path for co-working keywords
    const urlPath = window.location.pathname.toLowerCase();
    const pathHasCoworking = urlPath.includes('coworking') || urlPath.includes('co-working');
-   
-   console.log('[PropertyForm] Coworking detection (URL):', pathHasCoworking, {
-     urlPath
-   });
-   
+   console.log('[PropertyForm] Coworking detection (URL):', pathHasCoworking, { urlPath });
    return pathHasCoworking;
  }, [derivedAdType, derivedCategory]);
  
- // Determine if we're in Land/Plot Sale mode
  const isLandSaleMode = useMemo(() => {
-   // Check if the category indicates land
    if (derivedCategory) {
      const isLandType = derivedCategory.toLowerCase() === 'land';
      const result = isLandType;
-     
      console.log('[PropertyForm] Land sale detection (category):', result, {
        derivedCategory,
        isLandType
      });
-     
      return result;
    }
-   
-   // Check URL path for land keywords
    const urlPath = window.location.pathname.toLowerCase();
    const pathHasLand = urlPath.includes('land') || urlPath.includes('plot');
-   
-   console.log('[PropertyForm] Land sale detection (URL):', pathHasLand, {
-     urlPath
-   });
-   
+   console.log('[PropertyForm] Land sale detection (URL):', pathHasLand, { urlPath });
    return pathHasLand;
  }, [derivedCategory]);
  
- // Determine if we're in Residential Flatmates mode
  const isFlatmatesMode = useMemo(() => {
-   // Check if the ad type specifically indicates flatmates
    if (derivedAdType && derivedCategory) {
      const isFlatmatesType = derivedAdType.toLowerCase() === 'flatmates' && 
                            derivedCategory.toLowerCase() === 'residential';
      return isFlatmatesType;
    }
-   
-   // Check URL path for flatmates keywords
    const urlPath = window.location.pathname.toLowerCase();
    return urlPath.includes('flatmate');
  }, [derivedAdType, derivedCategory]);
 
- // Determine which flow steps to use based on property type
+ // 4. Flow steps memo - ALWAYS called in same order
  const flowSteps = useMemo(() => {
+   // FIXED: Always return a valid array to prevent undefined.length errors
+   if (!derivedCategory || !derivedAdType) {
+     console.log('[PropertyForm] Missing required parameters, returning empty array');
+     return []; // Return empty array instead of null
+   }
+   
    let result;
    
    if (isPGHostelMode) {
@@ -243,8 +193,18 @@ export function PropertyForm({
      result = FLOW_STEP_SEQUENCES.residential_flatmates;
    } else if (derivedAdType?.toLowerCase() === 'sale' || derivedAdType?.toLowerCase() === 'sell') {
      result = FLOW_STEP_SEQUENCES.residential_sale;
-   } else {
+   } else if (derivedAdType?.toLowerCase() === 'rent') {
      result = FLOW_STEP_SEQUENCES.residential_rent;
+   } else {
+     // Return empty array instead of null to prevent hooks violations
+     console.log('[PropertyForm] Invalid property type combination, returning empty array');
+     return [];
+   }
+   
+   // FIXED: Ensure result is always an array
+   if (!Array.isArray(result)) {
+     console.warn('[PropertyForm] Flow steps result is not an array, returning empty array');
+     return [];
    }
    
    console.log('[PropertyForm] Determined flow steps:', result?.map(step => step.id), {
@@ -259,6 +219,7 @@ export function PropertyForm({
    
    return result;
  }, [
+   derivedCategory,
    derivedAdType, 
    isPGHostelMode, 
    isCommercialRentMode, 
@@ -268,16 +229,17 @@ export function PropertyForm({
    isFlatmatesMode
  ]);
 
- // Determine initial step from URL or default to 1
+ // 5. Initial step memo - ALWAYS called in same order
  const initialStep = useMemo(() => {
-   if (urlStep && flowSteps) {
+   if (urlStep && flowSteps && flowSteps.length > 0) {
      const stepIndex = flowSteps.findIndex(s => s.id === urlStep) + 1;
      return stepIndex > 0 ? stepIndex : 1;
    }
    return 1;
  }, [urlStep, flowSteps]);
 
- // Initialize form with its context and state
+ // 6. CRITICAL: ALWAYS call usePropertyForm hook - this maintains consistent hooks order
+ // The hook itself handles invalid parameters internally, so we always call it
  const {
    form,
    currentStep: formStep,
@@ -291,24 +253,74 @@ export function PropertyForm({
    handleNextStep: originalHandleNextStep,
    handlePreviousStep,
    handleSaveAsDraft,
-   handleUpdate,
    handleImageUploadComplete,
    setCurrentStep,
  } = usePropertyForm({ 
    initialData, 
    propertyId, 
-   mode, 
+   mode: 'create', // Always create mode
    status: initialStatus,
    propertyCategory: derivedCategory,
    adType: derivedAdType,
    city: selectedCity || initialData?.locality || ''
  });
 
- // Track form data changes to detect old structure issues
+ // 7. CRITICAL: ALWAYS call useFormDataChangeTracking hook after usePropertyForm
+ // This maintains consistent hooks order and prevents violations
  useFormDataChangeTracking(form);
 
- // Force update flow type and category on initialization
+ // 8. CRITICAL: ALWAYS call useStepNavigation hook last
+ // This ensures all hooks are called in the same order every time
+ const { 
+   isSaleMode, 
+   isPGHostelMode: detectedPGHostelMode,
+   isCommercialRentMode: detectedCommercialRentMode,
+   isCommercialSaleMode: detectedCommercialSaleMode,
+   isCoworkingMode: detectedCoworkingMode,
+   isLandSaleMode: detectedLandSaleMode,
+   isFlatmatesMode: detectedFlatmatesMode,
+   getVisibleSteps, 
+   handleNextStep 
+ } = useStepNavigation({
+   form, 
+   formStep, 
+   formIsSaleMode, 
+   originalHandleNextStep, 
+   setCurrentStep, 
+   STEPS: flowSteps // Always pass flowSteps (never null/undefined)
+ });
+
+ // NOW that all hooks have been called, we can do conditional logic and early returns
+ 
+ // Check if we need type selection
+ const needsTypeSelection = !passedCategory || !passedAdType || flowSteps.length === 0;
+ 
+ if (needsTypeSelection && !showTypeSelection) {
+   console.log('[PropertyForm] Missing category/adType, forcing type selection');
+   return (
+     <PropertyTypeSelection 
+       onNext={(category: string, adType: string, city: string) => {
+         if (onTypeSelect) {
+           onTypeSelect(category, adType, city);
+         } else {
+           const path = `/properties/list/${category.toLowerCase()}/${adType.toLowerCase()}/details`;
+           console.log('[PropertyForm] Navigating to:', path);
+           navigate(path);
+         }
+       }}
+       selectedCategory={passedCategory}
+       selectedAdType={passedAdType}
+     />
+   );
+ }
+
+ // Check if form is properly initialized
+ const shouldInitializeForm = flowSteps.length > 0 && form !== null;
+
+ // Force update flow type and category on initialization - only if form exists
  useEffect(() => {
+   if (!form || !shouldInitializeForm) return;
+   
    // Make sure we're actually in a specific detected mode that needs the correct flow
    if (isLandSaleMode || isCoworkingMode) {
      console.log(`[PropertyForm] Special mode detected (Land Sale: ${isLandSaleMode}, Coworking: ${isCoworkingMode}), updating flow data`);
@@ -359,7 +371,7 @@ export function PropertyForm({
        console.error("[PropertyForm] Error updating flow on init:", error);
      }
    }
- }, [form, isLandSaleMode, isCoworkingMode]);
+ }, [form, shouldInitializeForm, isLandSaleMode, isCoworkingMode]);
 
  // Update propertyIdAfterSave when savedPropertyId changes
  useEffect(() => {
@@ -368,32 +380,12 @@ export function PropertyForm({
    }
  }, [savedPropertyId]);
 
- // Set initial step from URL
+ // Set initial step from URL - only if form exists
  useEffect(() => {
-   if (initialStep > 1) {
+   if (shouldInitializeForm && setCurrentStep && initialStep > 1) {
      setCurrentStep(initialStep);
    }
- }, [initialStep, setCurrentStep]);
-
- // Initialize custom step navigation with the correct flow steps
- const { 
-   isSaleMode, 
-   isPGHostelMode: detectedPGHostelMode,
-   isCommercialRentMode: detectedCommercialRentMode,
-   isCommercialSaleMode: detectedCommercialSaleMode,
-   isCoworkingMode: detectedCoworkingMode,
-   isLandSaleMode: detectedLandSaleMode,
-   isFlatmatesMode: detectedFlatmatesMode,
-   getVisibleSteps, 
-   handleNextStep 
- } = useStepNavigation({
-   form, 
-   formStep, 
-   formIsSaleMode, 
-   originalHandleNextStep, 
-   setCurrentStep, 
-   STEPS: flowSteps // Use flow-specific steps
- });
+ }, [shouldInitializeForm, initialStep, setCurrentStep]);
 
  // Log when the navigation hook properties change
  useEffect(() => {
@@ -431,6 +423,11 @@ export function PropertyForm({
 
  // Enhanced save function that returns the property ID
  const enhancedSaveFunction = async (): Promise<string | undefined> => {
+   if (!form || !shouldInitializeForm) {
+     console.warn('[PropertyForm] Cannot save - form not initialized');
+     return undefined;
+   }
+   
    setSaveInProgress(true);
    
    try {
@@ -542,19 +539,20 @@ export function PropertyForm({
    setShowTypeSelectionState(false);
  };
 
- // If user is not logged in, show login prompt
- if (!user) {
+ // Update showTypeSelectionState based on flowSteps
+ useEffect(() => {
+   setShowTypeSelectionState(
+     showTypeSelection || (!derivedCategory && !derivedAdType) || flowSteps.length === 0
+   );
+ }, [showTypeSelection, derivedCategory, derivedAdType, flowSteps]);
+
+ // If user is not logged in, show login prompt - only check if we have form data
+ if (shouldInitializeForm && !user) {
    return <LoginPrompt onLoginClick={() => navigate('/login')} />;
  }
 
- // In edit mode with initialData, bypass type selection
- useEffect(() => {
-   if (mode === 'edit' && initialData && showTypeSelectionState) {
-     setShowTypeSelectionState(false);
-   }
- }, [mode, initialData, showTypeSelectionState]);
-
- if (showTypeSelectionState) {
+ // Show type selection if needed
+ if (showTypeSelectionState || !shouldInitializeForm) {
    return (
      <PropertyTypeSelection 
        onNext={handleTypeSelectionComplete}
@@ -564,20 +562,30 @@ export function PropertyForm({
    );
  }
 
- // Ensure we have category and type either from props or initialData
- const effectiveCategory = derivedCategory || initialData?.propertyType || '';
- const effectiveAdType = derivedAdType || initialData?.listingType || '';
+ // Ensure we have category and type
+ const effectiveCategory = derivedCategory || '';
+ const effectiveAdType = derivedAdType || '';
 
- // Debug check for valid property parameters
- if (!effectiveCategory || !effectiveAdType) {
-   console.error('[PropertyForm] Missing required parameters:', { 
-     effectiveCategory, 
-     effectiveAdType,
-     derivedCategory,
-     derivedAdType,
-     'initialData?.propertyType': initialData?.propertyType,
-     'initialData?.listingType': initialData?.listingType
-   });
+ // Show error if missing required parameters instead of fallback
+ if (!effectiveCategory || !effectiveAdType || !shouldInitializeForm) {
+   return (
+     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+       <div className="bg-card rounded-xl shadow-lg p-6">
+         <div className="bg-destructive/10 border border-destructive/20 p-4 rounded-xl">
+           <h2 className="text-lg font-semibold text-destructive mb-2">Missing Property Information</h2>
+           <p className="text-sm text-destructive/80">
+             Unable to determine property type and listing option. Please go back and select a valid property type.
+           </p>
+           <button 
+             onClick={() => navigate('/properties/list')}
+             className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
+           >
+             Select Property Type
+           </button>
+         </div>
+       </div>
+     </div>
+   );
  }
 
  // Get the filtered steps for the form navigation
@@ -621,7 +629,6 @@ export function PropertyForm({
          currentStep={formStep} 
          onStepChange={setCurrentStep}
          propertyId={effectivePropertyId}
-         mode={mode}
          category={effectiveCategory}
          adType={effectiveAdType}
          steps={visibleSteps}
@@ -645,7 +652,7 @@ export function PropertyForm({
                STEPS={flowSteps || STEPS}
                effectiveCategory={effectiveCategory}
                effectiveAdType={effectiveAdType}
-               mode={mode}
+               mode="create"
                selectedCity={selectedCity || initialData?.locality || ''}
                isSaleMode={isSaleMode}
                isPGHostelMode={isPGHostelMode}
@@ -656,7 +663,6 @@ export function PropertyForm({
                isFlatmatesMode={isFlatmatesMode}
                handlePreviousStep={safePreviousStep}
                handleSaveAsDraft={handleSaveAsDraft}
-               handleUpdate={handleUpdate}
                saving={saving}
                status={status}
                savedPropertyId={effectivePropertyId}

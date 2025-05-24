@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/hooks/usePropertyFormNavigation.ts
-// Version: 2.5.0
-// Last Modified: 14-04-2025 11:30 IST
-// Purpose: Added handlePreviousStep implementation to fix reference error
+// Version: 3.0.0
+// Last Modified: 25-05-2025 16:30 IST
+// Purpose: Remove edit mode functionality and simplify navigation
 
 import { useState, useCallback, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
@@ -13,10 +13,10 @@ interface UsePropertyFormNavigationProps {
   form: UseFormReturn<FormData>;
   validateCurrentStep: () => boolean;
   user: any;
-  mode?: 'create' | 'edit';
+  mode?: 'create'; // Only create mode supported
   existingPropertyId?: string;
   setError: (error: string) => void;
-  isPGHostelMode?: boolean; // Add this parameter
+  isPGHostelMode?: boolean;
 }
 
 export function usePropertyFormNavigation({
@@ -26,60 +26,31 @@ export function usePropertyFormNavigation({
   mode = 'create',
   existingPropertyId,
   setError,
-  isPGHostelMode = false // Default to false
+  isPGHostelMode = false
 }: UsePropertyFormNavigationProps) {
   const navigate = useNavigate();
   const { step: urlStep } = useParams();
   const location = useLocation();
   
-  // Check for step parameter in query string for edit mode
-  const queryParams = new URLSearchParams(location.search);
-  const queryStep = queryParams.get('step');
-  
-  // Combine URL parameter step and query parameter step
-  const effectiveUrlStep = urlStep || queryStep;
-  
   // Get the appropriate steps based on property type
-  // This is the key fix - properly use the FLOW_STEPS for PG/Hostel mode
   const effectiveSteps = isPGHostelMode 
     ? FLOW_STEPS.RESIDENTIAL_PGHOSTEL 
     : STEPS;
   
   // Define currentStep state
   const [currentStep, setCurrentStep] = useState<number>(() => {
-    // If step is in URL or query params, prioritize that regardless of mode
-    if (effectiveUrlStep) {
-      const stepIndex = effectiveSteps.findIndex(s => s.id === effectiveUrlStep) + 1;
-      // Ensure a valid step index, defaulting to 1 (details) if not found or invalid
+    // If step is in URL, prioritize that
+    if (urlStep) {
+      const stepIndex = effectiveSteps.findIndex(s => s.id === urlStep) + 1;
+      // Ensure a valid step index, defaulting to 1 if not found or invalid
       return stepIndex > 0 ? stepIndex : 1;
     }
     
     // For newly created listings after property type selection, always start at step 1
-    if (mode === 'create' && !existingPropertyId) {
-      return 1; // Always start with first step (Room Details for PG/Hostel)
-    }
-    
-    // If we're in edit mode, try loading from local storage
-    if (mode === 'edit' && user?.id && existingPropertyId) {
-      const savedStep = localStorage.getItem(`propertyWizard_${user.id}_${existingPropertyId}_step`);
-      if (savedStep) {
-        return parseInt(savedStep);
-      }
-    }
-    
-    // Fall back to general saved step
-    if (user?.id) {
-      const savedStep = localStorage.getItem(`propertyWizard_${user.id}_step`);
-      if (savedStep) {
-        return parseInt(savedStep);
-      }
-    }
-    
-    // Default to first step
-    return 1;
+    return 1; // Always start with first step
   });
 
-  // Update URL when step changes - simplified to avoid excessive re-renders
+  // Update URL when step changes - simplified for create mode only
   const updateUrl = useCallback((newStep: number) => {
     try {
       if (!form || typeof form.getValues !== 'function') {
@@ -98,13 +69,6 @@ export function usePropertyFormNavigation({
         return;
       }
 
-      // For edit mode, use query parameter
-      if (mode === 'edit' && existingPropertyId) {
-        const newPath = `/properties/${existingPropertyId}/edit?step=${stepData.id}`;
-        navigate(newPath, { replace: true });
-        return;
-      }
-
       // For create mode, use path parameter
       const stepId = stepData.id;
       const newPath = `/properties/list/${effectiveCategory.toLowerCase()}/${effectiveType.toLowerCase()}/${stepId}`;
@@ -112,7 +76,7 @@ export function usePropertyFormNavigation({
     } catch (err) {
       // Silent error handling to avoid console spam
     }
-  }, [navigate, form, mode, existingPropertyId, effectiveSteps]);
+  }, [navigate, form, effectiveSteps]);
 
   // Effect to sync URL with current step - with debounce to prevent rapid updates
   useEffect(() => {
@@ -136,17 +100,12 @@ export function usePropertyFormNavigation({
           flatPlotNo: data.flatPlotNo || ''
         };
         
-        // In edit mode, store with property ID
-        if (mode === 'edit' && existingPropertyId) {
-          localStorage.setItem(`propertyWizard_${user.id}_${existingPropertyId}_data`, JSON.stringify(safeData));
-        } else {
-          localStorage.setItem(`propertyWizard_${user.id}_data`, JSON.stringify(safeData));
-        }
+        localStorage.setItem(`propertyWizard_${user.id}_data`, JSON.stringify(safeData));
       }
     } catch (err) {
       // Silent error handling
     }
-  }, [user?.id, mode, existingPropertyId]);
+  }, [user?.id]);
 
   // Enhanced setCurrentStep with localStorage updates
   const setCurrentStepWithPersistence = useCallback((step: number) => {
@@ -154,19 +113,14 @@ export function usePropertyFormNavigation({
       setCurrentStep(step);
       
       if (user?.id) {
-        // In edit mode, store step with property ID
-        if (mode === 'edit' && existingPropertyId) {
-          localStorage.setItem(`propertyWizard_${user.id}_${existingPropertyId}_step`, step.toString());
-        } else {
-          localStorage.setItem(`propertyWizard_${user.id}_step`, step.toString());
-        }
+        localStorage.setItem(`propertyWizard_${user.id}_step`, step.toString());
       }
     } catch (err) {
       // Silent error handling
     }
-  }, [user?.id, mode, existingPropertyId]);
+  }, [user?.id]);
 
-  // Simplified next step handler - Updated to validate before proceeding
+  // Simplified next step handler
   const handleNextStep = useCallback(() => {
     try {
       // Validate current step before proceeding
@@ -207,7 +161,7 @@ export function usePropertyFormNavigation({
     }
   }, [currentStep, form, saveFormToStorage, setCurrentStepWithPersistence, validateCurrentStep, setError, effectiveSteps, isPGHostelMode]);
 
-  // Added handlePreviousStep implementation - this was missing before
+  // Added handlePreviousStep implementation
   const handlePreviousStep = useCallback(() => {
     try {
       if (!form || typeof form.getValues !== 'function') {
@@ -244,18 +198,13 @@ export function usePropertyFormNavigation({
   const clearStorage = useCallback(() => {
     try {
       if (user?.id) {
-        if (mode === 'edit' && existingPropertyId) {
-          localStorage.removeItem(`propertyWizard_${user.id}_${existingPropertyId}_step`);
-          localStorage.removeItem(`propertyWizard_${user.id}_${existingPropertyId}_data`);
-        } else {
-          localStorage.removeItem(`propertyWizard_${user.id}_step`);
-          localStorage.removeItem(`propertyWizard_${user.id}_data`);
-        }
+        localStorage.removeItem(`propertyWizard_${user.id}_step`);
+        localStorage.removeItem(`propertyWizard_${user.id}_data`);
       }
     } catch (err) {
       // Silent error handling
     }
-  }, [user?.id, mode, existingPropertyId]);
+  }, [user?.id]);
 
   const handleImageUploadComplete = useCallback(() => {
     try {

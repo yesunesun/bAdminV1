@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/services/flows/BaseFlowService.ts
-// Version: 2.4.0
-// Last Modified: 17-05-2025 19:30 IST
-// Purpose: Added comprehensive root field migration to steps structure
+// Version: 3.0.0
+// Last Modified: 25-05-2025 16:30 IST
+// Purpose: Remove edit mode functionality and residential rent fallback
 
 import { FlowServiceInterface, FlowContext } from './FlowServiceInterface';
 import { FormData } from '../../types';
@@ -18,7 +18,11 @@ export abstract class BaseFlowService implements FlowServiceInterface {
    */
   formatData(formData: any): FormData {
     const flowKey = this.getFlowKey();
-    const flowSteps = FLOW_STEPS[flowKey] || FLOW_STEPS.default;
+    const flowSteps = FLOW_STEPS[flowKey];
+    
+    if (!flowSteps) {
+      throw new Error(`No flow steps defined for flow key: ${flowKey}. Please ensure a valid property type is selected.`);
+    }
     
     // Migrate any root-level fields to the appropriate steps first
     const migratedData = this.migrateRootFieldsToSteps(formData, flowSteps);
@@ -60,15 +64,14 @@ export abstract class BaseFlowService implements FlowServiceInterface {
   }
   
   /**
-   * Format meta section
+   * Format meta section - create mode only
    */
   protected formatMetaSection(formData: any): any {
     return {
       _version: 'v3',
-      created_at: formData.meta?.created_at || new Date().toISOString(),
+      created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
-      status: formData.meta?.status || 'draft',
-      id: formData.meta?.id,
+      status: 'draft',
       owner_id: formData.meta?.owner_id
     };
   }

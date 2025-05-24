@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/services/flows/FlowServiceFactory.ts
-// Version: 1.3.0
-// Last Modified: 19-05-2025 14:20 IST
-// Purpose: Enhanced PG/Hostel flow detection to ensure correct flow initialization
+// Version: 2.0.0
+// Last Modified: 25-05-2025 16:30 IST
+// Purpose: Remove default fallback and show explicit errors when no flow detected
 
 import { FlowServiceInterface, FlowContext } from './FlowServiceInterface';
 import { ResidentialRentFlowService } from './ResidentialRentFlowService';
@@ -33,10 +33,9 @@ export class FlowServiceFactory {
     new ResidentialRentFlowService()
   ];
   
-  private static defaultFlowService = new ResidentialRentFlowService();
-  
   /**
    * Detect the appropriate flow service for the given form data and context
+   * Throws error if no valid flow is detected instead of using fallback
    */
   public static getFlowService(formData: any, flowContext: FlowContext): FlowServiceInterface {
     // Enhanced debug logging
@@ -105,8 +104,15 @@ export class FlowServiceFactory {
       }
     }
     
-    console.log(`No flow detected, using default: ${this.defaultFlowService.getFlowType()}`);
-    return this.defaultFlowService;
+    // Instead of fallback, throw an error
+    const errorMessage = `No valid property flow detected. Please ensure you've selected a valid property type and listing option. Context: ${JSON.stringify({
+      urlPath: flowContext.urlPath,
+      adType: flowContext.adType,
+      formFlow: formData.flow
+    })}`;
+    
+    console.error(errorMessage);
+    throw new Error(errorMessage);
   }
   
   /**
@@ -129,8 +135,9 @@ export class FlowServiceFactory {
     const service = this.flowServices.find(s => s.getFlowType() === flowType);
     
     if (!service) {
-      console.warn(`Flow service for type "${flowType}" not found, using default`);
-      return this.defaultFlowService;
+      const errorMessage = `Flow service for type "${flowType}" not found. Available types: ${this.flowServices.map(s => s.getFlowType()).join(', ')}`;
+      console.error(errorMessage);
+      throw new Error(errorMessage);
     }
     
     return service;
@@ -160,8 +167,9 @@ export class FlowServiceFactory {
     const service = this.flowServices.find(s => s.getFlowType() === mappedFlowType);
     
     if (!service) {
-      console.warn(`Flow service for category "${category}" and listingType "${listingType}" not found, using default`);
-      return this.defaultFlowService;
+      const errorMessage = `Flow service for category "${category}" and listingType "${listingType}" not found. Available flow types: ${this.flowServices.map(s => s.getFlowType()).join(', ')}`;
+      console.error(errorMessage);
+      throw new Error(errorMessage);
     }
     
     console.log(`Found flow service for: ${mappedFlowType}`);
@@ -189,6 +197,12 @@ export class FlowServiceFactory {
     };
     
     const normalized = flowType.toLowerCase();
-    return mappings[normalized] || normalized;
+    const mapped = mappings[normalized];
+    
+    if (!mapped) {
+      throw new Error(`Unknown flow type variation: ${flowType}. Please use a valid property type and listing option.`);
+    }
+    
+    return mapped;
   }
 }

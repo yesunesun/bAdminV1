@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/PropertyForm/hooks/useStepNavigation.ts
-// Version: 9.0.0
-// Last Modified: 06-05-2025 18:15 IST
-// Purpose: Fixed import paths to match exact project structure
+// Version: 10.1.1
+// Last Modified: 25-05-2025 19:45 IST
+// Purpose: Fixed syntax error with duplicated function and removed invalid references
 
 import { useMemo, useCallback, useEffect } from 'react';
 import { UseFormReturn } from 'react-hook-form';
@@ -10,18 +10,16 @@ import { FormData } from '../../../types';
 import { addFormAutofillHelpers, fillFormSection } from '../../utilities/formAutofill';
 
 // Update imports to use the correct paths
-// The constants are in src/modules/owner/components/property/wizard/constants/
 import { 
   FLOW_TYPES, 
   FLOW_STEP_SEQUENCES, 
-  STEP_FIELD_MAPPINGS,
   createStepObjectsFromFlow 
 } from '../../constants/flows';
 
 import { STEP_DEFINITIONS } from '../../constants/common';
 
 interface UseStepNavigationProps {
-  form: UseFormReturn<FormData>;
+  form: UseFormReturn<FormData> | null;
   formStep: number;
   formIsSaleMode?: boolean;
   originalHandleNextStep: () => void;
@@ -40,43 +38,69 @@ export function useStepNavigation({
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Generate steps array from flow-based step definitions if STEPS is empty
+  // FIXED: Add comprehensive safety checks for form access
+  const safeGetFormValues = useCallback(() => {
+    try {
+      if (!form || typeof form.getValues !== 'function') {
+        console.warn('Form not available or getValues method missing');
+        return {};
+      }
+      return form.getValues();
+    } catch (error) {
+      console.error('Error getting form values:', error);
+      return {};
+    }
+  }, [form]);
+
+  // FIXED: Generate steps array from flow-based step definitions if STEPS is empty
   const computedSteps = useMemo(() => {
-    if (STEPS && STEPS.length > 0) {
+    // Always ensure we have a valid array to prevent undefined.length errors
+    if (STEPS && Array.isArray(STEPS) && STEPS.length > 0) {
       return STEPS; // Use provided STEPS if available
     }
     
     // Otherwise, generate from our flow-based system
-    // Determine which flow type to use based on form data and URL
-    const flowType = determineFlowType();
-    
-    // Get step sequence for this flow
-    const stepSequence = FLOW_STEP_SEQUENCES[flowType] || FLOW_STEP_SEQUENCES.residential_rent;
-    
-    // Convert to the format expected by the existing code
-    return stepSequence.map(step => {
-      // Find the step definition
-      const stepDef = STEP_DEFINITIONS[step.id] || {
-        id: step.id,
-        title: step.label,
-        icon: null,
-        description: step.label
-      };
+    try {
+      // Determine which flow type to use based on form data and URL
+      const flowType = determineFlowType();
       
-      return {
-        id: step.id,
-        title: stepDef.title || step.label,
-        icon: stepDef.icon,
-        description: stepDef.description || step.label
-      };
-    });
+      // Get step sequence for this flow - ensure it exists
+      const stepSequence = FLOW_STEP_SEQUENCES[flowType] || FLOW_STEP_SEQUENCES.residential_rent || [];
+      
+      // Ensure stepSequence is an array
+      if (!Array.isArray(stepSequence)) {
+        console.error('Step sequence is not an array:', stepSequence);
+        return [];
+      }
+      
+      // Convert to the format expected by the existing code
+      return stepSequence.map(step => {
+        // Find the step definition
+        const stepDef = STEP_DEFINITIONS[step.id] || {
+          id: step.id,
+          title: step.label,
+          icon: null,
+          description: step.label
+        };
+        
+        return {
+          id: step.id,
+          title: stepDef.title || step.label,
+          icon: stepDef.icon,
+          description: stepDef.description || step.label
+        };
+      });
+    } catch (error) {
+      console.error('Error generating computed steps:', error);
+      return []; // Return empty array as fallback
+    }
   }, [STEPS]);
   
-  // Determine the flow type based on form data and URL
+  // FIXED: Determine the flow type based on form data and URL with comprehensive safety checks
   function determineFlowType() {
     try {
-      // Get form data
-      const formData = form.getValues();
+      // Get form data safely
+      const formData = safeGetFormValues();
       const urlPath = window.location.pathname.toLowerCase();
       
       // Check for explicit flow info in form data
@@ -115,45 +139,56 @@ export function useStepNavigation({
       return isSaleMode ? FLOW_TYPES.RESIDENTIAL_SALE : FLOW_TYPES.RESIDENTIAL_RENT;
     } catch (error) {
       console.error('Error determining flow type:', error);
-      return FLOW_TYPES.DEFAULT;
+      return FLOW_TYPES.RESIDENTIAL_RENT; // Safe fallback
     }
   }
 
-  // Improved sale mode detection logic
+  // FIXED: Improved sale mode detection logic with comprehensive safety checks
   const isSaleMode = useMemo(() => {
-    // Check explicit flag first
-    if (formIsSaleMode !== undefined) {
-      return formIsSaleMode;
+    try {
+      // Check explicit flag first
+      if (formIsSaleMode !== undefined) {
+        return formIsSaleMode;
+      }
+      
+      // Safety check for form
+      if (!form) return false;
+      
+      // Get current form values safely
+      const formValues = safeGetFormValues();
+      
+      // Check flow data first
+      if (formValues.flow?.listingType) {
+        const listingType = formValues.flow.listingType.toLowerCase();
+        return listingType === 'sale' || listingType === 'sell';
+      }
+      
+      // Check legacy listingType - secondary indicator
+      const listingType = formValues.listingType?.toLowerCase() || '';
+      const isSaleFromListingType = listingType === 'sale' || listingType === 'sell';
+      
+      // Check URL path for keywords
+      const urlPath = window.location.pathname.toLowerCase();
+      const isSaleFromUrl = urlPath.includes('sale') || urlPath.includes('sell');
+      
+      // Determine final result with URL having higher priority
+      const result = isSaleFromUrl || isSaleFromListingType;
+      
+      return result;
+    } catch (error) {
+      console.error('Error in isSaleMode calculation:', error);
+      return false;
     }
-    
-    // Get current form values
-    const formValues = form.getValues();
-    
-    // Check flow data first
-    if (formValues.flow?.listingType) {
-      const listingType = formValues.flow.listingType.toLowerCase();
-      return listingType === 'sale' || listingType === 'sell';
-    }
-    
-    // Check legacy listingType - secondary indicator
-    const listingType = formValues.listingType?.toLowerCase() || '';
-    const isSaleFromListingType = listingType === 'sale' || listingType === 'sell';
-    
-    // Check URL path for keywords
-    const urlPath = window.location.pathname.toLowerCase();
-    const isSaleFromUrl = urlPath.includes('sale') || urlPath.includes('sell');
-    
-    // Determine final result with URL having higher priority
-    const result = isSaleFromUrl || isSaleFromListingType;
-    
-    return result;
-  }, [form, formIsSaleMode]);
+  }, [form, formIsSaleMode, safeGetFormValues]);
   
-  // Enhanced PG/Hostel mode detection
+  // FIXED: Enhanced PG/Hostel mode detection with comprehensive safety checks
   const isPGHostelMode = useMemo(() => {
     try {
-      // Check form values
-      const formValues = form.getValues();
+      // Safety check for form
+      if (!form) return false;
+      
+      // Check form values safely
+      const formValues = safeGetFormValues();
       
       // Check flow data first
       if (formValues.flow?.category === 'residential' && formValues.flow?.listingType === 'pghostel') {
@@ -178,13 +213,16 @@ export function useStepNavigation({
       console.error('Error in isPGHostelMode:', error);
       return false;
     }
-  }, [form]);
+  }, [form, safeGetFormValues]);
   
-  // Commercial Rent mode detection
+  // FIXED: Commercial Rent mode detection with comprehensive safety checks
   const isCommercialRentMode = useMemo(() => {
     try {
-      // Check form values
-      const formValues = form.getValues();
+      // Safety check for form
+      if (!form) return false;
+      
+      // Check form values safely
+      const formValues = safeGetFormValues();
       
       // Check flow data first
       if (formValues.flow?.category === 'commercial' && formValues.flow?.listingType === 'rent') {
@@ -213,13 +251,16 @@ export function useStepNavigation({
       console.error('Error in isCommercialRentMode:', error);
       return false;
     }
-  }, [form]);
+  }, [form, safeGetFormValues]);
   
-  // Commercial Sale mode detection
+  // FIXED: Commercial Sale mode detection with comprehensive safety checks
   const isCommercialSaleMode = useMemo(() => {
     try {
-      // Check form values
-      const formValues = form.getValues();
+      // Safety check for form
+      if (!form) return false;
+      
+      // Check form values safely
+      const formValues = safeGetFormValues();
       
       // Check flow data first
       if (formValues.flow?.category === 'commercial' && 
@@ -245,13 +286,16 @@ export function useStepNavigation({
       console.error('Error in isCommercialSaleMode:', error);
       return false;
     }
-  }, [form]);
+  }, [form, safeGetFormValues]);
   
-  // Commercial Co-working mode detection
+  // FIXED: Commercial Co-working mode detection with comprehensive safety checks
   const isCoworkingMode = useMemo(() => {
     try {
-      // Check form values
-      const formValues = form.getValues();
+      // Safety check for form
+      if (!form) return false;
+      
+      // Check form values safely
+      const formValues = safeGetFormValues();
       
       // Check flow data first
       if (formValues.flow?.category === 'commercial' && formValues.flow?.listingType === 'coworking') {
@@ -275,13 +319,16 @@ export function useStepNavigation({
       console.error('Error in isCoworkingMode:', error);
       return false;
     }
-  }, [form]);
+  }, [form, safeGetFormValues]);
   
-  // Land/Plot Sale mode detection
+  // FIXED: Land/Plot Sale mode detection with comprehensive safety checks
   const isLandSaleMode = useMemo(() => {
     try {
-      // Check form values
-      const formValues = form.getValues();
+      // Safety check for form
+      if (!form) return false;
+      
+      // Check form values safely
+      const formValues = safeGetFormValues();
       
       // Check flow data first
       if (formValues.flow?.category === 'land') {
@@ -303,13 +350,16 @@ export function useStepNavigation({
       console.error('Error in isLandSaleMode:', error);
       return false;
     }
-  }, [form]);
+  }, [form, safeGetFormValues]);
   
-  // Residential Flatmates mode detection
+  // FIXED: Residential Flatmates mode detection with comprehensive safety checks
   const isFlatmatesMode = useMemo(() => {
     try {
-      // Check form values
-      const formValues = form.getValues();
+      // Safety check for form
+      if (!form) return false;
+      
+      // Check form values safely
+      const formValues = safeGetFormValues();
       
       // Check flow data first
       if (formValues.flow?.category === 'residential' && formValues.flow?.listingType === 'flatmates') {
@@ -333,12 +383,23 @@ export function useStepNavigation({
       console.error('Error in isFlatmatesMode:', error);
       return false;
     }
-  }, [form]);
+  }, [form, safeGetFormValues]);
 
-  // Get current step ID
+  // FIXED: Get current step ID with comprehensive safety checks
   const getCurrentStepId = useCallback(() => {
-    if (formStep <= 0 || formStep > computedSteps.length) return null;
-    return computedSteps[formStep - 1]?.id || null;
+    // Ensure computedSteps exists and is an array
+    if (!computedSteps || !Array.isArray(computedSteps) || computedSteps.length === 0) {
+      console.warn('computedSteps is not available or empty');
+      return null;
+    }
+    
+    if (formStep <= 0 || formStep > computedSteps.length) {
+      console.warn(`formStep ${formStep} is out of bounds for computedSteps length ${computedSteps.length}`);
+      return null;
+    }
+    
+    const step = computedSteps[formStep - 1];
+    return step?.id || null;
   }, [formStep, computedSteps]);
   
   // Auto-fill the form with test data for the current step
@@ -346,7 +407,7 @@ export function useStepNavigation({
     const currentStepId = getCurrentStepId();
     console.log(`Auto-fill requested for step: ${currentStepId}`);
     
-    if (!currentStepId) return;
+    if (!currentStepId || !form) return;
     
     // Map step IDs to section names in test-data.ts
     const sectionMap: Record<string, string> = {
@@ -379,6 +440,9 @@ export function useStepNavigation({
 
   // Auto-fill helpers setup
   useEffect(() => {
+    // Only add helpers if form exists
+    if (!form) return;
+    
     // Add global autofill helpers
     addFormAutofillHelpers(form);
     
@@ -451,7 +515,7 @@ export function useStepNavigation({
     stepSequences
   ]);
 
-  // Extract property category and type from current URL
+  // FIXED: Extract property category and type from current URL with stable reference
   const getPropertyInfoFromUrl = useCallback(() => {
     const urlPath = location.pathname;
     const pathParts = urlPath.split('/').filter(part => part.length > 0);
@@ -472,20 +536,15 @@ export function useStepNavigation({
       }
     }
     
-    // Edit mode detection
-    const isEditMode = urlPath.includes('/edit');
-    let propertyId = '';
+    console.log(`URL Info - Category: ${category}, Type: ${type}`);
     
-    if (isEditMode && pathParts.length >= 2) {
-      propertyId = pathParts[1]; // Second part should be property ID
-    }
-    
-    console.log(`URL Info - Category: ${category}, Type: ${type}, Edit Mode: ${isEditMode}, Property ID: ${propertyId}`);
-    
-    return { category, type, isEditMode, propertyId };
+    return { category, type };
   }, [location.pathname]);
+  
+  // FIXED: Memoize current location pathname to prevent unnecessary re-renders
+  const currentPathname = useMemo(() => location.pathname, [location.pathname]);
 
-  // FIXED: Function to update URL based on current flow and step
+  // FIXED: Function to update URL based on current flow and step with stable dependencies
   const updateUrlForStep = useCallback((stepId: string) => {
     try {
       if (!form || typeof form.getValues !== 'function') {
@@ -497,10 +556,10 @@ export function useStepNavigation({
       console.log('Current URL before update:', window.location.pathname);
       
       // Get property info from current URL first
-      const { category, type, isEditMode, propertyId } = getPropertyInfoFromUrl();
+      const { category, type } = getPropertyInfoFromUrl();
       
       // Extract necessary values from form as fallback
-      const formValues = form.getValues();
+      const formValues = safeGetFormValues();
       
       // Use flow information from v3 data structure if available
       const formCategory = formValues.flow?.category || 
@@ -525,20 +584,9 @@ export function useStepNavigation({
       // FIXED: Construct base URL preserving the original path structure
       let baseUrl = '';
       
-      // Handle existing property editing
-      if (isEditMode && propertyId) {
-        baseUrl = `/properties/${propertyId}/edit`;
-        
-        // Use query parameter for edit mode
-        const newUrl = `${baseUrl}?step=${stepId}`;
-        console.log(`Navigating to edit URL: ${newUrl}`);
-        navigate(newUrl, { replace: true });
-        return;
-      }
-      
       // For create mode, build a proper path based on the original URL
       // Check if we already have a full path structure in the current URL
-      const urlPath = window.location.pathname;
+      const urlPath = currentPathname;
       const hasProperListPrefix = urlPath.includes('/properties/list/');
       
       if (hasProperListPrefix) {
@@ -570,11 +618,26 @@ export function useStepNavigation({
     } catch (error) {
       console.error('Error updating URL:', error);
     }
-  }, [form, navigate, location, isPGHostelMode, isFlatmatesMode, isCoworkingMode, getPropertyInfoFromUrl]);
+  }, [
+    form, 
+    navigate, 
+    currentPathname, 
+    isPGHostelMode, 
+    isFlatmatesMode, 
+    isCoworkingMode, 
+    getPropertyInfoFromUrl, 
+    safeGetFormValues
+  ]);
 
-  // Custom navigation function for all property flows
+  // FIXED: Custom navigation function for all property flows with enhanced safety
   const handleNextStep = useCallback(() => {
     try {
+      // Safety check - ensure we have valid form and steps
+      if (!form || !computedSteps || !Array.isArray(computedSteps) || computedSteps.length === 0) {
+        console.warn('Cannot navigate - form or steps not available');
+        return;
+      }
+      
       const currentStepId = getCurrentStepId();
       
       // Enhanced debug information for navigation troubleshooting
@@ -593,6 +656,14 @@ export function useStepNavigation({
       if (isPGHostelMode || isCommercialRentMode || isCommercialSaleMode || 
           isCoworkingMode || isLandSaleMode || isFlatmatesMode) {
         const activeSequence = getActiveSequence();
+        
+        // Ensure activeSequence is valid
+        if (!Array.isArray(activeSequence) || activeSequence.length === 0) {
+          console.warn('Active sequence is not valid, falling back to original handler');
+          originalHandleNextStep();
+          return;
+        }
+        
         const currentIndex = activeSequence.indexOf(currentStepId);
         
         console.log(`Flow Navigation - Current index in sequence: ${currentIndex}, Sequence:`, activeSequence);
@@ -602,7 +673,7 @@ export function useStepNavigation({
           const nextStepId = activeSequence[currentIndex + 1];
           
           // Find index in computedSteps array
-          const nextStepIndex = computedSteps.findIndex(step => step.id === nextStepId);
+          const nextStepIndex = computedSteps.findIndex(step => step && step.id === nextStepId);
           
           console.log(`Flow Navigation - Next step ID: ${nextStepId}, Index: ${nextStepIndex}`);
           
@@ -622,7 +693,8 @@ export function useStepNavigation({
       
       // For other flows, determine the next step
       const nextStepIndex = Math.min(formStep + 1, computedSteps.length);
-      const nextStepId = computedSteps[nextStepIndex - 1]?.id;
+      const nextStep = computedSteps[nextStepIndex - 1];
+      const nextStepId = nextStep?.id;
       
       if (nextStepId) {
         // First update the URL
@@ -638,9 +710,10 @@ export function useStepNavigation({
       originalHandleNextStep();
     }
   }, [
+    form,
+    computedSteps,
     getCurrentStepId, 
     formStep, 
-    computedSteps, 
     isPGHostelMode, 
     isCommercialRentMode, 
     isCommercialSaleMode, 
@@ -654,9 +727,15 @@ export function useStepNavigation({
     updateUrlForStep
   ]);
 
-  // Handle Previous button click
+  // FIXED: Handle Previous button click with enhanced safety
   const handlePreviousStep = useCallback(() => {
     try {
+      // Safety check - ensure we have valid form and steps
+      if (!form || !computedSteps || !Array.isArray(computedSteps) || computedSteps.length === 0) {
+        console.warn('Cannot navigate - form or steps not available');
+        return;
+      }
+      
       const currentStepId = getCurrentStepId();
       
       console.log(`Navigation - Current step: ${currentStepId} (${formStep}/${computedSteps.length})`);
@@ -665,6 +744,15 @@ export function useStepNavigation({
       if (isPGHostelMode || isCommercialRentMode || isCommercialSaleMode || 
           isCoworkingMode || isLandSaleMode || isFlatmatesMode) {
         const activeSequence = getActiveSequence();
+        
+        // Ensure activeSequence is valid
+        if (!Array.isArray(activeSequence) || activeSequence.length === 0) {
+          console.warn('Active sequence is not valid, falling back to simple navigation');
+          const prevStepIndex = Math.max(formStep - 1, 1);
+          setCurrentStep(prevStepIndex);
+          return;
+        }
+        
         const currentIndex = activeSequence.indexOf(currentStepId);
         
         console.log(`Flow Navigation - Current index in sequence: ${currentIndex}, Sequence:`, activeSequence);
@@ -674,7 +762,7 @@ export function useStepNavigation({
           const prevStepId = activeSequence[currentIndex - 1];
           
           // Find index in computedSteps array
-          const prevStepIndex = computedSteps.findIndex(step => step.id === prevStepId);
+          const prevStepIndex = computedSteps.findIndex(step => step && step.id === prevStepId);
           
           console.log(`Flow Navigation - Previous step ID: ${prevStepId}, Index: ${prevStepIndex}`);
           
@@ -692,7 +780,8 @@ export function useStepNavigation({
       
       // For other flows, directly calculate the previous step
       const prevStepIndex = Math.max(formStep - 1, 1);
-      const prevStepId = computedSteps[prevStepIndex - 1]?.id;
+      const prevStep = computedSteps[prevStepIndex - 1];
+      const prevStepId = prevStep?.id;
       
       if (prevStepId) {
         // First update the URL
@@ -709,9 +798,10 @@ export function useStepNavigation({
       setCurrentStep(prevStepIndex);
     }
   }, [
+    form,
+    computedSteps,
     getCurrentStepId, 
     formStep, 
-    computedSteps, 
     isPGHostelMode, 
     isCommercialRentMode, 
     isCommercialSaleMode, 
@@ -723,48 +813,73 @@ export function useStepNavigation({
     updateUrlForStep
   ]);
 
-  // Create step indices for lookup
+  // FIXED: Create step indices for lookup with safety checks
   const stepIndices = useMemo(() => {
     const indices: Record<string, number> = {};
-    computedSteps.forEach((step, index) => {
-      indices[step.id] = index + 1; // 1-based index to match formStep
-    });
+    
+    // Ensure computedSteps exists and is an array
+    if (!computedSteps || !Array.isArray(computedSteps)) {
+      console.warn('stepIndices: computedSteps is not available or not an array');
+      return indices;
+    }
+    
+    try {
+      computedSteps.forEach((step, index) => {
+        if (step && step.id) {
+          indices[step.id] = index + 1; // 1-based index to match formStep
+        }
+      });
+    } catch (error) {
+      console.error('Error creating step indices:', error);
+    }
+    
     return indices;
   }, [computedSteps]);
 
-  // Visible steps function - updated to allow 'details' step for Commercial Rent
+  // FIXED: Visible steps function with comprehensive safety checks
   const getVisibleSteps = useCallback(() => {
-    return computedSteps.map(step => ({
-      ...step,
-      hidden: 
-        // Rental step hidden for non-rental flows
-        (step.id === 'rental' && (isSaleMode || isPGHostelMode || 
-                               isCommercialSaleMode || isCoworkingMode || isLandSaleMode || 
-                               isFlatmatesMode)) || 
-        // Sale step hidden for non-sale flows
-        (step.id === 'sale' && (!isSaleMode || isPGHostelMode || isCommercialRentMode || 
-                               isCommercialSaleMode || isCoworkingMode || isLandSaleMode || 
-                               isFlatmatesMode)) ||
-        // Details step hidden for PG/Hostel and Land/Plot flows
-        // Removed isCommercialRentMode from this condition to allow details step for Commercial Rent
-        (step.id === 'details' && (isPGHostelMode || isLandSaleMode)) ||
-        // Commercial basics step hidden for non-Commercial Rent flows
-        (step.id === 'commercial_basics' && !isCommercialRentMode) ||
-        // PG/Hostel steps hidden for non-PG/Hostel flows
-        (step.id === 'room_details' && !isPGHostelMode) ||
-        (step.id === 'pg_details' && !isPGHostelMode) ||
-        // Commercial details step hidden for all flows (removed step)
-        (step.id === 'commercial') ||
-        // Commercial sale step hidden for non-Commercial Sale flows
-        (step.id === 'commercial_sale' && !isCommercialSaleMode) ||
-        // Co-working step hidden for non-Co-working flows
-        (step.id === 'coworking' && !isCoworkingMode) ||
-        // Land details steps hidden for non-Land/Plot flows
-        (step.id === 'land_details' && !isLandSaleMode) ||
-        (step.id === 'land_features' && !isLandSaleMode) ||
-        // Flatmates step hidden for non-Flatmates flows
-        (step.id === 'flatmate_details' && !isFlatmatesMode)
-    }));
+    // Safety check - return empty array if no steps or not an array
+    if (!computedSteps || !Array.isArray(computedSteps) || computedSteps.length === 0) {
+      console.warn('getVisibleSteps: computedSteps is not available or empty');
+      return [];
+    }
+    
+    try {
+      return computedSteps.map(step => ({
+        ...step,
+        hidden: 
+          // Rental step hidden for non-rental flows
+          (step.id === 'rental' && (isSaleMode || isPGHostelMode || 
+                                 isCommercialSaleMode || isCoworkingMode || isLandSaleMode || 
+                                 isFlatmatesMode)) || 
+          // Sale step hidden for non-sale flows
+          (step.id === 'sale' && (!isSaleMode || isPGHostelMode || isCommercialRentMode || 
+                                 isCommercialSaleMode || isCoworkingMode || isLandSaleMode || 
+                                 isFlatmatesMode)) ||
+          // Details step hidden for PG/Hostel and Land/Plot flows
+          // Removed isCommercialRentMode from this condition to allow details step for Commercial Rent
+          (step.id === 'details' && (isPGHostelMode || isLandSaleMode)) ||
+          // Commercial basics step hidden for non-Commercial Rent flows
+          (step.id === 'commercial_basics' && !isCommercialRentMode) ||
+          // PG/Hostel steps hidden for non-PG/Hostel flows
+          (step.id === 'room_details' && !isPGHostelMode) ||
+          (step.id === 'pg_details' && !isPGHostelMode) ||
+          // Commercial details step hidden for all flows (removed step)
+          (step.id === 'commercial') ||
+          // Commercial sale step hidden for non-Commercial Sale flows
+          (step.id === 'commercial_sale' && !isCommercialSaleMode) ||
+          // Co-working step hidden for non-Co-working flows
+          (step.id === 'coworking' && !isCoworkingMode) ||
+          // Land details steps hidden for non-Land/Plot flows
+          (step.id === 'land_details' && !isLandSaleMode) ||
+          (step.id === 'land_features' && !isLandSaleMode) ||
+          // Flatmates step hidden for non-Flatmates flows
+          (step.id === 'flatmate_details' && !isFlatmatesMode)
+      }));
+    } catch (error) {
+      console.error('Error in getVisibleSteps:', error);
+      return [];
+    }
   }, [
     computedSteps, 
     isSaleMode, 

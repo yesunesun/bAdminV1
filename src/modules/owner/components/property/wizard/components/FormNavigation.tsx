@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/components/FormNavigation.tsx
-// Version: 5.0.2
-// Last Modified: 09-05-2025 17:00 IST
-// Purpose: Fix React component casing issues with icon components
+// Version: 6.0.0
+// Last Modified: 25-05-2025 16:30 IST
+// Purpose: Remove edit mode functionality and residential rent fallback
 
 import React, { useMemo } from 'react';
 import { cn } from '@/lib/utils';
@@ -27,7 +27,6 @@ interface FormNavigationProps {
   currentStep: number;
   onStepChange: (step: number) => void;
   propertyId?: string;
-  mode?: 'create' | 'edit';
   category?: string;
   adType?: string;
   steps: Step[];
@@ -118,8 +117,8 @@ const getFlowType = (category: string, adType: string): string => {
     }
   }
   
-  // Default flow
-  return FLOW_TYPES.DEFAULT;
+  // Throw error instead of using default fallback
+  throw new Error(`Invalid property type combination: ${category}/${adType}. Please select a valid property type and listing option.`);
 };
 
 // Create component
@@ -128,7 +127,6 @@ const NavigationComponent = (props: FormNavigationProps) => {
     currentStep,
     onStepChange,
     propertyId,
-    mode = 'create',
     category = '',
     adType = '',
     steps = []
@@ -138,13 +136,26 @@ const NavigationComponent = (props: FormNavigationProps) => {
 
   // Get flow type based on category and ad type
   const flowType = useMemo(() => {
-    return getFlowType(category, adType);
+    try {
+      return getFlowType(category, adType);
+    } catch (error) {
+      console.error('Flow type detection error:', error);
+      // Show error in UI instead of falling back
+      return null;
+    }
   }, [category, adType]);
 
   // Get flow steps for this flow type
   const flowSteps = useMemo(() => {
+    if (!flowType) return [];
+    
     console.log('Flow type:', flowType);
-    const flowStepIds = FLOW_STEPS[flowType] || FLOW_STEPS.default;
+    const flowStepIds = FLOW_STEPS[flowType];
+    
+    if (!flowStepIds) {
+      console.error(`No flow steps defined for flow type: ${flowType}`);
+      return [];
+    }
     
     // Convert step IDs to step objects
     return flowStepIds.map(stepId => ({
@@ -169,10 +180,10 @@ const NavigationComponent = (props: FormNavigationProps) => {
     return flowSteps;
   }, [steps, flowSteps]);
 
-  // Handle clicking on steps for navigation
+  // Handle clicking on steps for navigation - create mode only
   const handleStepClick = (index: number, stepId: string) => {
-    // In edit mode, all steps should be clickable
-    if (mode === 'edit' || currentStep > index) {
+    // Only allow navigation to previous steps in create mode
+    if (currentStep > index) {
       try {
         // Extract base URL
         const urlParts = window.location.pathname.split('/');
@@ -191,6 +202,30 @@ const NavigationComponent = (props: FormNavigationProps) => {
     }
   };
 
+  // Show error if no valid flow type
+  if (!flowType) {
+    return (
+      <div className="px-6 py-4 border-b border-border mb-4 bg-destructive/10">
+        <div className="text-destructive text-sm">
+          <strong>Error:</strong> Invalid property type combination ({category}/{adType}). 
+          Please go back and select a valid property type and listing option.
+        </div>
+      </div>
+    );
+  }
+
+  // Show error if no steps available
+  if (stepsToRender.length === 0) {
+    return (
+      <div className="px-6 py-4 border-b border-border mb-4 bg-destructive/10">
+        <div className="text-destructive text-sm">
+          <strong>Error:</strong> No wizard steps available for the selected property type. 
+          Please contact support if this issue persists.
+        </div>
+      </div>
+    );
+  }
+
   // Debug information
   console.log('FormNavigation debug:', {
     category,
@@ -198,8 +233,7 @@ const NavigationComponent = (props: FormNavigationProps) => {
     flowType,
     currentStep,
     flowSteps: flowSteps.map(s => s.id),
-    stepsToRender: stepsToRender.map(s => s.id),
-    mode
+    stepsToRender: stepsToRender.map(s => s.id)
   });
 
   return (
@@ -224,7 +258,7 @@ const NavigationComponent = (props: FormNavigationProps) => {
             
             const isActive = currentStep === index + 1;
             const isPassed = currentStep > index + 1;
-            const isClickable = mode === 'edit' || isPassed;
+            const isClickable = isPassed; // Only previous steps are clickable in create mode
             
             return (
               <button
