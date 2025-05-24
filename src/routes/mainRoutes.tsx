@@ -1,7 +1,7 @@
 // src/routes/mainRoutes.tsx
-// Version: 11.6.0
-// Last Modified: 07-04-2025 16:15 IST
-// Purpose: Fix navigation issues with property listing
+// Version: 12.0.0
+// Last Modified: 25-05-2025 21:30 IST
+// Purpose: Fixed property listing routes to work with FlowContext
 
 import React from 'react';
 import { Navigate } from 'react-router-dom';
@@ -28,9 +28,13 @@ export const mainRoutes = [
     path: '/properties',
     children: [
       { index: true, element: <Properties /> },
+      // Main listing route - handles both selection and wizard
       { path: 'list', element: <ListYourProperty /> },
+      // Specific flow routes - all render the same ListYourProperty component
+      // The component will detect the flow from URL parameters via FlowContext
       { path: 'list/:category/:type', element: <ListYourProperty /> },
       { path: 'list/:category/:type/:step', element: <ListYourProperty /> },
+      // Property management routes
       { path: ':id/preview', element: <PropertyPreview /> },
       { path: ':id/edit', element: <EditProperty /> },
       { path: ':id', element: <PropertyDetails /> }

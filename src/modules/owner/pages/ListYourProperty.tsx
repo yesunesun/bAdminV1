@@ -1,83 +1,76 @@
 // src/modules/owner/pages/ListYourProperty.tsx
-// Version: 2.0.0
-// Last Modified: 14-04-2025 08:45 IST
-// Purpose: Fully reset wizard state when accessed with reset parameter
+// Version: 3.2.0
+// Last Modified: 25-05-2025 22:15 IST
+// Purpose: Fixed width issue and navigation problems
 
 import React, { useEffect } from 'react';
-import { useParams, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
-import { PropertyForm } from '@/modules/owner/components/property/wizard/PropertyForm/index';
+import { useParams, useLocation } from 'react-router-dom';
+import { useFlow } from '@/contexts/FlowContext';
+import PropertyForm from '@/modules/owner/components/property/wizard/PropertyForm/index';
+import PropertyTypeSelection from '@/modules/owner/components/property/wizard/components/PropertyTypeSelection';
 
 export default function ListYourProperty() {
   const { category, type, step } = useParams();
-  const navigate = useNavigate();
   const location = useLocation();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const { isValidFlow, isLoading, flowType, category: contextCategory, listingType } = useFlow();
 
-  // Process reset parameter and localStorage flag on mount
+  // Enhanced debugging
   useEffect(() => {
-    // Check if reset parameter exists
-    const hasResetParam = searchParams.has('reset');
-    const resetFlag = localStorage.getItem('resetPropertyWizard');
-
-    console.log('ListYourProperty mounted with params:', { 
-      category, 
-      type, 
-      step,
-      hasResetParam,
-      resetFlag,
-      pathname: location.pathname
+    console.log('[ListYourProperty] Component mounted/updated with:', {
+      'URL Params': { category, type, step },
+      'Location': { pathname: location.pathname, search: location.search },
+      'FlowContext': { isValidFlow, isLoading, flowType, contextCategory, listingType },
+      'Timestamp': new Date().toISOString()
     });
+  }, [category, type, step, location.pathname, isValidFlow, isLoading, flowType, contextCategory, listingType]);
 
-    // Clear any reset flags and parameters
-    if (hasResetParam) {
-      // Remove the reset parameter from URL
-      searchParams.delete('reset');
-      setSearchParams(searchParams);
-    }
-    
-    if (resetFlag === 'true') {
-      // Clear the localStorage flag
-      localStorage.removeItem('resetPropertyWizard');
-      
-      // If we're in a deep path and not already at the root listing path, redirect to it
-      if ((category || type || step) && location.pathname !== '/properties/list') {
-        console.log('Redirecting to /properties/list due to reset flag');
-        navigate('/properties/list', { replace: true });
-        return;
-      }
-    }
-
-    // If we have category and type but no step, add details step
-    if (category && type && !step) {
-      console.log('No step specified, redirecting to details step');
-      navigate(`/properties/list/${category.toLowerCase()}/${type.toLowerCase()}/details`, { replace: true });
-    }
-  }, [category, type, step, navigate, searchParams, setSearchParams, location.pathname]);
-
-  // Function to handle property type selection
-  const handlePropertyTypeSelect = (selectedCategory: string, selectedType: string, selectedCity: string) => {
-    console.log('PropertyType selection:', { selectedCategory, selectedType, selectedCity });
-    
-    // Ensure proper URL path formation with 'details' as default step
-    const path = `/properties/list/${selectedCategory.toLowerCase()}/${selectedType.toLowerCase()}/details`;
-    console.log('Navigating to:', path);
-    
-    // Use replace to avoid building up history stack
-    navigate(path, { replace: true });
-  };
-
-  // Initial rendering logic
-  if (!category || !type) {
-    console.log('Rendering PropertyForm with selection mode (no category/type)');
-    return <PropertyForm showTypeSelection onTypeSelect={handlePropertyTypeSelect} />;
+  // Show loading spinner while flow context is initializing
+  if (isLoading) {
+    console.log('[ListYourProperty] Rendering loading state');
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <span className="ml-3 text-sm text-gray-600">Loading property wizard...</span>
+      </div>
+    );
   }
 
-  console.log('Rendering PropertyForm with params:', { category, type, step });
+  // If we have a valid flow (URL contains category and type), show the PropertyForm wizard
+  if (isValidFlow && flowType) {
+    console.log('[ListYourProperty] ✅ Rendering PropertyForm for flow:', flowType);
+    return (
+      // FIXED: Removed container constraints to let PropertyForm handle its own width
+      <div className="w-full">
+        {/* Debug info at top in development */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4 max-w-7xl mx-auto">
+            <strong>Debug - Wizard Mode:</strong> Flow: {flowType}, Category: {contextCategory}, Type: {listingType}
+          </div>
+        )}
+        <PropertyForm 
+          currentStep={step}
+          selectedCategory={contextCategory}
+          selectedAdType={listingType}
+        />
+      </div>
+    );
+  }
+
+  // Otherwise, show the PropertyTypeSelection
+  console.log('[ListYourProperty] 📝 Rendering PropertyTypeSelection');
   return (
-    <PropertyForm 
-      selectedCategory={category}
-      selectedAdType={type}
-      currentStep={step}
-    />
+    <div className="w-full">
+      {/* Debug info at top in development */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4 max-w-7xl mx-auto">
+          <strong>Debug - Selection Mode:</strong> Path: {location.pathname}, Valid Flow: {isValidFlow ? 'Yes' : 'No'}
+        </div>
+      )}
+      <PropertyTypeSelection 
+        onNext={(selectedCategory, selectedType, city) => {
+          console.log('[ListYourProperty] PropertyTypeSelection onNext called:', { selectedCategory, selectedType, city });
+        }} 
+      />
+    </div>
   );
 }

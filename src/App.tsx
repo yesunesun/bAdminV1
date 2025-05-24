@@ -1,23 +1,32 @@
 // src/App.tsx 
-// Version: 8.16.0
-// Last Modified: 08-04-2025 11:45 IST
-// Purpose: Fix property listing wizard navigation by adding nested routes to SeekerLayout
+// Version: 9.2.0
+// Last Modified: 25-05-2025 22:00 IST
+// Purpose: Simplified routing to fix parameter passing issues
 
 import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { FavoritesProvider } from './contexts/FavoritesContext';
+import { FlowProvider } from './contexts/FlowContext';
 import { Header, BrandLogo } from '@/components/Header';
 import { useAdminAccess } from './modules/admin/hooks/useAdminAccess';
 import FavoritesDrawer from '@/modules/seeker/components/FavoritesDrawer';
 import Footer from '@/components/Footer';
 
-// Import HomePage and PropertyMapHome (updated path)
+// Import components directly
 import HomePage from './pages/HomePage';
-import PropertyMapHome from './modules/seeker'; // Updated import path
+import PropertyMapHome from './modules/seeker';
+import Dashboard from './modules/owner/pages/Dashboard';
+import Properties from './modules/owner/pages/Properties';
+import PropertyDetails from './modules/owner/pages/PropertyDetails';
+import PropertyPreview from './modules/owner/pages/PropertyPreview';
+import EditProperty from './modules/owner/pages/EditProperty';
+import ListYourProperty from './modules/owner/pages/ListYourProperty';
+import BrowseProperties from './modules/seeker/pages/BrowseProperties';
+import PropertyDetailPage from './modules/seeker/pages/PropertyDetailPage';
+import AllProperties from './modules/seeker/pages/AllProperties/index';
 
 // Route Configurations
-import { mainRoutes } from './routes/mainRoutes';
 import { authRoutes } from './routes/authRoutes';
 import { adminRoutes } from './routes/adminRoutes';
 import { moderatorRoutes } from './routes/moderatorRoutes';
@@ -77,23 +86,10 @@ const ModeratorRoute = ({ children }: { children: React.ReactNode }) => {
     return <Navigate to="/moderator/login" replace />;
   }
   
-  // Debug log to check role values
-  console.log('ModeratorRoute check:', { 
-    isAdmin, 
-    isPropertyModerator, 
-    user: user.email,
-    metadata: user.user_metadata
-  });
-  
-  // Allow both moderators and admins to access moderator routes
   if (!isPropertyModerator && !isAdmin) {
-    console.error('Access denied to moderator route - user lacks required role');
     return (
       <div className="min-h-screen flex items-center justify-center bg-red-50 p-4">
         <div className="max-w-md w-full bg-white p-8 rounded-lg shadow-md">
-          <svg className="w-12 h-12 text-red-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-          </svg>
           <h2 className="text-xl font-bold text-center text-red-700 mb-2">Access Denied</h2>
           <p className="text-gray-600 text-center mb-4">You do not have permission to access this page</p>
           <button 
@@ -155,7 +151,7 @@ const PublicOrProtectedRoute = ({ children }: { children: React.ReactNode }) => 
   return <>{children}</>;
 };
 
-// Main app layout with Header - used for non-seeker routes
+// Main app layout with Header - used for property owner routes
 function AppLayout() {
   const [isFavoritesOpen, setIsFavoritesOpen] = useState(false);
   
@@ -171,15 +167,18 @@ function AppLayout() {
     <div className="flex flex-col min-h-screen">
       <Header onFavoritesClick={handleFavoritesClick} />
       <FavoritesDrawer open={isFavoritesOpen} onClose={handleFavoritesClose} />
-      <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex-grow">
-        <Outlet />
+      <main className="flex-grow bg-background">
+        {/* FIXED: Removed max-width constraint to let PropertyForm control its own width */}
+        <div className="py-6">
+          <Outlet />
+        </div>
       </main>
       <Footer />
     </div>
   );
 }
 
-// Standardized Seeker layout with consistent width and padding
+// Standardized Seeker layout
 function SeekerLayout() {
   const [isFavoritesOpen, setIsFavoritesOpen] = useState(false);
   
@@ -212,236 +211,204 @@ function App() {
     <AuthProvider>
       <FavoritesProvider>
         <BrowserRouter>
-          <div className="min-h-screen bg-background">
-            <Routes>
-              {/* Root path - Use the standardized seeker layout */}
-              <Route element={<SeekerLayout />}>
-                <Route 
-                  path="/" 
-                  element={
-                    <PublicOrProtectedRoute>
-                      <PropertyMapHome />
-                    </PublicOrProtectedRoute>
-                  } 
-                />
-                
-                {/* Home page */}
-                <Route 
-                  path="/home" 
-                  element={
-                    <PublicOrProtectedRoute>
-                      <HomePage />
-                    </PublicOrProtectedRoute>
-                  } 
-                />
-                
-                {/* Add the new browse route with SeekerLayout */}
-                <Route 
-                  path="/browse" 
-                  element={
-                    <PublicOrProtectedRoute>
-                      {mainRoutes
-                        .find(route => route.path === '/browse')
-                        ?.element || <Navigate to="/" />}
-                    </PublicOrProtectedRoute>
-                  } 
-                />
-                
-                {/* Seeker module routes */}
-                <Route path="/seeker">
+          <FlowProvider>
+            <div className="min-h-screen bg-background">
+              <Routes>
+                {/* Auth Routes - accessible to everyone */}
+                {authRoutes.map((route, i) => (
                   <Route 
-                    index
+                    key={`auth-${i}`}
+                    path={route.path} 
+                    element={<PublicRoute>{route.element}</PublicRoute>} 
+                  />
+                ))}
+
+                {/* Admin Routes - accessible ONLY to admins */}
+                {adminRoutes.map((route, i) => {
+                  const isPublicRoute = 
+                    route.path?.endsWith('login') || 
+                    route.path?.includes('forgot-password') || 
+                    route.path?.includes('reset-password');
+                  
+                  return (
+                    <Route 
+                      key={`admin-${i}`}
+                      path={route.path} 
+                      element={
+                        isPublicRoute ? 
+                          <PublicRoute>{route.element}</PublicRoute> : 
+                          <AdminRoute>{route.element}</AdminRoute>
+                      } 
+                    />
+                  );
+                })}
+                
+                {/* Moderator Routes - accessible to moderators and admins */}
+                {moderatorRoutes.map((route, i) => {
+                  const isPublicRoute = route.path?.endsWith('login');
+                  
+                  return (
+                    <Route 
+                      key={`mod-${i}`}
+                      path={route.path} 
+                      element={
+                        isPublicRoute ? 
+                          <PublicRoute>{route.element}</PublicRoute> : 
+                          <ModeratorRoute>{route.element}</ModeratorRoute>
+                      } 
+                    />
+                  );
+                })}
+
+                {/* Seeker Routes with SeekerLayout */}
+                <Route element={<SeekerLayout />}>
+                  <Route 
+                    path="/" 
                     element={
                       <PublicOrProtectedRoute>
                         <PropertyMapHome />
                       </PublicOrProtectedRoute>
                     } 
                   />
-                  {/* Child routes of /seeker */}
-                  {mainRoutes
-                    .filter(route => route.path === '/seeker')
-                    .flatMap(route => route.children || [])
-                    .map((childRoute, j) => (
-                      <Route
-                        key={`seeker-child-${j}`}
-                        path={childRoute.path}
-                        element={
-                          <PublicOrProtectedRoute>
-                            {childRoute.element}
-                          </PublicOrProtectedRoute>
-                        }
-                        index={childRoute.index}
-                      />
-                    ))}
-                </Route>
-                
-                {/* Add properties main route to use seeker layout when coming from seeker module */}
-                <Route 
-                  path="/properties" 
-                  element={
-                    <PublicOrProtectedRoute>
-                      {mainRoutes
-                        .find(route => route.path === '/properties')
-                        ?.children?.find(child => child.index)
-                        ?.element || <Navigate to="/" />}
-                    </PublicOrProtectedRoute>
-                  } 
-                />
-                
-                {/* Add properties/list path to use seeker layout when coming from seeker module */}
-                <Route 
-                  path="/properties/list" 
-                  element={
-                    <PublicOrProtectedRoute>
-                      {mainRoutes
-                        .find(route => route.path === '/properties')
-                        ?.children?.find(child => child.path === 'list')
-                        ?.element || <Navigate to="/" />}
-                    </PublicOrProtectedRoute>
-                  } 
-                />
-                
-                {/* Add missing nested routes for property listing wizard */}
-                <Route 
-                  path="/properties/list/:category/:type" 
-                  element={
-                    <PublicOrProtectedRoute>
-                      {mainRoutes
-                        .find(route => route.path === '/properties')
-                        ?.children?.find(child => child.path === 'list/:category/:type')
-                        ?.element || <Navigate to="/" />}
-                    </PublicOrProtectedRoute>
-                  } 
-                />
-                
-                <Route 
-                  path="/properties/list/:category/:type/:step" 
-                  element={
-                    <PublicOrProtectedRoute>
-                      {mainRoutes
-                        .find(route => route.path === '/properties')
-                        ?.children?.find(child => child.path === 'list/:category/:type/:step')
-                        ?.element || <Navigate to="/" />}
-                    </PublicOrProtectedRoute>
-                  } 
-                />
-                
-                {/* Properties pages that should use the seeker layout */}
-                <Route 
-                  path="/properties/:id" 
-                  element={
-                    <PublicOrProtectedRoute>
-                      {mainRoutes
-                        .find(route => route.path === '/properties')
-                        ?.children?.find(child => child.path === ':id')
-                        ?.element || <Navigate to="/" />}
-                    </PublicOrProtectedRoute>
-                  } 
-                />
-                
-                {/* Include other seeker-related routes here */}
-              </Route>
-              
-              {/* Auth Routes - accessible to everyone */}
-              {authRoutes.map((route, i) => (
-                <Route 
-                  key={`auth-${i}`}
-                  path={route.path} 
-                  element={<PublicRoute>{route.element}</PublicRoute>} 
-                />
-              ))}
-
-              {/* Admin Routes - accessible ONLY to admins */}
-              {adminRoutes.map((route, i) => {
-                const isPublicRoute = 
-                  route.path?.endsWith('login') || 
-                  route.path?.includes('forgot-password') || 
-                  route.path?.includes('reset-password');
-                
-                return (
+                  
                   <Route 
-                    key={`admin-${i}`}
-                    path={route.path} 
+                    path="/home" 
                     element={
-                      isPublicRoute ? 
-                        <PublicRoute>{route.element}</PublicRoute> : 
-                        <AdminRoute>{route.element}</AdminRoute>
+                      <PublicOrProtectedRoute>
+                        <HomePage />
+                      </PublicOrProtectedRoute>
                     } 
                   />
-                );
-              })}
-              
-              {/* Moderator Routes - accessible to moderators and admins */}
-              {moderatorRoutes.map((route, i) => {
-                const isPublicRoute = route.path?.endsWith('login');
-                
-                return (
+                  
                   <Route 
-                    key={`mod-${i}`}
-                    path={route.path} 
+                    path="/browse" 
                     element={
-                      isPublicRoute ? 
-                        <PublicRoute>{route.element}</PublicRoute> : 
-                        <ModeratorRoute>{route.element}</ModeratorRoute>
+                      <PublicOrProtectedRoute>
+                        <BrowseProperties />
+                      </PublicOrProtectedRoute>
                     } 
                   />
-                );
-              })}
-
-              {/* Main App Routes with standard header */}
-              <Route element={<AppLayout />}>
-                {mainRoutes.map((route, i) => {
-                  // Skip routes that are handled by the seeker layout
-                  if (route.path === '/seeker' || route.path === '/home' || 
-                      route.path === '/properties' || route.path === '/browse') {
-                    return null;
-                  }
                   
-                  // Handle routes with children
-                  if (route.children) {
-                    // Skip the /properties route which is handled in SeekerLayout
-                    if (route.path === '/properties') {
-                      return null;
-                    }
-                    
-                    return (
-                      <Route key={`main-${i}`} path={route.path}>
-                        {route.children.map((childRoute, j) => (
-                          <Route
-                            key={`main-${i}-child-${j}`}
-                            path={childRoute.path}
-                            element={
-                              <ProtectedRoute>
-                                {childRoute.element}
-                              </ProtectedRoute>
-                            }
-                            index={childRoute.index}
-                          />
-                        ))}
-                      </Route>
-                    );
-                  }
+                  <Route 
+                    path="/allproperties" 
+                    element={
+                      <PublicOrProtectedRoute>
+                        <AllProperties />
+                      </PublicOrProtectedRoute>
+                    } 
+                  />
                   
-                  // Handle regular routes
-                  return (
-                    <Route
-                      key={`main-${i}`}
-                      path={route.path}
+                  <Route path="/seeker">
+                    <Route 
+                      index
                       element={
-                        <ProtectedRoute>
-                          {route.element}
-                        </ProtectedRoute>
-                      }
-                      index={route.index}
+                        <PublicOrProtectedRoute>
+                          <PropertyMapHome />
+                        </PublicOrProtectedRoute>
+                      } 
                     />
-                  );
-                })}
-              </Route>
+                    <Route 
+                      path="property/:id" 
+                      element={
+                        <PublicOrProtectedRoute>
+                          <PropertyDetailPage />
+                        </PublicOrProtectedRoute>
+                      } 
+                    />
+                    <Route 
+                      path="allproperties" 
+                      element={
+                        <PublicOrProtectedRoute>
+                          <AllProperties />
+                        </PublicOrProtectedRoute>
+                      } 
+                    />
+                  </Route>
+                  
+                  {/* Property detail pages for seekers */}
+                  <Route 
+                    path="/properties/:id" 
+                    element={
+                      <PublicOrProtectedRoute>
+                        <PropertyDetailPage />
+                      </PublicOrProtectedRoute>
+                    } 
+                  />
+                </Route>
 
-              {/* Catch-all route - redirect to root */}
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </div>
+                {/* Owner/Property Management Routes with AppLayout */}
+                <Route element={<AppLayout />}>
+                  <Route 
+                    path="/dashboard" 
+                    element={
+                      <ProtectedRoute>
+                        <Dashboard />
+                      </ProtectedRoute>
+                    } 
+                  />
+                  
+                  <Route 
+                    path="/properties" 
+                    element={
+                      <ProtectedRoute>
+                        <Properties />
+                      </ProtectedRoute>
+                    } 
+                  />
+                  
+                  {/* SIMPLIFIED: Direct route definitions for property listing */}
+                  <Route 
+                    path="/properties/list" 
+                    element={
+                      <PublicOrProtectedRoute>
+                        <ListYourProperty />
+                      </PublicOrProtectedRoute>
+                    } 
+                  />
+                  
+                  <Route 
+                    path="/properties/list/:category/:type" 
+                    element={
+                      <PublicOrProtectedRoute>
+                        <ListYourProperty />
+                      </PublicOrProtectedRoute>
+                    } 
+                  />
+                  
+                  <Route 
+                    path="/properties/list/:category/:type/:step" 
+                    element={
+                      <PublicOrProtectedRoute>
+                        <ListYourProperty />
+                      </PublicOrProtectedRoute>
+                    } 
+                  />
+                  
+                  {/* Other property management routes */}
+                  <Route 
+                    path="/properties/:id/preview" 
+                    element={
+                      <ProtectedRoute>
+                        <PropertyPreview />
+                      </ProtectedRoute>
+                    } 
+                  />
+                  
+                  <Route 
+                    path="/properties/:id/edit" 
+                    element={
+                      <ProtectedRoute>
+                        <EditProperty />
+                      </ProtectedRoute>
+                    } 
+                  />
+                </Route>
+
+                {/* Catch-all route - redirect to root */}
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </div>
+          </FlowProvider>
         </BrowserRouter>
       </FavoritesProvider>
     </AuthProvider>

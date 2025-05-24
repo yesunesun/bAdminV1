@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/components/PropertyTypeSelection.tsx
-// Version: 2.0.0
-// Last Modified: 10-04-2025 22:45 IST
-// Purpose: Updated to support all property flow types including Commercial Sale, Co-working, Land/Plot, and Flatmates
+// Version: 3.0.0
+// Last Modified: 25-05-2025 21:15 IST
+// Purpose: Updated to use FlowContext for centralized flow management
 
 import React, { useState, useEffect } from 'react';
 import { 
@@ -11,6 +11,7 @@ import {
 import { Building2, Home, Trees, Shield, Clock, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { HowItWorks } from '../../../property/HowItWorks';
+import { useFlow } from '@/contexts/FlowContext';
 
 // Updated property categories to include all the new property types
 const propertyCategories = [
@@ -63,6 +64,8 @@ export default function PropertyTypeSelection({
   selectedCategory: initialCategory,
   selectedAdType: initialAdType 
 }: PropertyTypeSelectionProps) {
+  const { setFlow } = useFlow();
+  
   const [selectedCategory, setSelectedCategory] = useState<string>(initialCategory || '');
   const [selectedListingType, setSelectedListingType] = useState<string>(initialAdType || '');
   const [selectedCity] = useState<string>('Hyderabad'); // Default city
@@ -74,20 +77,9 @@ export default function PropertyTypeSelection({
     if (initialAdType) setSelectedListingType(initialAdType);
   }, [initialCategory, initialAdType]);
 
-  // Handle URL-friendly conversion for listing types
-  const getURLFriendlyType = (type: string): string => {
-    const typeMap: Record<string, string> = {
-      'PG/Hostel': 'pghostel',
-      'Co-working': 'coworking',
-      'Flatmates': 'flatmates'
-    };
-    
-    return typeMap[type] || type.toLowerCase();
-  };
-
-  // Handle form submission with proper URL formatting
+  // Handle form submission using FlowContext
   const handleSubmit = (e: React.MouseEvent) => {
-    e.preventDefault(); // Prevent default form submission
+    e.preventDefault();
     
     console.log('PropertyTypeSelection - handleSubmit', {
       selectedCategory,
@@ -96,14 +88,13 @@ export default function PropertyTypeSelection({
     });
     
     if (selectedCategory && selectedListingType) {
-      // Convert to URL-friendly format
-      const urlFriendlyType = getURLFriendlyType(selectedListingType);
+      // Use FlowContext to set the flow and navigate
+      setFlow(selectedCategory, selectedListingType);
       
-      onNext(
-        selectedCategory.toLowerCase(), 
-        urlFriendlyType,
-        selectedCity
-      );
+      // Call the onNext callback if provided (for compatibility)
+      if (onNext) {
+        onNext(selectedCategory, selectedListingType, selectedCity);
+      }
     }
   };
 
@@ -199,7 +190,7 @@ export default function PropertyTypeSelection({
 
                 <button
                   onClick={handleSubmit}
-                  type="button" // Explicitly set button type to prevent form submission
+                  type="button"
                   disabled={!selectedCategory || !selectedListingType}
                   className={cn(
                     "w-full py-3 px-4 rounded-lg text-white font-medium transition-all",
