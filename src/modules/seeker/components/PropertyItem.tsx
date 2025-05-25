@@ -1,9 +1,9 @@
 // src/modules/seeker/components/PropertyItem.tsx
-// Version: 4.1.0
-// Last Modified: 21-05-2025 17:00 IST
-// Purpose: Updated to use property title from flow.title only, without fallbacks
+// Version: 4.2.0
+// Last Modified: 25-05-2025 18:30 IST
+// Purpose: Restored favorite button functionality with proper integration
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PropertyType } from '@/modules/owner/components/property/types';
 import { 
@@ -39,6 +39,9 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
   onFavoriteToggle,
   onShare
 }) => {
+  // State for favorite button loading
+  const [isFavoriteLoading, setIsFavoriteLoading] = useState(false);
+
   // Extract details from property
   const details = property.property_details || {};
   
@@ -52,11 +55,36 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
   // Get display data specific to the flow type
   const displayData = getFlowSpecificDisplayData(property, flowType, details);
   
+  // Handle favorite toggle with loading state
+  const handleFavoriteToggle = async (isLiked: boolean) => {
+    setIsFavoriteLoading(true);
+    
+    try {
+      const success = await onFavoriteToggle(property.id, isLiked);
+      return success;
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+      return false;
+    } finally {
+      setIsFavoriteLoading(false);
+    }
+  };
+  
   return (
     <div 
       key={`property-${property.id}`}
       className={`relative transition hover:bg-muted/40 ${isHovered ? 'bg-muted/40' : ''}`}
     >
+      {/* Favorite Button - Top Right Corner of Card */}
+      <div className="absolute top-2 right-2 z-10">
+        <FavoriteButton
+          initialIsLiked={isLiked}
+          onToggle={handleFavoriteToggle}
+          isLoading={isFavoriteLoading}
+          className="w-8 h-8" // Slightly larger for better accessibility
+        />
+      </div>
+
       <div className="p-3"
         onMouseEnter={() => onHover(property.id, true)}
         onMouseLeave={() => onHover(property.id, false)}
@@ -76,7 +104,7 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
           to={`/seeker/property/${property.id}`} 
           className="flex gap-2"
         >
-          {/* Property image */}
+          {/* Property image - clean without overlay */}
           <div className="relative h-20 w-24 flex-shrink-0 overflow-hidden rounded-lg">
             <img
               src={propertyImage}
