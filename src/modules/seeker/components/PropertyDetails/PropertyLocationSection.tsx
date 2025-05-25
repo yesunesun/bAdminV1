@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyDetails/PropertyLocationSection.tsx
-// Version: 9.5.0
-// Last Modified: 19-05-2025 14:00 IST
-// Purpose: Removed duplicate buttons below the map, keeping only the ones within the map
+// Version: 10.0.0
+// Last Modified: 25-05-2025 15:30 IST
+// Purpose: Fixed location display issue across all flows by dynamically detecting location step
 
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,6 +13,52 @@ interface PropertyLocationSectionProps {
   property: any;
   isLoading?: boolean;
 }
+
+/**
+ * Helper function to find the location step dynamically based on the property's flow
+ */
+const findLocationStep = (steps: any): { stepKey: string | null; locationData: any } => {
+  if (!steps || typeof steps !== 'object') {
+    return { stepKey: null, locationData: null };
+  }
+
+  // Find the step that contains location data by looking for steps that end with '_location'
+  const locationStepKey = Object.keys(steps).find(key => 
+    key.includes('_location') && steps[key] && typeof steps[key] === 'object'
+  );
+
+  if (locationStepKey && steps[locationStepKey]) {
+    console.log(`[PropertyLocationSection] Found location step: ${locationStepKey}`, steps[locationStepKey]);
+    return { 
+      stepKey: locationStepKey, 
+      locationData: steps[locationStepKey] 
+    };
+  }
+
+  // Fallback: look for any step that has location-like properties
+  const fallbackStepKey = Object.keys(steps).find(key => {
+    const stepData = steps[key];
+    return stepData && typeof stepData === 'object' && (
+      stepData.address || 
+      stepData.city || 
+      stepData.latitude || 
+      stepData.coordinates ||
+      stepData.locality ||
+      stepData.pinCode
+    );
+  });
+
+  if (fallbackStepKey) {
+    console.log(`[PropertyLocationSection] Found location data in fallback step: ${fallbackStepKey}`, steps[fallbackStepKey]);
+    return { 
+      stepKey: fallbackStepKey, 
+      locationData: steps[fallbackStepKey] 
+    };
+  }
+
+  console.log('[PropertyLocationSection] No location step found in steps');
+  return { stepKey: null, locationData: null };
+};
 
 const PropertyLocationSection: React.FC<PropertyLocationSectionProps> = ({ 
   property,
@@ -50,18 +96,21 @@ const PropertyLocationSection: React.FC<PropertyLocationSectionProps> = ({
         details = {};
       }
 
-      // Check steps directly
-      if (details.steps?.res_rent_location) {
-        const loc = details.steps.res_rent_location;
-        if (loc.latitude && loc.longitude) {
+      // NEW: Use dynamic location step detection
+      if (details.steps) {
+        const { stepKey, locationData: stepLocationData } = findLocationStep(details.steps);
+        
+        if (stepLocationData && stepLocationData.latitude && stepLocationData.longitude) {
+          console.log(`[PropertyLocationSection] Found coordinates in step ${stepKey}:`, 
+            stepLocationData.latitude, stepLocationData.longitude);
           return {
-            lat: parseFloat(loc.latitude),
-            lng: parseFloat(loc.longitude)
+            lat: parseFloat(stepLocationData.latitude),
+            lng: parseFloat(stepLocationData.longitude)
           };
         }
       }
 
-      // Try all possible coordinate locations
+      // Try all possible coordinate locations (fallback for legacy data)
       // 1. Check property.location structure (v2 format)
       if (property.location?.coordinates) {
         const lat = Number(property.location.coordinates.latitude || property.location.coordinates.lat);
@@ -131,24 +180,27 @@ const PropertyLocationSection: React.FC<PropertyLocationSectionProps> = ({
         }
       }
       
-      // First try to get location from steps
-      if (details.steps && details.steps.res_rent_location) {
-        const loc = details.steps.res_rent_location;
-        console.log("Found location in steps.res_rent_location:", loc);
+      // NEW: Use dynamic location step detection
+      if (details.steps) {
+        const { stepKey, locationData: stepLocationData } = findLocationStep(details.steps);
         
-        data.address = loc.address || '';
-        data.locality = loc.locality || '';
-        data.city = loc.city || '';
-        data.state = loc.state || '';
-        data.pinCode = loc.pinCode || '';
-        data.landmark = loc.landmark || '';
-        data.flatPlotNo = loc.flatPlotNo || '';
-        
-        // Return early since we found good data
-        return data;
+        if (stepLocationData) {
+          console.log(`[PropertyLocationSection] Found location data in step ${stepKey}:`, stepLocationData);
+          
+          data.address = stepLocationData.address || '';
+          data.locality = stepLocationData.locality || '';
+          data.city = stepLocationData.city || '';
+          data.state = stepLocationData.state || '';
+          data.pinCode = stepLocationData.pinCode || '';
+          data.landmark = stepLocationData.landmark || '';
+          data.flatPlotNo = stepLocationData.flatPlotNo || '';
+          
+          // Return early since we found good data
+          return data;
+        }
       }
       
-      // Check for location in property (v2 format)
+      // Check for location in property (v2 format) - fallback
       if (property.location) {
         console.log("Found location in property.location:", property.location);
         
