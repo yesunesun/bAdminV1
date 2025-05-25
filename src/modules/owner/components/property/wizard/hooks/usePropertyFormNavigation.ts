@@ -1,13 +1,13 @@
 // src/modules/owner/components/property/wizard/hooks/usePropertyFormNavigation.ts
-// Version: 3.0.0
-// Last Modified: 25-05-2025 16:30 IST
-// Purpose: Remove edit mode functionality and simplify navigation
+// Version: 3.1.0
+// Last Modified: 26-01-2025 00:15 IST
+// Purpose: Fix PG/Hostel flow navigation error and ensure proper step handling
 
 import { useState, useCallback, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { UseFormReturn } from 'react-hook-form';
 import { FormData } from '../types';
-import { STEPS, FLOW_STEPS } from '../constants'; // Updated to import FLOW_STEPS
+import { STEPS, FLOW_STEP_SEQUENCES } from '../constants'; // Updated to import FLOW_STEP_SEQUENCES
 
 interface UsePropertyFormNavigationProps {
   form: UseFormReturn<FormData>;
@@ -32,18 +32,46 @@ export function usePropertyFormNavigation({
   const { step: urlStep } = useParams();
   const location = useLocation();
   
-  // Get the appropriate steps based on property type
+  // Get the appropriate steps based on property type - FIXED: Use FLOW_STEP_SEQUENCES
   const effectiveSteps = isPGHostelMode 
-    ? FLOW_STEPS.RESIDENTIAL_PGHOSTEL 
+    ? FLOW_STEP_SEQUENCES.residential_pghostel || STEPS  // Fallback to STEPS if undefined
     : STEPS;
+  
+  // Debug logging for step resolution
+  console.log('[usePropertyFormNavigation] Step resolution:', {
+    isPGHostelMode,
+    effectiveStepsLength: effectiveSteps?.length,
+    effectiveStepsType: Array.isArray(effectiveSteps) ? 'array' : typeof effectiveSteps,
+    firstStep: effectiveSteps?.[0],
+    availableFlowSequences: Object.keys(FLOW_STEP_SEQUENCES)
+  });
+  
+  // Ensure we always have a valid steps array
+  const safeEffectiveSteps = Array.isArray(effectiveSteps) && effectiveSteps.length > 0 
+    ? effectiveSteps 
+    : STEPS; // Fallback to default STEPS if effectiveSteps is invalid
   
   // Define currentStep state
   const [currentStep, setCurrentStep] = useState<number>(() => {
     // If step is in URL, prioritize that
-    if (urlStep) {
-      const stepIndex = effectiveSteps.findIndex(s => s.id === urlStep) + 1;
-      // Ensure a valid step index, defaulting to 1 if not found or invalid
-      return stepIndex > 0 ? stepIndex : 1;
+    if (urlStep && safeEffectiveSteps) {
+      try {
+        const stepIndex = safeEffectiveSteps.findIndex(s => s?.id === urlStep) + 1;
+        // Ensure a valid step index, defaulting to 1 if not found or invalid
+        const validStepIndex = stepIndex > 0 ? stepIndex : 1;
+        
+        console.log('[usePropertyFormNavigation] URL step resolution:', {
+          urlStep,
+          stepIndex,
+          validStepIndex,
+          stepsAvailable: safeEffectiveSteps.map(s => s?.id).filter(Boolean)
+        });
+        
+        return validStepIndex;
+      } catch (error) {
+        console.error('[usePropertyFormNavigation] Error resolving URL step:', error);
+        return 1;
+      }
     }
     
     // For newly created listings after property type selection, always start at step 1
@@ -64,8 +92,9 @@ export function usePropertyFormNavigation({
         return;
       }
 
-      const stepData = effectiveSteps[newStep - 1];
-      if (!stepData) {
+      const stepData = safeEffectiveSteps[newStep - 1];
+      if (!stepData || !stepData.id) {
+        console.warn('[usePropertyFormNavigation] Invalid step data for step:', newStep);
         return;
       }
 
@@ -73,10 +102,17 @@ export function usePropertyFormNavigation({
       const stepId = stepData.id;
       const newPath = `/properties/list/${effectiveCategory.toLowerCase()}/${effectiveType.toLowerCase()}/${stepId}`;
       navigate(newPath, { replace: true });
+      
+      console.log('[usePropertyFormNavigation] URL updated:', {
+        newStep,
+        stepId,
+        newPath
+      });
     } catch (err) {
+      console.error('[usePropertyFormNavigation] Error updating URL:', err);
       // Silent error handling to avoid console spam
     }
-  }, [navigate, form, effectiveSteps]);
+  }, [navigate, form, safeEffectiveSteps]);
 
   // Effect to sync URL with current step - with debounce to prevent rapid updates
   useEffect(() => {
@@ -103,6 +139,7 @@ export function usePropertyFormNavigation({
         localStorage.setItem(`propertyWizard_${user.id}_data`, JSON.stringify(safeData));
       }
     } catch (err) {
+      console.error('[usePropertyFormNavigation] Error saving to storage:', err);
       // Silent error handling
     }
   }, [user?.id]);
@@ -110,15 +147,26 @@ export function usePropertyFormNavigation({
   // Enhanced setCurrentStep with localStorage updates
   const setCurrentStepWithPersistence = useCallback((step: number) => {
     try {
-      setCurrentStep(step);
+      // Validate step number
+      const maxSteps = safeEffectiveSteps.length;
+      const validStep = Math.max(1, Math.min(step, maxSteps));
+      
+      console.log('[usePropertyFormNavigation] Setting step:', {
+        requestedStep: step,
+        validStep,
+        maxSteps
+      });
+      
+      setCurrentStep(validStep);
       
       if (user?.id) {
-        localStorage.setItem(`propertyWizard_${user.id}_step`, step.toString());
+        localStorage.setItem(`propertyWizard_${user.id}_step`, validStep.toString());
       }
     } catch (err) {
+      console.error('[usePropertyFormNavigation] Error setting current step:', err);
       // Silent error handling
     }
-  }, [user?.id]);
+  }, [user?.id, safeEffectiveSteps]);
 
   // Simplified next step handler
   const handleNextStep = useCallback(() => {
@@ -132,6 +180,7 @@ export function usePropertyFormNavigation({
       setError('');
       
       if (!form || typeof form.getValues !== 'function') {
+        console.warn('[usePropertyFormNavigation] Form not available for next step');
         return;
       }
       
@@ -145,26 +194,33 @@ export function usePropertyFormNavigation({
       
       saveFormToStorage(safeFormData);
       
-      // Always use effectiveSteps to determine the flow
-      const maxStep = effectiveSteps.length;
+      // Always use safeEffectiveSteps to determine the flow
+      const maxStep = safeEffectiveSteps.length;
       const nextStep = Math.min(currentStep + 1, maxStep);
       
       setCurrentStepWithPersistence(nextStep);
       
       // Add debug logging
-      console.log(`Navigation: Moving from step ${currentStep} to step ${nextStep} (max: ${maxStep})`);
-      console.log(`Current step ID: ${effectiveSteps[currentStep - 1]?.id}, Next step ID: ${effectiveSteps[nextStep - 1]?.id}`);
-      console.log(`Using PG/Hostel mode: ${isPGHostelMode}`);
+      console.log('[usePropertyFormNavigation] Moving to next step:', {
+        currentStep,
+        nextStep,
+        maxStep,
+        currentStepId: safeEffectiveSteps[currentStep - 1]?.id,
+        nextStepId: safeEffectiveSteps[nextStep - 1]?.id,
+        isPGHostelMode
+      });
       
     } catch (err) {
+      console.error('[usePropertyFormNavigation] Error in handleNextStep:', err);
       setError('An error occurred while proceeding to the next step. Please try again.');
     }
-  }, [currentStep, form, saveFormToStorage, setCurrentStepWithPersistence, validateCurrentStep, setError, effectiveSteps, isPGHostelMode]);
+  }, [currentStep, form, saveFormToStorage, setCurrentStepWithPersistence, validateCurrentStep, setError, safeEffectiveSteps, isPGHostelMode]);
 
   // Added handlePreviousStep implementation
   const handlePreviousStep = useCallback(() => {
     try {
       if (!form || typeof form.getValues !== 'function') {
+        console.warn('[usePropertyFormNavigation] Form not available for previous step');
         return;
       }
       
@@ -185,14 +241,19 @@ export function usePropertyFormNavigation({
       setCurrentStepWithPersistence(prevStep);
       
       // Add debug logging
-      console.log(`Navigation: Moving back from step ${currentStep} to step ${prevStep}`);
-      console.log(`Current step ID: ${effectiveSteps[currentStep - 1]?.id}, Previous step ID: ${effectiveSteps[prevStep - 1]?.id}`);
-      console.log(`Using PG/Hostel mode: ${isPGHostelMode}`);
+      console.log('[usePropertyFormNavigation] Moving to previous step:', {
+        currentStep,
+        prevStep,
+        currentStepId: safeEffectiveSteps[currentStep - 1]?.id,
+        prevStepId: safeEffectiveSteps[prevStep - 1]?.id,
+        isPGHostelMode
+      });
       
     } catch (err) {
+      console.error('[usePropertyFormNavigation] Error in handlePreviousStep:', err);
       setError('An error occurred while going back to the previous step. Please try again.');
     }
-  }, [currentStep, form, saveFormToStorage, setCurrentStepWithPersistence, setError, effectiveSteps, isPGHostelMode]);
+  }, [currentStep, form, saveFormToStorage, setCurrentStepWithPersistence, setError, safeEffectiveSteps, isPGHostelMode]);
 
   // Clear storage when form is completed
   const clearStorage = useCallback(() => {
@@ -202,6 +263,7 @@ export function usePropertyFormNavigation({
         localStorage.removeItem(`propertyWizard_${user.id}_data`);
       }
     } catch (err) {
+      console.error('[usePropertyFormNavigation] Error clearing storage:', err);
       // Silent error handling
     }
   }, [user?.id]);
@@ -211,9 +273,19 @@ export function usePropertyFormNavigation({
       clearStorage();
       navigate('/properties');
     } catch (err) {
+      console.error('[usePropertyFormNavigation] Error in handleImageUploadComplete:', err);
       // Silent error handling
     }
   }, [clearStorage, navigate]);
+
+  // Return with additional debugging info
+  console.log('[usePropertyFormNavigation] Current state:', {
+    currentStep,
+    totalSteps: safeEffectiveSteps.length,
+    currentStepId: safeEffectiveSteps[currentStep - 1]?.id,
+    isPGHostelMode,
+    hasValidSteps: safeEffectiveSteps.length > 0
+  });
 
   return {
     currentStep,

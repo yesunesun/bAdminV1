@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/PropertyForm/index.tsx
-// Version: 11.1.0
-// Last Modified: 25-05-2025 22:15 IST
-// Purpose: Fixed step navigation with FlowContext and proper URL updates
+// Version: 11.2.0
+// Last Modified: 26-01-2025 02:00 IST
+// Purpose: Fixed URL construction for PG/Hostel and other special listing types
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -12,6 +12,7 @@ import { FormData } from '../types';
 import { STEPS } from '../constants';
 import { FLOW_TYPES, FLOW_STEP_SEQUENCES } from '../constants/flows';
 import { useFlow } from '@/contexts/FlowContext';
+import { getURLFriendlyType } from '@/contexts/FlowContext'; // Import the helper function
 
 // Components
 import FormHeader from './components/FormHeader';
@@ -159,7 +160,7 @@ export function PropertyForm({
   // Track form data changes
   useFormDataChangeTracking(form);
 
-  // Custom next step handler that updates URL
+  // FIXED: Custom next step handler with proper URL construction
   const handleNextStepWithNavigation = () => {
     const nextStep = formStep + 1;
     const maxSteps = flowSteps.length;
@@ -168,41 +169,68 @@ export function PropertyForm({
       currentStep: formStep,
       nextStep,
       maxSteps,
-      flowSteps: flowSteps.map(s => s.id)
+      flowSteps: flowSteps.map(s => s.id),
+      category,
+      listingType,
+      displayListingType: listingType
     });
     
     if (nextStep <= maxSteps) {
       // Update the current step first
       setCurrentStep(nextStep);
       
-      // Update URL to reflect new step
+      // FIXED: Convert display listing type to URL-friendly format
+      const urlFriendlyType = getURLFriendlyType(listingType);
       const stepName = flowSteps[nextStep - 1]?.id || 'details';
-      const newUrl = `/properties/list/${category.toLowerCase()}/${listingType.toLowerCase()}/${stepName}`;
+      const newUrl = `/properties/list/${category.toLowerCase()}/${urlFriendlyType}/${stepName}`;
       
-      console.log('[PropertyForm] Navigating to next step:', newUrl);
+      console.log('[PropertyForm] Navigating to next step:', {
+        from: window.location.pathname,
+        to: newUrl,
+        parts: { 
+          category: category.toLowerCase(), 
+          originalListingType: listingType,
+          urlFriendlyType, 
+          stepName 
+        }
+      });
+      
       navigate(newUrl, { replace: true });
     } else {
       console.log('[PropertyForm] Reached end of steps');
     }
   };
 
-  // Custom previous step handler that updates URL
+  // FIXED: Custom previous step handler with proper URL construction
   const handlePreviousStepWithNavigation = () => {
     const prevStep = Math.max(formStep - 1, 1);
     
     console.log('[PropertyForm] handlePreviousStepWithNavigation:', {
       currentStep: formStep,
-      prevStep
+      prevStep,
+      category,
+      listingType
     });
     
     // Update the current step first
     setCurrentStep(prevStep);
     
-    // Update URL to reflect new step
+    // FIXED: Convert display listing type to URL-friendly format
+    const urlFriendlyType = getURLFriendlyType(listingType);
     const stepName = flowSteps[prevStep - 1]?.id || 'details';
-    const newUrl = `/properties/list/${category.toLowerCase()}/${listingType.toLowerCase()}/${stepName}`;
+    const newUrl = `/properties/list/${category.toLowerCase()}/${urlFriendlyType}/${stepName}`;
     
-    console.log('[PropertyForm] Navigating to previous step:', newUrl);
+    console.log('[PropertyForm] Navigating to previous step:', {
+      from: window.location.pathname,
+      to: newUrl,
+      parts: { 
+        category: category.toLowerCase(), 
+        originalListingType: listingType,
+        urlFriendlyType, 
+        stepName 
+      }
+    });
+    
     navigate(newUrl, { replace: true });
   };
 
@@ -337,8 +365,10 @@ export function PropertyForm({
           currentStep={formStep} 
           onStepChange={(newStep) => {
             setCurrentStep(newStep);
+            // FIXED: Use URL-friendly type in navigation
+            const urlFriendlyType = getURLFriendlyType(listingType);
             const stepName = flowSteps[newStep - 1]?.id || 'details';
-            const newUrl = `/properties/list/${category.toLowerCase()}/${listingType.toLowerCase()}/${stepName}`;
+            const newUrl = `/properties/list/${category.toLowerCase()}/${urlFriendlyType}/${stepName}`;
             navigate(newUrl, { replace: true });
           }}
           propertyId={effectivePropertyId}

@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/components/FormNavigation.tsx
-// Version: 6.0.0
-// Last Modified: 25-05-2025 16:30 IST
-// Purpose: Remove edit mode functionality and residential rent fallback
+// Version: 6.2.0
+// Last Modified: 26-01-2025 02:00 IST
+// Purpose: Fix URL construction for PG/Hostel and other special listing types
 
 import React, { useMemo } from 'react';
 import { cn } from '@/lib/utils';
@@ -13,6 +13,7 @@ import {
 
 // Import flow types and steps directly
 import { FLOW_TYPES, FLOW_STEPS, FLOW_STEP_SEQUENCES } from '../constants/flows';
+import { getURLFriendlyType } from '@/contexts/FlowContext'; // Import the helper
 
 interface Step {
   id: string;
@@ -54,7 +55,47 @@ const getIconForStep = (stepId: string) => {
     flatmate_details: Users,
     coworking: Briefcase,
     land_details: Map,
-    land_features: Settings
+    land_features: Settings,
+    // Add flow-specific step mappings
+    res_rent_basic_details: Home,
+    res_rent_location: MapPin,
+    res_rent_rental: DollarSign,
+    res_rent_features: Settings,
+    res_rent_review: FileText,
+    res_sale_basic_details: Home,
+    res_sale_location: MapPin,
+    res_sale_sale_details: DollarSign,
+    res_sale_features: Settings,
+    res_sale_review: FileText,
+    res_flat_basic_details: Bed,
+    res_flat_location: MapPin,
+    res_flat_flatmate_details: Users,
+    res_flat_features: Settings,
+    res_flat_review: FileText,
+    res_pg_basic_details: Building,
+    res_pg_location: MapPin,
+    res_pg_pg_details: Building,
+    res_pg_features: Settings,
+    res_pg_review: FileText,
+    com_rent_basic_details: Building,
+    com_rent_location: MapPin,
+    com_rent_rental: DollarSign,
+    com_rent_features: Settings,
+    com_rent_review: FileText,
+    com_sale_basic_details: Building,
+    com_sale_location: MapPin,
+    com_sale_sale_details: DollarSign,
+    com_sale_features: Settings,
+    com_sale_review: FileText,
+    com_cow_basic_details: Briefcase,
+    com_cow_location: MapPin,
+    com_cow_coworking_details: Briefcase,
+    com_cow_features: Settings,
+    com_cow_review: FileText,
+    land_sale_basic_details: Map,
+    land_sale_location: MapPin,
+    land_sale_land_features: Settings,
+    land_sale_review: FileText
   };
   
   return iconMap[stepId] || Settings;
@@ -82,40 +123,131 @@ const getTitleForStep = (stepId: string) => {
     flatmate_details: 'Flatmate Details',
     coworking: 'Co-working',
     land_details: 'Land Details',
-    land_features: 'Land Features'
+    land_features: 'Land Features',
+    // Add flow-specific step mappings
+    res_rent_basic_details: 'Property Details',
+    res_rent_location: 'Location',
+    res_rent_rental: 'Rental Details',
+    res_rent_features: 'Features',
+    res_rent_review: 'Review',
+    res_sale_basic_details: 'Property Details',
+    res_sale_location: 'Location',
+    res_sale_sale_details: 'Sale Details',
+    res_sale_features: 'Features',
+    res_sale_review: 'Review',
+    res_flat_basic_details: 'Room Details',
+    res_flat_location: 'Location',
+    res_flat_flatmate_details: 'Flatmate Details',
+    res_flat_features: 'Features',
+    res_flat_review: 'Review',
+    res_pg_basic_details: 'Room Details',
+    res_pg_location: 'Location',
+    res_pg_pg_details: 'PG Details',
+    res_pg_features: 'Features',
+    res_pg_review: 'Review',
+    com_rent_basic_details: 'Comm. Prop. Details',
+    com_rent_location: 'Location',
+    com_rent_rental: 'Rental Details',
+    com_rent_features: 'Features',
+    com_rent_review: 'Review',
+    com_sale_basic_details: 'Comm. Prop. Details',
+    com_sale_location: 'Location',
+    com_sale_sale_details: 'Sale Details',
+    com_sale_features: 'Features',
+    com_sale_review: 'Review',
+    com_cow_basic_details: 'Basic Details',
+    com_cow_location: 'Location',
+    com_cow_coworking_details: 'Coworking Details',
+    com_cow_features: 'Features',
+    com_cow_review: 'Review',
+    land_sale_basic_details: 'Land/Plot Details',
+    land_sale_location: 'Location',
+    land_sale_land_features: 'Land Features',
+    land_sale_review: 'Review'
   };
   
-  return titleMap[stepId] || stepId.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+  return titleMap[stepId] || stepId.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()).replace(/_/g, ' ');
+};
+
+// Normalize string for better matching
+const normalizeString = (str: string): string => {
+  return str.toLowerCase()
+    .replace(/[\s\-_\/]/g, '') // Remove spaces, hyphens, underscores, slashes
+    .replace(/[^\w]/g, ''); // Remove non-word characters
 };
 
 // Get the flow type based on category and ad type
 const getFlowType = (category: string, adType: string): string => {
-  const normalizedCategory = category.toLowerCase();
-  const normalizedAdType = adType.toLowerCase();
+  const normalizedCategory = normalizeString(category);
+  const normalizedAdType = normalizeString(adType);
+  
+  console.log('[FormNavigation] Flow type detection:', {
+    original: `${category}/${adType}`,
+    normalized: `${normalizedCategory}/${normalizedAdType}`,
+    availableFlowTypes: Object.values(FLOW_TYPES)
+  });
   
   if (normalizedCategory === 'residential') {
+    // Handle various rent variations
     if (normalizedAdType === 'rent' || normalizedAdType === 'rental') {
       return FLOW_TYPES.RESIDENTIAL_RENT;
-    } else if (normalizedAdType === 'sale' || normalizedAdType === 'sell') {
+    } 
+    // Handle various sale variations
+    else if (normalizedAdType === 'sale' || normalizedAdType === 'sell') {
       return FLOW_TYPES.RESIDENTIAL_SALE;
-    } else if (normalizedAdType === 'pghostel') {
+    } 
+    // Handle PG/Hostel variations - be more flexible with matching
+    else if (
+      normalizedAdType === 'pghostel' || 
+      normalizedAdType === 'pghostel' ||
+      normalizedAdType === 'pg' ||
+      normalizedAdType === 'hostel' ||
+      normalizedAdType.includes('pg') ||
+      normalizedAdType.includes('hostel')
+    ) {
       return FLOW_TYPES.RESIDENTIAL_PGHOSTEL;
-    } else if (normalizedAdType === 'flatmates') {
+    } 
+    // Handle flatmates variations
+    else if (
+      normalizedAdType === 'flatmates' ||
+      normalizedAdType === 'flatmate' ||
+      normalizedAdType === 'roommates' ||
+      normalizedAdType === 'roommate'
+    ) {
       return FLOW_TYPES.RESIDENTIAL_FLATMATES;
     }
   } else if (normalizedCategory === 'commercial') {
-    if (normalizedAdType === 'rent' || normalizedAdType === 'lease') {
+    // Handle commercial rent variations
+    if (normalizedAdType === 'rent' || normalizedAdType === 'lease' || normalizedAdType === 'rental') {
       return FLOW_TYPES.COMMERCIAL_RENT;
-    } else if (normalizedAdType === 'sale' || normalizedAdType === 'sell') {
+    } 
+    // Handle commercial sale variations
+    else if (normalizedAdType === 'sale' || normalizedAdType === 'sell') {
       return FLOW_TYPES.COMMERCIAL_SALE;
-    } else if (normalizedAdType === 'coworking') {
+    } 
+    // Handle coworking variations
+    else if (
+      normalizedAdType === 'coworking' ||
+      normalizedAdType === 'coworking' ||
+      normalizedAdType.includes('cowork')
+    ) {
       return FLOW_TYPES.COMMERCIAL_COWORKING;
     }
   } else if (normalizedCategory === 'land' || normalizedCategory === 'plot') {
+    // Handle land sale variations
     if (normalizedAdType === 'sale' || normalizedAdType === 'sell') {
       return FLOW_TYPES.LAND_SALE;
     }
   }
+  
+  // Log error for debugging
+  console.error('[FormNavigation] Invalid property type combination:', {
+    category,
+    adType,
+    normalizedCategory,
+    normalizedAdType,
+    availableFlowTypes: Object.values(FLOW_TYPES)
+  });
   
   // Throw error instead of using default fallback
   throw new Error(`Invalid property type combination: ${category}/${adType}. Please select a valid property type and listing option.`);
@@ -137,9 +269,11 @@ const NavigationComponent = (props: FormNavigationProps) => {
   // Get flow type based on category and ad type
   const flowType = useMemo(() => {
     try {
-      return getFlowType(category, adType);
+      const detectedFlowType = getFlowType(category, adType);
+      console.log('[FormNavigation] Flow type detected:', detectedFlowType);
+      return detectedFlowType;
     } catch (error) {
-      console.error('Flow type detection error:', error);
+      console.error('[FormNavigation] Flow type detection error:', error);
       // Show error in UI instead of falling back
       return null;
     }
@@ -149,53 +283,89 @@ const NavigationComponent = (props: FormNavigationProps) => {
   const flowSteps = useMemo(() => {
     if (!flowType) return [];
     
-    console.log('Flow type:', flowType);
+    console.log('[FormNavigation] Getting flow steps for:', flowType);
     const flowStepIds = FLOW_STEPS[flowType];
     
-    if (!flowStepIds) {
-      console.error(`No flow steps defined for flow type: ${flowType}`);
+    if (!flowStepIds || !Array.isArray(flowStepIds)) {
+      console.error(`[FormNavigation] No flow steps defined for flow type: ${flowType}`);
       return [];
     }
     
+    console.log('[FormNavigation] Flow step IDs:', flowStepIds);
+    
     // Convert step IDs to step objects
-    return flowStepIds.map(stepId => ({
+    const stepObjects = flowStepIds.map(stepId => ({
       id: stepId,
       title: getTitleForStep(stepId),
       icon: getIconForStep(stepId)
     }));
+    
+    console.log('[FormNavigation] Generated step objects:', stepObjects);
+    return stepObjects;
   }, [flowType]);
 
   // Use provided steps if they exist, otherwise use generated flowSteps
   const stepsToRender = useMemo(() => {
     if (steps && steps.length > 0) {
       // If steps are provided, process them
-      return steps.map(step => ({
+      const processedSteps = steps.map(step => ({
         ...step,
         title: step.title || getTitleForStep(step.id),
         icon: step.icon || getIconForStep(step.id)
       }));
+      
+      console.log('[FormNavigation] Using provided steps:', processedSteps);
+      return processedSteps;
     }
     
     // Otherwise use generated flow steps
+    console.log('[FormNavigation] Using generated flow steps:', flowSteps);
     return flowSteps;
   }, [steps, flowSteps]);
 
-  // Handle clicking on steps for navigation - create mode only
+  // FIXED: Handle clicking on steps for navigation with proper URL construction
   const handleStepClick = (index: number, stepId: string) => {
     // Only allow navigation to previous steps in create mode
-    if (currentStep > index) {
+    if (currentStep > index + 1) {
       try {
-        // Extract base URL
-        const urlParts = window.location.pathname.split('/');
-        // Remove the last part (current step)
-        urlParts.pop();
-        // Add the new step
-        urlParts.push(stepId);
-        // Navigate to the new URL
-        navigate(urlParts.join('/'));
-        // Update internal step state
-        onStepChange(index + 1);
+        console.log('[FormNavigation] Step click:', {
+          index,
+          stepId,
+          currentStep,
+          targetStep: index + 1,
+          currentPath: window.location.pathname,
+          category,
+          adType
+        });
+        
+        // Parse current URL to extract category and type
+        const currentPath = window.location.pathname;
+        const pathRegex = /\/properties\/list\/([^\/]+)\/([^\/]+)(?:\/([^\/]+))?/;
+        const match = currentPath.match(pathRegex);
+        
+        if (match) {
+          const [, urlCategory, urlType] = match;
+          
+          // FIXED: Construct the new URL with proper URL-friendly type
+          const urlFriendlyType = getURLFriendlyType(adType);
+          const newUrl = `/properties/list/${urlCategory}/${urlFriendlyType}/${stepId}`;
+          
+          console.log('[FormNavigation] Navigating to:', {
+            from: currentPath,
+            to: newUrl,
+            parts: { urlCategory, originalAdType: adType, urlFriendlyType, stepId }
+          });
+          
+          navigate(newUrl);
+          // Update internal step state
+          onStepChange(index + 1);
+        } else {
+          console.warn('[FormNavigation] Could not parse current URL for navigation:', currentPath);
+          // Fallback to just updating the step state
+          onStepChange(index + 1);
+        }
       } catch (error) {
+        console.error('[FormNavigation] Error navigating:', error);
         // Fallback to just updating the step state
         onStepChange(index + 1);
       }
@@ -209,6 +379,11 @@ const NavigationComponent = (props: FormNavigationProps) => {
         <div className="text-destructive text-sm">
           <strong>Error:</strong> Invalid property type combination ({category}/{adType}). 
           Please go back and select a valid property type and listing option.
+          <br />
+          <small className="text-xs opacity-75">
+            Available combinations: Residential (Rent, Sale, PG/Hostel, Flatmates), 
+            Commercial (Rent, Sale, Coworking), Land (Sale)
+          </small>
         </div>
       </div>
     );
@@ -219,7 +394,7 @@ const NavigationComponent = (props: FormNavigationProps) => {
     return (
       <div className="px-6 py-4 border-b border-border mb-4 bg-destructive/10">
         <div className="text-destructive text-sm">
-          <strong>Error:</strong> No wizard steps available for the selected property type. 
+          <strong>Error:</strong> No wizard steps available for the selected property type ({flowType}). 
           Please contact support if this issue persists.
         </div>
       </div>
@@ -227,13 +402,13 @@ const NavigationComponent = (props: FormNavigationProps) => {
   }
 
   // Debug information
-  console.log('FormNavigation debug:', {
+  console.log('[FormNavigation] Rendering navigation:', {
     category,
     adType,
     flowType,
     currentStep,
     flowSteps: flowSteps.map(s => s.id),
-    stepsToRender: stepsToRender.map(s => s.id)
+    stepsToRender: stepsToRender.map(s => ({ id: s.id, title: s.title }))
   });
 
   return (

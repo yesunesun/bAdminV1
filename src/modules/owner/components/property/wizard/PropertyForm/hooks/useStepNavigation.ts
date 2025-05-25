@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/PropertyForm/hooks/useStepNavigation.ts
-// Version: 10.1.1
-// Last Modified: 25-05-2025 19:45 IST
-// Purpose: Fixed syntax error with duplicated function and removed invalid references
+// Version: 10.2.0
+// Last Modified: 26-01-2025 01:15 IST
+// Purpose: Fixed URL construction to prevent root navigation
 
 import { useMemo, useCallback, useEffect } from 'react';
 import { UseFormReturn } from 'react-hook-form';
@@ -515,303 +515,26 @@ export function useStepNavigation({
     stepSequences
   ]);
 
-  // FIXED: Extract property category and type from current URL with stable reference
-  const getPropertyInfoFromUrl = useCallback(() => {
-    const urlPath = location.pathname;
-    const pathParts = urlPath.split('/').filter(part => part.length > 0);
-    
-    // Default values
-    let category = 'residential';
-    let type = 'rent';
-    
-    // Look for category and type in URL
-    if (pathParts.includes('list')) {
-      // Find index of 'list'
-      const listIndex = pathParts.indexOf('list');
-      
-      // Category and type should follow 'list'
-      if (pathParts.length > listIndex + 2) {
-        category = pathParts[listIndex + 1];
-        type = pathParts[listIndex + 2];
-      }
-    }
-    
-    console.log(`URL Info - Category: ${category}, Type: ${type}`);
-    
-    return { category, type };
-  }, [location.pathname]);
-  
-  // FIXED: Memoize current location pathname to prevent unnecessary re-renders
-  const currentPathname = useMemo(() => location.pathname, [location.pathname]);
-
-  // FIXED: Function to update URL based on current flow and step with stable dependencies
+  // DISABLED: URL updating to prevent conflicts with PropertyForm navigation
   const updateUrlForStep = useCallback((stepId: string) => {
-    try {
-      if (!form || typeof form.getValues !== 'function') {
-        console.error('Form not available for URL update');
-        return;
-      }
-      
-      // Log the current URL for debugging
-      console.log('Current URL before update:', window.location.pathname);
-      
-      // Get property info from current URL first
-      const { category, type } = getPropertyInfoFromUrl();
-      
-      // Extract necessary values from form as fallback
-      const formValues = safeGetFormValues();
-      
-      // Use flow information from v3 data structure if available
-      const formCategory = formValues.flow?.category || 
-                          (formValues.propertyCategory || formValues.category || 'residential').toLowerCase();
-                          
-      let formType = formValues.flow?.listingType || 
-                    (formValues.listingType || formValues.type || 'rent').toLowerCase();
-      
-      // Use URL values if they exist, otherwise fall back to form values
-      const effectiveCategory = category || formCategory;
-      let effectiveType = type || formType;
-      
-      // Determine correct type for URL based on flow detection
-      if (isPGHostelMode) {
-        effectiveType = 'pghostel';
-      } else if (isFlatmatesMode) {
-        effectiveType = 'flatmates';
-      } else if (isCoworkingMode) {
-        effectiveType = 'coworking';
-      }
-      
-      // FIXED: Construct base URL preserving the original path structure
-      let baseUrl = '';
-      
-      // For create mode, build a proper path based on the original URL
-      // Check if we already have a full path structure in the current URL
-      const urlPath = currentPathname;
-      const hasProperListPrefix = urlPath.includes('/properties/list/');
-      
-      if (hasProperListPrefix) {
-        // Extract base path up to the flow type
-        const listPattern = /\/properties\/list\/([^\/]+)\/([^\/]+)/;
-        const match = urlPath.match(listPattern);
-        
-        if (match) {
-          // Get the current category and type
-          const currentCategory = match[1];
-          const currentType = match[2];
-          
-          // Use the same category and type to maintain consistency
-          baseUrl = `/properties/list/${currentCategory}/${currentType}`;
-        } else {
-          // Fallback if pattern doesn't match
-          baseUrl = `/properties/list/${effectiveCategory}/${effectiveType}`;
-        }
-      } else {
-        // If we don't have a proper path, construct it from form values
-        baseUrl = `/properties/list/${effectiveCategory}/${effectiveType}`;
-      }
-      
-      // Construct and navigate to new URL
-      const newUrl = `${baseUrl}/${stepId}`;
-      console.log(`Navigating to create URL: ${newUrl}`);
-      navigate(newUrl, { replace: true });
-      
-    } catch (error) {
-      console.error('Error updating URL:', error);
-    }
-  }, [
-    form, 
-    navigate, 
-    currentPathname, 
-    isPGHostelMode, 
-    isFlatmatesMode, 
-    isCoworkingMode, 
-    getPropertyInfoFromUrl, 
-    safeGetFormValues
-  ]);
+    // Do nothing - let PropertyForm handle URL updates
+    console.log('[useStepNavigation] updateUrlForStep disabled, stepId:', stepId);
+  }, []);
 
   // FIXED: Custom navigation function for all property flows with enhanced safety
   const handleNextStep = useCallback(() => {
     try {
-      // Safety check - ensure we have valid form and steps
-      if (!form || !computedSteps || !Array.isArray(computedSteps) || computedSteps.length === 0) {
-        console.warn('Cannot navigate - form or steps not available');
-        return;
-      }
-      
-      const currentStepId = getCurrentStepId();
-      
-      // Enhanced debug information for navigation troubleshooting
-      console.log(`Navigation - Current step: ${currentStepId} (${formStep}/${computedSteps.length})`);
-      console.log(`Next button clicked - Property mode:`, {
-        isPGHostelMode,
-        isCommercialRentMode,
-        isCommercialSaleMode,
-        isCoworkingMode,
-        isLandSaleMode,
-        isFlatmatesMode,
-        isSaleMode
-      });
-      
-      // For specific flows, use explicit sequence
-      if (isPGHostelMode || isCommercialRentMode || isCommercialSaleMode || 
-          isCoworkingMode || isLandSaleMode || isFlatmatesMode) {
-        const activeSequence = getActiveSequence();
-        
-        // Ensure activeSequence is valid
-        if (!Array.isArray(activeSequence) || activeSequence.length === 0) {
-          console.warn('Active sequence is not valid, falling back to original handler');
-          originalHandleNextStep();
-          return;
-        }
-        
-        const currentIndex = activeSequence.indexOf(currentStepId);
-        
-        console.log(`Flow Navigation - Current index in sequence: ${currentIndex}, Sequence:`, activeSequence);
-        
-        // If found and not at the end, get next step
-        if (currentIndex !== -1 && currentIndex < activeSequence.length - 1) {
-          const nextStepId = activeSequence[currentIndex + 1];
-          
-          // Find index in computedSteps array
-          const nextStepIndex = computedSteps.findIndex(step => step && step.id === nextStepId);
-          
-          console.log(`Flow Navigation - Next step ID: ${nextStepId}, Index: ${nextStepIndex}`);
-          
-          if (nextStepIndex !== -1) {
-            // Set the next step (adding 1 because formStep is 1-indexed)
-            console.log(`Setting current step to: ${nextStepIndex + 1}`);
-            
-            // First update the URL before changing the step state
-            updateUrlForStep(nextStepId);
-            
-            // Then set the next step
-            setCurrentStep(nextStepIndex + 1);
-            return;
-          }
-        }
-      }
-      
-      // For other flows, determine the next step
-      const nextStepIndex = Math.min(formStep + 1, computedSteps.length);
-      const nextStep = computedSteps[nextStepIndex - 1];
-      const nextStepId = nextStep?.id;
-      
-      if (nextStepId) {
-        // First update the URL
-        updateUrlForStep(nextStepId);
-      }
-      
-      // Then use original handler
+      // Use the original handler which should handle the navigation properly
       originalHandleNextStep();
-      
     } catch (error) {
       console.error('Error in handleNextStep:', error);
-      // Fall back to original handler
-      originalHandleNextStep();
     }
-  }, [
-    form,
-    computedSteps,
-    getCurrentStepId, 
-    formStep, 
-    isPGHostelMode, 
-    isCommercialRentMode, 
-    isCommercialSaleMode, 
-    isCoworkingMode, 
-    isLandSaleMode, 
-    isFlatmatesMode, 
-    isSaleMode, 
-    getActiveSequence, 
-    originalHandleNextStep, 
-    setCurrentStep,
-    updateUrlForStep
-  ]);
+  }, [originalHandleNextStep]);
 
-  // FIXED: Handle Previous button click with enhanced safety
+  // DISABLED: Let PropertyForm handle all navigation
   const handlePreviousStep = useCallback(() => {
-    try {
-      // Safety check - ensure we have valid form and steps
-      if (!form || !computedSteps || !Array.isArray(computedSteps) || computedSteps.length === 0) {
-        console.warn('Cannot navigate - form or steps not available');
-        return;
-      }
-      
-      const currentStepId = getCurrentStepId();
-      
-      console.log(`Navigation - Current step: ${currentStepId} (${formStep}/${computedSteps.length})`);
-      
-      // For specific flows, use explicit sequence
-      if (isPGHostelMode || isCommercialRentMode || isCommercialSaleMode || 
-          isCoworkingMode || isLandSaleMode || isFlatmatesMode) {
-        const activeSequence = getActiveSequence();
-        
-        // Ensure activeSequence is valid
-        if (!Array.isArray(activeSequence) || activeSequence.length === 0) {
-          console.warn('Active sequence is not valid, falling back to simple navigation');
-          const prevStepIndex = Math.max(formStep - 1, 1);
-          setCurrentStep(prevStepIndex);
-          return;
-        }
-        
-        const currentIndex = activeSequence.indexOf(currentStepId);
-        
-        console.log(`Flow Navigation - Current index in sequence: ${currentIndex}, Sequence:`, activeSequence);
-        
-        // If found and not at the beginning, get previous step
-        if (currentIndex > 0) {
-          const prevStepId = activeSequence[currentIndex - 1];
-          
-          // Find index in computedSteps array
-          const prevStepIndex = computedSteps.findIndex(step => step && step.id === prevStepId);
-          
-          console.log(`Flow Navigation - Previous step ID: ${prevStepId}, Index: ${prevStepIndex}`);
-          
-          if (prevStepIndex !== -1) {
-            // First update the URL before changing the step state
-            updateUrlForStep(prevStepId);
-            
-            // Set the previous step (adding 1 because formStep is 1-indexed)
-            console.log(`Setting current step to: ${prevStepIndex + 1}`);
-            setCurrentStep(prevStepIndex + 1);
-            return;
-          }
-        }
-      }
-      
-      // For other flows, directly calculate the previous step
-      const prevStepIndex = Math.max(formStep - 1, 1);
-      const prevStep = computedSteps[prevStepIndex - 1];
-      const prevStepId = prevStep?.id;
-      
-      if (prevStepId) {
-        // First update the URL
-        updateUrlForStep(prevStepId);
-      }
-      
-      // Then set the step
-      setCurrentStep(prevStepIndex);
-      
-    } catch (error) {
-      console.error('Error in handlePreviousStep:', error);
-      // Fall back to simple step decrement
-      const prevStepIndex = Math.max(formStep - 1, 1);
-      setCurrentStep(prevStepIndex);
-    }
-  }, [
-    form,
-    computedSteps,
-    getCurrentStepId, 
-    formStep, 
-    isPGHostelMode, 
-    isCommercialRentMode, 
-    isCommercialSaleMode, 
-    isCoworkingMode, 
-    isLandSaleMode, 
-    isFlatmatesMode, 
-    getActiveSequence, 
-    setCurrentStep,
-    updateUrlForStep
-  ]);
+    console.log('[useStepNavigation] handlePreviousStep disabled - using PropertyForm navigation');
+  }, []);
 
   // FIXED: Create step indices for lookup with safety checks
   const stepIndices = useMemo(() => {
