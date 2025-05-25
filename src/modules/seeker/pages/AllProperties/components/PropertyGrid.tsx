@@ -1,7 +1,7 @@
 // src/modules/seeker/pages/AllProperties/components/PropertyGrid.tsx
-// Version: 1.7.0
-// Last Modified: 14-04-2025 14:45 IST
-// Purpose: Fixed property deletion callback functionality
+// Version: 2.0.0
+// Last Modified: 25-05-2025 16:20 IST
+// Purpose: Updated to support new data structure exclusively
 
 import React from 'react';
 import { PropertyType } from '@/modules/owner/components/property/PropertyFormTypes';

@@ -1,7 +1,7 @@
 // src/modules/seeker/pages/AllProperties/components/PropertyCard.tsx
-// Version: 4.7.0
-// Last Modified: 15-04-2025 14:00 IST
-// Purpose: Updated to use propertyVersionService for version information
+// Version: 5.0.0
+// Last Modified: 25-05-2025 16:15 IST
+// Purpose: Updated to use new data structure exclusively and existing title utility
 
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
@@ -9,12 +9,13 @@ import { PropertyType } from '@/modules/owner/components/property/PropertyFormTy
 import { formatPrice } from '@/modules/seeker/services/seekerService';
 import { getPropertyFlow, getFlowLabel } from '../utils/propertyUtils';
 import { getPropertyVersion } from '../services/propertyVersionService';
+import { generatePropertyTitle } from '@/modules/seeker/utils/propertyTitleUtils';
 import { Card, CardHeader, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/lib/supabase';
-import { Trash2, AlertTriangle, Pencil, ShieldAlert, Info } from 'lucide-react';
+import { Trash2, Pencil, ShieldAlert, Info } from 'lucide-react';
 import { 
   Dialog,
   DialogContent, 
@@ -56,97 +57,212 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
   // Get property version using our service
   const propertyVersion = getPropertyVersion(property.property_details);
 
-  // Check if current user is an admin
+  // Get display title from new data structure
+  const displayTitle = property.property_details?.flow?.title || 'Untitled Property';
+
+  // Get property details for display
+  const propertyDetails = property.property_details || {};
+  const flowCategory = propertyDetails.flow?.category || 'Unknown';
+  const flowListingTypeFromData = propertyDetails.flow?.listingType || 'Unknown';
+
+  // Check if current user is an admin - with proper error handling
   useEffect(() => {
     const checkAdminStatus = async () => {
-      if (!user?.id) return;
+      if (!user?.id) {
+        setIsAdmin(false);
+        return;
+      }
       
       try {
+        // Try the admin check with better error handling
         const { data, error } = await supabase
           .from('admin_users')
-          .select('role_id, admin_roles(role_type)')
+          .select(`
+            role_id,
+            admin_roles!inner (
+              role_type
+            )
+          `)
           .eq('user_id', user.id)
-          .single();
+          .maybeSingle(); // Use maybeSingle to handle no results gracefully
         
-        if (!error && data) {
+        if (error) {
+          console.warn('Admin status check failed (user likely not admin):', error.message);
+          setIsAdmin(false);
+          return;
+        }
+        
+        if (data && data.admin_roles) {
           // Check if user has admin role
-          const roleType = data.admin_roles?.role_type;
+          const roleType = data.admin_roles.role_type;
           const hasAdminRole = roleType === 'admin' || 
             roleType === 'super_admin' || 
             roleType === 'property_moderator';
           
           setIsAdmin(hasAdminRole);
           console.log('User admin status:', hasAdminRole, 'Role type:', roleType);
+        } else {
+          setIsAdmin(false);
         }
       } catch (error) {
-        console.error('Error checking admin status:', error);
+        console.warn('Error checking admin status (user likely not admin):', error);
+        setIsAdmin(false);
       }
     };
     
     checkAdminStatus();
   }, [user?.id]);
 
-  // Generate a formatted property title
-  const generateFormattedTitle = (property: PropertyType): string => {
-    const details = property.property_details || {};
-    
-    // Extract needed information
-    const bhkType = details.bhkType || (property.bedrooms ? `${property.bedrooms} BHK` : '');
-    const propertyType = details.propertyType || 'Property';
-    const listingType = details.listingType?.toLowerCase() || '';
-    const locality = details.locality || property.city || '';
-    
-    // Determine if this is for sale or rent
-    const isForSale = 
-      listingType === 'sale' || 
-      listingType === 'sell' ||
-      details.isSaleProperty === true;
-    
-    const forText = isForSale ? 'for Sale' : 'for Rent';
-    
-    // Construct the title
-    return `${bhkType} ${propertyType} ${forText} in ${locality}`;
-  };
-  
-  // Function to fix property title
+  // Function to fix property title using existing utility
   const handleFixTitle = async () => {
-    if (!property.id || !user?.id) return;
+    console.log('=== FIX TITLE DEBUG START ===');
+    console.log('Fix Title: Button clicked');
+    console.log('Fix Title: Property ID:', property.id);
+    console.log('Fix Title: User ID:', user?.id);
+    console.log('Fix Title: Full property object:', property);
+    
+    if (!property.id || !user?.id) {
+      console.error('Fix Title: FAILED - Missing property ID or user ID');
+      console.log('Fix Title: Property ID exists:', !!property.id);
+      console.log('Fix Title: User ID exists:', !!user?.id);
+      toast({
+        title: "Error",
+        description: "Unable to fix title: missing required information",
+        variant: "destructive"
+      });
+      return;
+    }
     
     try {
       setIsFixingTitle(true);
+      console.log('Fix Title: Starting title generation process...');
       
-      // Generate the new formatted title
-      const newTitle = generateFormattedTitle(property);
+      // Debug the property structure before title generation
+      console.log('Fix Title: Property.property_details:', property.property_details);
+      console.log('Fix Title: Property.property_details type:', typeof property.property_details);
       
-      // Update the property in the database
-      const { error } = await supabase
-        .from('properties')
-        .update({ title: newTitle })
-        .eq('id', property.id);
+      if (property.property_details) {
+        console.log('Fix Title: Property.property_details.flow:', property.property_details.flow);
+        console.log('Fix Title: Property.property_details.steps:', property.property_details.steps);
+        console.log('Fix Title: Current title in flow:', property.property_details.flow?.title);
+      } else {
+        console.log('Fix Title: WARNING - No property_details found');
+      }
+      
+      // Generate the new title using existing utility
+      console.log('Fix Title: Calling generatePropertyTitle utility...');
+      const newTitle = generatePropertyTitle(property);
+      console.log('Fix Title: Generated new title:', newTitle);
+      console.log('Fix Title: Generated title type:', typeof newTitle);
+      console.log('Fix Title: Generated title length:', newTitle?.length);
+      
+      if (!newTitle || newTitle.trim() === '') {
+        console.error('Fix Title: FAILED - Generated title is empty or invalid');
+        throw new Error('Generated title is empty');
+      }
+      
+      // Prepare updated property_details
+      console.log('Fix Title: Preparing database update...');
+      const currentPropertyDetails = property.property_details || {};
+      const currentFlow = currentPropertyDetails.flow || {};
+      
+      console.log('Fix Title: Current property_details:', currentPropertyDetails);
+      console.log('Fix Title: Current flow:', currentFlow);
+      
+      const updatedPropertyDetails = {
+        ...currentPropertyDetails,
+        flow: {
+          ...currentFlow,
+          title: newTitle
+        }
+      };
+
+      console.log('Fix Title: Updated property_details to save:', updatedPropertyDetails);
+      console.log('Fix Title: New title in updated object:', updatedPropertyDetails.flow.title);
+
+      // Update properties_v2 table
+      console.log('Fix Title: Executing database update...');
+      console.log('Fix Title: Updating property ID:', property.id);
+      console.log('Fix Title: Update payload:', {
+        property_details: updatedPropertyDetails,
+        updated_at: new Date().toISOString()
+      });
+      
+      const { data, error, status, statusText } = await supabase
+        .from('properties_v2')
+        .update({ 
+          property_details: updatedPropertyDetails,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', property.id)
+        .select();
+      
+      console.log('Fix Title: Database response status:', status);
+      console.log('Fix Title: Database response statusText:', statusText);
+      console.log('Fix Title: Database response data:', data);
+      console.log('Fix Title: Database response error:', error);
       
       if (error) {
+        console.error('Fix Title: DATABASE ERROR:', error);
+        console.error('Fix Title: Error code:', error.code);
+        console.error('Fix Title: Error message:', error.message);
+        console.error('Fix Title: Error details:', error.details);
+        console.error('Fix Title: Error hint:', error.hint);
         throw error;
       }
       
+      if (!data || data.length === 0) {
+        console.warn('Fix Title: WARNING - No data returned from update (might still be successful)');
+      } else {
+        console.log('Fix Title: SUCCESS - Database updated successfully');
+        console.log('Fix Title: Updated record count:', data.length);
+        console.log('Fix Title: Updated record data:', data[0]);
+        
+        // Verify the title was actually saved
+        if (data[0]?.property_details?.flow?.title) {
+          console.log('Fix Title: VERIFIED - Title saved in database:', data[0].property_details.flow.title);
+        } else {
+          console.warn('Fix Title: WARNING - Title not found in returned data');
+        }
+      }
+      
       // Show success toast
+      console.log('Fix Title: Showing success toast...');
       toast({
-        title: "Title updated",
-        description: `Title changed to "${newTitle}"`,
+        title: "Title updated successfully",
+        description: `New title: "${newTitle}"`,
       });
       
       // Refresh the property list
       if (onPropertyUpdated) {
+        console.log('Fix Title: Calling onPropertyUpdated callback...');
         onPropertyUpdated();
+      } else {
+        console.log('Fix Title: No onPropertyUpdated callback provided');
       }
+      
+      console.log('Fix Title: Process completed successfully');
+      
     } catch (error) {
-      console.error('Error updating property title:', error);
+      console.error('=== FIX TITLE ERROR ===');
+      console.error('Fix Title: ERROR occurred:', error);
+      console.error('Fix Title: Error type:', typeof error);
+      console.error('Fix Title: Error constructor:', error.constructor.name);
+      
+      if (error instanceof Error) {
+        console.error('Fix Title: Error message:', error.message);
+        console.error('Fix Title: Error stack:', error.stack);
+      }
+      
       toast({
-        title: "Update failed",
-        description: error instanceof Error ? error.message : "An error occurred while updating the property title",
+        title: "Failed to update title",
+        description: error instanceof Error ? error.message : "An unexpected error occurred",
         variant: "destructive"
       });
     } finally {
+      console.log('Fix Title: Cleaning up - setting isFixingTitle to false');
       setIsFixingTitle(false);
+      console.log('=== FIX TITLE DEBUG END ===');
     }
   };
   
@@ -196,6 +312,63 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
       setIsDeleteDialogOpen(false);
     }
   };
+
+  // Extract basic property info from steps for display
+  let bedrooms = '';
+  let bathrooms = '';
+  let area = '';
+  let price = property.price || 0;
+
+  // Extract data from steps based on flow type
+  if (propertyDetails.steps) {
+    for (const [stepId, stepData] of Object.entries(propertyDetails.steps)) {
+      if (stepData && typeof stepData === 'object') {
+        const data = stepData as any;
+        
+        // Extract bedroom info
+        if (data.bhkType && !bedrooms) {
+          bedrooms = data.bhkType;
+        }
+        
+        // Extract bathroom info
+        if (data.bathrooms && !bathrooms) {
+          bathrooms = `${data.bathrooms} Bath`;
+        }
+        
+        // Extract area info
+        if (data.builtUpArea && !area) {
+          const unit = data.builtUpAreaUnit === 'sqft' ? 'sq.ft' : 
+                      data.builtUpAreaUnit === 'sqyd' ? 'sq.yd' : 
+                      data.builtUpAreaUnit || 'sq.ft';
+          area = `${data.builtUpArea} ${unit}`;
+        }
+        
+        // Extract price info (rent/sale)
+        if (data.rentAmount && price === 0) {
+          price = data.rentAmount;
+        } else if (data.expectedPrice && price === 0) {
+          price = data.expectedPrice;
+        }
+      }
+    }
+  }
+
+  // Get address from location step
+  let address = property.address || '';
+  let city = property.city || '';
+  let state = property.state || '';
+
+  if (propertyDetails.steps) {
+    for (const [stepId, stepData] of Object.entries(propertyDetails.steps)) {
+      if (stepId.includes('location') && stepData && typeof stepData === 'object') {
+        const locationData = stepData as any;
+        if (locationData.address && !address) address = locationData.address;
+        if (locationData.city && !city) city = locationData.city;
+        if (locationData.state && !state) state = locationData.state;
+        break;
+      }
+    }
+  }
   
   return (
     <Card className="overflow-hidden transition-shadow hover:shadow-lg">
@@ -205,7 +378,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
             src={property.property_images && property.property_images.length > 0 
               ? property.property_images[0].url 
               : '/noimage.png'}
-            alt={property.title}
+            alt={displayTitle}
             className="w-full h-full object-cover"
           />
           {/* Property Flow Badge */}
@@ -241,9 +414,9 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
           <CardHeader className="p-0 pb-2">
             <div className="flex justify-between items-start">
               <div>
-                <h2 className="text-xl font-semibold line-clamp-1">{property.title}</h2>
+                <h2 className="text-xl font-semibold line-clamp-1">{displayTitle}</h2>
                 <p className="text-gray-500 dark:text-gray-400 text-sm line-clamp-1">
-                  {property.address}, {property.city}, {property.state}
+                  {address}, {city}, {state}
                 </p>
                 {/* Property ID Display */}
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
@@ -276,7 +449,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
                 )}
               </div>
               <Badge className="ml-2">
-                {property.property_details?.propertyType || 'Property'}
+                {flowCategory}
               </Badge>
             </div>
           </CardHeader>
@@ -284,21 +457,21 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
           <CardContent className="p-0 pb-2">
             <div className="grid grid-cols-3 gap-2 my-2 text-sm">
               <div>
-                <span className="font-medium">Price:</span> {formatPrice(property.price)}
+                <span className="font-medium">Price:</span> {formatPrice(price)}
               </div>
-              {property.bedrooms && (
+              {bedrooms && (
                 <div>
-                  <span className="font-medium">Bedrooms:</span> {property.bedrooms}
+                  <span className="font-medium">Type:</span> {bedrooms}
                 </div>
               )}
-              {property.bathrooms && (
+              {bathrooms && (
                 <div>
-                  <span className="font-medium">Bathrooms:</span> {property.bathrooms}
+                  <span className="font-medium">Bathrooms:</span> {bathrooms}
                 </div>
               )}
-              {property.square_feet && (
+              {area && (
                 <div>
-                  <span className="font-medium">Area:</span> {property.square_feet} sq.ft
+                  <span className="font-medium">Area:</span> {area}
                 </div>
               )}
             </div>
@@ -315,6 +488,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
               {isAdmin ? "Admin Delete" : "Delete"}
             </Button>
             
+            {/* Fix Title button - appears unconditionally for all properties */}
             <Button 
               size="sm" 
               variant="outline"
@@ -355,9 +529,9 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
             </DialogDescription>
           </DialogHeader>
           <div className="py-3">
-            <h3 className="font-medium">{property.title}</h3>
+            <h3 className="font-medium">{displayTitle}</h3>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              {property.address}, {property.city}, {property.state}
+              {address}, {city}, {state}
             </p>
             {property.profiles && (
               <p className="text-sm text-blue-600 font-medium mt-1">
