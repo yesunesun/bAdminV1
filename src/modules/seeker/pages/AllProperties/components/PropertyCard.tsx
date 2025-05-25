@@ -1,13 +1,18 @@
 // src/modules/seeker/pages/AllProperties/components/PropertyCard.tsx
-// Version: 5.0.0
-// Last Modified: 25-05-2025 16:15 IST
-// Purpose: Updated to use new data structure exclusively and existing title utility
+// Version: 6.0.0
+// Last Modified: 25-05-2025 17:35 IST
+// Purpose: Fixed Property Type/Listing Type display, delete functionality, and owner information
 
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { PropertyType } from '@/modules/owner/components/property/PropertyFormTypes';
 import { formatPrice } from '@/modules/seeker/services/seekerService';
-import { getPropertyFlow, getFlowLabel } from '../utils/propertyUtils';
+import { 
+  getPropertyFlow, 
+  getFlowLabel, 
+  getPropertyTypeFromFlow, 
+  getListingTypeFromFlow 
+} from '../utils/propertyUtils';
 import { getPropertyVersion } from '../services/propertyVersionService';
 import { generatePropertyTitle } from '@/modules/seeker/utils/propertyTitleUtils';
 import { Card, CardHeader, CardContent, CardFooter } from '@/components/ui/card';
@@ -15,7 +20,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/lib/supabase';
-import { Trash2, Pencil, ShieldAlert, Info } from 'lucide-react';
+import { Trash2, Pencil, ShieldAlert, Info, User, Mail } from 'lucide-react';
 import { 
   Dialog,
   DialogContent, 
@@ -25,7 +30,6 @@ import {
   DialogFooter
 } from '@/components/ui/dialog';
 import { useAuth } from '@/contexts/AuthContext';
-import { propertyService } from '@/modules/owner/services/propertyService';
 
 interface PropertyCardProps {
   property: PropertyType;
@@ -45,14 +49,11 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
   const { toast } = useToast();
   const { user } = useAuth();
   
-  // Get property flow type
+  // Get property flow type and derived information
   const propertyFlow = getPropertyFlow(property);
   const flowLabel = getFlowLabel(propertyFlow);
-  
-  // Extract property type and listing type from the flow
-  const flowParts = propertyFlow.split('_');
-  const flowPropertyType = flowParts[0] || 'UNKNOWN';
-  const flowListingType = flowParts[1] || 'UNKNOWN';
+  const propertyType = getPropertyTypeFromFlow(propertyFlow);
+  const listingType = getListingTypeFromFlow(propertyFlow);
   
   // Get property version using our service
   const propertyVersion = getPropertyVersion(property.property_details);
@@ -62,8 +63,6 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
 
   // Get property details for display
   const propertyDetails = property.property_details || {};
-  const flowCategory = propertyDetails.flow?.category || 'Unknown';
-  const flowListingTypeFromData = propertyDetails.flow?.listingType || 'Unknown';
 
   // Check if current user is an admin - with proper error handling
   useEffect(() => {
@@ -74,7 +73,6 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
       }
       
       try {
-        // Try the admin check with better error handling
         const { data, error } = await supabase
           .from('admin_users')
           .select(`
@@ -84,7 +82,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
             )
           `)
           .eq('user_id', user.id)
-          .maybeSingle(); // Use maybeSingle to handle no results gracefully
+          .maybeSingle();
         
         if (error) {
           console.warn('Admin status check failed (user likely not admin):', error.message);
@@ -93,14 +91,12 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
         }
         
         if (data && data.admin_roles) {
-          // Check if user has admin role
           const roleType = data.admin_roles.role_type;
           const hasAdminRole = roleType === 'admin' || 
             roleType === 'super_admin' || 
             roleType === 'property_moderator';
           
           setIsAdmin(hasAdminRole);
-          console.log('User admin status:', hasAdminRole, 'Role type:', roleType);
         } else {
           setIsAdmin(false);
         }
@@ -116,15 +112,13 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
   // Function to fix property title using existing utility
   const handleFixTitle = async () => {
     console.log('=== FIX TITLE DEBUG START ===');
-    console.log('Fix Title: Button clicked');
-    console.log('Fix Title: Property ID:', property.id);
-    console.log('Fix Title: User ID:', user?.id);
-    console.log('Fix Title: Full property object:', property);
+    console.log('Fix Title: Button clicked for property:', property.id);
+    console.log('Fix Title: Property flow type:', propertyFlow);
+    console.log('Fix Title: Property type:', propertyType);
+    console.log('Fix Title: Listing type:', listingType);
     
     if (!property.id || !user?.id) {
       console.error('Fix Title: FAILED - Missing property ID or user ID');
-      console.log('Fix Title: Property ID exists:', !!property.id);
-      console.log('Fix Title: User ID exists:', !!user?.id);
       toast({
         title: "Error",
         description: "Unable to fix title: missing required information",
@@ -135,39 +129,42 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
     
     try {
       setIsFixingTitle(true);
-      console.log('Fix Title: Starting title generation process...');
       
-      // Debug the property structure before title generation
-      console.log('Fix Title: Property.property_details:', property.property_details);
-      console.log('Fix Title: Property.property_details type:', typeof property.property_details);
+      // Log current title
+      const currentTitle = property.property_details?.flow?.title || 'No current title';
+      console.log('Fix Title: Current title:', currentTitle);
       
-      if (property.property_details) {
-        console.log('Fix Title: Property.property_details.flow:', property.property_details.flow);
-        console.log('Fix Title: Property.property_details.steps:', property.property_details.steps);
-        console.log('Fix Title: Current title in flow:', property.property_details.flow?.title);
-      } else {
-        console.log('Fix Title: WARNING - No property_details found');
-      }
+      // Log the property structure being passed to generatePropertyTitle
+      console.log('Fix Title: Property structure being passed to generatePropertyTitle:');
+      console.log('Fix Title: - property.id:', property.id);
+      console.log('Fix Title: - property.property_details:', property.property_details);
+      console.log('Fix Title: - property.property_details.flow:', property.property_details?.flow);
+      console.log('Fix Title: - property.property_details.steps:', property.property_details?.steps ? Object.keys(property.property_details.steps) : 'no steps');
       
-      // Generate the new title using existing utility
-      console.log('Fix Title: Calling generatePropertyTitle utility...');
+      // Generate the new title
+      console.log('Fix Title: Calling generatePropertyTitle...');
       const newTitle = generatePropertyTitle(property);
       console.log('Fix Title: Generated new title:', newTitle);
       console.log('Fix Title: Generated title type:', typeof newTitle);
-      console.log('Fix Title: Generated title length:', newTitle?.length);
+      console.log('Fix Title: Title changed?', currentTitle !== newTitle);
       
       if (!newTitle || newTitle.trim() === '') {
-        console.error('Fix Title: FAILED - Generated title is empty or invalid');
+        console.error('Fix Title: FAILED - Generated title is empty');
         throw new Error('Generated title is empty');
       }
       
-      // Prepare updated property_details
-      console.log('Fix Title: Preparing database update...');
+      if (currentTitle === newTitle) {
+        console.warn('Fix Title: WARNING - New title is same as current title');
+        toast({
+          title: "Title already correct",
+          description: `Current title: "${currentTitle}"`,
+        });
+        return;
+      }
+      
+      // Prepare the update
       const currentPropertyDetails = property.property_details || {};
       const currentFlow = currentPropertyDetails.flow || {};
-      
-      console.log('Fix Title: Current property_details:', currentPropertyDetails);
-      console.log('Fix Title: Current flow:', currentFlow);
       
       const updatedPropertyDetails = {
         ...currentPropertyDetails,
@@ -177,115 +174,248 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
         }
       };
 
-      console.log('Fix Title: Updated property_details to save:', updatedPropertyDetails);
-      console.log('Fix Title: New title in updated object:', updatedPropertyDetails.flow.title);
-
-      // Update properties_v2 table
-      console.log('Fix Title: Executing database update...');
-      console.log('Fix Title: Updating property ID:', property.id);
-      console.log('Fix Title: Update payload:', {
-        property_details: updatedPropertyDetails,
-        updated_at: new Date().toISOString()
-      });
+      console.log('Fix Title: Updating database...');
+      console.log('Fix Title: Old title in database:', currentFlow.title);
+      console.log('Fix Title: New title for database:', newTitle);
+      console.log('Fix Title: Property ID:', property.id);
+      console.log('Fix Title: Updated property_details structure:', updatedPropertyDetails);
       
-      const { data, error, status, statusText } = await supabase
+      // First, let's verify the property exists and check current user permissions
+      console.log('Fix Title: Checking if property exists and user permissions...');
+      const { data: existsData, error: existsError } = await supabase
         .from('properties_v2')
-        .update({ 
-          property_details: updatedPropertyDetails,
-          updated_at: new Date().toISOString()
-        })
+        .select('id, owner_id, property_details')
         .eq('id', property.id)
-        .select();
+        .single();
       
-      console.log('Fix Title: Database response status:', status);
-      console.log('Fix Title: Database response statusText:', statusText);
-      console.log('Fix Title: Database response data:', data);
-      console.log('Fix Title: Database response error:', error);
-      
-      if (error) {
-        console.error('Fix Title: DATABASE ERROR:', error);
-        console.error('Fix Title: Error code:', error.code);
-        console.error('Fix Title: Error message:', error.message);
-        console.error('Fix Title: Error details:', error.details);
-        console.error('Fix Title: Error hint:', error.hint);
-        throw error;
+      if (existsError) {
+        console.error('Fix Title: Error checking property existence:', existsError);
+        throw new Error(`Property check failed: ${existsError.message}`);
       }
       
-      if (!data || data.length === 0) {
-        console.warn('Fix Title: WARNING - No data returned from update (might still be successful)');
-      } else {
-        console.log('Fix Title: SUCCESS - Database updated successfully');
-        console.log('Fix Title: Updated record count:', data.length);
-        console.log('Fix Title: Updated record data:', data[0]);
+      console.log('Fix Title: Property exists check - ID:', existsData?.id);
+      console.log('Fix Title: Property owner_id:', existsData?.owner_id);
+      console.log('Fix Title: Current user ID:', user.id);
+      console.log('Fix Title: User is owner?', existsData?.owner_id === user.id);
+      console.log('Fix Title: User is admin?', isAdmin);
+      console.log('Fix Title: Current title in DB:', existsData?.property_details?.flow?.title);
+      
+      // Check if user has permission to update
+      const userIsOwner = existsData?.owner_id === user.id;
+      const userCanUpdate = userIsOwner || isAdmin;
+      
+      console.log('Fix Title: User can update?', userCanUpdate);
+      
+      if (!userCanUpdate) {
+        throw new Error(`Permission denied. User is owner: ${userIsOwner}, User is admin: ${isAdmin}`);
+      }
+      
+      // Now attempt the update - try database function first since RLS is causing issues
+      console.log('Fix Title: Attempting database update using function...');
+      
+      try {
+        const { data: functionResult, error: functionError } = await supabase.rpc('update_property_title', {
+          property_id_param: property.id,
+          new_title_param: newTitle
+        });
         
-        // Verify the title was actually saved
-        if (data[0]?.property_details?.flow?.title) {
-          console.log('Fix Title: VERIFIED - Title saved in database:', data[0].property_details.flow.title);
+        console.log('Fix Title: Function result:', functionResult);
+        console.log('Fix Title: Function error:', functionError);
+        
+        if (functionError) {
+          console.error('Fix Title: Database function failed:', functionError);
+          throw new Error(`Database function failed: ${functionError.message}`);
+        }
+        
+        if (functionResult?.success) {
+          console.log('Fix Title: ✅ Database function succeeded!');
+          
+          toast({
+            title: "Title updated successfully",
+            description: `Old: "${currentFlow.title}" → New: "${newTitle}"`,
+          });
+          
+          if (onPropertyUpdated) {
+            onPropertyUpdated();
+          }
+          return; // Success - exit early
         } else {
-          console.warn('Fix Title: WARNING - Title not found in returned data');
+          console.error('Fix Title: Database function returned failure:', functionResult);
+          throw new Error(`Database function failed: ${functionResult?.error || 'Unknown error'}`);
+        }
+        
+      } catch (functionError) {
+        console.warn('Fix Title: Database function not available or failed, trying direct update:', functionError);
+        
+        // Fallback to direct update
+        console.log('Fix Title: Attempting direct database update...');
+        
+        let updateResult;
+        
+        if (isAdmin) {
+          console.log('Fix Title: User is admin - attempting admin update...');
+          updateResult = await supabase
+            .from('properties_v2')
+            .update({ 
+              property_details: updatedPropertyDetails,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', property.id)
+            .select();
+        } else if (existsData?.owner_id === user.id) {
+          console.log('Fix Title: User is owner - attempting owner update...');
+          updateResult = await supabase
+            .from('properties_v2')
+            .update({ 
+              property_details: updatedPropertyDetails,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', property.id)
+            .eq('owner_id', user.id)
+            .select();
+        } else {
+          throw new Error('User has no permission to update this property');
+        }
+        
+        const { error, data, status, statusText } = updateResult;
+        
+        console.log('Fix Title: Update response status:', status);
+        console.log('Fix Title: Update response statusText:', statusText);
+        console.log('Fix Title: Update response error:', error);
+        console.log('Fix Title: Update response data:', data);
+        
+        if (error) {
+          console.error('Fix Title: Database update error:', error);
+          console.error('Fix Title: Error details:', {
+            code: error.code,
+            message: error.message,
+            details: error.details,
+            hint: error.hint
+          });
+          throw error;
+        }
+        
+        console.log('Fix Title: Database update completed');
+        console.log('Fix Title: Returned data from update:', data);
+        console.log('Fix Title: Number of rows updated:', data?.length || 0);
+        
+        if (!data || data.length === 0) {
+          console.error('Fix Title: No rows were updated! This suggests a permissions or RLS policy issue.');
+          throw new Error('Database update failed - no rows were affected. This may be due to Row Level Security policies.');
+        }
+        
+        // Verify the title was saved correctly
+        if (data && data[0] && data[0].property_details?.flow?.title) {
+          console.log('Fix Title: VERIFIED - Title saved correctly in database:', data[0].property_details.flow.title);
+        } else {
+          console.warn('Fix Title: WARNING - Could not verify title was saved correctly');
+          console.log('Fix Title: Returned data structure:', data);
         }
       }
       
-      // Show success toast
-      console.log('Fix Title: Showing success toast...');
-      toast({
-        title: "Title updated successfully",
-        description: `New title: "${newTitle}"`,
-      });
+      // Additional verification - fetch the property again to double-check
+      console.log('Fix Title: Double-checking by fetching property again...');
+      const { data: verifyData, error: verifyError } = await supabase
+        .from('properties_v2')
+        .select('property_details')
+        .eq('id', property.id)
+        .single();
       
-      // Refresh the property list
-      if (onPropertyUpdated) {
-        console.log('Fix Title: Calling onPropertyUpdated callback...');
-        onPropertyUpdated();
+      if (verifyError) {
+        console.error('Fix Title: Error during verification fetch:', verifyError);
       } else {
-        console.log('Fix Title: No onPropertyUpdated callback provided');
+        console.log('Fix Title: VERIFICATION FETCH - Current title in database:', verifyData?.property_details?.flow?.title);
+        if (verifyData?.property_details?.flow?.title === newTitle) {
+          console.log('Fix Title: ✅ VERIFICATION PASSED - Title correctly saved');
+        } else {
+          console.error('Fix Title: ❌ VERIFICATION FAILED - Title not saved correctly');
+          console.log('Fix Title: Expected:', newTitle);
+          console.log('Fix Title: Actually in DB:', verifyData?.property_details?.flow?.title);
+        }
       }
       
-      console.log('Fix Title: Process completed successfully');
+      toast({
+        title: "Title updated successfully",
+        description: `Old: "${currentTitle}" → New: "${newTitle}"`,
+      });
+      
+      if (onPropertyUpdated) {
+        onPropertyUpdated();
+      }
       
     } catch (error) {
       console.error('=== FIX TITLE ERROR ===');
-      console.error('Fix Title: ERROR occurred:', error);
-      console.error('Fix Title: Error type:', typeof error);
-      console.error('Fix Title: Error constructor:', error.constructor.name);
-      
-      if (error instanceof Error) {
-        console.error('Fix Title: Error message:', error.message);
-        console.error('Fix Title: Error stack:', error.stack);
-      }
-      
+      console.error('Fix Title: ERROR:', error);
       toast({
         title: "Failed to update title",
         description: error instanceof Error ? error.message : "An unexpected error occurred",
         variant: "destructive"
       });
     } finally {
-      console.log('Fix Title: Cleaning up - setting isFixingTitle to false');
       setIsFixingTitle(false);
       console.log('=== FIX TITLE DEBUG END ===');
     }
   };
   
-  // Function to delete property
+  // Function to delete property - Fixed implementation
   const deleteProperty = async (propertyId: string) => {
-    if (!user) return;
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "You must be logged in to delete properties",
+        variant: "destructive"
+      });
+      return;
+    }
     
     try {
       setIsDeleting(true);
-      console.log('Deleting property:', propertyId);
+      console.log('Attempting to delete property:', propertyId);
       
-      // Check if user is admin and use appropriate delete method
-      if (isAdmin) {
-        // Use admin delete method if user is admin
-        await propertyService.adminDeleteProperty(propertyId);
-      } else {
-        // Use regular delete method for property owners
-        await propertyService.deleteProperty(propertyId, user.id);
+      // First check if the property exists and get owner info
+      const { data: propertyData, error: fetchError } = await supabase
+        .from('properties_v2')
+        .select('owner_id, property_details')
+        .eq('id', propertyId)
+        .single();
+      
+      if (fetchError) {
+        console.error('Error fetching property:', fetchError);
+        throw new Error('Property not found or access denied');
+      }
+      
+      // Check permissions: user must be property owner or admin
+      const isOwner = propertyData.owner_id === user.id;
+      
+      if (!isOwner && !isAdmin) {
+        throw new Error('You do not have permission to delete this property');
+      }
+      
+      // Delete property images first (if any)
+      const { error: imagesError } = await supabase
+        .from('property_images')
+        .delete()
+        .eq('property_id', propertyId);
+      
+      if (imagesError) {
+        console.warn('Error deleting property images:', imagesError);
+        // Don't fail the whole operation if image deletion fails
+      }
+      
+      // Delete the property from properties_v2
+      const { error: deleteError } = await supabase
+        .from('properties_v2')
+        .delete()
+        .eq('id', propertyId);
+      
+      if (deleteError) {
+        console.error('Error deleting property:', deleteError);
+        throw deleteError;
       }
       
       toast({
-        title: "Property deleted",
-        description: "The property has been successfully deleted",
+        title: "Property deleted successfully",
+        description: "The property has been removed from the database",
       });
       
       // Notify parent component to refresh the list
@@ -381,9 +511,10 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
             alt={displayTitle}
             className="w-full h-full object-cover"
           />
-          {/* Property Flow Badge */}
+          
+          {/* Main Flow Badge */}
           <div className="absolute top-2 left-2">
-            <Badge className="bg-blue-500 hover:bg-blue-600">
+            <Badge className="bg-blue-500 hover:bg-blue-600 text-white">
               {flowLabel}
             </Badge>
           </div>
@@ -391,7 +522,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
           {/* Version Badge */}
           <div className="absolute bottom-2 right-2">
             <Badge 
-              className={`flex items-center gap-1 ${isAdmin ? 'bg-amber-500 hover:bg-amber-600' : 'bg-gray-500 hover:bg-gray-600'}`}
+              className="bg-gray-500 hover:bg-gray-600 text-white flex items-center gap-1"
               title="Data Structure Version"
             >
               <Info className="h-3 w-3" />
@@ -402,7 +533,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
           {/* Admin Badge */}
           {isAdmin && (
             <div className="absolute top-2 right-2">
-              <Badge className="bg-purple-600 hover:bg-purple-700 flex items-center gap-1">
+              <Badge className="bg-purple-600 hover:bg-purple-700 text-white flex items-center gap-1">
                 <ShieldAlert className="h-3 w-3" />
                 Admin
               </Badge>
@@ -413,65 +544,78 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
         <div className="flex-1 p-4">
           <CardHeader className="p-0 pb-2">
             <div className="flex justify-between items-start">
-              <div>
-                <h2 className="text-xl font-semibold line-clamp-1">{displayTitle}</h2>
-                <p className="text-gray-500 dark:text-gray-400 text-sm line-clamp-1">
+              <div className="flex-1">
+                <h2 className="text-xl font-semibold line-clamp-1 mb-1">{displayTitle}</h2>
+                <p className="text-gray-500 dark:text-gray-400 text-sm line-clamp-1 mb-2">
                   {address}, {city}, {state}
                 </p>
-                {/* Property ID Display */}
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  ID: <span className="font-mono select-all">{property.id}</span>
-                </p>
-                {/* Property Flow Display - Complete flow string */}
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Flow: <span className="font-medium text-blue-600 dark:text-blue-400">{propertyFlow}</span>
-                </p>
-                {/* Version Display */}
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Version: <span className={`font-medium ${isAdmin ? 'text-amber-600 dark:text-amber-400' : 'text-gray-600 dark:text-gray-400'}`}>
-                    {propertyVersion}
-                  </span>
-                </p>
-                {/* Property Type Tag */}
-                <div className="flex flex-wrap gap-1 mt-1">
-                  <Badge variant="outline" className="text-xs border-blue-500 text-blue-600 dark:text-blue-400">
-                    Type: {flowPropertyType}
+                
+                {/* Property Type and Listing Type - Clean Display */}
+                <div className="flex flex-wrap gap-2 mb-2">
+                  <Badge variant="outline" className="border-blue-500 text-blue-600 dark:text-blue-400">
+                    {propertyType}
                   </Badge>
-                  {/* Listing Type Tag */}
-                  <Badge variant="outline" className="text-xs border-green-500 text-green-600 dark:text-green-400">
-                    Listing: {flowListingType}
+                  <Badge variant="outline" className="border-green-500 text-green-600 dark:text-green-400">
+                    {listingType}
                   </Badge>
                 </div>
+                
+                {/* Owner Information - Prominent Display */}
                 {property.profiles && (
-                  <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                    Owner: {property.profiles.email}
-                  </p>
+                  <div className="bg-gray-50 dark:bg-gray-800 p-2 rounded mb-2">
+                    <div className="flex items-center gap-2 text-sm">
+                      <User className="h-4 w-4 text-blue-600" />
+                      <span className="font-medium text-blue-600 dark:text-blue-400">Owner:</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm mt-1">
+                      <Mail className="h-4 w-4 text-gray-500" />
+                      <span className="text-gray-700 dark:text-gray-300">{property.profiles.email}</span>
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      ID: <span className="font-mono">{property.profiles.id}</span>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Technical Details - Collapsed */}
+                {isAdmin && (
+                  <details className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                    <summary className="cursor-pointer hover:text-gray-700 dark:hover:text-gray-300">
+                      Technical Details
+                    </summary>
+                    <div className="mt-1 pl-2 border-l-2 border-gray-200 dark:border-gray-700">
+                      <p>Property ID: <span className="font-mono select-all">{property.id}</span></p>
+                      <p>Flow: <span className="font-medium text-blue-600 dark:text-blue-400">{propertyFlow}</span></p>
+                      <p>Version: <span className="font-medium">{propertyVersion}</span></p>
+                    </div>
+                  </details>
                 )}
               </div>
-              <Badge className="ml-2">
-                {flowCategory}
-              </Badge>
             </div>
           </CardHeader>
           
           <CardContent className="p-0 pb-2">
-            <div className="grid grid-cols-3 gap-2 my-2 text-sm">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 my-2 text-sm">
               <div>
-                <span className="font-medium">Price:</span> {formatPrice(price)}
+                <span className="font-medium">Price:</span>
+                <div className="text-lg font-bold text-green-600">{formatPrice(price)}</div>
               </div>
               {bedrooms && (
                 <div>
-                  <span className="font-medium">Type:</span> {bedrooms}
+                  <span className="font-medium">Type:</span>
+                  <div>{bedrooms}</div>
                 </div>
               )}
               {bathrooms && (
                 <div>
-                  <span className="font-medium">Bathrooms:</span> {bathrooms}
+                  <span className="font-medium">Bathrooms:</span>
+                  <div>{bathrooms}</div>
                 </div>
               )}
               {area && (
-                <div>
-                  <span className="font-medium">Area:</span> {area}
+                <div className="col-span-2 sm:col-span-1">
+                  <span className="font-medium">Area:</span>
+                  <div>{area}</div>
                 </div>
               )}
             </div>
@@ -483,12 +627,12 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
               variant="destructive"
               onClick={() => setIsDeleteDialogOpen(true)}
               className="flex items-center gap-1"
+              disabled={isDeleting}
             >
               <Trash2 className="h-4 w-4" />
               {isAdmin ? "Admin Delete" : "Delete"}
             </Button>
             
-            {/* Fix Title button - appears unconditionally for all properties */}
             <Button 
               size="sm" 
               variant="outline"
@@ -533,10 +677,19 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
             <p className="text-sm text-gray-500 dark:text-gray-400">
               {address}, {city}, {state}
             </p>
+            <div className="mt-2 flex gap-2">
+              <Badge variant="outline">{propertyType}</Badge>
+              <Badge variant="outline">{listingType}</Badge>
+            </div>
             {property.profiles && (
-              <p className="text-sm text-blue-600 font-medium mt-1">
-                Owner: {property.profiles.email}
-              </p>
+              <div className="mt-2 p-2 bg-gray-50 dark:bg-gray-800 rounded">
+                <p className="text-sm font-medium text-blue-600">
+                  Owner: {property.profiles.email}
+                </p>
+                <p className="text-xs text-gray-500">
+                  ID: {property.profiles.id}
+                </p>
+              </div>
             )}
           </div>
           <DialogFooter className="flex flex-row justify-end gap-2 mt-4">
