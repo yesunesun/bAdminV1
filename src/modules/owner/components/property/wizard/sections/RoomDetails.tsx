@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/RoomDetails.tsx
-// Version: 2.3.0
-// Last Modified: 19-05-2025 20:45 IST
-// Purpose: Added missing fields for PG/Hostel Room Details including meal options and room features
+// Version: 2.4.0
+// Last Modified: 26-05-2025 11:30 IST
+// Purpose: Fixed data duplication issue - only save to step location, not root
 
 import React, { useEffect } from 'react';
 import { FormData, FormSectionProps } from '../types';
@@ -65,7 +65,7 @@ const RoomDetails: React.FC<FormSectionProps> = ({
     // First try to get from the step
     const stepValue = getValues(getFieldPath(field));
     
-    // If not found in the step, try root level for backward compatibility
+    // If not found in the step, try root level for backward compatibility during migration
     if (stepValue === undefined) {
       return getValues(field);
     }
@@ -73,13 +73,10 @@ const RoomDetails: React.FC<FormSectionProps> = ({
     return stepValue;
   };
   
-  // Helper to set values with the correct path
+  // Helper to set values ONLY in the correct step path (no more dual registration)
   const setStepValue = (field: string, value: any, options?: any) => {
-    // Set in the proper step
+    // Only set in the proper step location
     setValue(getFieldPath(field), value, options);
-    
-    // Also set at root level for backward compatibility
-    setValue(field, value, options);
   };
 
   // Get array values (for checkboxes)
@@ -98,7 +95,7 @@ const RoomDetails: React.FC<FormSectionProps> = ({
     setStepValue(field, newValues, { shouldValidate: true });
   };
 
-  // When component mounts, ensure fields are registered in the correct step path
+  // When component mounts, migrate any root level fields to step location ONCE
   useEffect(() => {
     // Check if any of the fields are at root level but should be in step
     const fieldsToCheck = [
@@ -108,10 +105,16 @@ const RoomDetails: React.FC<FormSectionProps> = ({
     
     fieldsToCheck.forEach(field => {
       const rootValue = getValues(field);
-      if (rootValue !== undefined && rootValue !== null && rootValue !== '') {
-        // Root level field exists, also set it in the proper step
-        console.log(`Moving field ${field} from root to step ${actualStepId}`, rootValue);
+      const stepValue = getValues(getFieldPath(field));
+      
+      // Only migrate if root value exists and step doesn't have the value
+      if (rootValue !== undefined && rootValue !== null && rootValue !== '' && 
+          (stepValue === undefined || stepValue === null || stepValue === '')) {
+        console.log(`Migrating field ${field} from root to step ${actualStepId}`, rootValue);
         setStepValue(field, rootValue);
+        
+        // Clear the root level value to prevent duplication
+        setValue(field, undefined);
       }
     });
     
