@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyDetails/index.tsx
-// Version: 12.3.0
-// Last Modified: 21-05-2025 18:15 IST
-// Purpose: Added inline title editing capability from flow.title field
+// Version: 12.4.0
+// Last Modified: 25-05-2025 15:45 IST
+// Purpose: Added proper listing type display (PgHostel, Flatmates, etc.) from flow type
 
 import React, { useState, useEffect } from 'react';
 import { PropertyDetails as PropertyDetailsType } from '../../hooks/usePropertyDetails';
@@ -78,6 +78,100 @@ const formatIndianRupees = (amount: number | string): string => {
     currency: 'INR',
     maximumFractionDigits: 0
   }).format(numValue);
+};
+
+// Helper function to get display name for flow types
+const getFlowTypeDisplayName = (flowType: string): string => {
+  const flowDisplayNames: { [key: string]: string } = {
+    'residential_rent': 'Residential Rent',
+    'residential_sale': 'Residential Sale', 
+    'residential_flatmates': 'Flatmates',
+    'residential_pghostel': 'PG/Hostel',
+    'commercial_rent': 'Commercial Rent',
+    'commercial_sale': 'Commercial Sale',
+    'commercial_coworking': 'Coworking Space',
+    'land_sale': 'Land/Plot Sale'
+  };
+  
+  return flowDisplayNames[flowType] || flowType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+};
+
+// Helper function to get flow type from property data
+const detectFlowType = (property: any): string => {
+  // Parse property_details if it's a string
+  let details = property.property_details;
+  if (typeof details === 'string') {
+    try {
+      details = JSON.parse(details);
+    } catch (e) {
+      details = {};
+    }
+  } else if (!details) {
+    details = {};
+  }
+
+  // Try to get flow type from various locations
+  const flowType = 
+    // From flow object in property_details
+    details.flow?.flowType ||
+    // From direct property_details
+    details.flowType ||
+    // From property level
+    property.flow_type ||
+    property.flowType ||
+    // From steps (look for step patterns to infer flow)
+    (() => {
+      if (details.steps) {
+        const stepKeys = Object.keys(details.steps);
+        const firstStepKey = stepKeys[0];
+        
+        if (firstStepKey) {
+          // Extract flow type from step naming pattern
+          if (firstStepKey.includes('res_pg_')) return 'residential_pghostel';
+          if (firstStepKey.includes('res_flat_')) return 'residential_flatmates';
+          if (firstStepKey.includes('res_rent_')) return 'residential_rent';
+          if (firstStepKey.includes('res_sale_')) return 'residential_sale';
+          if (firstStepKey.includes('com_rent_')) return 'commercial_rent';
+          if (firstStepKey.includes('com_sale_')) return 'commercial_sale';
+          if (firstStepKey.includes('com_cow_')) return 'commercial_coworking';
+          if (firstStepKey.includes('land_sale_')) return 'land_sale';
+        }
+      }
+      return null;
+    })() ||
+    // Fallback based on property characteristics
+    (() => {
+      // Check for PG/Hostel indicators
+      if (details.pgDetails || 
+          Object.keys(details.steps || {}).some(key => key.includes('pg_details'))) {
+        return 'residential_pghostel';
+      }
+      
+      // Check for Flatmates indicators  
+      if (details.flatmateDetails || 
+          Object.keys(details.steps || {}).some(key => key.includes('flatmate'))) {
+        return 'residential_flatmates';
+      }
+      
+      // Check for Coworking indicators
+      if (details.coworkingDetails || 
+          Object.keys(details.steps || {}).some(key => key.includes('coworking'))) {
+        return 'commercial_coworking';
+      }
+      
+      // Check for Land indicators
+      if (details.landDetails || 
+          details.basicDetails?.propertyType === 'Land' ||
+          Object.keys(details.steps || {}).some(key => key.includes('land'))) {
+        return 'land_sale';
+      }
+      
+      // Default to residential rent
+      return 'residential_rent';
+    })();
+
+  console.log('[PropertyDetails] Detected flow type:', flowType);
+  return flowType;
 };
 
 // Component to render a single step section based on step data
@@ -531,10 +625,14 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
   // Extract structured data from property_details
   const propertyDetails = property.property_details || {};
   
+  // Detect the flow type dynamically
+  const detectedFlowType = detectFlowType(property);
+  const flowDisplayName = getFlowTypeDisplayName(detectedFlowType);
+  
   // Get flow information (category and listing type)
   const flow = propertyDetails.flow || { 
-    category: 'residential', 
-    listingType: 'rent',
+    category: detectedFlowType.split('_')[0] || 'residential', 
+    listingType: detectedFlowType.includes('sale') ? 'sale' : 'rent',
     title: 'Property Listing'
   };
   
@@ -592,7 +690,7 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
     : null;
   
   // Get price information
-  const isSaleProperty = flow.listingType.toLowerCase() === 'sale';
+  const isSaleProperty = detectedFlowType.includes('sale');
   
   // Find sale or rental details step
   const priceStepKey = Object.keys(steps).find(key => 
@@ -652,14 +750,27 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
            ownerId={ownerId}
            onTitleUpdated={handleTitleUpdated}
          />
-         <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-           isSaleProperty ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
-         }`}>
-           For {isSaleProperty ? 'Sale' : 'Rent'}
-         </span>
-         <span className="px-3 py-1 rounded-full bg-purple-100 text-purple-800 text-sm font-medium capitalize">
-           {flow.category}
-         </span>
+         
+         {/* Enhanced badge display with flow type */}
+         <div className="flex flex-wrap gap-2">
+           <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+             isSaleProperty ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
+           }`}>
+             For {isSaleProperty ? 'Sale' : 'Rent'}
+           </span>
+           
+           {/* Show specific flow type badge */}
+           <span className="px-3 py-1 rounded-full bg-purple-100 text-purple-800 text-sm font-medium">
+             {flowDisplayName}
+           </span>
+           
+           {/* Show category if different from flow display name */}
+           {flow.category && flow.category !== flowDisplayName.toLowerCase() && (
+             <span className="px-3 py-1 rounded-full bg-gray-100 text-gray-800 text-sm font-medium capitalize">
+               {flow.category}
+             </span>
+           )}
+         </div>
        </div>
        <p className="text-muted-foreground">{locationString}</p>
      </div>
