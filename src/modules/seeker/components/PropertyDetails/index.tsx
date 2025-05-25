@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyDetails/index.tsx
-// Version: 12.4.0
-// Last Modified: 25-05-2025 15:45 IST
-// Purpose: Added proper listing type display (PgHostel, Flatmates, etc.) from flow type
+// Version: 12.7.0
+// Last Modified: 25-05-2025 21:00 IST
+// Purpose: Added CoworkingDetailsSection for conditional rendering of Commercial Coworking property details
 
 import React, { useState, useEffect } from 'react';
 import { PropertyDetails as PropertyDetailsType } from '../../hooks/usePropertyDetails';
@@ -25,7 +25,14 @@ import { extractImagesFromJson } from './utils/propertyDataUtils';
 import PropertyGalleryCard from './PropertyGalleryCard';
 import PropertyLocationMap from './PropertyLocationMap';
 import PropertyLocationSection from './PropertyLocationSection';
-import PropertyTitleEditor from './PropertyTitleEditor'; // Import the new title editor
+import PropertyTitleEditor from './PropertyTitleEditor';
+// Import the section components
+import LandSaleDetailsSection from './LandSaleDetailsSection';
+import PGHostelDetailsSection from './PGHostelDetailsSection';
+import FlatmatesDetailsSection from './FlatmatesDetailsSection';
+import CoworkingDetailsSection from './CoworkingDetailsSection';
+import CoworkingSpecificDetailsSection from './CoworkingSpecificDetailsSection';
+import FeaturesAmenitiesSection from './FeaturesAmenitiesSection';
 
 // Define static data for similar properties
 const SIMILAR_PROPERTIES_DATA = [
@@ -70,9 +77,9 @@ const SIMILAR_PROPERTIES_DATA = [
 // Enhanced Indian Rupee formatter
 const formatIndianRupees = (amount: number | string): string => {
   const numValue = typeof amount === 'number' ? amount : Number(parseFloat(amount));
-  
+
   if (isNaN(numValue)) return '₹0';
-  
+
   return new Intl.NumberFormat('en-IN', {
     style: 'currency',
     currency: 'INR',
@@ -84,7 +91,7 @@ const formatIndianRupees = (amount: number | string): string => {
 const getFlowTypeDisplayName = (flowType: string): string => {
   const flowDisplayNames: { [key: string]: string } = {
     'residential_rent': 'Residential Rent',
-    'residential_sale': 'Residential Sale', 
+    'residential_sale': 'Residential Sale',
     'residential_flatmates': 'Flatmates',
     'residential_pghostel': 'PG/Hostel',
     'commercial_rent': 'Commercial Rent',
@@ -92,7 +99,7 @@ const getFlowTypeDisplayName = (flowType: string): string => {
     'commercial_coworking': 'Coworking Space',
     'land_sale': 'Land/Plot Sale'
   };
-  
+
   return flowDisplayNames[flowType] || flowType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 };
 
@@ -111,7 +118,7 @@ const detectFlowType = (property: any): string => {
   }
 
   // Try to get flow type from various locations
-  const flowType = 
+  const flowType =
     // From flow object in property_details
     details.flow?.flowType ||
     // From direct property_details
@@ -124,7 +131,7 @@ const detectFlowType = (property: any): string => {
       if (details.steps) {
         const stepKeys = Object.keys(details.steps);
         const firstStepKey = stepKeys[0];
-        
+
         if (firstStepKey) {
           // Extract flow type from step naming pattern
           if (firstStepKey.includes('res_pg_')) return 'residential_pghostel';
@@ -142,30 +149,30 @@ const detectFlowType = (property: any): string => {
     // Fallback based on property characteristics
     (() => {
       // Check for PG/Hostel indicators
-      if (details.pgDetails || 
-          Object.keys(details.steps || {}).some(key => key.includes('pg_details'))) {
+      if (details.pgDetails ||
+        Object.keys(details.steps || {}).some(key => key.includes('pg_details'))) {
         return 'residential_pghostel';
       }
-      
+
       // Check for Flatmates indicators  
-      if (details.flatmateDetails || 
-          Object.keys(details.steps || {}).some(key => key.includes('flatmate'))) {
+      if (details.flatmateDetails ||
+        Object.keys(details.steps || {}).some(key => key.includes('flatmate'))) {
         return 'residential_flatmates';
       }
-      
+
       // Check for Coworking indicators
-      if (details.coworkingDetails || 
-          Object.keys(details.steps || {}).some(key => key.includes('coworking'))) {
+      if (details.coworkingDetails ||
+        Object.keys(details.steps || {}).some(key => key.includes('coworking'))) {
         return 'commercial_coworking';
       }
-      
+
       // Check for Land indicators
-      if (details.landDetails || 
-          details.basicDetails?.propertyType === 'Land' ||
-          Object.keys(details.steps || {}).some(key => key.includes('land'))) {
+      if (details.landDetails ||
+        details.basicDetails?.propertyType === 'Land' ||
+        Object.keys(details.steps || {}).some(key => key.includes('land'))) {
         return 'land_sale';
       }
-      
+
       // Default to residential rent
       return 'residential_rent';
     })();
@@ -183,7 +190,7 @@ const StepSection: React.FC<{
   if (!stepData || Object.keys(stepData).length === 0) {
     return null;
   }
-  
+
   // Format step ID for display (e.g., "com_sale_basic_details" -> "Basic Details")
   const formatStepId = (id: string): string => {
     const parts = id.split('_');
@@ -193,25 +200,25 @@ const StepSection: React.FC<{
       .map(part => part.charAt(0).toUpperCase() + part.slice(1))
       .join(' ');
   };
-  
+
   const sectionTitle = title || formatStepId(stepId);
-  
+
   // Special handling for description field to display it as a paragraph
   const descriptionField = Object.entries(stepData).find(
     ([key]) => key.toLowerCase() === 'description'
   );
-  
+
   return (
     <Card className="p-4 md:p-6 shadow-sm">
       <h2 className="text-xl font-semibold mb-4">{sectionTitle}</h2>
-      
+
       {/* Render description as a paragraph if it exists */}
       {descriptionField && (
         <div className="mb-4">
           <p className="text-gray-700 whitespace-pre-line">{descriptionField[1]}</p>
         </div>
       )}
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3">
         {Object.entries(stepData)
           .filter(([key]) => key.toLowerCase() !== 'description') // Skip description as it's handled separately
@@ -236,20 +243,20 @@ const renderFieldValue = (field: any, key: string) => {
   if (field === null || field === undefined) {
     return 'Not specified';
   }
-  
+
   if (typeof field === 'boolean') {
     return field ? 'Yes' : 'No';
   }
-  
+
   if (Array.isArray(field)) {
     return field.join(', ');
   }
-  
+
   // Format date fields (keys containing 'date', 'from', etc.)
-  if (typeof field === 'string' && 
-      (key.toLowerCase().includes('date') || 
-       key.toLowerCase().includes('from') || 
-       key.toLowerCase().includes('possession'))) {
+  if (typeof field === 'string' &&
+    (key.toLowerCase().includes('date') ||
+      key.toLowerCase().includes('from') ||
+      key.toLowerCase().includes('possession'))) {
     try {
       const date = new Date(field);
       if (!isNaN(date.getTime())) {
@@ -263,19 +270,19 @@ const renderFieldValue = (field: any, key: string) => {
       // If date parsing fails, return the original string
     }
   }
-  
+
   // Format price fields (keys containing 'price', 'amount', etc.)
-  if ((typeof field === 'number' || !isNaN(Number(field))) && 
-      (key.toLowerCase().includes('price') || 
-       key.toLowerCase().includes('amount') || 
-       key.toLowerCase().includes('deposit') || 
-       key.toLowerCase().includes('cost') ||
-       key.toLowerCase().includes('value') ||
-       key.toLowerCase().includes('budget'))) {
+  if ((typeof field === 'number' || !isNaN(Number(field))) &&
+    (key.toLowerCase().includes('price') ||
+      key.toLowerCase().includes('amount') ||
+      key.toLowerCase().includes('deposit') ||
+      key.toLowerCase().includes('cost') ||
+      key.toLowerCase().includes('value') ||
+      key.toLowerCase().includes('budget'))) {
     const numValue = typeof field === 'number' ? field : Number(field);
     return formatIndianRupees(numValue);
   }
-  
+
   return field.toString();
 };
 
@@ -288,10 +295,10 @@ const BasicDetailsSection: React.FC<{
   if (!basicDetails) return null;
 
   const isSaleProperty = listingType.toLowerCase() === 'sale';
-  
+
   // Get property type, bedrooms, bathrooms, and area
   const propertyType = basicDetails?.propertyType || '';
-  
+
   // Extract bedrooms from bhkType
   let bedrooms = 0;
   if (basicDetails?.bhkType) {
@@ -300,11 +307,11 @@ const BasicDetailsSection: React.FC<{
       bedrooms = parseInt(match[1], 10);
     }
   }
-  
+
   const bathrooms = basicDetails?.bathrooms || 0;
   const builtUpArea = basicDetails?.builtUpArea || 0;
   const builtUpAreaUnit = basicDetails?.builtUpAreaUnit || 'sqft';
-  
+
   return (
     <Card className="p-4 md:p-6 shadow-sm">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4">
@@ -316,7 +323,7 @@ const BasicDetailsSection: React.FC<{
           {!isSaleProperty && <span className="text-gray-500 ml-1">/month</span>}
         </div>
       </div>
-      
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {propertyType && (
           <div className="flex flex-col">
@@ -324,21 +331,21 @@ const BasicDetailsSection: React.FC<{
             <span className="text-gray-900 capitalize">{propertyType}</span>
           </div>
         )}
-        
+
         {bedrooms > 0 && (
           <div className="flex flex-col">
             <span className="text-sm font-medium text-gray-500">Bedrooms</span>
             <span className="text-gray-900">{bedrooms}</span>
           </div>
         )}
-        
+
         {bathrooms > 0 && (
           <div className="flex flex-col">
             <span className="text-sm font-medium text-gray-500">Bathrooms</span>
             <span className="text-gray-900">{bathrooms}</span>
           </div>
         )}
-        
+
         {builtUpArea > 0 && (
           <div className="flex flex-col">
             <span className="text-sm font-medium text-gray-500">Built-up Area</span>
@@ -349,14 +356,14 @@ const BasicDetailsSection: React.FC<{
 
       {/* Display other basic details if available */}
       {Object.entries(basicDetails)
-        .filter(([key]) => 
-          !['propertyType', 'bhkType', 'bathrooms', 'builtUpArea', 'builtUpAreaUnit'].includes(key) && 
+        .filter(([key]) =>
+          !['propertyType', 'bhkType', 'bathrooms', 'builtUpArea', 'builtUpAreaUnit'].includes(key) &&
           key.toLowerCase() !== 'description'
         )
         .length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3 mt-4 border-t border-gray-200 pt-4">
             {Object.entries(basicDetails)
-              .filter(([key]) => 
+              .filter(([key]) =>
                 !['propertyType', 'bhkType', 'bathrooms', 'builtUpArea', 'builtUpAreaUnit'].includes(key) &&
                 key.toLowerCase() !== 'description'
               )
@@ -372,7 +379,7 @@ const BasicDetailsSection: React.FC<{
               ))}
           </div>
         )}
-        
+
       {/* Description if available */}
       {basicDetails.description && (
         <div className="mt-4 border-t border-gray-200 pt-4">
@@ -393,7 +400,7 @@ const LocationSection: React.FC<{
   zipCode?: string;
 }> = ({ location, address, city, state, zipCode }) => {
   if (!location && !address) return null;
-  
+
   // Format location string
   const locationParts = location ? [
     location.address,
@@ -402,17 +409,17 @@ const LocationSection: React.FC<{
     location.state,
     location.pinCode
   ].filter(Boolean) : [];
-  
+
   const locationString = locationParts.length > 0
     ? locationParts.join(', ')
-    : address 
+    : address
       ? [address, city, state, zipCode].filter(Boolean).join(', ')
       : "Location not specified";
-  
+
   // Extract coordinates from the location object
   const getCoordinates = () => {
     if (!location) return null;
-    
+
     // Try various coordinate formats
     if (location.latitude && location.longitude) {
       return {
@@ -420,18 +427,18 @@ const LocationSection: React.FC<{
         lng: parseFloat(location.longitude)
       };
     }
-    
+
     if (location.lat && location.lng) {
       return {
         lat: parseFloat(location.lat),
         lng: parseFloat(location.lng)
       };
     }
-    
+
     if (location.coordinates) {
       const lat = location.coordinates.lat || location.coordinates.latitude;
       const lng = location.coordinates.lng || location.coordinates.longitude;
-      
+
       if (lat && lng) {
         return {
           lat: parseFloat(lat),
@@ -439,33 +446,33 @@ const LocationSection: React.FC<{
         };
       }
     }
-    
+
     return null;
   };
-  
+
   const coordinates = getCoordinates();
-    
+
   return (
     <Card className="p-4 md:p-6 shadow-sm">
       <h2 className="text-xl font-semibold mb-4">Location</h2>
-      
+
       {/* Map Section - Now using PropertyLocationMap component */}
       <div className="mb-4 rounded-lg overflow-hidden">
-        <PropertyLocationMap 
+        <PropertyLocationMap
           coordinates={coordinates}
           address={location?.address || address}
           locality={location?.area || location?.locality}
           city={location?.city || city}
         />
       </div>
-      
+
       <p className="text-gray-700">{locationString}</p>
-      
+
       {/* Display other location details if available */}
       {location && Object.keys(location).length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3 mt-4 border-t border-gray-200 pt-4">
           {Object.entries(location)
-            .filter(([key]) => 
+            .filter(([key]) =>
               !['latitude', 'longitude', 'lat', 'lng', 'coordinates', 'address', 'area', 'city', 'state', 'pinCode'].includes(key)
             )
             .map(([key, value]) => (
@@ -491,19 +498,19 @@ const PricingDetailsSection: React.FC<{
   title?: string;
 }> = ({ listingType, pricingDetails, title }) => {
   if (!pricingDetails) return null;
-  
+
   const isSaleProperty = listingType.toLowerCase() === 'sale';
   const sectionTitle = title || (isSaleProperty ? 'Sale Details' : 'Rental Details');
-  
+
   // Format the main price display
   const mainPrice = isSaleProperty
     ? pricingDetails.expectedPrice || pricingDetails.price
     : pricingDetails.rentAmount || pricingDetails.monthlyRent;
-    
+
   return (
     <Card className="p-4 md:p-6 shadow-sm">
       <h2 className="text-xl font-semibold mb-4">{sectionTitle}</h2>
-      
+
       <div className="mb-4">
         <span className="text-sm font-medium text-gray-500">
           {isSaleProperty ? 'Expected Price' : 'Monthly Rent'}
@@ -513,11 +520,11 @@ const PricingDetailsSection: React.FC<{
           {!isSaleProperty && <span className="text-gray-500 text-base ml-1">/month</span>}
         </div>
       </div>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3">
         {Object.entries(pricingDetails)
-          .filter(([key]) => 
-            key !== (isSaleProperty ? 'expectedPrice' : 'rentAmount') && 
+          .filter(([key]) =>
+            key !== (isSaleProperty ? 'expectedPrice' : 'rentAmount') &&
             key !== (isSaleProperty ? 'price' : 'monthlyRent')
           )
           .map(([key, value]) => (
@@ -556,20 +563,20 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
   const [visitDialogOpen, setVisitDialogOpen] = useState(false);
   const [propertyImages, setPropertyImages] = useState<any[]>([]);
   const [displayTitle, setDisplayTitle] = useState('');
-  
+
   // Use effect to extract and process images
   useEffect(() => {
     if (!property) return;
-    
+
     // Extract images from the property JSON structure
     const extractedImages = extractImagesFromJson(property);
-    
+
     if (extractedImages.length > 0) {
       // Use setState to trigger re-render with images
       setPropertyImages(extractedImages);
     }
   }, [property]);
-  
+
   // Update image count in debug info to match actual property_details
   useEffect(() => {
     if (property && property.property_details && property.property_details.images) {
@@ -582,17 +589,17 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
           is_primary: !!img.isPrimary || !!img.is_primary,
           display_order: idx
         }));
-        
+
         setPropertyImages(directImages);
       }
     }
   }, [property]);
-  
+
   // Handle image upload completion
   const handleImageUploaded = () => {
     if (onRefresh) {
       onRefresh();
-      
+
       // After refresh, show toast notification
       setTimeout(() => {
         toast({
@@ -603,7 +610,7 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
       }, 500);
     }
   };
-  
+
   // Handle title update
   const handleTitleUpdated = (newTitle: string) => {
     setDisplayTitle(newTitle);
@@ -611,12 +618,12 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
       onRefresh();
     }
   };
-  
+
   // Loading state
   if (isLoading) {
     return <PropertyDetailsSkeleton />;
   }
-  
+
   // Error state - Property not found
   if (!property) {
     return <PropertyNotFound />;
@@ -624,103 +631,123 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
 
   // Extract structured data from property_details
   const propertyDetails = property.property_details || {};
-  
+
   // Detect the flow type dynamically
   const detectedFlowType = detectFlowType(property);
   const flowDisplayName = getFlowTypeDisplayName(detectedFlowType);
+
+  // Check if this is a land sale property
+  const isLandSaleProperty = detectedFlowType === 'land_sale';
   
+  // Check if this is a PG/Hostel property
+  const isPGHostelProperty = detectedFlowType === 'residential_pghostel';
+  
+  // Check if this is a Flatmates property
+  const isFlatmatesProperty = detectedFlowType === 'residential_flatmates';
+
+  // Check if this is a Commercial Coworking property
+  const isCoworkingProperty = detectedFlowType === 'commercial_coworking';
+
   // Get flow information (category and listing type)
-  const flow = propertyDetails.flow || { 
-    category: detectedFlowType.split('_')[0] || 'residential', 
+  const flow = propertyDetails.flow || {
+    category: detectedFlowType.split('_')[0] || 'residential',
     listingType: detectedFlowType.includes('sale') ? 'sale' : 'rent',
     title: 'Property Listing'
   };
-  
+
   // Get steps from property_details if available
   const steps = propertyDetails.steps || {};
-  
+
   // Get meta information
-  const meta = propertyDetails.meta || { 
-    id: property.id, 
-    owner_id: property.owner_id 
+  const meta = propertyDetails.meta || {
+    id: property.id,
+    owner_id: property.owner_id
   };
-  
+
   // Get media information
-  const media = propertyDetails.media || { 
-    photos: { images: [] } 
+  const media = propertyDetails.media || {
+    photos: { images: [] }
   };
 
   // Extract key details for title and overview
   const propertyId = property.id || meta.id;
   const ownerId = property.owner_id || meta.owner_id;
-  
+
   // Find the basic details step
-  const basicDetailsStepKey = Object.keys(steps).find(key => 
+  const basicDetailsStepKey = Object.keys(steps).find(key =>
     key.includes('basic_details')
   );
-  
+
   const basicDetails = basicDetailsStepKey ? steps[basicDetailsStepKey] : null;
-  
+
+  // Find land details step - specific for Land Sale properties
+  const landDetailsStepKey = Object.keys(steps).find(key =>
+    key.includes('land_details') || key.includes('land_features')
+  );
+
+  const landDetails = landDetailsStepKey ? steps[landDetailsStepKey] : null;
+
   // Get property title - use the display title if available (from editing), otherwise use flow.title
   const propertyTitle = displayTitle || flow.title || (basicDetails?.title || property.title || 'Property Listing');
-  
+
   // Get location information
-  const locationStepKey = Object.keys(steps).find(key => 
+  const locationStepKey = Object.keys(steps).find(key =>
     key.includes('location')
   );
-  
+
   const location = locationStepKey ? steps[locationStepKey] : null;
-  
+
   // Format location string for breadcrumb display
   const locationParts = location ? [
     location.area,
     location.city,
     location.state
   ].filter(Boolean) : [];
-  
+
   const locationString = locationParts.length > 0
     ? locationParts.join(', ')
     : property.city
       ? [property.city, property.state].filter(Boolean).join(', ')
       : "Location not specified";
-  
+
   // Get coordinates
   const coordinates = location
     ? { lat: parseFloat(location.latitude), lng: parseFloat(location.longitude) }
     : null;
-  
+
   // Get price information
   const isSaleProperty = detectedFlowType.includes('sale');
-  
+
   // Find sale or rental details step
-  const priceStepKey = Object.keys(steps).find(key => 
-    isSaleProperty 
-      ? key.includes('sale_details') 
-      : key.includes('rental') || key.includes('rent')
+  const priceStepKey = Object.keys(steps).find(key =>
+    isSaleProperty
+      ? key.includes('sale_details')
+      : key.includes('rental') || key.includes('rent') || key.includes('coworking_details')
   );
-  
+
   const priceDetails = priceStepKey ? steps[priceStepKey] : null;
-  
+
   // Get price value
   const price = isSaleProperty
     ? priceDetails?.expectedPrice || property.price || 0
-    : priceDetails?.rentAmount || property.price || 0;
-  
+    : priceDetails?.rentAmount || priceDetails?.monthlyRent || property.price || 0;
+
   // Find features/amenities steps
-  const featuresStepKey = Object.keys(steps).find(key => 
+  const featuresStepKey = Object.keys(steps).find(key =>
     key.includes('features') || key.includes('amenities')
   );
-  
+
   const featuresDetails = featuresStepKey ? steps[featuresStepKey] : null;
-  
+
   // Organize remaining steps by categories
-  const remainingStepKeys = Object.keys(steps).filter(key => 
-    key !== basicDetailsStepKey && 
-    key !== locationStepKey && 
+  const remainingStepKeys = Object.keys(steps).filter(key =>
+    key !== basicDetailsStepKey &&
+    key !== locationStepKey &&
     key !== priceStepKey &&
-    key !== featuresStepKey
+    key !== featuresStepKey &&
+    key !== landDetailsStepKey // Also exclude land details step
   );
-  
+
   // Handle share functionality
   const handleShare = () => {
     if (navigator.share) {
@@ -737,153 +764,163 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
       });
     }
   };
-  
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
       {/* Property Title Section with Listing Type Badge */}
       <div className="mb-6">
         <div className="flex flex-wrap items-center gap-3 mb-2">
-         {/* Replace static title with editable title component */}
-         <PropertyTitleEditor
-           propertyId={propertyId}
-           title={propertyTitle}
-           ownerId={ownerId}
-           onTitleUpdated={handleTitleUpdated}
-         />
-         
-         {/* Enhanced badge display with flow type */}
-         <div className="flex flex-wrap gap-2">
-           <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-             isSaleProperty ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
-           }`}>
-             For {isSaleProperty ? 'Sale' : 'Rent'}
-           </span>
-           
-           {/* Show specific flow type badge */}
-           <span className="px-3 py-1 rounded-full bg-purple-100 text-purple-800 text-sm font-medium">
-             {flowDisplayName}
-           </span>
-           
-           {/* Show category if different from flow display name */}
-           {flow.category && flow.category !== flowDisplayName.toLowerCase() && (
-             <span className="px-3 py-1 rounded-full bg-gray-100 text-gray-800 text-sm font-medium capitalize">
-               {flow.category}
-             </span>
-           )}
-         </div>
-       </div>
-       <p className="text-muted-foreground">{locationString}</p>
-     </div>
-     
-     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-       {/* Main Content Column */}
-       <div className="lg:col-span-2 space-y-6">
-         {/* Image Gallery - Using PropertyGalleryCard with direct blob URLs */}
-         <PropertyGalleryCard 
-           images={propertyImages} 
-           propertyId={propertyId}
-           directUrls={directUrls}
-         />
-         
-         {/* Image Upload Component (only shown to authorized users) */}
-         <PropertyImageUpload 
-           property={property} 
-           onImageUploaded={handleImageUploaded} 
-         />
-         
-         {/* Quick Actions */}
-         <PropertyActionButtons
-           isLiked={isLiked}
-           onToggleLike={onToggleLike}
-           onShare={handleShare}
-           onScheduleVisit={() => setVisitDialogOpen(true)}
-         />
-         
-         {/* Section 1: Basic Details */}
-         {basicDetails && (
-           <BasicDetailsSection 
-             basicDetails={basicDetails}
-             price={price}
-             listingType={flow.listingType}
-           />
-         )}
-         
-         {/* Section 2: Location - Use the PropertyLocationSection component */}
-         <PropertyLocationSection property={property} />
-         
-         {/* Section 3: Sale/Rental Details */}
-         {priceDetails && (
-           <PricingDetailsSection 
-             listingType={flow.listingType}
-             pricingDetails={priceDetails}
-           />
-         )}
-         
-         {/* Section 4: Features/Amenities */}
-         {featuresDetails && (
-           <StepSection 
-             stepId={featuresStepKey!}
-             stepData={featuresDetails}
-             title="Features & Amenities"
-           />
-         )}
-         
-         {/* Remaining sections in original order */}
-         {remainingStepKeys.map(stepId => (
-           <StepSection 
-             key={stepId}
-             stepId={stepId}
-             stepData={steps[stepId]}
-           />
-         ))}
-       </div>
-       
-       {/* Sidebar Column */}
-       <div className="space-y-6">
-         <ContactOwnerCard
-           propertyTitle={propertyTitle}
-           propertyId={propertyId}
-           ownerId={ownerId}
-           ownerInfo={property.ownerInfo}
-         />
-         
-         {property.property_details?.highlights && (
-           <PropertyHighlightsCard 
-             highlights={property.property_details.highlights} 
-           />
-         )}
-         
-         <SimilarProperties 
-           properties={SIMILAR_PROPERTIES_DATA.map(prop => ({
-             id: prop.id,
-             title: prop.title,
-             city: prop.city,
-             state: prop.state,
-             price: prop.price,
-             bedrooms: prop.bedrooms,
-             bathrooms: prop.bathrooms,
-             square_feet: prop.square_feet
-           }))} 
-         />
-         
-         <NearbyAmenities
-           address={location?.address || property.address}
-           city={location?.city || property.city}
-           state={location?.state || property.state}
-           coordinates={coordinates}
-           radius={1500}
-         />
-       </div>
-     </div>
-     
-     {/* Visit Request Dialog */}
-     <VisitRequestDialog
-       propertyId={propertyId}
-       open={visitDialogOpen}
-       onOpenChange={setVisitDialogOpen}
-     />
-   </div>
- );
+          {/* Replace static title with editable title component */}
+          <PropertyTitleEditor
+            propertyId={propertyId}
+            title={propertyTitle}
+            ownerId={ownerId}
+            onTitleUpdated={handleTitleUpdated}
+          />
+
+          {/* Enhanced badge display with flow type */}
+          <div className="flex flex-wrap gap-2">
+            <span className={`px-3 py-1 rounded-full text-sm font-medium ${isSaleProperty ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
+              }`}>
+              For {isSaleProperty ? 'Sale' : 'Rent'}
+            </span>
+
+            {/* Show specific flow type badge */}
+            <span className="px-3 py-1 rounded-full bg-purple-100 text-purple-800 text-sm font-medium">
+              {flowDisplayName}
+            </span>
+
+            {/* Show category if different from flow display name */}
+            {flow.category && flow.category !== flowDisplayName.toLowerCase() && (
+              <span className="px-3 py-1 rounded-full bg-gray-100 text-gray-800 text-sm font-medium capitalize">
+                {flow.category}
+              </span>
+            )}
+          </div>
+        </div>
+        <p className="text-muted-foreground">{locationString}</p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Main Content Column */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Image Gallery - Using PropertyGalleryCard with direct blob URLs */}
+          <PropertyGalleryCard
+            images={propertyImages}
+            propertyId={propertyId}
+            directUrls={directUrls}
+          />
+
+          {/* Image Upload Component (only shown to authorized users) */}
+          <PropertyImageUpload
+            property={property}
+            onImageUploaded={handleImageUploaded}
+          />
+
+          {/* Quick Actions */}
+          <PropertyActionButtons
+            isLiked={isLiked}
+            onToggleLike={onToggleLike}
+            onShare={handleShare}
+            onScheduleVisit={() => setVisitDialogOpen(true)}
+          />
+
+          {/* Conditionally render property-specific details sections */}
+          {isLandSaleProperty ? (
+            <LandSaleDetailsSection landDetails={steps} />
+          ) : isPGHostelProperty ? (
+            <PGHostelDetailsSection pgDetails={steps} />
+          ) : isFlatmatesProperty ? (
+            <FlatmatesDetailsSection flatmatesDetails={steps} />
+          ) : isCoworkingProperty ? (
+            <CoworkingDetailsSection coworkingDetails={steps} />
+          ) : (
+            basicDetails && (
+              <BasicDetailsSection
+                basicDetails={basicDetails}
+                price={price}
+                listingType={flow.listingType}
+              />
+            )
+          )}
+
+          {/* Section 2: Location - Use the PropertyLocationSection component */}
+          <PropertyLocationSection property={property} />
+
+          {/* Section 2.5: Coworking Specific Details - Only show for coworking properties */}
+          {isCoworkingProperty && (
+            <CoworkingSpecificDetailsSection coworkingDetails={steps} />
+          )}
+
+          {/* Section 3: Sale/Rental Details - Only show if not PG/Hostel, Flatmates, or Coworking (since these sections include pricing) */}
+          {priceDetails && !isPGHostelProperty && !isFlatmatesProperty && !isCoworkingProperty && (
+            <PricingDetailsSection
+              listingType={flow.listingType}
+              pricingDetails={priceDetails}
+            />
+          )}
+
+          {/* Section 4: Features/Amenities - Using enhanced component */}
+          {featuresDetails && (
+            <FeaturesAmenitiesSection featuresData={featuresDetails} />
+          )}
+
+          {/* Remaining sections in original order */}
+          {remainingStepKeys.map(stepId => (
+            <StepSection
+              key={stepId}
+              stepId={stepId}
+              stepData={steps[stepId]}
+            />
+          ))}
+        </div>
+
+        {/* Sidebar Column */}
+        <div className="space-y-6">
+          <ContactOwnerCard
+            propertyTitle={propertyTitle}
+            propertyId={propertyId}
+            ownerId={ownerId}
+            ownerInfo={property.ownerInfo}
+          />
+
+          {property.property_details?.highlights && (
+            <PropertyHighlightsCard
+              highlights={property.property_details.highlights}
+            />
+          )}
+
+          <SimilarProperties
+            properties={SIMILAR_PROPERTIES_DATA.map(prop => ({
+              id: prop.id,
+              title: prop.title,
+              city: prop.city,
+              state: prop.state,
+              price: prop.price,
+              bedrooms: prop.bedrooms,
+              bathrooms: prop.bathrooms,
+              square_feet: prop.square_feet
+            }))}
+          />
+
+          <NearbyAmenities
+            address={location?.address || property.address}
+            city={location?.city || property.city}
+            state={location?.state || property.state}
+            coordinates={coordinates}
+            radius={1500}
+          />
+        </div>
+      </div>
+
+      {/* Visit Request Dialog */}
+      <VisitRequestDialog
+        propertyId={propertyId}
+        open={visitDialogOpen}
+        onOpenChange={setVisitDialogOpen}
+      />
+    </div>
+  );
 };
 
 export default PropertyDetails;
