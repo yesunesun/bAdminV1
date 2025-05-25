@@ -1,6 +1,6 @@
 // src/components/LazyImage.tsx
 // Version: 1.0.0
-// Last Modified: 27-05-2025 16:15 IST
+// Last Modified: 27-05-2025 19:15 IST
 // Purpose: Lazy loading image component with progressive enhancement
 
 import React, { useState, useRef, useEffect } from 'react';
@@ -65,8 +65,8 @@ const LazyImage: React.FC<LazyImageProps> = ({
         else if (image.url) {
           imageUrl = image.url;
         }
-        // Priority 3: Get URL from image service
-        else if (image.fileName && propertyId) {
+        // Priority 3: Get URL from image service (if it exists)
+        else if (image.fileName && propertyId && typeof imageService !== 'undefined') {
           imageUrl = await imageService.getImageUrl(propertyId, image.fileName);
         }
         

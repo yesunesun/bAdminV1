@@ -1,23 +1,21 @@
 // src/services/imageService.ts
 // Version: 1.0.0
-// Last Modified: 27-05-2025 14:30 IST
-// Purpose: Optimized image service for fast loading
+// Last Modified: 27-05-2025 19:30 IST
+// Purpose: Simplified image service for immediate bug fix
 
 import { supabase } from '@/lib/supabase';
 
 interface CachedImage {
   url: string;
   timestamp: number;
-  blobUrl?: string;
 }
 
 class ImageService {
   private cache = new Map<string, CachedImage>();
-  private pendingRequests = new Map<string, Promise<string>>();
   private readonly CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
   private readonly STORAGE_BUCKET = 'property-images-v2';
 
-  // Get image URL with caching
+  // Get image URL with basic caching
   async getImageUrl(propertyId: string, fileName: string): Promise<string> {
     if (!propertyId || !fileName) return '/noimage.png';
 
@@ -32,68 +30,29 @@ class ImageService {
     // Check cache first
     const cached = this.cache.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < this.CACHE_DURATION) {
-      return cached.blobUrl || cached.url;
+      return cached.url;
     }
 
-    // Check if request is already pending
-    const pending = this.pendingRequests.get(cacheKey);
-    if (pending) return pending;
-
-    // Create new request
-    const promise = this.createImageUrl(propertyId, fileName, cacheKey);
-    this.pendingRequests.set(cacheKey, promise);
-
     try {
-      const url = await promise;
-      this.pendingRequests.delete(cacheKey);
-      return url;
+      // Try to get public URL
+      const { data: urlData } = supabase
+        .storage
+        .from(this.STORAGE_BUCKET)
+        .getPublicUrl(`${propertyId}/${fileName}`);
+
+      const publicUrl = `${urlData.publicUrl}?t=${Date.now()}`;
+      
+      // Cache public URL
+      this.cache.set(cacheKey, {
+        url: publicUrl,
+        timestamp: Date.now()
+      });
+
+      return publicUrl;
     } catch (error) {
-      this.pendingRequests.delete(cacheKey);
       console.error(`Failed to load image ${cacheKey}:`, error);
       return '/noimage.png';
     }
-  }
-
-  private async createImageUrl(propertyId: string, fileName: string, cacheKey: string): Promise<string> {
-    try {
-      // Method 1: Try to create blob URL for best performance
-      const { data, error } = await supabase
-        .storage
-        .from(this.STORAGE_BUCKET)
-        .download(`${propertyId}/${fileName}`);
-
-      if (!error && data) {
-        const blob = new Blob([data], { type: 'image/jpeg' });
-        const blobUrl = URL.createObjectURL(blob);
-        
-        // Cache with blob URL
-        this.cache.set(cacheKey, {
-          url: blobUrl,
-          blobUrl,
-          timestamp: Date.now()
-        });
-
-        return blobUrl;
-      }
-    } catch (error) {
-      console.warn(`Blob creation failed for ${cacheKey}, falling back to public URL`);
-    }
-
-    // Method 2: Fall back to public URL
-    const { data: urlData } = supabase
-      .storage
-      .from(this.STORAGE_BUCKET)
-      .getPublicUrl(`${propertyId}/${fileName}`);
-
-    const publicUrl = `${urlData.publicUrl}?t=${Date.now()}`;
-    
-    // Cache public URL
-    this.cache.set(cacheKey, {
-      url: publicUrl,
-      timestamp: Date.now()
-    });
-
-    return publicUrl;
   }
 
   // Preload multiple images in parallel
@@ -105,23 +64,9 @@ class ImageService {
     return Promise.all(promises);
   }
 
-  // Clean up blob URLs to prevent memory leaks
+  // Clean up cache
   cleanup() {
-    this.cache.forEach(cached => {
-      if (cached.blobUrl && cached.blobUrl.startsWith('blob:')) {
-        URL.revokeObjectURL(cached.blobUrl);
-      }
-    });
     this.cache.clear();
-    this.pendingRequests.clear();
-  }
-
-  // Get cache stats for debugging
-  getCacheStats() {
-    return {
-      cacheSize: this.cache.size,
-      pendingRequests: this.pendingRequests.size
-    };
   }
 }
 
