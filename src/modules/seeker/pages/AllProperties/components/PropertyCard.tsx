@@ -300,7 +300,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
     }
   };
   
-  // Function to delete property - Fixed implementation
+  // Function to delete property - Simplified working solution without non-existent functions
   const deleteProperty = async (propertyId: string) => {
     if (!user) {
       toast({
@@ -313,7 +313,10 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
     
     try {
       setIsDeleting(true);
+      console.log('=== DELETE PROPERTY DEBUG START ===');
       console.log('Attempting to delete property:', propertyId);
+      console.log('User ID:', user.id);
+      console.log('Is Admin:', isAdmin);
       
       // First check if the property exists and get owner info
       const { data: propertyData, error: fetchError } = await supabase
@@ -324,41 +327,120 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
       
       if (fetchError) {
         console.error('Error fetching property:', fetchError);
-        throw new Error('Property not found or access denied');
+        throw new Error(`Property not found: ${fetchError.message}`);
       }
+      
+      console.log('Property found - Owner ID:', propertyData.owner_id);
       
       // Check permissions: user must be property owner or admin
       const isOwner = propertyData.owner_id === user.id;
+      console.log('User is owner:', isOwner);
+      console.log('User is admin:', isAdmin);
       
       if (!isOwner && !isAdmin) {
         throw new Error('You do not have permission to delete this property');
       }
       
-      // Delete property images first (if any)
-      const { error: imagesError } = await supabase
-        .from('property_images')
-        .delete()
-        .eq('property_id', propertyId);
+      console.log('Starting deletion process...');
       
-      if (imagesError) {
-        console.warn('Error deleting property images:', imagesError);
-        // Don't fail the whole operation if image deletion fails
+      // Delete related records first (these usually work fine)
+      const deletionSteps = [
+        { table: 'property_likes', field: 'property_id', name: 'Property Likes' },
+        { table: 'properties_v2_likes', field: 'property_id', name: 'V2 Property Likes' },
+        { table: 'v2_favorites', field: 'property_id', name: 'V2 Favorites' },
+        { table: 'property_visits', field: 'property_id', name: 'Property Visits' },
+        { table: 'owner_notifications', field: 'property_id', name: 'Owner Notifications' },
+        { table: 'property_images', field: 'property_id', name: 'Property Images' },
+        { table: 'temp_property_listing', field: 'id', name: 'Temp Property Listing' }
+      ];
+      
+      console.log('Deleting related records...');
+      for (const step of deletionSteps) {
+        try {
+          const { error, count } = await supabase
+            .from(step.table)
+            .delete()
+            .eq(step.field, propertyId);
+          
+          if (error) {
+            console.warn(`Warning: Could not delete from ${step.name}:`, error.message);
+          } else {
+            console.log(`✅ ${step.name} deleted successfully (${count || 0} records)`);
+          }
+        } catch (err) {
+          console.warn(`Warning: ${step.name} deletion failed:`, err);
+        }
       }
       
-      // Delete the property from properties_v2
-      const { error: deleteError } = await supabase
-        .from('properties_v2')
-        .delete()
-        .eq('id', propertyId);
+      // Now delete the main property record
+      console.log('Deleting main property record...');
+      
+      let deleteResult;
+      
+      if (isAdmin) {
+        console.log('Admin deletion: Attempting to delete any property...');
+        // For admins, try to delete without owner constraint
+        deleteResult = await supabase
+          .from('properties_v2')
+          .delete()
+          .eq('id', propertyId)
+          .select('id'); // Select minimal data to confirm deletion
+      } else {
+        console.log('Owner deletion: Attempting to delete own property...');
+        // For owners, only delete if they own it
+        deleteResult = await supabase
+          .from('properties_v2')
+          .delete()
+          .eq('id', propertyId)
+          .eq('owner_id', user.id)
+          .select('id'); // Select minimal data to confirm deletion
+      }
+      
+      const { error: deleteError, data: deleteData } = deleteResult;
+      
+      console.log('Delete result error:', deleteError);
+      console.log('Delete result data:', deleteData);
+      console.log('Number of records deleted:', deleteData ? deleteData.length : 0);
       
       if (deleteError) {
         console.error('Error deleting property:', deleteError);
-        throw deleteError;
+        console.error('Delete error details:', {
+          code: deleteError.code,
+          message: deleteError.message,
+          details: deleteError.details,
+          hint: deleteError.hint
+        });
+        
+        // Provide specific error messages based on error type
+        if (deleteError.code === '42501') {
+          throw new Error('Permission denied: Admin users need additional database permissions to delete properties owned by other users.');
+        } else if (deleteError.message.includes('permission') || deleteError.message.includes('policy')) {
+          throw new Error(`Database security policy error: ${deleteError.message}`);
+        } else {
+          throw new Error(`Database error: ${deleteError.message}`);
+        }
       }
+      
+      // Check if any rows were actually deleted
+      const deletedCount = deleteData ? deleteData.length : 0;
+      if (deletedCount === 0) {
+        console.error('No rows were deleted - this indicates an RLS policy issue');
+        
+        if (isAdmin && !isOwner) {
+          throw new Error('Admin deletion failed: The database Row Level Security policies do not allow admins to delete properties owned by other users. This needs to be configured at the database level.');
+        } else {
+          throw new Error('Property deletion failed: No rows were affected. This may be due to database security policies or the property may not exist.');
+        }
+      }
+      
+      console.log('✅ Property deleted successfully!');
+      console.log(`Deleted ${deletedCount} property record(s)`);
       
       toast({
         title: "Property deleted successfully",
-        description: "The property has been removed from the database",
+        description: isAdmin 
+          ? `Property removed by admin (${deletedCount} record deleted)`
+          : "Your property has been removed successfully",
       });
       
       // Notify parent component to refresh the list
@@ -367,14 +449,23 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
       }
       
     } catch (err) {
-      console.error('Error deleting property:', err);
+      console.error('=== DELETE PROPERTY ERROR ===');
+      console.error('Delete error:', err);
+      
+      let errorMessage = "Failed to delete property";
+      if (err instanceof Error) {
+        errorMessage = err.message;
+      }
+      
+      // Show user-friendly error message
       toast({
         title: "Delete failed",
-        description: err instanceof Error ? err.message : "Failed to delete property",
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {
       setIsDeleting(false);
+      console.log('=== DELETE PROPERTY DEBUG END ===');
     }
   };
   
