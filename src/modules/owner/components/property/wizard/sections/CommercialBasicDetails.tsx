@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/CommercialBasicDetails.tsx
-// Version: 1.4.0
-// Last Modified: 19-05-2025 23:15 IST
-// Purpose: Fixed to store values in the correct step structure (com_rent_basic_details)
+// Version: 1.5.0
+// Last Modified: 26-05-2025 12:00 IST
+// Purpose: Fixed data duplication issue - only save to step location, not root
 
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { FormSection } from '@/components/FormSection';
@@ -73,18 +73,15 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
     const stepValue = form.getValues(`steps.${stepId}.${fieldName}`);
     if (stepValue !== undefined) return stepValue;
     
-    // Fall back to root level value
+    // Fall back to root level value for backward compatibility during migration
     const rootValue = form.getValues(fieldName);
     return rootValue !== undefined ? rootValue : defaultValue;
   };
   
-  // Helper function to set field in both step and root (for backwards compatibility)
+  // Helper function to set field ONLY in step location (no more dual registration)
   const setFieldValue = (fieldName: string, value: any, validate = false) => {
-    // Set in step structure
+    // Only set in step structure
     form.setValue(`steps.${stepId}.${fieldName}`, value, { shouldValidate: validate });
-    
-    // Set at root level for backward compatibility
-    form.setValue(fieldName, value, { shouldValidate: validate });
   };
   
   // Subscribe to form changes with improved handling
@@ -126,7 +123,7 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
       }
     });
     
-    // One-time initialization
+    // One-time initialization and migration
     if (!initialProcessDone.current) {
       console.log('First-time processing of initial values');
       initialProcessDone.current = true;
@@ -147,7 +144,7 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
         setFieldValue('builtUpAreaUnit', 'sqft', false);
       }
       
-      // Move root level values to step structure if they exist
+      // Migrate root level values to step structure if they exist and clear root
       const fieldsToMove = [
         'propertyType', 'buildingType', 'ageOfProperty', 'builtUpArea',
         'builtUpAreaUnit', 'floor', 'totalFloors', 'cabins', 'conferenceRooms',
@@ -156,9 +153,16 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
       
       fieldsToMove.forEach(field => {
         const rootValue = form.getValues(field);
-        if (rootValue !== undefined && rootValue !== '') {
-          console.log(`Moving root field ${field} to step structure:`, rootValue);
+        const stepValue = form.getValues(`steps.${stepId}.${field}`);
+        
+        // Only migrate if root value exists and step doesn't have the value
+        if (rootValue !== undefined && rootValue !== '' && 
+            (stepValue === undefined || stepValue === null || stepValue === '')) {
+          console.log(`Migrating root field ${field} to step structure:`, rootValue);
           setFieldValue(field, rootValue, false);
+          
+          // Clear the root level value to prevent duplication
+          form.setValue(field, undefined, { shouldValidate: false });
         }
       });
       
@@ -222,7 +226,7 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
       [field]: value
     }));
     
-    // Update form field in both step structure and root level
+    // Update form field ONLY in step structure
     setFieldValue(field, value, true);
     
     // Debug log
