@@ -1,22 +1,20 @@
 // src/modules/owner/components/property/wizard/sections/PropertySummary/PropertySummaryPage.tsx
-// Version: 3.0.0
-// Last Modified: 21-05-2025 18:00 IST
-// Purpose: Removed references to deleted PropertyTitleEditor component
+// Version: 4.0.0
+// Last Modified: 25-05-2025 14:40 IST
+// Purpose: Enhanced PropertySummaryPage with improved title generation integration
 
-import React, { useEffect, useState, useCallback } from 'react';
-import { Info, Clock, MapPin, Edit, Check } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Info, Clock, MapPin, Edit, Check, RefreshCw } from 'lucide-react';
 import { PropertySummaryProps } from './types';
 import { useFlowDetection } from './hooks/useFlowDetection';
 import { usePropertyData } from './hooks/usePropertyData';
+import { usePropertyTitle } from './hooks/usePropertyTitle';
 import { FlowFactory } from './flows/FlowFactory';
-import { BaseSummaryFlow } from './flows/base/BaseSummaryFlow';
 import { prepareFormDataForSubmission } from '../../utils/formDataFormatter';
 import { Card, CardContent } from '@/components/ui/card';
 import { DescriptionSection } from './components/DescriptionSection';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-// Import the seeker's title generator directly
-import { generatePropertyTitle } from '@/modules/seeker/utils/propertyTitleUtils';
 
 // Helper function to capitalize first letter of each word
 const capitalizeEachWord = (str: string): string => {
@@ -40,82 +38,17 @@ export const PropertySummaryPage: React.FC<PropertySummaryProps> = (props) => {
   // Use property data hook to get derived values
   const { fullAddress, description, flowInfo } = usePropertyData(formData, stepIds);
   
-  // Simple title management (replacing usePropertyTitle hook)
-  const [isEditingTitle, setIsEditingTitle] = useState(false);
-  const [editedTitle, setEditedTitle] = useState('');
-  
-  // Initialize title when formData or flow changes
-  useEffect(() => {
-    if (!formData) return;
-    
-    // Get title directly from flow.title or generate a new one
-    const existingTitle = formData.flow?.title || '';
-    
-    if (existingTitle && existingTitle !== "New Property") {
-      setEditedTitle(existingTitle);
-    } else {
-      try {
-        // Format formData for the seeker's title generator
-        const propertyData = {
-          property_details: formData,
-          address: formData.steps?.[stepIds.location || '']?.address || '',
-          city: formData.steps?.[stepIds.location || '']?.city || '',
-          locality: formData.steps?.[stepIds.location || '']?.locality || '',
-          bedrooms: formData.steps?.[stepIds.basicDetails || '']?.bhkType?.replace('BHK', '').trim() || '',
-        };
-        
-        // Generate a title using the seeker's generator
-        const generatedTitle = generatePropertyTitle(propertyData);
-        console.log('Generated title using seeker utility:', generatedTitle);
-        
-        // Update only flow.title
-        if (formData.flow) {
-          formData.flow.title = generatedTitle.trim();
-        } else {
-          formData.flow = { title: generatedTitle.trim() };
-        }
-        
-        setEditedTitle(generatedTitle);
-      } catch (error) {
-        console.error('Error generating title:', error);
-        // Set a generic title as fallback
-        const fallbackTitle = 'New Property Listing';
-        
-        // Update only flow.title
-        if (formData.flow) {
-          formData.flow.title = fallbackTitle;
-        } else {
-          formData.flow = { title: fallbackTitle };
-        }
-        
-        setEditedTitle(fallbackTitle);
-      }
-    }
-  }, [formData, stepIds, flowType]);
-  
-  // Handle title edit completion
-  const handleTitleEditComplete = useCallback(() => {
-    if (editedTitle.trim()) {
-      // Update only flow.title
-      if (formData.flow) {
-        formData.flow.title = editedTitle.trim();
-      } else {
-        formData.flow = { title: editedTitle.trim() };
-      }
-    }
-    setIsEditingTitle(false);
-  }, [editedTitle, formData]);
-  
-  // Handle keyboard events
-  const handleTitleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleTitleEditComplete();
-    } else if (e.key === 'Escape') {
-      const currentTitle = formData.flow?.title || '';
-      setEditedTitle(currentTitle);
-      setIsEditingTitle(false);
-    }
-  }, [formData, handleTitleEditComplete]);
+  // Use the enhanced property title hook
+  const {
+    isEditingTitle,
+    setIsEditingTitle,
+    editedTitle,
+    setEditedTitle,
+    handleTitleEditComplete,
+    handleTitleKeyDown,
+    regenerateTitle,
+    currentTitle
+  } = usePropertyTitle(formData, stepIds, flowType);
   
   // Transform data on initial render
   useEffect(() => {
@@ -148,8 +81,10 @@ export const PropertySummaryPage: React.FC<PropertySummaryProps> = (props) => {
       };
       
       setTransformedData(cleanedData);
+      
+      console.log('PropertySummaryPage - Transformed data:', cleanedData);
     } catch (error) {
-      console.error('Transformation error:', error);
+      console.error('PropertySummaryPage - Transformation error:', error);
       setError('Failed to transform data. Please try again.');
     } finally {
       setIsLoading(false);
@@ -162,6 +97,7 @@ export const PropertySummaryPage: React.FC<PropertySummaryProps> = (props) => {
       <div className="py-6 px-4">
         <div className="flex justify-center items-center h-48">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          <p className="ml-4 text-muted-foreground">Preparing property summary...</p>
         </div>
       </div>
     );
@@ -173,9 +109,11 @@ export const PropertySummaryPage: React.FC<PropertySummaryProps> = (props) => {
       <div className="py-6 px-4">
         <div className="flex justify-center items-center h-48 text-red-500">
           <div className="text-center">
+            <Info className="h-8 w-8 mx-auto mb-4" />
             <p className="text-lg font-semibold mb-4">Something went wrong</p>
+            <p className="text-sm mb-4">{error}</p>
             <button 
-              className="px-4 py-2 bg-blue-500 text-white rounded-md"
+              className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
               onClick={() => window.location.reload()}
             >
               Refresh Page
@@ -189,94 +127,180 @@ export const PropertySummaryPage: React.FC<PropertySummaryProps> = (props) => {
   // Use transformed data for rendering
   const dataToRender = transformedData || formData;
   
-  // Get property title
-  const propertyTitle = dataToRender?.flow?.title || editedTitle || 'Property Details';
-  
   // Get the flow component for the current flow type
   const FlowComponent = FlowFactory.getFlowComponent(flowType);
   
   return (
-    <div className="space-y-6 py-4">
-      {/* HEADER: Property Title with inline editor */}
-      <div className="mb-6">
+    <div className="space-y-6 py-4 max-w-4xl mx-auto">
+      {/* HEADER: Property Title with enhanced inline editor */}
+      <div className="mb-6 bg-white p-6 rounded-lg shadow-sm border">
         {isEditingTitle ? (
-          <div className="flex items-center gap-2">
-            <Input
-              type="text"
-              value={editedTitle}
-              onChange={(e) => setEditedTitle(e.target.value)}
-              onKeyDown={handleTitleKeyDown}
-              autoFocus
-              className="text-lg font-semibold h-10"
-              placeholder="Enter property title"
-            />
-            <Button 
-              size="sm" 
-              variant="ghost" 
-              onClick={handleTitleEditComplete}
-              className="p-2 h-10 w-10"
-            >
-              <Check className="h-5 w-5" />
-            </Button>
+          <div className="space-y-3">
+            <label className="text-sm font-medium text-gray-700">Edit Property Title</label>
+            <div className="flex items-center gap-2">
+              <Input
+                type="text"
+                value={editedTitle}
+                onChange={(e) => setEditedTitle(e.target.value)}
+                onKeyDown={handleTitleKeyDown}
+                autoFocus
+                className="text-lg font-semibold h-12"
+                placeholder="Enter property title"
+              />
+              <Button 
+                size="sm" 
+                variant="default" 
+                onClick={handleTitleEditComplete}
+                className="h-12 px-4"
+                disabled={!editedTitle.trim()}
+              >
+                <Check className="h-5 w-5 mr-1" />
+                Save
+              </Button>
+              <Button 
+                size="sm" 
+                variant="outline" 
+                onClick={() => {
+                  const currentTitle = formData.flow?.title || '';
+                  setEditedTitle(currentTitle);
+                  setIsEditingTitle(false);
+                }}
+                className="h-12 px-4"
+              >
+                Cancel
+              </Button>
+            </div>
+            <p className="text-xs text-gray-500">Press Enter to save, Escape to cancel</p>
           </div>
         ) : (
-          <div className="flex items-center gap-2">
-            <h2 className="text-xl font-semibold text-foreground">
-              {propertyTitle || "Unnamed Property"}
-            </h2>
-            <Button 
-              size="sm" 
-              variant="ghost" 
-              onClick={() => setIsEditingTitle(true)}
-              className="p-1 h-8 w-8 ml-1"
-              title="Edit property title"
-            >
-              <Edit className="h-4 w-4" />
-            </Button>
+          <div className="space-y-3">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <h1 className="text-2xl font-bold text-foreground mb-2">
+                  {currentTitle || "Unnamed Property"}
+                </h1>
+                <p className="text-muted-foreground text-sm">{fullAddress}</p>
+              </div>
+              <div className="flex items-center gap-2 ml-4">
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  onClick={() => setIsEditingTitle(true)}
+                  className="h-9 px-3"
+                  title="Edit property title"
+                >
+                  <Edit className="h-4 w-4 mr-1" />
+                  Edit
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  onClick={regenerateTitle}
+                  className="h-9 px-3"
+                  title="Regenerate title using current property details"
+                >
+                  <RefreshCw className="h-4 w-4 mr-1" />
+                  Regenerate
+                </Button>
+              </div>
+            </div>
           </div>
         )}
-        <p className="text-muted-foreground text-sm mt-1">{fullAddress}</p>
       </div>
       
       {/* Listing Information Card */}
-      <Card className="bg-blue-50">
-        <CardContent className="p-4">
-          <h3 className="text-lg font-semibold text-primary mb-3">Listing Information</h3>
-          <div className="grid gap-2">
-            <div className="flex justify-between items-center py-2 border-b border-gray-100">
-              <span className="text-sm font-medium text-gray-500 flex items-center gap-1">
-                <Clock className="h-4 w-4" /> Listing Type
+      <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-l-blue-500">
+        <CardContent className="p-6">
+          <h3 className="text-lg font-semibold text-primary mb-4 flex items-center gap-2">
+            <Info className="h-5 w-5" />
+            Listing Information
+          </h3>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="flex justify-between items-center py-3 px-4 bg-white rounded-lg shadow-sm">
+              <span className="text-sm font-medium text-gray-600 flex items-center gap-2">
+                <Clock className="h-4 w-4" /> 
+                Listing Type
               </span>
-              <span className="text-sm font-medium">{flowInfo}</span>
+              <span className="text-sm font-semibold text-gray-900">{flowInfo}</span>
             </div>
-            <div className="flex justify-between items-center py-2 border-b border-gray-100">
-              <span className="text-sm font-medium text-gray-500 flex items-center gap-1">
-                <MapPin className="h-4 w-4" /> Location
+            <div className="flex justify-between items-center py-3 px-4 bg-white rounded-lg shadow-sm">
+              <span className="text-sm font-medium text-gray-600 flex items-center gap-2">
+                <MapPin className="h-4 w-4" /> 
+                Location
               </span>
-              <span className="text-sm font-medium">{fullAddress || 'Not specified'}</span>
+              <span className="text-sm font-semibold text-gray-900 text-right max-w-[200px] truncate" title={fullAddress}>
+                {fullAddress || 'Not specified'}
+              </span>
+            </div>
+            <div className="flex justify-between items-center py-3 px-4 bg-white rounded-lg shadow-sm md:col-span-2">
+              <span className="text-sm font-medium text-gray-600 flex items-center gap-2">
+                <Edit className="h-4 w-4" /> 
+                Property Title
+              </span>
+              <span className="text-sm font-semibold text-gray-900 text-right max-w-[300px] truncate" title={currentTitle}>
+                {currentTitle}
+              </span>
             </div>
           </div>
         </CardContent>
       </Card>
       
       {/* Flow-specific content */}
-      {FlowComponent ? (
-        <FlowComponent formData={dataToRender} />
-      ) : (
-        <div className="flex justify-center items-center h-48 text-amber-500">
-          <div className="text-center flex items-center gap-2">
-            <Info className="h-5 w-5" />
-            <p>No flow component found for type: {flowType}</p>
-          </div>
+      <div className="bg-white rounded-lg shadow-sm border">
+        <div className="p-6 border-b border-gray-200">
+          <h3 className="text-lg font-semibold text-primary">Property Details</h3>
+          <p className="text-sm text-muted-foreground mt-1">
+            Review all the details for your {flowInfo.toLowerCase()} listing
+          </p>
         </div>
-      )}
+        <div className="p-6">
+          {FlowComponent ? (
+            <FlowComponent formData={dataToRender} />
+          ) : (
+            <div className="flex justify-center items-center h-48 text-amber-600 bg-amber-50 rounded-lg">
+              <div className="text-center flex flex-col items-center gap-3">
+                <Info className="h-8 w-8" />
+                <div>
+                  <p className="font-medium">Flow Component Not Found</p>
+                  <p className="text-sm text-amber-700">No component available for flow type: {flowType}</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
       
       {/* Description Section if available */}
       {description && (
-        <div className="mt-6 border-t border-border pt-4">
-          <h3 className="text-lg font-semibold text-primary mb-3">Description</h3>
-          <DescriptionSection description={description} />
-        </div>
+        <Card>
+          <CardContent className="p-6">
+            <h3 className="text-lg font-semibold text-primary mb-4 flex items-center gap-2">
+              <Edit className="h-5 w-5" />
+              Property Description
+            </h3>
+            <DescriptionSection description={description} />
+          </CardContent>
+        </Card>
+      )}
+      
+      {/* Debug Information (only in development) */}
+      {process.env.NODE_ENV === 'development' && (
+        <Card className="bg-gray-50 border-dashed">
+          <CardContent className="p-4">
+            <details className="text-xs">
+              <summary className="font-medium cursor-pointer text-gray-600 hover:text-gray-800">
+                Debug Information (Development Only)
+              </summary>
+              <div className="mt-2 space-y-2 text-gray-500">
+                <p><strong>Flow Type:</strong> {flowType}</p>
+                <p><strong>Step IDs:</strong> {JSON.stringify(stepIds, null, 2)}</p>
+                <p><strong>Has Flow Component:</strong> {FlowComponent ? 'Yes' : 'No'}</p>
+                <p><strong>Current Title:</strong> {currentTitle}</p>
+                <p><strong>Full Address:</strong> {fullAddress}</p>
+              </div>
+            </details>
+          </CardContent>
+        </Card>
       )}
     </div>
   );

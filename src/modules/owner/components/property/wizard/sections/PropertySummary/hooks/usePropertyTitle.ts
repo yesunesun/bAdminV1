@@ -1,13 +1,12 @@
 // src/modules/owner/components/property/wizard/sections/PropertySummary/hooks/usePropertyTitle.ts
-// Version: 2.0.0
-// Last Modified: 21-05-2025 15:45 IST
-// Purpose: Simplified property title management hook that only uses flow.title and seeker's title generator
+// Version: 3.0.0
+// Last Modified: 25-05-2025 14:30 IST
+// Purpose: Enhanced property title management hook with better integration of seeker's utility
 
 import { useState, useEffect, useCallback } from 'react';
 import { FormData } from '../../../types';
 import { StepIds } from '../types';
-// Import only the seeker's title generator
-import { generatePropertyTitle } from '@/modules/seeker/utils/propertyTitleUtils';
+import { generatePropertyTitle, cleanupPropertyTitle } from '@/modules/seeker/utils/propertyTitleUtils';
 
 export const usePropertyTitle = (
   formData: FormData,
@@ -17,79 +16,121 @@ export const usePropertyTitle = (
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editedTitle, setEditedTitle] = useState('');
 
-  // Get property title and update state
-  useEffect(() => {
-    // First try to get existing title from flow.title
-    const existingTitle = formData.flow?.title || '';
-    
-    if (existingTitle && existingTitle !== "New Property") {
-      // If there's a valid existing title, use it
-      setEditedTitle(existingTitle);
-    } else {
-      // If no valid title exists, generate a new one using the seeker's utility
-      try {
-        // Format formData to match the structure expected by the seeker's utility
-        const propertyData = {
-          property_details: formData,
-          // Include any other needed fields
-          address: formData.steps?.[stepIds.location || '']?.address || '',
-          city: formData.steps?.[stepIds.location || '']?.city || '',
-          locality: formData.steps?.[stepIds.location || '']?.locality || '',
-          bedrooms: formData.steps?.[stepIds.basicDetails || '']?.bhkType?.replace('BHK', '').trim() || '',
-        };
-        
-        // Generate a title using the seeker's generator
+  // Helper function to format formData for seeker's utility
+  const formatPropertyDataForTitleGeneration = useCallback((formData: FormData, stepIds: StepIds) => {
+    const locationStep = formData.steps?.[stepIds.location || ''];
+    const basicDetailsStep = formData.steps?.[stepIds.basicDetails || ''];
+    const rentalStep = formData.steps?.[stepIds.rental || ''];
+    const saleStep = formData.steps?.[stepIds.saleDetails || ''];
+
+    return {
+      property_details: formData,
+      // Address and location information
+      address: locationStep?.address || '',
+      city: locationStep?.city || locationStep?.selectedCity || '',
+      locality: locationStep?.locality || locationStep?.selectedLocality || '',
+      // Property type and size information
+      bedrooms: basicDetailsStep?.bhkType?.replace('BHK', '').trim() || '',
+      property_type: basicDetailsStep?.propertyType || '',
+      // Pricing information for flow detection
+      price: rentalStep?.rent || saleStep?.price || rentalStep?.totalRent || 0,
+      listing_type: formData.flow?.listingType || (saleStep ? 'sale' : 'rent'),
+      // Additional context
+      title: formData.flow?.title || ''
+    };
+  }, []);
+
+  // Generate or update property title
+  const generateTitle = useCallback(() => {
+    try {
+      // Format data for the utility
+      const propertyData = formatPropertyDataForTitleGeneration(formData, stepIds);
+      
+      console.log('Formatted property data for title generation:', propertyData);
+      
+      // Check if we have an existing title that might need cleanup
+      if (propertyData.title && propertyData.title !== "New Property") {
+        // Use cleanup function to improve existing title
+        const cleanedTitle = cleanupPropertyTitle(propertyData);
+        console.log('Cleaned up existing title:', cleanedTitle);
+        return cleanedTitle;
+      } else {
+        // Generate a completely new title
         const generatedTitle = generatePropertyTitle(propertyData);
-        console.log('Generated title using seeker utility:', generatedTitle);
-        
-        // Update only flow.title
-        if (formData.flow) {
-          formData.flow.title = generatedTitle.trim();
-        } else {
-          formData.flow = { title: generatedTitle.trim() };
-        }
-        
-        setEditedTitle(generatedTitle);
-      } catch (error) {
-        console.error('Error generating title with seeker utility:', error);
-        // Set a generic title as fallback
-        const fallbackTitle = 'New Property Listing';
-        
-        // Update only flow.title
-        if (formData.flow) {
-          formData.flow.title = fallbackTitle;
-        } else {
-          formData.flow = { title: fallbackTitle };
-        }
-        
-        setEditedTitle(fallbackTitle);
+        console.log('Generated new title:', generatedTitle);
+        return generatedTitle;
       }
+    } catch (error) {
+      console.error('Error generating/cleaning title with seeker utility:', error);
+      // Return a safe fallback title
+      return 'Property Listing';
     }
-  }, [formData, stepIds, flowType]);
+  }, [formData, stepIds, formatPropertyDataForTitleGeneration]);
+
+  // Initialize and update title when dependencies change
+  useEffect(() => {
+    if (!formData) return;
+    
+    // Generate the best possible title
+    const newTitle = generateTitle();
+    
+    // Update the form data's flow.title
+    if (formData.flow) {
+      formData.flow.title = newTitle;
+    } else {
+      formData.flow = { title: newTitle };
+    }
+    
+    // Update local state
+    setEditedTitle(newTitle);
+    
+    console.log('Title updated in usePropertyTitle:', newTitle);
+  }, [formData, stepIds, flowType, generateTitle]);
 
   // Handle title edit completion
   const handleTitleEditComplete = useCallback(() => {
     if (editedTitle.trim()) {
-      // Update only flow.title
+      // Update the form data
       if (formData.flow) {
         formData.flow.title = editedTitle.trim();
       } else {
         formData.flow = { title: editedTitle.trim() };
       }
+      
+      console.log('Title manually updated:', editedTitle.trim());
     }
     setIsEditingTitle(false);
   }, [editedTitle, formData]);
 
-  // Handle keyboard events
+  // Handle keyboard events for title editing
   const handleTitleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       handleTitleEditComplete();
     } else if (e.key === 'Escape') {
+      // Reset to current saved title
       const currentTitle = formData.flow?.title || '';
       setEditedTitle(currentTitle);
       setIsEditingTitle(false);
     }
   }, [formData, handleTitleEditComplete]);
+
+  // Function to regenerate title (can be called manually)
+  const regenerateTitle = useCallback(() => {
+    const newTitle = generateTitle();
+    
+    // Update form data
+    if (formData.flow) {
+      formData.flow.title = newTitle;
+    } else {
+      formData.flow = { title: newTitle };
+    }
+    
+    // Update local state
+    setEditedTitle(newTitle);
+    
+    console.log('Title regenerated:', newTitle);
+    return newTitle;
+  }, [generateTitle, formData]);
 
   return {
     isEditingTitle,
@@ -97,6 +138,8 @@ export const usePropertyTitle = (
     editedTitle,
     setEditedTitle,
     handleTitleEditComplete,
-    handleTitleKeyDown
+    handleTitleKeyDown,
+    regenerateTitle,
+    currentTitle: formData.flow?.title || editedTitle || 'Property Listing'
   };
 };
