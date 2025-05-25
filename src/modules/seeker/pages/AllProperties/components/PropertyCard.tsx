@@ -1,7 +1,7 @@
 // src/modules/seeker/pages/AllProperties/components/PropertyCard.tsx
-// Version: 6.0.0
-// Last Modified: 25-05-2025 17:35 IST
-// Purpose: Fixed Property Type/Listing Type display, delete functionality, and owner information
+// Version: 7.1.0
+// Last Modified: 25-05-2025 19:20 IST
+// Purpose: Fixed copy icons visibility - ensuring all copy buttons are properly displayed
 
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
@@ -20,7 +20,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/lib/supabase';
-import { Trash2, Pencil, ShieldAlert, Info, User, Mail } from 'lucide-react';
+import { Trash2, Pencil, ShieldAlert, Info, User, Mail, Hash, Copy, Check } from 'lucide-react';
 import { 
   Dialog,
   DialogContent, 
@@ -46,6 +46,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
   const [isDeleting, setIsDeleting] = useState(false);
   const [isFixingTitle, setIsFixingTitle] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
   
@@ -63,6 +64,59 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
 
   // Get property details for display
   const propertyDetails = property.property_details || {};
+
+  // Copy function with visual feedback
+  const handleCopy = async (value: string, label: string, fieldId: string) => {
+    if (!value || value.trim() === '') {
+      toast({
+        title: "Copy failed",
+        description: "No value to copy",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      // Modern browsers
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(value);
+      } else {
+        // Fallback for older browsers
+        const textArea = document.createElement('textarea');
+        textArea.value = value;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        textArea.style.top = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        
+        const successful = document.execCommand('copy');
+        document.body.removeChild(textArea);
+        
+        if (!successful) {
+          throw new Error('Fallback copy failed');
+        }
+      }
+
+      // Success feedback
+      setCopiedField(fieldId);
+      setTimeout(() => setCopiedField(null), 2000);
+
+      toast({
+        title: "Copied to clipboard",
+        description: `${label} copied successfully`,
+      });
+
+    } catch (error) {
+      console.error('Copy failed:', error);
+      toast({
+        title: "Copy failed",
+        description: "Unable to copy to clipboard. Please try selecting and copying manually.",
+        variant: "destructive"
+      });
+    }
+  };
 
   // Check if current user is an admin - with proper error handling
   useEffect(() => {
@@ -134,19 +188,10 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
       const currentTitle = property.property_details?.flow?.title || 'No current title';
       console.log('Fix Title: Current title:', currentTitle);
       
-      // Log the property structure being passed to generatePropertyTitle
-      console.log('Fix Title: Property structure being passed to generatePropertyTitle:');
-      console.log('Fix Title: - property.id:', property.id);
-      console.log('Fix Title: - property.property_details:', property.property_details);
-      console.log('Fix Title: - property.property_details.flow:', property.property_details?.flow);
-      console.log('Fix Title: - property.property_details.steps:', property.property_details?.steps ? Object.keys(property.property_details.steps) : 'no steps');
-      
       // Generate the new title
       console.log('Fix Title: Calling generatePropertyTitle...');
       const newTitle = generatePropertyTitle(property);
       console.log('Fix Title: Generated new title:', newTitle);
-      console.log('Fix Title: Generated title type:', typeof newTitle);
-      console.log('Fix Title: Title changed?', currentTitle !== newTitle);
       
       if (!newTitle || newTitle.trim() === '') {
         console.error('Fix Title: FAILED - Generated title is empty');
@@ -174,14 +219,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
         }
       };
 
-      console.log('Fix Title: Updating database...');
-      console.log('Fix Title: Old title in database:', currentFlow.title);
-      console.log('Fix Title: New title for database:', newTitle);
-      console.log('Fix Title: Property ID:', property.id);
-      console.log('Fix Title: Updated property_details structure:', updatedPropertyDetails);
-      
       // First, let's verify the property exists and check current user permissions
-      console.log('Fix Title: Checking if property exists and user permissions...');
       const { data: existsData, error: existsError } = await supabase
         .from('properties_v2')
         .select('id, owner_id, property_details')
@@ -193,145 +231,50 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
         throw new Error(`Property check failed: ${existsError.message}`);
       }
       
-      console.log('Fix Title: Property exists check - ID:', existsData?.id);
-      console.log('Fix Title: Property owner_id:', existsData?.owner_id);
-      console.log('Fix Title: Current user ID:', user.id);
-      console.log('Fix Title: User is owner?', existsData?.owner_id === user.id);
-      console.log('Fix Title: User is admin?', isAdmin);
-      console.log('Fix Title: Current title in DB:', existsData?.property_details?.flow?.title);
-      
       // Check if user has permission to update
       const userIsOwner = existsData?.owner_id === user.id;
       const userCanUpdate = userIsOwner || isAdmin;
-      
-      console.log('Fix Title: User can update?', userCanUpdate);
       
       if (!userCanUpdate) {
         throw new Error(`Permission denied. User is owner: ${userIsOwner}, User is admin: ${isAdmin}`);
       }
       
-      // Now attempt the update - try database function first since RLS is causing issues
-      console.log('Fix Title: Attempting database update using function...');
+      // Direct update
+      let updateResult;
       
-      try {
-        const { data: functionResult, error: functionError } = await supabase.rpc('update_property_title', {
-          property_id_param: property.id,
-          new_title_param: newTitle
-        });
-        
-        console.log('Fix Title: Function result:', functionResult);
-        console.log('Fix Title: Function error:', functionError);
-        
-        if (functionError) {
-          console.error('Fix Title: Database function failed:', functionError);
-          throw new Error(`Database function failed: ${functionError.message}`);
-        }
-        
-        if (functionResult?.success) {
-          console.log('Fix Title: ✅ Database function succeeded!');
-          
-          toast({
-            title: "Title updated successfully",
-            description: `Old: "${currentFlow.title}" → New: "${newTitle}"`,
-          });
-          
-          if (onPropertyUpdated) {
-            onPropertyUpdated();
-          }
-          return; // Success - exit early
-        } else {
-          console.error('Fix Title: Database function returned failure:', functionResult);
-          throw new Error(`Database function failed: ${functionResult?.error || 'Unknown error'}`);
-        }
-        
-      } catch (functionError) {
-        console.warn('Fix Title: Database function not available or failed, trying direct update:', functionError);
-        
-        // Fallback to direct update
-        console.log('Fix Title: Attempting direct database update...');
-        
-        let updateResult;
-        
-        if (isAdmin) {
-          console.log('Fix Title: User is admin - attempting admin update...');
-          updateResult = await supabase
-            .from('properties_v2')
-            .update({ 
-              property_details: updatedPropertyDetails,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', property.id)
-            .select();
-        } else if (existsData?.owner_id === user.id) {
-          console.log('Fix Title: User is owner - attempting owner update...');
-          updateResult = await supabase
-            .from('properties_v2')
-            .update({ 
-              property_details: updatedPropertyDetails,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', property.id)
-            .eq('owner_id', user.id)
-            .select();
-        } else {
-          throw new Error('User has no permission to update this property');
-        }
-        
-        const { error, data, status, statusText } = updateResult;
-        
-        console.log('Fix Title: Update response status:', status);
-        console.log('Fix Title: Update response statusText:', statusText);
-        console.log('Fix Title: Update response error:', error);
-        console.log('Fix Title: Update response data:', data);
-        
-        if (error) {
-          console.error('Fix Title: Database update error:', error);
-          console.error('Fix Title: Error details:', {
-            code: error.code,
-            message: error.message,
-            details: error.details,
-            hint: error.hint
-          });
-          throw error;
-        }
-        
-        console.log('Fix Title: Database update completed');
-        console.log('Fix Title: Returned data from update:', data);
-        console.log('Fix Title: Number of rows updated:', data?.length || 0);
-        
-        if (!data || data.length === 0) {
-          console.error('Fix Title: No rows were updated! This suggests a permissions or RLS policy issue.');
-          throw new Error('Database update failed - no rows were affected. This may be due to Row Level Security policies.');
-        }
-        
-        // Verify the title was saved correctly
-        if (data && data[0] && data[0].property_details?.flow?.title) {
-          console.log('Fix Title: VERIFIED - Title saved correctly in database:', data[0].property_details.flow.title);
-        } else {
-          console.warn('Fix Title: WARNING - Could not verify title was saved correctly');
-          console.log('Fix Title: Returned data structure:', data);
-        }
+      if (isAdmin) {
+        updateResult = await supabase
+          .from('properties_v2')
+          .update({ 
+            property_details: updatedPropertyDetails,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', property.id)
+          .select();
+      } else if (existsData?.owner_id === user.id) {
+        updateResult = await supabase
+          .from('properties_v2')
+          .update({ 
+            property_details: updatedPropertyDetails,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', property.id)
+          .eq('owner_id', user.id)
+          .select();
+      } else {
+        throw new Error('User has no permission to update this property');
       }
       
-      // Additional verification - fetch the property again to double-check
-      console.log('Fix Title: Double-checking by fetching property again...');
-      const { data: verifyData, error: verifyError } = await supabase
-        .from('properties_v2')
-        .select('property_details')
-        .eq('id', property.id)
-        .single();
+      const { error, data } = updateResult;
       
-      if (verifyError) {
-        console.error('Fix Title: Error during verification fetch:', verifyError);
-      } else {
-        console.log('Fix Title: VERIFICATION FETCH - Current title in database:', verifyData?.property_details?.flow?.title);
-        if (verifyData?.property_details?.flow?.title === newTitle) {
-          console.log('Fix Title: ✅ VERIFICATION PASSED - Title correctly saved');
-        } else {
-          console.error('Fix Title: ❌ VERIFICATION FAILED - Title not saved correctly');
-          console.log('Fix Title: Expected:', newTitle);
-          console.log('Fix Title: Actually in DB:', verifyData?.property_details?.flow?.title);
-        }
+      if (error) {
+        console.error('Fix Title: Database update error:', error);
+        throw error;
+      }
+      
+      if (!data || data.length === 0) {
+        console.error('Fix Title: No rows were updated! This suggests a permissions or RLS policy issue.');
+        throw new Error('Database update failed - no rows were affected. This may be due to Row Level Security policies.');
       }
       
       toast({
@@ -550,8 +493,34 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
                   {address}, {city}, {state}
                 </p>
                 
+                {/* Property ID - Prominent Display with Copy Button */}
+                <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <Hash className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                      <span className="text-sm font-medium text-blue-800 dark:text-blue-200">Property ID</span>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleCopy(property.id, 'Property ID', 'property_id')}
+                      className="h-8 w-8 p-0 hover:bg-blue-100 dark:hover:bg-blue-900"
+                      title="Copy Property ID"
+                    >
+                      {copiedField === 'property_id' ? (
+                        <Check className="h-4 w-4 text-green-600 dark:text-green-400" />
+                      ) : (
+                        <Copy className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                      )}
+                    </Button>
+                  </div>
+                  <div className="font-mono text-sm text-blue-700 dark:text-blue-300 break-all select-all">
+                    {property.id}
+                  </div>
+                </div>
+                
                 {/* Property Type and Listing Type - Clean Display */}
-                <div className="flex flex-wrap gap-2 mb-2">
+                <div className="flex flex-wrap gap-2 mb-3">
                   <Badge variant="outline" className="border-blue-500 text-blue-600 dark:text-blue-400">
                     {propertyType}
                   </Badge>
@@ -560,19 +529,61 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
                   </Badge>
                 </div>
                 
-                {/* Owner Information - Prominent Display */}
+                {/* Owner Information - Enhanced with Copy Buttons */}
                 {property.profiles && (
-                  <div className="bg-gray-50 dark:bg-gray-800 p-2 rounded mb-2">
-                    <div className="flex items-center gap-2 text-sm">
-                      <User className="h-4 w-4 text-blue-600" />
-                      <span className="font-medium text-blue-600 dark:text-blue-400">Owner:</span>
+                  <div className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 mb-2">
+                    <div className="flex items-center gap-2 text-sm mb-3">
+                      <User className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                      <span className="font-medium text-blue-600 dark:text-blue-400">Property Owner</span>
                     </div>
-                    <div className="flex items-center gap-2 text-sm mt-1">
-                      <Mail className="h-4 w-4 text-gray-500" />
-                      <span className="text-gray-700 dark:text-gray-300">{property.profiles.email}</span>
+                    
+                    {/* Owner Email with Copy Button */}
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <Mail className="h-4 w-4 text-gray-500 dark:text-gray-400 flex-shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Email</div>
+                          <div className="text-sm text-gray-700 dark:text-gray-300 truncate select-all">
+                            {property.profiles.email}
+                          </div>
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleCopy(property.profiles.email, 'Owner Email', 'owner_email')}
+                        className="h-8 w-8 p-0 ml-2 flex-shrink-0 hover:bg-gray-100 dark:hover:bg-gray-700"
+                        title="Copy Owner Email"
+                      >
+                        {copiedField === 'owner_email' ? (
+                          <Check className="h-4 w-4 text-green-600 dark:text-green-400" />
+                        ) : (
+                          <Copy className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                        )}
+                      </Button>
                     </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      ID: <span className="font-mono">{property.profiles.id}</span>
+                    
+                    {/* Owner ID with Copy Button */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Owner ID</div>
+                        <div className="font-mono text-sm text-gray-600 dark:text-gray-400 break-all select-all">
+                          {property.profiles.id}
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleCopy(property.profiles.id, 'Owner ID', 'owner_id')}
+                        className="h-8 w-8 p-0 ml-2 flex-shrink-0 hover:bg-gray-100 dark:hover:bg-gray-700"
+                        title="Copy Owner ID"
+                      >
+                        {copiedField === 'owner_id' ? (
+                          <Check className="h-4 w-4 text-green-600 dark:text-green-400" />
+                        ) : (
+                          <Copy className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                        )}
+                      </Button>
                     </div>
                   </div>
                 )}
@@ -584,7 +595,6 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
                       Technical Details
                     </summary>
                     <div className="mt-1 pl-2 border-l-2 border-gray-200 dark:border-gray-700">
-                      <p>Property ID: <span className="font-mono select-all">{property.id}</span></p>
                       <p>Flow: <span className="font-medium text-blue-600 dark:text-blue-400">{propertyFlow}</span></p>
                       <p>Version: <span className="font-medium">{propertyVersion}</span></p>
                     </div>
