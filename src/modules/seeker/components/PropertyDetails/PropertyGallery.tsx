@@ -1,16 +1,85 @@
 // src/modules/seeker/components/PropertyDetails/PropertyGallery.tsx
-// Version: 10.0.0
-// Last Modified: 27-05-2025 16:30 IST
-// Purpose: Enhanced control visibility with better contrast and background styling
+// Version: 11.0.0
+// Last Modified: 27-05-2025 20:30 IST
+// Purpose: Optimized with public URLs + smart caching for images and videos
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { ChevronLeftIcon, ChevronRightIcon, ImageIcon, ExpandIcon, XIcon, Play, Video } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
+import { supabase } from '@/lib/supabase';
 import { PropertyImage, PropertyVideo } from '../../hooks/usePropertyDetails';
 
 const FALLBACK_IMAGE = '/noimage.png';
+
+// Smart Media Cache Service
+class MediaCacheService {
+  private static instance: MediaCacheService;
+  private urlCache = new Map<string, string>();
+  private readonly IMAGE_BUCKET = 'property-images-v2';
+  private readonly VIDEO_BUCKET = 'property-videos';
+  
+  static getInstance(): MediaCacheService {
+    if (!MediaCacheService.instance) {
+      MediaCacheService.instance = new MediaCacheService();
+    }
+    return MediaCacheService.instance;
+  }
+  
+  // Get direct public URL - ZERO API calls after first generation
+  getPublicMediaUrl(propertyId: string, fileName: string, mediaType: 'image' | 'video' = 'image'): string {
+    if (!propertyId || !fileName) return FALLBACK_IMAGE;
+    
+    // Handle legacy formats
+    if (fileName.startsWith('data:image/') || fileName.startsWith('blob:')) {
+      return fileName;
+    }
+    if (fileName.startsWith('legacy-') || fileName.startsWith('img-')) {
+      return FALLBACK_IMAGE;
+    }
+    
+    const cacheKey = `${mediaType}-${propertyId}/${fileName}`;
+    
+    // Check cache first
+    if (this.urlCache.has(cacheKey)) {
+      return this.urlCache.get(cacheKey)!;
+    }
+    
+    // Build direct public URL
+    const bucket = mediaType === 'video' ? this.VIDEO_BUCKET : this.IMAGE_BUCKET;
+    const { data } = supabase.storage.from(bucket).getPublicUrl(`${propertyId}/${fileName}`);
+    const publicUrl = data.publicUrl;
+    
+    // Cache the URL
+    this.urlCache.set(cacheKey, publicUrl);
+    
+    return publicUrl;
+  }
+  
+  // Preload media URLs in batch
+  preloadMediaUrls(items: Array<{ propertyId: string; fileName: string; type: 'image' | 'video' }>): void {
+    items.forEach(item => {
+      this.getPublicMediaUrl(item.propertyId, item.fileName, item.type);
+    });
+  }
+  
+  // Clear cache if needed
+  clearCache(): void {
+    this.urlCache.clear();
+  }
+  
+  // Get cache stats for debugging
+  getCacheStats() {
+    return {
+      size: this.urlCache.size,
+      keys: Array.from(this.urlCache.keys())
+    };
+  }
+}
+
+// Get singleton instance
+const mediaCache = MediaCacheService.getInstance();
 
 interface MediaItem {
   id: string;
@@ -41,7 +110,6 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
   const [fullscreenIndex, setFullscreenIndex] = useState(0);
-  const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
   const [loadingStates, setLoadingStates] = useState<Record<string, boolean>>({});
   const [videoPlaying, setVideoPlaying] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -53,30 +121,19 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({
       hasVideo: !!video,
       videoUrl: video?.url,
       propertyId,
-      images: images
+      cacheStats: mediaCache.getCacheStats()
     });
-    
-    // Log first few images for debugging
-    if (images && images.length > 0) {
-      console.log('[PropertyGallery] First image details:', {
-        id: images[0].id,
-        url: images[0].url,
-        dataUrl: images[0].dataUrl ? images[0].dataUrl.substring(0, 50) + '...' : 'none',
-        fileName: images[0].fileName,
-        isPrimary: images[0].isPrimary
-      });
-    }
   }, [images, video, propertyId]);
 
-  // Combine images and video into a single media array
+  // Combine images and video into a single media array with optimized URLs
   const mediaItems = useMemo((): MediaItem[] => {
     const allItems: MediaItem[] = [];
 
-    console.log('[PropertyGallery] Building media items...');
+    console.log('[PropertyGallery] Building optimized media items...');
 
     // Add images first
     if (images && images.length > 0) {
-      console.log('[PropertyGallery] Processing', images.length, 'images');
+      console.log('[PropertyGallery] Processing', images.length, 'images with optimization');
       
       const processedImages = [...images]
         .filter(img => img && (img.url || img.dataUrl || img.fileName))
@@ -97,12 +154,27 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({
         }));
 
       allItems.push(...processedImages);
-      console.log('[PropertyGallery] Added', processedImages.length, 'processed images');
+      
+      // Preload image URLs in cache
+      if (propertyId) {
+        const preloadItems = processedImages
+          .filter(img => img.fileName && !img.fileName.startsWith('data:') && !img.fileName.startsWith('blob:'))
+          .map(img => ({
+            propertyId,
+            fileName: img.fileName!,
+            type: 'image' as const
+          }));
+        
+        if (preloadItems.length > 0) {
+          mediaCache.preloadMediaUrls(preloadItems);
+          console.log('[PropertyGallery] Preloaded', preloadItems.length, 'image URLs in cache');
+        }
+      }
     }
 
     // Add video at the end
     if (video && video.url) {
-      console.log('[PropertyGallery] Adding video:', video.fileName);
+      console.log('[PropertyGallery] Adding optimized video:', video.fileName);
       allItems.push({
         id: 'property-video',
         type: 'video',
@@ -112,6 +184,16 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({
         fileSize: video.fileSize,
         display_order: 999 // Place video after images
       });
+      
+      // Preload video URL in cache if it has fileName
+      if (propertyId && video.fileName && !video.url.startsWith('data:') && !video.url.startsWith('blob:')) {
+        mediaCache.preloadMediaUrls([{
+          propertyId,
+          fileName: video.fileName,
+          type: 'video'
+        }]);
+        console.log('[PropertyGallery] Preloaded video URL in cache');
+      }
     }
 
     // If no media at all, show placeholder
@@ -126,42 +208,72 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({
       });
     }
 
-    console.log('[PropertyGallery] Final media items:', allItems.length, 'items');
+    console.log('[PropertyGallery] Final optimized media items:', allItems.length, 'items');
     return allItems;
-  }, [images, video]);
+  }, [images, video, propertyId]);
 
-  // Simple media URL resolver
-  const getMediaSource = useCallback((item: MediaItem): string => {
+  // Optimized media URL resolver using cached public URLs
+  const getOptimizedMediaSource = useCallback((item: MediaItem): string => {
+    // Handle video thumbnails
     if (item.type === 'video') {
-      // For video thumbnails, prefer thumbnailUrl, fallback to a video placeholder
-      return item.thumbnailUrl || item.url || FALLBACK_IMAGE;
+      // For video thumbnails, prefer thumbnailUrl, then try to get cached public URL
+      if (item.thumbnailUrl) {
+        return item.thumbnailUrl;
+      }
+      
+      // If we have fileName and propertyId, use cached public URL
+      if (propertyId && item.fileName && !item.url?.startsWith('data:') && !item.url?.startsWith('blob:')) {
+        return mediaCache.getPublicMediaUrl(propertyId, item.fileName, 'video');
+      }
+      
+      // Fallback to original URL or placeholder
+      return item.url || FALLBACK_IMAGE;
     }
 
-    // For images, use the same logic as before
+    // For images, use directUrls if available (legacy support)
     const imageIndex = mediaItems.findIndex(media => media.id === item.id && media.type === 'image');
     if (directUrls && directUrls.length > imageIndex && imageIndex >= 0) {
       return directUrls[imageIndex];
     }
 
-    if (item.dataUrl) {
+    // Handle dataUrl format (legacy)
+    if (item.dataUrl && (item.dataUrl.startsWith('data:image/') || item.dataUrl.startsWith('blob:'))) {
       return item.dataUrl;
     }
 
+    // Use cached public URL if we have fileName and propertyId
+    if (propertyId && item.fileName && !item.fileName.startsWith('legacy-') && !item.fileName.startsWith('img-')) {
+      return mediaCache.getPublicMediaUrl(propertyId, item.fileName, 'image');
+    }
+
+    // Fallback to original URL
     if (item.url) {
       return item.url;
     }
 
     return FALLBACK_IMAGE;
-  }, [mediaItems, directUrls]);
+  }, [mediaItems, directUrls, propertyId]);
+
+  // Get video source URL (for actual video playback)
+  const getVideoSource = useCallback((item: MediaItem): string => {
+    if (item.type !== 'video') return '';
+    
+    // For video playback, we need the actual video URL
+    if (propertyId && item.fileName && !item.url?.startsWith('data:') && !item.url?.startsWith('blob:')) {
+      return mediaCache.getPublicMediaUrl(propertyId, item.fileName, 'video');
+    }
+    
+    return item.url || '';
+  }, [propertyId]);
 
   // Handle media load events
   const handleMediaLoad = useCallback((mediaId: string) => {
     setLoadingStates(prev => ({ ...prev, [mediaId]: false }));
   }, []);
 
-  // Handle media error events
+  // Handle media error events with smart fallback
   const handleMediaError = useCallback((mediaId: string, e: React.SyntheticEvent<HTMLImageElement | HTMLVideoElement>) => {
-    console.warn(`Media load failed for ${mediaId}`);
+    console.warn(`Optimized media load failed for ${mediaId}, using fallback`);
     if ('src' in e.currentTarget) {
       e.currentTarget.src = FALLBACK_IMAGE;
     }
@@ -211,7 +323,7 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({
   }
 
   const currentItem = mediaItems[currentIndex];
-  const currentMediaUrl = getMediaSource(currentItem);
+  const currentMediaUrl = getOptimizedMediaSource(currentItem);
   const isCurrentMediaLoading = loadingStates[currentItem.id] ?? false;
 
   return (
@@ -232,7 +344,7 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({
               {/* Video element for actual playback */}
               <video
                 ref={videoRef}
-                src={currentItem.url}
+                src={getVideoSource(currentItem)}
                 className="w-full h-full object-cover"
                 onLoadedData={() => handleMediaLoad(currentItem.id)}
                 onError={(e) => handleMediaError(currentItem.id, e)}
@@ -240,7 +352,8 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({
                 onPause={() => setVideoPlaying(false)}
                 onEnded={() => setVideoPlaying(false)}
                 playsInline
-                poster={currentItem.thumbnailUrl}
+                poster={currentMediaUrl}
+                preload="metadata"
               />
               
               {/* Video overlay with play button */}
@@ -336,7 +449,7 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({
       {mediaItems.length > 1 && (
         <div className="flex space-x-2 overflow-x-auto pb-2 -mx-1 px-1">
           {mediaItems.map((item, index) => {
-            const thumbUrl = getMediaSource(item);
+            const thumbUrl = getOptimizedMediaSource(item);
             
             return (
               <button
@@ -373,7 +486,7 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({
       <Dialog open={fullscreenOpen} onOpenChange={setFullscreenOpen}>
         <DialogContent className="max-w-[95vw] w-[95vw] h-[95vh] p-0 bg-black border-none overflow-hidden">
           <VisuallyHidden>
-            <DialogTitle>Property Gallery - Image {fullscreenIndex + 1} of {mediaItems.length}</DialogTitle>
+            <DialogTitle>Property Gallery - Media {fullscreenIndex + 1} of {mediaItems.length}</DialogTitle>
           </VisuallyHidden>
           <div className="relative w-full h-full flex flex-col">
             {/* Close button with enhanced visibility */}
@@ -399,18 +512,19 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({
                   }}
                 >
                   <video
-                    src={mediaItems[fullscreenIndex].url}
+                    src={getVideoSource(mediaItems[fullscreenIndex])}
                     className="w-full h-full object-contain bg-black"
                     controls
                     autoPlay={false}
-                    poster={mediaItems[fullscreenIndex].thumbnailUrl}
+                    poster={getOptimizedMediaSource(mediaItems[fullscreenIndex])}
+                    preload="metadata"
                   >
                     Your browser does not support video playback.
                   </video>
                 </div>
               ) : (
                 <img
-                  src={getMediaSource(mediaItems[fullscreenIndex])}
+                  src={getOptimizedMediaSource(mediaItems[fullscreenIndex])}
                   alt={`Property view ${fullscreenIndex + 1}`}
                   className="object-contain"
                   onError={(e) => handleMediaError(mediaItems[fullscreenIndex].id, e)}

@@ -1,10 +1,20 @@
 // src/modules/seeker/components/PropertyDetails/index.tsx  
-// Version: 17.0.0
-// Last Modified: 27-05-2025 17:20 IST
-// Purpose: Fully refactored main component using extracted hooks, components, and services
+// Version: 18.0.0
+// Last Modified: 27-01-2025 16:30 IST
+// Purpose: Phase 4 visual enhancements - micro-interactions, loading states, and animations
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useToast } from '@/components/ui/use-toast';
+import { cn } from '@/lib/utils';
+import { 
+  Heart,
+  Share2,
+  Calendar,
+  CheckCircle2,
+  AlertCircle,
+  RefreshCw,
+  Sparkles
+} from 'lucide-react';
 
 // Import extracted hooks
 import { usePropertyData } from './hooks/usePropertyData';
@@ -92,27 +102,182 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
   const { toast } = useToast();
   const [visitDialogOpen, setVisitDialogOpen] = useState(false);
   const [displayTitle, setDisplayTitle] = useState('');
+  const [pageLoaded, setPageLoaded] = useState(false);
+  const [sectionsVisible, setSectionsVisible] = useState<Record<string, boolean>>({});
+  const [actionStates, setActionStates] = useState({
+    sharing: false,
+    liking: false,
+    refreshing: false
+  });
 
   // Use custom hooks for data processing and media management
   const propertyData = usePropertyData(property);
   const { propertyImages, handleMediaUploaded } = usePropertyMedia(property, onRefresh);
 
-  // Handle title update
+  // Page load animation effect
+  useEffect(() => {
+    if (!isLoading && propertyData) {
+      const timer = setTimeout(() => setPageLoaded(true), 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isLoading, propertyData]);
+
+  // Progressive section reveal effect
+  useEffect(() => {
+    if (pageLoaded) {
+      const sections = ['header', 'gallery', 'actions', 'details', 'location', 'features', 'sidebar'];
+      sections.forEach((section, index) => {
+        setTimeout(() => {
+          setSectionsVisible(prev => ({ ...prev, [section]: true }));
+        }, index * 150);
+      });
+    }
+  }, [pageLoaded]);
+
+  // Handle title update with animation feedback
   const handleTitleUpdated = (newTitle: string) => {
     setDisplayTitle(newTitle);
     if (onRefresh) {
       onRefresh();
     }
+    
+    // Show success animation
+    toast({
+      title: "Title Updated",
+      description: "Property title has been successfully updated",
+      variant: "default"
+    });
   };
 
-  // Loading state
+  // Enhanced share functionality with loading state
+  const handleShare = async () => {
+    setActionStates(prev => ({ ...prev, sharing: true }));
+    
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: propertyTitle,
+          url: window.location.href
+        });
+        
+        toast({
+          title: "Shared Successfully",
+          description: "Property has been shared",
+          variant: "default"
+        });
+      } else {
+        await navigator.clipboard.writeText(window.location.href);
+        toast({
+          title: "Link Copied",
+          description: "Property link copied to clipboard",
+          variant: "default"
+        });
+      }
+    } catch (error) {
+      if (error instanceof Error && error.name !== 'AbortError') {
+        toast({
+          title: "Share Failed",
+          description: "Unable to share property. Please try again.",
+          variant: "destructive"
+        });
+      }
+    } finally {
+      setActionStates(prev => ({ ...prev, sharing: false }));
+    }
+  };
+
+  // Enhanced like handler with optimistic updates
+  const handleLikeToggle = async () => {
+    if (!onToggleLike) return;
+    
+    setActionStates(prev => ({ ...prev, liking: true }));
+    
+    try {
+      await onToggleLike();
+      
+      // Success feedback
+      toast({
+        title: isLiked ? "Removed from Favorites" : "Added to Favorites",
+        description: isLiked ? "Property removed from your favorites" : "Property saved to your favorites",
+        variant: "default"
+      });
+    } catch (error) {
+      toast({
+        title: "Action Failed",
+        description: "Unable to update favorites. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setActionStates(prev => ({ ...prev, liking: false }));
+    }
+  };
+
+  // Enhanced refresh with loading feedback
+  const handleRefresh = async () => {
+    if (!onRefresh) return;
+    
+    setActionStates(prev => ({ ...prev, refreshing: true }));
+    
+    try {
+      await onRefresh();
+      toast({
+        title: "Content Refreshed",
+        description: "Property data has been updated",
+        variant: "default"
+      });
+    } catch (error) {
+      toast({
+        title: "Refresh Failed",
+        description: "Unable to refresh content. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setActionStates(prev => ({ ...prev, refreshing: false }));
+    }
+  };
+
+  // Enhanced visit dialog handler
+  const handleScheduleVisit = () => {
+    setVisitDialogOpen(true);
+    
+    // Analytics or tracking could go here
+    console.log('Visit request initiated for property:', propertyData?.propertyId);
+  };
+
+  // Loading state with enhanced skeleton
   if (isLoading) {
-    return <PropertyDetailsSkeleton />;
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <PropertyDetailsSkeleton />
+      </div>
+    );
   }
 
-  // Error state - Property not found
+  // Error state - Property not found with retry option
   if (!property || !propertyData) {
-    return <PropertyNotFound />;
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="text-center py-12">
+          <AlertCircle className="h-16 w-16 text-muted-foreground mx-auto mb-4 opacity-50" />
+          <h2 className="text-2xl font-semibold mb-2">Property Not Found</h2>
+          <p className="text-muted-foreground mb-6">
+            The property you're looking for doesn't exist or has been removed.
+          </p>
+          <button
+            onClick={handleRefresh}
+            disabled={actionStates.refreshing}
+            className={cn(
+              "inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg",
+              "hover:bg-primary/90 transition-colors",
+              actionStates.refreshing && "opacity-50 cursor-not-allowed"
+            )}
+          >
+            <RefreshCw className={cn("h-4 w-4", actionStates.refreshing && "animate-spin")} />
+            {actionStates.refreshing ? "Refreshing..." : "Try Again"}
+          </button>
+        </div>
+      </div>
+    );
   }
 
   // Destructure processed property data
@@ -142,137 +307,233 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
   // Get property title - use the display title if available (from editing), otherwise use flow.title
   const propertyTitle = displayTitle || flow.title || (basicDetails?.title || property.title || 'Property Listing');
 
-  // Handle share functionality
-  const handleShare = () => {
-    if (navigator.share) {
-      navigator.share({
-        title: propertyTitle,
-        url: window.location.href
-      }).catch(console.error);
-    } else {
-      navigator.clipboard.writeText(window.location.href);
-      toast({
-        title: "Link Copied",
-        description: "Property link copied to clipboard",
-        variant: "default"
-      });
-    }
-  };
-
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div className={cn(
+      "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 transition-opacity duration-500",
+      pageLoaded ? "opacity-100" : "opacity-0"
+    )}>
       {/* Property Title Section with Listing Type Badge */}
-      <div className="mb-6">
+      <div className={cn(
+        "mb-6 transition-all duration-700 transform",
+        sectionsVisible.header ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
+      )}>
         <div className="flex flex-wrap items-center gap-3 mb-2">
-          {/* Editable title component */}
-          <PropertyTitleEditor
-            propertyId={propertyId}
-            title={propertyTitle}
-            ownerId={ownerId}
-            onTitleUpdated={handleTitleUpdated}
-          />
+          {/* Editable title component with enhanced feedback */}
+          <div className="flex-1 min-w-0">
+            <PropertyTitleEditor
+              propertyId={propertyId}
+              title={propertyTitle}
+              ownerId={ownerId}
+              onTitleUpdated={handleTitleUpdated}
+            />
+          </div>
 
-          {/* Enhanced badge display with flow type */}
+          {/* Enhanced badge display with flow type and animations */}
           <div className="flex flex-wrap gap-2">
-            <span className={`px-3 py-1 rounded-full text-sm font-medium ${isCurrentSaleProperty ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
-              }`}>
-              For {isCurrentSaleProperty ? 'Sale' : 'Rent'}
+            <span className={cn(
+              "px-3 py-1 rounded-full text-sm font-medium transition-all duration-300 hover:scale-105",
+              isCurrentSaleProperty 
+                ? 'bg-gradient-to-r from-blue-100 to-blue-200 text-blue-800 border border-blue-300' 
+                : 'bg-gradient-to-r from-green-100 to-green-200 text-green-800 border border-green-300'
+            )}>
+              <span className="flex items-center gap-1">
+                <Sparkles className="h-3 w-3" />
+                For {isCurrentSaleProperty ? 'Sale' : 'Rent'}
+              </span>
             </span>
 
             {/* Show specific flow type badge */}
-            <span className="px-3 py-1 rounded-full bg-purple-100 text-purple-800 text-sm font-medium">
+            <span className="px-3 py-1 rounded-full bg-gradient-to-r from-purple-100 to-purple-200 text-purple-800 text-sm font-medium border border-purple-300 transition-all duration-300 hover:scale-105">
               {flowDisplayName}
             </span>
 
             {/* Show category if different from flow display name */}
             {flow.category && flow.category !== flowDisplayName.toLowerCase() && (
-              <span className="px-3 py-1 rounded-full bg-gray-100 text-gray-800 text-sm font-medium capitalize">
+              <span className="px-3 py-1 rounded-full bg-gradient-to-r from-gray-100 to-gray-200 text-gray-800 text-sm font-medium border border-gray-300 capitalize transition-all duration-300 hover:scale-105">
                 {flow.category}
               </span>
             )}
           </div>
         </div>
-        <p className="text-muted-foreground">{locationString}</p>
+        <p className="text-muted-foreground flex items-center gap-2">
+          <span className="h-1 w-1 bg-primary rounded-full"></span>
+          {locationString}
+        </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Content Column */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Enhanced Media Gallery with Video Support */}
-          <PropertyGallery
-            images={propertyImages}
-            video={property.property_video}
-            propertyId={propertyId}
-            directUrls={directUrls}
-          />
+          {/* Enhanced Media Gallery */}
+          <div className={cn(
+            "transition-all duration-700 transform",
+            sectionsVisible.gallery ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
+          )}>
+            <PropertyGallery
+              images={propertyImages}
+              video={property.property_video}
+              propertyId={propertyId}
+              directUrls={directUrls}
+            />
+          </div>
 
-          {/* Enhanced Image/Video Upload Component (consolidated) */}
-          <PropertyImageUpload
-            property={property}
-            onImageUploaded={() => handleMediaUploaded('image')}
-            onVideoUploaded={() => handleMediaUploaded('video')}
-          />
+          {/* Enhanced Image/Video Upload Component */}
+          <div className={cn(
+            "transition-all duration-700 transform",
+            sectionsVisible.gallery ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
+          )}>
+            <PropertyImageUpload
+              property={property}
+              onImageUploaded={() => handleMediaUploaded('image')}
+              onVideoUploaded={() => handleMediaUploaded('video')}
+            />
+          </div>
 
-          {/* Quick Actions */}
-          <PropertyActionButtons
-            isLiked={isLiked}
-            onToggleLike={onToggleLike}
-            onShare={handleShare}
-            onScheduleVisit={() => setVisitDialogOpen(true)}
-          />
+          {/* Enhanced Quick Actions */}
+          <div className={cn(
+            "transition-all duration-700 transform",
+            sectionsVisible.actions ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
+          )}>
+            <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-muted/30 to-muted/10 rounded-xl border border-border/50">
+              <button
+                onClick={handleLikeToggle}
+                disabled={actionStates.liking}
+                className={cn(
+                  "flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-200",
+                  "hover:scale-105 hover:shadow-md",
+                  isLiked 
+                    ? "bg-gradient-to-r from-red-100 to-pink-100 text-red-700 border border-red-300" 
+                    : "bg-gradient-to-r from-gray-100 to-gray-50 text-gray-700 border border-gray-300 hover:from-red-50 hover:to-pink-50",
+                  actionStates.liking && "opacity-50 cursor-not-allowed"
+                )}
+              >
+                <Heart className={cn(
+                  "h-4 w-4 transition-all duration-200",
+                  isLiked && "fill-red-500 text-red-500",
+                  actionStates.liking && "animate-pulse"
+                )} />
+                {actionStates.liking ? "Updating..." : (isLiked ? "Liked" : "Like")}
+              </button>
 
-          {/* Conditionally render property-specific details sections using extracted components */}
-          {isLandSaleProperty ? (
-            <LandSaleDetailsSection landDetails={steps} />
-          ) : isPGHostelProperty ? (
-            <PGHostelDetailsSection pgDetails={steps} />
-          ) : isFlatmatesProperty ? (
-            <FlatmatesDetailsSection flatmatesDetails={steps} />
-          ) : isCoworkingProperty ? (
-            <CoworkingDetailsSection coworkingDetails={steps} />
-          ) : (
-            basicDetails && (
-              <BasicDetailsSection
-                basicDetails={basicDetails}
-                price={price}
-                listingType={flow.listingType}
-              />
-            )
-          )}
+              <button
+                onClick={handleShare}
+                disabled={actionStates.sharing}
+                className={cn(
+                  "flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-200",
+                  "bg-gradient-to-r from-blue-100 to-blue-50 text-blue-700 border border-blue-300",
+                  "hover:scale-105 hover:shadow-md hover:from-blue-200 hover:to-blue-100",
+                  actionStates.sharing && "opacity-50 cursor-not-allowed"
+                )}
+              >
+                <Share2 className={cn(
+                  "h-4 w-4 transition-all duration-200",
+                  actionStates.sharing && "animate-pulse"
+                )} />
+                {actionStates.sharing ? "Sharing..." : "Share"}
+              </button>
 
-          {/* Section 2: Location - Use the PropertyLocationSection component */}
-          <PropertyLocationSection property={property} />
+              <button
+                onClick={handleScheduleVisit}
+                className={cn(
+                  "flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-200",
+                  "bg-gradient-to-r from-green-100 to-green-50 text-green-700 border border-green-300",
+                  "hover:scale-105 hover:shadow-md hover:from-green-200 hover:to-green-100"
+                )}
+              >
+                <Calendar className="h-4 w-4" />
+                Schedule Visit
+              </button>
+            </div>
+          </div>
 
-          {/* Section 2.5: Coworking Specific Details - Only show for coworking properties */}
+          {/* Property-specific details sections with staggered animations */}
+          <div className={cn(
+            "transition-all duration-700 transform",
+            sectionsVisible.details ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
+          )}>
+            {isLandSaleProperty ? (
+              <LandSaleDetailsSection landDetails={steps} />
+            ) : isPGHostelProperty ? (
+              <PGHostelDetailsSection pgDetails={steps} />
+            ) : isFlatmatesProperty ? (
+              <FlatmatesDetailsSection flatmatesDetails={steps} />
+            ) : isCoworkingProperty ? (
+              <CoworkingDetailsSection coworkingDetails={steps} />
+            ) : (
+              basicDetails && (
+                <BasicDetailsSection
+                  basicDetails={basicDetails}
+                  price={price}
+                  listingType={flow.listingType}
+                />
+              )
+            )}
+          </div>
+
+          {/* Location Section */}
+          <div className={cn(
+            "transition-all duration-700 transform",
+            sectionsVisible.location ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
+          )}>
+            <PropertyLocationSection property={property} />
+          </div>
+
+          {/* Coworking Specific Details */}
           {isCoworkingProperty && (
-            <CoworkingSpecificDetailsSection coworkingDetails={steps} />
+            <div className={cn(
+              "transition-all duration-700 transform",
+              sectionsVisible.features ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
+            )}>
+              <CoworkingSpecificDetailsSection coworkingDetails={steps} />
+            </div>
           )}
 
-          {/* Section 3: Sale/Rental Details - Only show if not PG/Hostel, Flatmates, or Coworking using extracted component */}
+          {/* Sale/Rental Details */}
           {priceDetails && !isPGHostelProperty && !isFlatmatesProperty && !isCoworkingProperty && (
-            <PricingDetailsSection
-              listingType={flow.listingType}
-              pricingDetails={priceDetails}
-            />
+            <div className={cn(
+              "transition-all duration-700 transform",
+              sectionsVisible.features ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
+            )}>
+              <PricingDetailsSection
+                listingType={flow.listingType}
+                pricingDetails={priceDetails}
+              />
+            </div>
           )}
 
-          {/* Section 4: Features/Amenities - Using enhanced component */}
+          {/* Features/Amenities */}
           {featuresDetails && (
-            <FeaturesAmenitiesSection featuresData={featuresDetails} />
+            <div className={cn(
+              "transition-all duration-700 transform",
+              sectionsVisible.features ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
+            )}>
+              <FeaturesAmenitiesSection featuresData={featuresDetails} />
+            </div>
           )}
 
-          {/* Remaining sections using extracted StepSection component */}
-          {remainingStepKeys.map(stepId => (
-            <StepSection
+          {/* Remaining sections */}
+          {remainingStepKeys.map((stepId, index) => (
+            <div 
               key={stepId}
-              stepId={stepId}
-              stepData={steps[stepId]}
-            />
+              className={cn(
+                "transition-all duration-700 transform",
+                sectionsVisible.features ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
+              )}
+              style={{ transitionDelay: `${index * 100}ms` }}
+            >
+              <StepSection
+                stepId={stepId}
+                stepData={steps[stepId]}
+              />
+            </div>
           ))}
         </div>
 
-        {/* Sidebar Column */}
-        <div className="space-y-6">
+        {/* Sidebar Column with staggered animations */}
+        <div className={cn(
+          "space-y-6 transition-all duration-700 transform",
+          sectionsVisible.sidebar ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
+        )}>
           <ContactOwnerCard
             propertyTitle={propertyTitle}
             propertyId={propertyId}
@@ -309,12 +570,28 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
         </div>
       </div>
 
-      {/* Visit Request Dialog */}
+      {/* Enhanced Visit Request Dialog */}
       <VisitRequestDialog
         propertyId={propertyId}
         open={visitDialogOpen}
         onOpenChange={setVisitDialogOpen}
       />
+
+      {/* Success feedback overlay */}
+      {pageLoaded && (
+        <div className="fixed bottom-4 right-4 pointer-events-none">
+          <div className={cn(
+            "bg-green-100 border border-green-300 text-green-800 px-4 py-2 rounded-lg shadow-lg",
+            "transition-all duration-500 transform",
+            "translate-y-0 opacity-100"
+          )}>
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4" />
+              <span className="text-sm font-medium">Property loaded successfully</span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
