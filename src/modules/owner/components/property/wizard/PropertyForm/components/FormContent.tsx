@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/PropertyForm/components/FormContent.tsx
-// Version: 6.4.0
-// Last Modified: 21-05-2025 11:00 IST
-// Purpose: Removed Save and Continue functionality from PropertySummary rendering
+// Version: 6.5.0
+// Last Modified: 26-05-2025 10:30 IST
+// Purpose: Added CommercialRentalDetails component for commercial rent flows
 
 import React, { useState } from 'react';
 import { UseFormReturn } from 'react-hook-form';
@@ -13,6 +13,7 @@ import { CommercialBasicDetails } from '../../sections/CommercialBasicDetails';
 import CoworkingBasicDetails from '../../sections/CoworkingBasicDetails';
 import { LocationDetails } from '../../sections/LocationDetails'; 
 import RentalDetails from '../../sections/RentalDetails';
+import CommercialRentalDetails from '../../sections/CommercialRentalDetails';
 import { SaleDetails } from '../../sections/SaleDetails';
 import { AmenitiesSection } from '../../sections/AmenitiesSection';
 import { PropertySummary } from "../../sections/PropertySummary/";
@@ -129,7 +130,12 @@ const FormContent = ({
       return renderSection(LocationDetails, {});
     }
     else if (stepId.includes('_rental')) {
-      return renderSection(RentalDetails, {});
+      // Use different rental components based on property type
+      if (isCommercialRentMode) {
+        return renderSection(CommercialRentalDetails, {});
+      } else {
+        return renderSection(RentalDetails, {});
+      }
     }
     else if (stepId.includes('_sale_details')) {
       if (isCommercialSaleMode) {
