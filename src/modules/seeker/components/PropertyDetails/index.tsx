@@ -3,7 +3,7 @@
 // Last Modified: 27-05-2025 16:45 IST
 // Purpose: Reordered sections - Features & Amenities moved to last position
 
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
 import { 
@@ -15,9 +15,6 @@ import {
   RefreshCw,
   Sparkles
 } from 'lucide-react';
-
-// Import AuthContext 
-import { AuthContext } from '@/contexts/AuthContext';
 
 // Import extracted hooks
 import { usePropertyData } from './hooks/usePropertyData';
@@ -53,6 +50,11 @@ import FeaturesAmenitiesSection from './FeaturesAmenitiesSection';
 
 // Import types
 import { PropertyDetailsProps } from './types';
+
+// Update the interface to include currentUser prop
+interface EnhancedPropertyDetailsProps extends PropertyDetailsProps {
+  currentUser?: { id: string } | null;
+}
 
 // Define static data for similar properties
 const SIMILAR_PROPERTIES_DATA = [
@@ -94,17 +96,16 @@ const SIMILAR_PROPERTIES_DATA = [
   }
 ];
 
-const PropertyDetails: React.FC<PropertyDetailsProps> = ({
+const PropertyDetails: React.FC<EnhancedPropertyDetailsProps> = ({
   property,
   isLiked,
   onToggleLike,
   isLoading,
   onRefresh,
-  directUrls
+  directUrls,
+  currentUser
 }) => {
   const { toast } = useToast();
-  const authContext = useContext(AuthContext); // Get auth context
-  const user = authContext?.user; // Get current user safely
   const [visitDialogOpen, setVisitDialogOpen] = useState(false);
   const [displayTitle, setDisplayTitle] = useState('');
   const [pageLoaded, setPageLoaded] = useState(false);
@@ -118,6 +119,46 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
   // Use custom hooks for data processing and media management
   const propertyData = usePropertyData(property);
   const { propertyImages, handleMediaUploaded } = usePropertyMedia(property, onRefresh);
+
+  // Generate 6-character property code from property ID
+  const generatePropertyCode = async (propertyId: string): Promise<string> => {
+    try {
+      // Step 1: Take the Property ID as string input
+      const input = propertyId.toString();
+      
+      // Step 2: Hash the UUID using SHA-256
+      const encoder = new TextEncoder();
+      const data = encoder.encode(input);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      
+      // Step 3: Convert the hash to an integer (using first 8 bytes for precision)
+      const hashArray = new Uint8Array(hashBuffer);
+      let hashInt = 0;
+      for (let i = 0; i < 8; i++) {
+        hashInt = hashInt * 256 + hashArray[i];
+      }
+      
+      // Step 4: Convert the integer to a Base36 string
+      const base36String = hashInt.toString(36).toUpperCase();
+      
+      // Step 5: Take the first 6 characters
+      return base36String.substring(0, 6).padEnd(6, '0');
+    } catch (error) {
+      console.error('Error generating property code:', error);
+      // Fallback: use first 6 characters of property ID
+      return propertyId.replace(/-/g, '').substring(0, 6).toUpperCase();
+    }
+  };
+
+  // State for property code
+  const [propertyCode, setPropertyCode] = useState<string>('');
+
+  // Generate property code when component mounts
+  useEffect(() => {
+    if (propertyData?.propertyId) {
+      generatePropertyCode(propertyData.propertyId).then(setPropertyCode);
+    }
+  }, [propertyData?.propertyId]);
 
   // Page load animation effect
   useEffect(() => {
@@ -313,7 +354,7 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
   const propertyTitle = displayTitle || flow.title || (basicDetails?.title || property.title || 'Property Listing');
 
   // Check if current user is the property owner
-  const currentUserId = user?.id;
+  const currentUserId = currentUser?.id;
   const isPropertyOwner = currentUserId && (currentUserId === ownerId || currentUserId === property.owner_id);
 
   return (
@@ -543,6 +584,13 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
               onImageUploaded={() => handleMediaUploaded('image')}
               onVideoUploaded={() => handleMediaUploaded('video')}
             />
+          </div>
+
+          {/* Property Code Section */}
+          <div className={cn(
+            "transition-all duration-700 transform",
+            sectionsVisible.gallery ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
+          )}>
           </div>
 
           {/* Enhanced Quick Actions */}
@@ -795,6 +843,51 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
           "space-y-6 transition-all duration-700 transform",
           sectionsVisible.sidebar ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
         )}>
+          {/* Property Code Section - MOVED TO SIDEBAR */}
+          <div className="bg-gradient-to-r from-muted/30 to-muted/10 rounded-xl border border-border/50 p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="h-2 w-2 bg-primary rounded-full animate-pulse"></div>
+                  <span className="text-sm font-medium text-muted-foreground">Property Code</span>
+                </div>
+                <div className="flex items-center gap-2 bg-background/80 backdrop-blur-sm border border-border rounded-lg px-4 py-2">
+                  <span className="text-xl font-bold font-mono text-primary tracking-wider">
+                    {propertyCode || 'LOADING'}
+                  </span>
+                </div>
+              </div>
+              
+              <button
+                onClick={() => {
+                  if (propertyCode) {
+                    navigator.clipboard.writeText(propertyCode);
+                    toast({
+                      title: "Code Copied",
+                      description: `Property code "${propertyCode}" copied to clipboard`,
+                      variant: "default"
+                    });
+                  }
+                }}
+                className={cn(
+                  "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200",
+                  "bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20",
+                  "hover:scale-105 hover:shadow-sm"
+                )}
+                disabled={!propertyCode}
+              >
+                <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 002 2z" />
+                </svg>
+                Copy
+              </button>
+            </div>
+            
+            <div className="mt-2 text-xs text-muted-foreground">
+              Use this unique code to quickly reference this property
+            </div>
+          </div>
+
           {/* Contact Owner Card - Only show if current user is NOT the property owner */}
           {!isPropertyOwner && (
             <ContactOwnerCard
