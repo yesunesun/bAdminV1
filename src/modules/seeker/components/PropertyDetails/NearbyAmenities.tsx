@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyDetails/NearbyAmenities.tsx
-// Version: 1.5.0
-// Last Modified: 09-05-2025 15:30 IST
-// Purpose: Fixed Google Maps geometry library integration and error handling
+// Version: 2.0.0
+// Last Modified: 27-01-2025 16:15 IST
+// Purpose: Enhanced nearby amenities with Phase 1 design system, Indian formatting, and improved UX
 
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -15,7 +15,10 @@ import {
   ShoppingBag, 
   Bus, 
   Trees,
-  Star
+  Star,
+  Navigation,
+  Clock,
+  Phone
 } from 'lucide-react';
 
 // Interface for nearby amenity data
@@ -38,12 +41,12 @@ interface NearbyAmenitiesProps {
 }
 
 const amenityTypes = [
-  { label: 'Hospitals', value: 'hospital', icon: Building },
-  { label: 'Schools', value: 'school', icon: GraduationCap },
-  { label: 'Restaurants', value: 'restaurant', icon: Utensils },
-  { label: 'Shopping', value: 'shopping_mall', icon: ShoppingBag },
-  { label: 'Transport', value: 'transit_station', icon: Bus },
-  { label: 'Parks', value: 'park', icon: Trees }
+  { label: 'Hospitals', value: 'hospital', icon: Building, color: 'red' },
+  { label: 'Schools', value: 'school', icon: GraduationCap, color: 'blue' },
+  { label: 'Restaurants', value: 'restaurant', icon: Utensils, color: 'orange' },
+  { label: 'Shopping', value: 'shopping_mall', icon: ShoppingBag, color: 'purple' },
+  { label: 'Transport', value: 'transit_station', icon: Bus, color: 'green' },
+  { label: 'Parks', value: 'park', icon: Trees, color: 'emerald' }
 ];
 
 const NearbyAmenities: React.FC<NearbyAmenitiesProps> = ({
@@ -90,7 +93,7 @@ const NearbyAmenities: React.FC<NearbyAmenitiesProps> = ({
     return () => clearInterval(checkInterval);
   }, []);
   
-  // Safe distance calculation function
+  // Safe distance calculation function with Indian format
   const calculateSafeDistance = (
     location1: google.maps.LatLng, 
     location2: google.maps.LatLng | undefined
@@ -129,6 +132,16 @@ const NearbyAmenities: React.FC<NearbyAmenitiesProps> = ({
       return 0;
     }
   };
+
+  // Format distance in Indian style
+  const formatDistance = (distanceInMeters: number): string => {
+    if (distanceInMeters < 1000) {
+      return `${Math.round(distanceInMeters)} m`;
+    } else {
+      const km = distanceInMeters / 1000;
+      return `${km.toFixed(1)} km`;
+    }
+  };
   
   // Fetch nearby amenities when coordinates change or when type is selected
   useEffect(() => {
@@ -161,9 +174,7 @@ const NearbyAmenities: React.FC<NearbyAmenitiesProps> = ({
                     place.geometry.location
                   );
                   
-                  distanceText = distanceInMeters < 1000 
-                    ? `${Math.round(distanceInMeters)} m` 
-                    : `${(distanceInMeters / 1000).toFixed(1)} km`;
+                  distanceText = formatDistance(distanceInMeters);
                 }
                 
                 return {
@@ -243,39 +254,53 @@ const NearbyAmenities: React.FC<NearbyAmenitiesProps> = ({
     ? amenities 
     : staticAmenitiesData.filter(amenity => amenity.type === selectedType);
     
-  // Get the icon for the selected type
-  const getIconForType = (type: string) => {
-    const foundType = amenityTypes.find(t => t.value === type);
-    return foundType ? foundType.icon : Building;
+  // Get the configuration for the selected type
+  const getTypeConfig = (type: string) => {
+    return amenityTypes.find(t => t.value === type) || amenityTypes[0];
   };
+
+  const selectedTypeConfig = getTypeConfig(selectedType);
   
   return (
-    <Card className={cn("border-border/40 shadow-md", className)}>
-      <CardContent className="p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-base font-semibold flex items-center">
-            Nearby Amenities
-          </h3>
+    <Card className={cn("overflow-hidden shadow-sm border-border/50 transition-colors duration-200", className)}>
+      <CardContent className="p-4 md:p-6">
+        {/* Header */}
+        <div className="flex items-center gap-3 mb-4">
+          <div className="p-2 rounded-lg bg-primary/10">
+            <Navigation className="h-5 w-5 text-primary" />
+          </div>
+          <h2 className="text-lg md:text-xl font-semibold">Nearby Amenities</h2>
         </div>
         
         {/* Amenity type selector */}
-        <div className="flex overflow-x-auto pb-2 gap-2 mb-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-6">
           {amenityTypes.map((type) => {
             const TypeIcon = type.icon;
+            const isSelected = selectedType === type.value;
+            
+            const colorClasses = {
+              red: isSelected ? 'bg-red-100 text-red-800 border-red-300' : 'hover:bg-red-50 hover:text-red-700',
+              blue: isSelected ? 'bg-blue-100 text-blue-800 border-blue-300' : 'hover:bg-blue-50 hover:text-blue-700',
+              orange: isSelected ? 'bg-orange-100 text-orange-800 border-orange-300' : 'hover:bg-orange-50 hover:text-orange-700',
+              purple: isSelected ? 'bg-purple-100 text-purple-800 border-purple-300' : 'hover:bg-purple-50 hover:text-purple-700',
+              green: isSelected ? 'bg-green-100 text-green-800 border-green-300' : 'hover:bg-green-50 hover:text-green-700',
+              emerald: isSelected ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'hover:bg-emerald-50 hover:text-emerald-700'
+            };
+            
             return (
-              <Button
+              <button
                 key={type.value}
-                variant="ghost"
-                size="sm"
                 onClick={() => setSelectedType(type.value)}
                 className={cn(
-                  "px-3 h-8 whitespace-nowrap",
-                  selectedType === type.value ? "bg-accent text-accent-foreground" : "text-muted-foreground"
+                  "flex items-center gap-2 p-3 rounded-lg border transition-all text-sm font-medium",
+                  isSelected 
+                    ? colorClasses[type.color as keyof typeof colorClasses]
+                    : `border-border text-muted-foreground ${colorClasses[type.color as keyof typeof colorClasses]}`
                 )}
               >
-                <TypeIcon className="h-4 w-4 mr-2" />
-                {type.label}
-              </Button>
+                <TypeIcon className="h-4 w-4 flex-shrink-0" />
+                <span className="truncate">{type.label}</span>
+              </button>
             );
           })}
         </div>
@@ -284,60 +309,90 @@ const NearbyAmenities: React.FC<NearbyAmenitiesProps> = ({
         {loading ? (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="p-3 border border-muted rounded-md bg-muted/10 animate-pulse h-16"></div>
+              <div key={i} className="p-4 border border-muted rounded-lg bg-muted/10 animate-pulse">
+                <div className="h-4 bg-muted rounded mb-2"></div>
+                <div className="h-3 bg-muted rounded w-3/4"></div>
+              </div>
             ))}
           </div>
         ) : (
           <div className="space-y-3" data-testid="nearby-amenities">
             {displayAmenities.map((amenity, index) => {
-              const TypeIcon = getIconForType(amenity.type);
+              const TypeIcon = selectedTypeConfig.icon;
+              const typeColor = selectedTypeConfig.color;
+              
+              const iconColorClasses = {
+                red: 'text-red-600 bg-red-500/10',
+                blue: 'text-blue-600 bg-blue-500/10',
+                orange: 'text-orange-600 bg-orange-500/10',
+                purple: 'text-purple-600 bg-purple-500/10',
+                green: 'text-green-600 bg-green-500/10',
+                emerald: 'text-emerald-600 bg-emerald-500/10'
+              };
+              
               return (
                 <div 
                   key={index} 
-                  className="p-3 border border-muted rounded-md bg-card hover:bg-accent/5 transition-colors"
+                  className="p-4 border border-muted rounded-lg bg-card hover:bg-accent/5 transition-all hover:-translate-y-0.5 hover:shadow-md"
                 >
-                  <div className="flex items-start">
-                    <TypeIcon className="h-4 w-4 text-primary mt-1 mr-2 flex-shrink-0" />
+                  <div className="flex items-start gap-3">
+                    <div className={cn("p-2 rounded-full flex-shrink-0", iconColorClasses[typeColor as keyof typeof iconColorClasses])}>
+                      <TypeIcon className="h-4 w-4" />
+                    </div>
                     <div className="flex-1 min-w-0">
-                      <h4 className="font-medium text-sm">{amenity.name}</h4>
-                      <div className="flex items-center text-xs text-muted-foreground mt-1 truncate">
-                        <MapPin className="h-3 w-3 mr-1 flex-shrink-0" />
-                        <span className="truncate">{amenity.address}</span>
+                      <h4 className="font-semibold text-sm md:text-base mb-1">{amenity.name}</h4>
+                      <div className="flex items-start text-xs text-muted-foreground mb-2">
+                        <MapPin className="h-3 w-3 mr-1 flex-shrink-0 mt-0.5" />
+                        <span className="line-clamp-2">{amenity.address}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className={cn(
+                          "text-xs font-medium px-2 py-1 rounded-full",
+                          typeColor === 'red' && "bg-red-100 text-red-700",
+                          typeColor === 'blue' && "bg-blue-100 text-blue-700",
+                          typeColor === 'orange' && "bg-orange-100 text-orange-700",
+                          typeColor === 'purple' && "bg-purple-100 text-purple-700",
+                          typeColor === 'green' && "bg-green-100 text-green-700",
+                          typeColor === 'emerald' && "bg-emerald-100 text-emerald-700"
+                        )}>
+                          {amenity.distance}
+                        </span>
+                        {amenity.rating && (
+                          <div className="flex items-center text-xs text-muted-foreground">
+                            <Star className="h-3 w-3 mr-1 text-amber-400 fill-amber-400" />
+                            <span className="font-medium">{amenity.rating}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
-                  </div>
-                  <div className="flex justify-between items-center mt-2">
-                    <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
-                      {amenity.distance}
-                    </span>
-                    {amenity.rating && (
-                      <div className="text-xs text-muted-foreground flex items-center">
-                        <Star className="h-3 w-3 mr-1 text-amber-400 fill-amber-400" />
-                        {amenity.rating}
-                      </div>
-                    )}
                   </div>
                 </div>
               );
             })}
             
             {displayAmenities.length === 0 && !loading && (
-              <div className="text-center p-3 border border-muted rounded-md">
-                <p className="text-xs text-muted-foreground">
-                  No {amenityTypes.find(t => t.value === selectedType)?.label.toLowerCase() || 'amenities'} found nearby
+              <div className="text-center p-6 border border-muted rounded-lg bg-muted/10">
+                <selectedTypeConfig.icon className="h-8 w-8 text-muted-foreground mx-auto mb-2 opacity-50" />
+                <p className="text-sm text-muted-foreground font-medium">
+                  No {selectedTypeConfig.label.toLowerCase()} found nearby
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Try searching in a different area or category
                 </p>
               </div>
             )}
           </div>
         )}
         
-        <div className="text-center mt-4">
+        {/* Footer with Google Maps link */}
+        <div className="text-center mt-6 pt-4 border-t border-border">
           <Button 
-            variant="link" 
+            variant="outline" 
             size="sm" 
-            className="text-xs text-primary hover:underline font-medium p-0 h-auto"
+            className="text-sm font-medium transition-colors"
             onClick={() => window.open(`https://www.google.com/maps/search/${selectedType}/@${coordinates?.lat},${coordinates?.lng},15z`, '_blank')}
           >
+            <MapPin className="h-4 w-4 mr-2" />
             View more on Google Maps
           </Button>
         </div>

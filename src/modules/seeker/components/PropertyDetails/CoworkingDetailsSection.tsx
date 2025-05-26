@@ -1,10 +1,35 @@
 // src/modules/seeker/components/PropertyDetails/CoworkingDetailsSection.tsx
-// Version: 1.0.0
-// Last Modified: 25-05-2025 21:00 IST
-// Purpose: Display Commercial Coworking specific details in property details page
+// Version: 2.0.0
+// Last Modified: 27-01-2025 14:30 IST
+// Purpose: Enhanced coworking details with Phase 1 design system, Indian formatting, and responsive layout
 
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
+import { 
+  Building2,
+  Users,
+  Clock,
+  Wifi,
+  Car,
+  Coffee,
+  Monitor,
+  MapPin,
+  IndianRupee,
+  CheckCircle2,
+  Briefcase,
+  Calendar,
+  Shield,
+  Settings
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { 
+  formatIndianRupees, 
+  renderFieldValue,
+  formatFieldLabel,
+  formatCapacity,
+  formatBoolean,
+  shouldDisplayValue
+} from './utils/dataFormatters';
 
 interface CoworkingDetailsSectionProps {
   coworkingDetails?: any; // Accept any structure since the data can be nested in different ways
@@ -17,19 +42,6 @@ const CoworkingDetailsSection: React.FC<CoworkingDetailsSectionProps> = ({ cowor
     if (value === '') return defaultValue;
     if (value === 0 && defaultValue !== '0') return defaultValue;
     return String(value);
-  };
-
-  // Format currency in Indian Rupees
-  const formatIndianRupees = (amount: number | string): string => {
-    const numValue = typeof amount === 'number' ? amount : Number(parseFloat(amount));
-    
-    if (isNaN(numValue)) return '₹0';
-    
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      maximumFractionDigits: 0
-    }).format(numValue);
   };
 
   // Extract data from potentially different locations in the property data
@@ -108,8 +120,8 @@ const CoworkingDetailsSection: React.FC<CoworkingDetailsSectionProps> = ({ cowor
   if (!data) {
     return (
       <Card className="overflow-hidden">
-        <CardContent className="p-6">
-          <h3 className="text-lg font-semibold mb-4">Coworking Space Details</h3>
+        <CardContent className="p-4 md:p-6">
+          <h3 className="text-lg md:text-xl font-semibold mb-4">Coworking Space Details</h3>
           <p className="text-muted-foreground">No coworking space details available for this property.</p>
         </CardContent>
       </Card>
@@ -119,222 +131,273 @@ const CoworkingDetailsSection: React.FC<CoworkingDetailsSectionProps> = ({ cowor
   // Format area with unit
   const formatArea = (area: any, unit: string = 'sqft'): string => {
     if (!area) return '-';
-    return `${area} ${unit || 'sqft'}`;
+    const numArea = typeof area === 'number' ? area : Number(area);
+    if (isNaN(numArea)) return '-';
+    const formatted = new Intl.NumberFormat('en-IN').format(numArea);
+    return `${formatted} ${unit || 'sqft'}`;
   };
 
-  // Format capacity
-  const formatCapacity = (capacity: any): string => {
-    if (!capacity) return '-';
-    const num = Number(capacity);
-    if (num === 1) return '1 Person';
-    if (num > 1) return `${num} Persons`;
-    return formatPropertyValue(capacity);
+  // Get icon for amenity type
+  const getAmenityIcon = (amenity: string) => {
+    const amenityLower = amenity.toLowerCase();
+    if (amenityLower.includes('wifi') || amenityLower.includes('internet')) return Wifi;
+    if (amenityLower.includes('parking') || amenityLower.includes('car')) return Car;
+    if (amenityLower.includes('coffee') || amenityLower.includes('tea') || amenityLower.includes('cafeteria')) return Coffee;
+    if (amenityLower.includes('meeting') || amenityLower.includes('conference')) return Monitor;
+    if (amenityLower.includes('security') || amenityLower.includes('guard')) return Shield;
+    return CheckCircle2;
   };
 
-  // Format boolean values
-  const formatBoolean = (value: any): string => {
-    if (typeof value === 'boolean') {
-      return value ? 'Yes' : 'No';
-    }
-    if (typeof value === 'string') {
-      const lower = value.toLowerCase();
-      if (lower === 'true' || lower === 'yes') return 'Yes';
-      if (lower === 'false' || lower === 'no') return 'No';
-    }
-    return formatPropertyValue(value);
+  // Get icon for service type
+  const getServiceIcon = (service: string) => {
+    const serviceLower = service.toLowerCase();
+    if (serviceLower.includes('reception') || serviceLower.includes('front desk')) return Users;
+    if (serviceLower.includes('cleaning') || serviceLower.includes('housekeeping')) return Settings;
+    if (serviceLower.includes('mail') || serviceLower.includes('courier')) return MapPin;
+    if (serviceLower.includes('business') || serviceLower.includes('support')) return Briefcase;
+    return CheckCircle2;
   };
 
-  // Format amenities as a grid
+  // Render amenities as color-coded cards
   const renderAmenities = (amenities: any[]) => {
     if (!amenities || !Array.isArray(amenities) || amenities.length === 0) {
       return <span className="text-muted-foreground">No amenities listed</span>;
     }
 
     return (
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
-        {amenities.map((amenity, index) => (
-          <div key={index} className="flex items-center gap-2">
-            <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"></div>
-            <span className="text-sm">{amenity}</span>
-          </div>
-        ))}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+        {amenities.map((amenity, index) => {
+          const IconComponent = getAmenityIcon(amenity);
+          return (
+            <div 
+              key={index} 
+              className={cn(
+                "flex items-center gap-2 p-3 rounded-lg bg-gradient-to-br from-blue-50 to-blue-100/50 border border-blue-200/50",
+                "transition-all hover:-translate-y-1 hover:shadow-md"
+              )}
+            >
+              <div className="p-1.5 rounded-full bg-blue-500/10">
+                <IconComponent className="h-4 w-4 text-blue-600" />
+              </div>
+              <span className="text-sm font-medium text-blue-900">{amenity}</span>
+            </div>
+          );
+        })}
       </div>
     );
   };
 
-  // Format services as a grid
+  // Render services as color-coded cards
   const renderServices = (services: any[]) => {
     if (!services || !Array.isArray(services) || services.length === 0) {
       return <span className="text-muted-foreground">No services listed</span>;
     }
 
     return (
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
-        {services.map((service, index) => (
-          <div key={index} className="flex items-center gap-2">
-            <div className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0"></div>
-            <span className="text-sm">{service}</span>
-          </div>
-        ))}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+        {services.map((service, index) => {
+          const IconComponent = getServiceIcon(service);
+          return (
+            <div 
+              key={index} 
+              className={cn(
+                "flex items-center gap-2 p-3 rounded-lg bg-gradient-to-br from-green-50 to-green-100/50 border border-green-200/50",
+                "transition-all hover:-translate-y-1 hover:shadow-md"
+              )}
+            >
+              <div className="p-1.5 rounded-full bg-green-500/10">
+                <IconComponent className="h-4 w-4 text-green-600" />
+              </div>
+              <span className="text-sm font-medium text-green-900">{service}</span>
+            </div>
+          );
+        })}
       </div>
     );
   };
 
+  // Fields to exclude from additional details display
+  const excludedFields = [
+    'title', 'propertyType', 'price', 'isSale', 'isNegotiable', 'amenities', 'services',
+    'description', 'rules', 'workspaceType', 'capacity', 'seatingArrangement',
+    'meetingRooms', 'cabins', 'operatingHours', 'accessType', 'internetSpeed',
+    'securityDeposit', 'parkingAvailable', 'builtUpArea', 'builtUpAreaUnit'
+  ];
+
+  // Get additional details
+  const additionalDetails = Object.entries(data)
+    .filter(([key, value]) => 
+      !excludedFields.includes(key) && 
+      shouldDisplayValue(value)
+    );
+
   return (
-    <Card className="overflow-hidden">
-      <CardContent className="p-6">
-        {/* Header with title and pricing */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4">
-          <h3 className="text-lg font-semibold">Coworking Space Details</h3>
-          <div className="mt-2 md:mt-0">
-            <span className="text-2xl font-bold text-primary">
-              {formatIndianRupees(data.price)}
-            </span>
-            {!data.isSale && <span className="text-sm text-muted-foreground ml-1">/month</span>}
-            {data.isNegotiable && (
-              <span className="text-sm text-muted-foreground ml-2">(Negotiable)</span>
-            )}
+    <Card className={cn("overflow-hidden shadow-sm border-border/50 transition-colors duration-200")}>
+      <CardContent className="p-4 md:p-6">
+        {/* Header Section with Pricing */}
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-primary/10">
+              <Building2 className="h-5 w-5 text-primary" />
+            </div>
+            <h2 className="text-lg md:text-xl font-semibold">Coworking Space Details</h2>
+          </div>
+          
+          <div className="flex items-center gap-2 bg-gradient-to-r from-primary/5 to-primary/10 px-4 py-3 rounded-xl border border-primary/20">
+            <IndianRupee className="h-5 w-5 text-primary" />
+            <div className="flex flex-col sm:flex-row sm:items-baseline sm:gap-2">
+              <span className="text-xl md:text-2xl font-bold text-primary">
+                {formatIndianRupees(data.price)}
+              </span>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                {!data.isSale && <span>/month</span>}
+                {data.isNegotiable && (
+                  <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
+                    Negotiable
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
         </div>
-        
-        <div className="grid grid-cols-2 gap-4">
-          {data.title && (
-            <div>
-              <p className="text-sm text-muted-foreground">Property Title</p>
-              <p className="font-medium">{formatPropertyValue(data.title)}</p>
-            </div>
-          )}
-          
-          <div>
-            <p className="text-sm text-muted-foreground">Property Type</p>
-            <p className="font-medium">{formatPropertyValue(data.propertyType, 'Coworking Space')}</p>
-          </div>
 
-          <div>
-            <p className="text-sm text-muted-foreground">Built-up Area</p>
-            <p className="font-medium">{formatArea(data.builtUpArea, data.builtUpAreaUnit)}</p>
-          </div>
-          
-          <div>
-            <p className="text-sm text-muted-foreground">Property Age</p>
-            <p className="font-medium">{formatPropertyValue(data.propertyAge)}</p>
-          </div>
-          
-          <div>
-            <p className="text-sm text-muted-foreground">Floor</p>
-            <p className="font-medium">{formatPropertyValue(data.floor)}</p>
-          </div>
-          
-          <div>
-            <p className="text-sm text-muted-foreground">Total Floors</p>
-            <p className="font-medium">{formatPropertyValue(data.totalFloors)}</p>
-          </div>
-
-          <div>
-            <p className="text-sm text-muted-foreground">Facing</p>
-            <p className="font-medium">{formatPropertyValue(data.facing)}</p>
-          </div>
-
+        {/* Main Coworking Stats Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
           {data.workspaceType && (
-            <div>
-              <p className="text-sm text-muted-foreground">Workspace Type</p>
-              <p className="font-medium">{formatPropertyValue(data.workspaceType)}</p>
+            <div className={cn(
+              "flex flex-col items-center p-4 rounded-xl bg-gradient-to-br from-purple-50 to-purple-100/50 border border-purple-200/50",
+              "transition-all hover:-translate-y-1 hover:shadow-md"
+            )}>
+              <div className="p-3 rounded-full bg-purple-500/10 mb-3">
+                <Briefcase className="h-6 w-6 text-purple-600" />
+              </div>
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Workspace Type</span>
+              <span className="font-semibold text-center text-sm mt-1 capitalize">
+                {data.workspaceType}
+              </span>
             </div>
           )}
 
           {data.capacity && (
-            <div>
-              <p className="text-sm text-muted-foreground">Capacity</p>
-              <p className="font-medium">{formatCapacity(data.capacity)}</p>
+            <div className={cn(
+              "flex flex-col items-center p-4 rounded-xl bg-gradient-to-br from-green-50 to-green-100/50 border border-green-200/50",
+              "transition-all hover:-translate-y-1 hover:shadow-md"
+            )}>
+              <div className="p-3 rounded-full bg-green-500/10 mb-3">
+                <Users className="h-6 w-6 text-green-600" />
+              </div>
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Capacity</span>
+              <span className="font-semibold text-sm mt-1">
+                {formatCapacity(data.capacity)}
+              </span>
             </div>
           )}
 
-          {data.seatingArrangement && (
-            <div>
-              <p className="text-sm text-muted-foreground">Seating Arrangement</p>
-              <p className="font-medium">{formatPropertyValue(data.seatingArrangement)}</p>
-            </div>
-          )}
-
-          {data.meetingRooms && (
-            <div>
-              <p className="text-sm text-muted-foreground">Meeting Rooms</p>
-              <p className="font-medium">{formatPropertyValue(data.meetingRooms)}</p>
-            </div>
-          )}
-
-          {data.cabins && (
-            <div>
-              <p className="text-sm text-muted-foreground">Cabins</p>
-              <p className="font-medium">{formatPropertyValue(data.cabins)}</p>
+          {data.builtUpArea && (
+            <div className={cn(
+              "flex flex-col items-center p-4 rounded-xl bg-gradient-to-br from-orange-50 to-orange-100/50 border border-orange-200/50",
+              "transition-all hover:-translate-y-1 hover:shadow-md"
+            )}>
+              <div className="p-3 rounded-full bg-orange-500/10 mb-3">
+                <Building2 className="h-6 w-6 text-orange-600" />
+              </div>
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Built-up Area</span>
+              <span className="font-semibold text-center text-sm mt-1">
+                {formatArea(data.builtUpArea, data.builtUpAreaUnit)}
+              </span>
             </div>
           )}
 
           {data.operatingHours && (
-            <div>
-              <p className="text-sm text-muted-foreground">Operating Hours</p>
-              <p className="font-medium">{formatPropertyValue(data.operatingHours)}</p>
-            </div>
-          )}
-
-          {data.accessType && (
-            <div>
-              <p className="text-sm text-muted-foreground">Access Type</p>
-              <p className="font-medium">{formatPropertyValue(data.accessType)}</p>
-            </div>
-          )}
-
-          {data.internetSpeed && (
-            <div>
-              <p className="text-sm text-muted-foreground">Internet Speed</p>
-              <p className="font-medium">{formatPropertyValue(data.internetSpeed)}</p>
-            </div>
-          )}
-
-          {data.securityDeposit && (
-            <div>
-              <p className="text-sm text-muted-foreground">Security Deposit</p>
-              <p className="font-medium">{formatIndianRupees(data.securityDeposit)}</p>
-            </div>
-          )}
-
-          {data.parkingAvailable !== null && data.parkingAvailable !== undefined && (
-            <div>
-              <p className="text-sm text-muted-foreground">Parking Available</p>
-              <p className="font-medium">{formatBoolean(data.parkingAvailable)}</p>
+            <div className={cn(
+              "flex flex-col items-center p-4 rounded-xl bg-gradient-to-br from-blue-50 to-blue-100/50 border border-blue-200/50",
+              "transition-all hover:-translate-y-1 hover:shadow-md"
+            )}>
+              <div className="p-3 rounded-full bg-blue-500/10 mb-3">
+                <Clock className="h-6 w-6 text-blue-600" />
+              </div>
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Operating Hours</span>
+              <span className="font-semibold text-center text-sm mt-1">
+                {data.operatingHours}
+              </span>
             </div>
           )}
         </div>
 
+        {/* Additional Details Section */}
+        {additionalDetails.length > 0 && (
+          <div className="pt-4 mt-4 border-t border-border">
+            <div className="flex items-center gap-2 mb-4">
+              <Settings className="h-4 w-4 text-muted-foreground" />
+              <h4 className="text-base md:text-lg font-medium">Additional Information</h4>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+              {additionalDetails.map(([key, value]) => (
+                <div key={key} className="flex flex-col space-y-1">
+                  <span className="text-sm font-medium text-muted-foreground">
+                    {formatFieldLabel(key)}
+                  </span>
+                  <span className="font-medium text-foreground">
+                    {key === 'securityDeposit' ? formatIndianRupees(value) : 
+                     key === 'parkingAvailable' ? formatBoolean(value) :
+                     renderFieldValue(value, key)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Amenities Section */}
         {data.amenities && data.amenities.length > 0 && (
-          <div className="mt-6 pt-4 border-t border-gray-200">
-            <p className="text-sm text-muted-foreground mb-2">Amenities</p>
+          <div className="pt-4 mt-4 border-t border-border">
+            <div className="flex items-center gap-2 mb-4">
+              <Coffee className="h-4 w-4 text-muted-foreground" />
+              <h4 className="text-base md:text-lg font-medium">Amenities</h4>
+            </div>
             {renderAmenities(data.amenities)}
           </div>
         )}
 
         {/* Services Section */}
         {data.services && data.services.length > 0 && (
-          <div className="mt-6 pt-4 border-t border-gray-200">
-            <p className="text-sm text-muted-foreground mb-2">Services</p>
+          <div className="pt-4 mt-4 border-t border-border">
+            <div className="flex items-center gap-2 mb-4">
+              <Briefcase className="h-4 w-4 text-muted-foreground" />
+              <h4 className="text-base md:text-lg font-medium">Services</h4>
+            </div>
             {renderServices(data.services)}
           </div>
         )}
 
         {/* Description Section */}
         {data.description && (
-          <div className="mt-4 pt-4 border-t border-gray-200">
-            <p className="text-sm text-muted-foreground mb-1">Description</p>
-            <p className="whitespace-pre-line">{data.description}</p>
+          <div className="pt-4 mt-4 border-t border-border">
+            <div className="flex items-center gap-2 mb-3">
+              <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
+              <h4 className="text-base md:text-lg font-medium">Description</h4>
+            </div>
+            <div className="bg-muted/30 rounded-lg p-4 border border-border/50">
+              <p className="text-sm md:text-base text-foreground/90 whitespace-pre-line leading-relaxed">
+                {data.description}
+              </p>
+            </div>
           </div>
         )}
         
         {/* Rules Section */}
         {data.rules && (
-          <div className="mt-4 pt-4 border-t border-gray-200">
-            <p className="text-sm text-muted-foreground mb-1">Rules & Guidelines</p>
-            <p className="whitespace-pre-line">{data.rules}</p>
+          <div className="pt-4 mt-4 border-t border-border">
+            <div className="flex items-center gap-2 mb-3">
+              <Shield className="h-4 w-4 text-muted-foreground" />
+              <h4 className="text-base md:text-lg font-medium">Rules & Guidelines</h4>
+            </div>
+            <div className="bg-muted/30 rounded-lg p-4 border border-border/50">
+              <p className="text-sm md:text-base text-foreground/90 whitespace-pre-line leading-relaxed">
+                {data.rules}
+              </p>
+            </div>
           </div>
         )}
       </CardContent>
