@@ -1,98 +1,184 @@
 // src/modules/seeker/components/PropertyDetails/utils/dataFormatters.ts
-// Version: 1.0.0
-// Last Modified: 27-05-2025 16:30 IST
-// Purpose: Data formatting utilities for property details display
+// Version: 1.1.0
+// Last Modified: 27-01-2025 12:00 IST
+// Purpose: Simplified formatting utilities that work without complex imports
 
 /**
- * Enhanced Indian Rupee formatter
- * @param amount - Amount to format (number or string)
- * @returns Formatted currency string in INR
+ * Format currency in Indian Rupees with proper symbol and notation
  */
-export const formatIndianRupees = (amount: number | string): string => {
-  const numValue = typeof amount === 'number' ? amount : Number(parseFloat(amount));
-
+export function formatIndianRupees(value: number | string): string {
+  const numValue = typeof value === 'number' ? value : Number(parseFloat(value as string));
+  
   if (isNaN(numValue)) return '₹0';
-
+  
   return new Intl.NumberFormat('en-IN', {
     style: 'currency',
     currency: 'INR',
     maximumFractionDigits: 0
   }).format(numValue);
-};
+}
 
 /**
- * Helper function to render field value with appropriate formatting
- * @param field - Field value to render
- * @param key - Field key for context-aware formatting
- * @returns Formatted field value as string
+ * Format phone number in Indian format (+91 XXXXX XXXXX)
  */
-export const renderFieldValue = (field: any, key: string): string => {
-  // Handle different data types appropriately
-  if (field === null || field === undefined) {
-    return 'Not specified';
+export function formatIndianPhone(phoneNumber: string | number): string {
+  if (!phoneNumber) return '';
+  
+  const phone = phoneNumber.toString().replace(/\D/g, '');
+  
+  // If already has country code
+  if (phone.startsWith('91') && phone.length === 12) {
+    const number = phone.slice(2);
+    return `+91 ${number.slice(0, 5)} ${number.slice(5)}`;
   }
-
-  if (typeof field === 'boolean') {
-    return field ? 'Yes' : 'No';
+  
+  // If 10 digit number
+  if (phone.length === 10) {
+    return `+91 ${phone.slice(0, 5)} ${phone.slice(5)}`;
   }
+  
+  return phoneNumber.toString();
+}
 
-  if (Array.isArray(field)) {
-    return field.join(', ');
+/**
+ * Format date in Indian DD/MM/YYYY format
+ */
+export function formatIndianDate(dateInput: string | Date | number | null | undefined): string {
+  if (!dateInput) return 'Not specified';
+  
+  try {
+    const date = new Date(dateInput);
+    
+    if (isNaN(date.getTime())) return 'Invalid date';
+    
+    return date.toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+  } catch (error) {
+    return 'Invalid date';
   }
+}
 
-  // Format date fields (keys containing 'date', 'from', etc.)
-  if (typeof field === 'string' &&
-    (key.toLowerCase().includes('date') ||
-      key.toLowerCase().includes('from') ||
-      key.toLowerCase().includes('possession'))) {
-    try {
-      const date = new Date(field);
-      if (!isNaN(date.getTime())) {
-        return date.toLocaleDateString('en-IN', {
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric'
-        });
-      }
-    } catch (e) {
-      // If date parsing fails, return the original string
+/**
+ * Safe value formatter with fallback
+ */
+export function formatValue(value: any, fallback: string = '-'): string {
+  if (value === null || value === undefined || value === '') return fallback;
+  if (value === 0 && fallback !== '0') return fallback;
+  return String(value);
+}
+
+/**
+ * Format field value based on field type and context
+ */
+export function renderFieldValue(value: any, fieldKey: string): string {
+  if (value === null || value === undefined || value === '') return '-';
+  
+  const key = fieldKey.toLowerCase();
+  
+  // Price fields
+  if (key.includes('price') || key.includes('rent') || key.includes('deposit') || 
+      key.includes('cost') || key.includes('amount') || key.includes('charge')) {
+    return formatIndianRupees(value);
+  }
+  
+  // Phone fields
+  if (key.includes('phone') || key.includes('mobile') || key.includes('contact')) {
+    return formatIndianPhone(value);
+  }
+  
+  // Date fields
+  if (key.includes('date') || key.includes('from') || key.includes('available') ||
+      key.includes('possession')) {
+    return formatIndianDate(value);
+  }
+  
+  // Boolean fields
+  if (key.includes('available') || key.includes('negotiable') || key.includes('parking') ||
+      key.includes('furnished') || key.includes('lift') || key.includes('security')) {
+    if (typeof value === 'boolean' || value === 'true' || value === 'false' ||
+        value === 'yes' || value === 'no') {
+      return typeof value === 'boolean' ? (value ? 'Yes' : 'No') : 
+             (value.toLowerCase() === 'true' || value.toLowerCase() === 'yes' ? 'Yes' : 'No');
     }
   }
-
-  // Format price fields (keys containing 'price', 'amount', etc.)
-  if ((typeof field === 'number' || !isNaN(Number(field))) &&
-    (key.toLowerCase().includes('price') ||
-      key.toLowerCase().includes('amount') ||
-      key.toLowerCase().includes('deposit') ||
-      key.toLowerCase().includes('cost') ||
-      key.toLowerCase().includes('value') ||
-      key.toLowerCase().includes('budget'))) {
-    const numValue = typeof field === 'number' ? field : Number(field);
-    return formatIndianRupees(numValue);
-  }
-
-  return field.toString();
-};
+  
+  // Default: return formatted value
+  return formatValue(value);
+}
 
 /**
- * Format step ID for display (e.g., "com_sale_basic_details" -> "Basic Details")
- * @param id - Step ID to format
- * @returns Formatted step name
+ * Format field label for display
  */
-export const formatStepId = (id: string): string => {
-  const parts = id.split('_');
-  // Remove flow prefix (e.g., "com_sale") and join remaining parts
-  const relevantParts = parts.slice(2);
-  return relevantParts
-    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+export function formatFieldLabel(key: string): string {
+  return key
+    .replace(/([A-Z])/g, ' $1') // Add space before capital letters
+    .replace(/^./, str => str.toUpperCase()) // Capitalize first letter
+    .replace(/_/g, ' ') // Replace underscores with spaces
+    .trim();
+}
+
+/**
+ * Format step ID for display (converts snake_case to Title Case)
+ */
+export function formatStepId(stepId: string): string {
+  return stepId
+    .split('_')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');
-};
+}
 
 /**
- * Format field key for display (camelCase to Title Case)
- * @param key - Field key to format
- * @returns Formatted field name
+ * Check if a value should be displayed
  */
-export const formatFieldKey = (key: string): string => {
-  return key.replace(/([A-Z])/g, ' $1').trim();
-};
+export function shouldDisplayValue(value: any): boolean {
+  if (value === null || value === undefined) return false;
+  if (value === '') return false;
+  if (Array.isArray(value) && value.length === 0) return false;
+  if (typeof value === 'object' && Object.keys(value).length === 0) return false;
+  return true;
+}
+
+/**
+ * Format boolean values for display
+ */
+export function formatBoolean(value: any): string {
+  if (typeof value === 'boolean') {
+    return value ? 'Yes' : 'No';
+  }
+  if (typeof value === 'string') {
+    const lower = value.toLowerCase();
+    if (lower === 'true' || lower === 'yes' || lower === 'available') return 'Yes';
+    if (lower === 'false' || lower === 'no' || lower === 'not available') return 'No';
+  }
+  return formatValue(value);
+}
+
+/**
+ * Format capacity (1 Person, 2 Persons, etc.)
+ */
+export function formatCapacity(capacity: any): string {
+  if (!capacity) return '-';
+  const num = Number(capacity);
+  if (num === 1) return '1 Person';
+  if (num > 1) return `${num} Persons`;
+  return formatValue(capacity);
+}
+
+/**
+ * Format area with unit
+ */
+export function formatArea(area: number | string | null | undefined, unit: string = 'sqft'): string {
+  if (!area || area === 0) return '-';
+  
+  const numArea = typeof area === 'number' ? area : Number(area);
+  
+  if (isNaN(numArea)) return '-';
+  
+  // Format with commas for large numbers
+  const formatted = new Intl.NumberFormat('en-IN').format(numArea);
+  
+  return `${formatted} ${unit}`;
+}

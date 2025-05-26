@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyDetails/FeaturesAmenitiesSection.tsx
-// Version: 1.0.0
-// Last Modified: 25-05-2025 21:30 IST
-// Purpose: Enhanced Features & Amenities section with better formatting and visual appeal
+// Version: 2.1.0
+// Last Modified: 27-01-2025 11:45 IST
+// Purpose: Fixed syntax errors and import issues
 
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -22,94 +22,188 @@ import {
   Bath,
   Hash,
   Eye,
-  Building
+  Building,
+  Dumbbell,
+  ShoppingCart,
+  Gamepad2,
+  Baby,
+  Dog,
+  TreePine,
+  Camera,
+  Utensils,
+  Tv,
+  AirVent,
+  Sun,
+  Lock,
+  Sprout,
+  Waves,
+  Mountain,
+  Settings,
+  Sparkles,
+  Star,
+  Smartphone
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface FeaturesAmenitiesSectionProps {
-  featuresData?: any; // Accept any structure since the data can be nested in different ways
+  featuresData?: any;
 }
 
+/**
+ * Comprehensive icon mapping for amenities and features
+ */
+const getAmenityIcon = (amenity: string) => {
+  const amenityLower = amenity.toLowerCase();
+  
+  // Internet & Technology
+  if (amenityLower.includes('internet') || amenityLower.includes('wifi') || amenityLower.includes('wi-fi') || amenityLower.includes('broadband')) {
+    return <Wifi className="w-4 h-4 text-blue-500" />;
+  }
+  if (amenityLower.includes('tv') || amenityLower.includes('television') || amenityLower.includes('cable')) {
+    return <Tv className="w-4 h-4 text-purple-500" />;
+  }
+  if (amenityLower.includes('phone') || amenityLower.includes('intercom') || amenityLower.includes('booth')) {
+    return <Phone className="w-4 h-4 text-green-500" />;
+  }
+  if (amenityLower.includes('cctv') || amenityLower.includes('camera') || amenityLower.includes('surveillance')) {
+    return <Camera className="w-4 h-4 text-gray-600" />;
+  }
+  
+  // Transportation & Parking
+  if (amenityLower.includes('parking') || amenityLower.includes('car') || amenityLower.includes('garage') || amenityLower.includes('vehicle')) {
+    return <Car className="w-4 h-4 text-gray-600" />;
+  }
+  
+  // Security & Safety
+  if (amenityLower.includes('security') || amenityLower.includes('guard') || amenityLower.includes('watchman')) {
+    return <Shield className="w-4 h-4 text-green-600" />;
+  }
+  if (amenityLower.includes('gated') || amenityLower.includes('gate') || amenityLower.includes('lock')) {
+    return <Lock className="w-4 h-4 text-amber-600" />;
+  }
+  
+  // Utilities
+  if (amenityLower.includes('power') || amenityLower.includes('electricity') || amenityLower.includes('backup') || amenityLower.includes('generator')) {
+    return <Zap className="w-4 h-4 text-yellow-500" />;
+  }
+  if (amenityLower.includes('water') || amenityLower.includes('pipeline') || amenityLower.includes('harvesting') || amenityLower.includes('supply')) {
+    return <Droplets className="w-4 h-4 text-blue-400" />;
+  }
+  if (amenityLower.includes('gas') || amenityLower.includes('lpg') || amenityLower.includes('pipeline')) {
+    return <Settings className="w-4 h-4 text-orange-500" />;
+  }
+  
+  // Climate Control
+  if (amenityLower.includes('air') || amenityLower.includes('ac') || amenityLower.includes('conditioner') || amenityLower.includes('cooling')) {
+    return <Wind className="w-4 h-4 text-cyan-500" />;
+  }
+  if (amenityLower.includes('heating') || amenityLower.includes('heater') || amenityLower.includes('warmth')) {
+    return <Sun className="w-4 h-4 text-orange-400" />;
+  }
+  if (amenityLower.includes('ventilation') || amenityLower.includes('exhaust') || amenityLower.includes('fan')) {
+    return <AirVent className="w-4 h-4 text-gray-500" />;
+  }
+  
+  // Building Features
+  if (amenityLower.includes('lift') || amenityLower.includes('elevator')) {
+    return <Building className="w-4 h-4 text-gray-500" />;
+  }
+  if (amenityLower.includes('stair') || amenityLower.includes('steps')) {
+    return <Hash className="w-4 h-4 text-gray-400" />;
+  }
+  
+  // Kitchen & Dining
+  if (amenityLower.includes('kitchen') || amenityLower.includes('cooking') || amenityLower.includes('gas') || amenityLower.includes('stove')) {
+    return <Utensils className="w-4 h-4 text-red-500" />;
+  }
+  if (amenityLower.includes('coffee') || amenityLower.includes('tea') || amenityLower.includes('pantry') || amenityLower.includes('cafeteria')) {
+    return <Coffee className="w-4 h-4 text-amber-600" />;
+  }
+  
+  // Recreation & Fitness
+  if (amenityLower.includes('gym') || amenityLower.includes('fitness') || amenityLower.includes('exercise') || amenityLower.includes('workout')) {
+    return <Dumbbell className="w-4 h-4 text-red-600" />;
+  }
+  if (amenityLower.includes('pool') || amenityLower.includes('swimming') || amenityLower.includes('spa')) {
+    return <Waves className="w-4 h-4 text-blue-500" />;
+  }
+  if (amenityLower.includes('game') || amenityLower.includes('play') || amenityLower.includes('recreation') || amenityLower.includes('entertainment')) {
+    return <Gamepad2 className="w-4 h-4 text-purple-600" />;
+  }
+  if (amenityLower.includes('club') || amenityLower.includes('community') || amenityLower.includes('hall')) {
+    return <Users className="w-4 h-4 text-indigo-500" />;
+  }
+  
+  // Outdoor & Nature
+  if (amenityLower.includes('garden') || amenityLower.includes('park') || amenityLower.includes('green') || amenityLower.includes('landscape')) {
+    return <TreePine className="w-4 h-4 text-green-500" />;
+  }
+  if (amenityLower.includes('terrace') || amenityLower.includes('balcony') || amenityLower.includes('outdoor')) {
+    return <Mountain className="w-4 h-4 text-green-400" />;
+  }
+  if (amenityLower.includes('plants') || amenityLower.includes('organic')) {
+    return <Sprout className="w-4 h-4 text-green-600" />;
+  }
+  
+  // Commercial & Professional
+  if (amenityLower.includes('printer') || amenityLower.includes('scanner') || amenityLower.includes('copier') || amenityLower.includes('office')) {
+    return <Printer className="w-4 h-4 text-gray-700" />;
+  }
+  if (amenityLower.includes('reception') || amenityLower.includes('front desk') || amenityLower.includes('concierge')) {
+    return <Users className="w-4 h-4 text-purple-500" />;
+  }
+  if (amenityLower.includes('conference') || amenityLower.includes('meeting') || amenityLower.includes('boardroom')) {
+    return <Users className="w-4 h-4 text-blue-700" />;
+  }
+  
+  // Shopping & Services
+  if (amenityLower.includes('shopping') || amenityLower.includes('mall') || amenityLower.includes('market') || amenityLower.includes('store')) {
+    return <ShoppingCart className="w-4 h-4 text-orange-600" />;
+  }
+  if (amenityLower.includes('atm') || amenityLower.includes('bank') || amenityLower.includes('financial')) {
+    return <Building className="w-4 h-4 text-green-700" />;
+  }
+  
+  // Family & Kids
+  if (amenityLower.includes('child') || amenityLower.includes('kid') || amenityLower.includes('baby') || amenityLower.includes('nursery')) {
+    return <Baby className="w-4 h-4 text-pink-400" />;
+  }
+  if (amenityLower.includes('pet') || amenityLower.includes('dog') || amenityLower.includes('animal')) {
+    return <Dog className="w-4 h-4 text-amber-500" />;
+  }
+  
+  // Accessibility & Special Features
+  if (amenityLower.includes('accessible') || amenityLower.includes('disabled') || amenityLower.includes('wheelchair')) {
+    return <Eye className="w-4 h-4 text-blue-600" />;
+  }
+  if (amenityLower.includes('24/7') || amenityLower.includes('hours') || amenityLower.includes('access') || amenityLower.includes('available')) {
+    return <Clock className="w-4 h-4 text-orange-500" />;
+  }
+  
+  // Premium Features
+  if (amenityLower.includes('premium') || amenityLower.includes('luxury') || amenityLower.includes('deluxe')) {
+    return <Star className="w-4 h-4 text-yellow-500" />;
+  }
+  if (amenityLower.includes('smart') || amenityLower.includes('automated') || amenityLower.includes('digital')) {
+    return <Smartphone className="w-4 h-4 text-indigo-600" />;
+  }
+  
+  // Default icon for unmatched amenities
+  return <CheckCircle2 className="w-4 h-4 text-green-500" />;
+};
+
 const FeaturesAmenitiesSection: React.FC<FeaturesAmenitiesSectionProps> = ({ featuresData }) => {
-  // Format a property value safely with fallback
-  const formatPropertyValue = (value: any, defaultValue: string = '-'): string => {
-    if (value === null || value === undefined) return defaultValue;
-    if (value === '') return defaultValue;
-    if (value === 0 && defaultValue !== '0') return defaultValue;
-    return String(value);
-  };
-
-  // Format boolean values
-  const formatBoolean = (value: any): string => {
-    if (typeof value === 'boolean') {
-      return value ? 'Yes' : 'No';
-    }
-    if (typeof value === 'string') {
-      const lower = value.toLowerCase();
-      if (lower === 'true' || lower === 'yes') return 'Yes';
-      if (lower === 'false' || lower === 'no') return 'No';
-    }
-    return formatPropertyValue(value);
-  };
-
-  // Icon mapping for different amenity types
-  const getAmenityIcon = (amenity: string) => {
-    const amenityLower = amenity.toLowerCase();
-    
-    if (amenityLower.includes('internet') || amenityLower.includes('wifi') || amenityLower.includes('wi-fi')) {
-      return <Wifi className="w-4 h-4 text-blue-500" />;
-    }
-    if (amenityLower.includes('parking') || amenityLower.includes('car')) {
-      return <Car className="w-4 h-4 text-gray-600" />;
-    }
-    if (amenityLower.includes('security') || amenityLower.includes('guard')) {
-      return <Shield className="w-4 h-4 text-green-600" />;
-    }
-    if (amenityLower.includes('power') || amenityLower.includes('electricity') || amenityLower.includes('backup')) {
-      return <Zap className="w-4 h-4 text-yellow-500" />;
-    }
-    if (amenityLower.includes('water') || amenityLower.includes('pipeline') || amenityLower.includes('harvesting')) {
-      return <Droplets className="w-4 h-4 text-blue-400" />;
-    }
-    if (amenityLower.includes('air') || amenityLower.includes('ac') || amenityLower.includes('conditioner')) {
-      return <Wind className="w-4 h-4 text-cyan-500" />;
-    }
-    if (amenityLower.includes('lift') || amenityLower.includes('elevator')) {
-      return <Building className="w-4 h-4 text-gray-500" />;
-    }
-    if (amenityLower.includes('coffee') || amenityLower.includes('tea') || amenityLower.includes('kitchen') || amenityLower.includes('pantry')) {
-      return <Coffee className="w-4 h-4 text-brown-500" />;
-    }
-    if (amenityLower.includes('printer') || amenityLower.includes('scanner') || amenityLower.includes('copier')) {
-      return <Printer className="w-4 h-4 text-gray-700" />;
-    }
-    if (amenityLower.includes('phone') || amenityLower.includes('booth')) {
-      return <Phone className="w-4 h-4 text-green-500" />;
-    }
-    if (amenityLower.includes('reception') || amenityLower.includes('front desk')) {
-      return <Users className="w-4 h-4 text-purple-500" />;
-    }
-    if (amenityLower.includes('24/7') || amenityLower.includes('access')) {
-      return <Clock className="w-4 h-4 text-orange-500" />;
-    }
-    
-    // Default icon
-    return <CheckCircle2 className="w-4 h-4 text-green-500" />;
-  };
-
   // Extract and organize features data
   const extractData = () => {
     if (!featuresData) return null;
 
-    // Handle different data structures
     const data = featuresData;
-
-    // Extract amenities from various possible locations
     let amenities: string[] = [];
     
+    // Extract amenities from various possible formats
     if (data.amenities && Array.isArray(data.amenities)) {
-      amenities = data.amenities;
+      amenities = data.amenities.filter(Boolean);
     } else if (typeof data.amenities === 'string') {
-      // If amenities is a comma-separated string
       amenities = data.amenities.split(',').map((item: string) => item.trim()).filter(Boolean);
     }
 
@@ -132,21 +226,43 @@ const FeaturesAmenitiesSection: React.FC<FeaturesAmenitiesSectionProps> = ({ fea
   // If no features data is provided, show a message
   if (!data || (data.amenities.length === 0 && Object.keys(data.otherFeatures).length === 0)) {
     return (
-      <Card className="overflow-hidden">
-        <CardContent className="p-6">
-          <h3 className="text-lg font-semibold mb-4">Features & Amenities</h3>
-          <p className="text-muted-foreground">No features or amenities information available for this property.</p>
+      <Card className="overflow-hidden shadow-sm border-border/50">
+        <CardContent className="p-4 md:p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2 rounded-lg bg-muted/50">
+              <CheckCircle2 className="h-5 w-5 text-muted-foreground" />
+            </div>
+            <h3 className="text-lg md:text-xl font-semibold">Features & Amenities</h3>
+          </div>
+          <div className="text-center py-8">
+            <CheckCircle2 className="h-12 w-12 text-muted-foreground/50 mx-auto mb-3" />
+            <p className="text-muted-foreground">No features or amenities information available for this property.</p>
+          </div>
         </CardContent>
       </Card>
     );
   }
 
-  // Format field labels to be more readable
+  // Format field label for display
   const formatFieldLabel = (key: string): string => {
     return key
-      .replace(/([A-Z])/g, ' $1') // Add space before capital letters
-      .replace(/^./, str => str.toUpperCase()) // Capitalize first letter
+      .replace(/([A-Z])/g, ' $1')
+      .replace(/^./, str => str.toUpperCase())
+      .replace(/_/g, ' ')
       .trim();
+  };
+
+  // Format boolean values
+  const formatBoolean = (value: any): string => {
+    if (typeof value === 'boolean') {
+      return value ? 'Yes' : 'No';
+    }
+    if (typeof value === 'string') {
+      const lower = value.toLowerCase();
+      if (lower === 'true' || lower === 'yes' || lower === 'available') return 'Yes';
+      if (lower === 'false' || lower === 'no' || lower === 'not available') return 'No';
+    }
+    return String(value);
   };
 
   // Render amenities in a visual grid
@@ -156,13 +272,30 @@ const FeaturesAmenitiesSection: React.FC<FeaturesAmenitiesSectionProps> = ({ fea
     }
 
     return (
-      <div className="mb-6">
-        <h4 className="text-md font-medium mb-3 text-gray-800">Amenities</h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+      <div className="mb-8">
+        <div className="flex items-center gap-2 mb-4">
+          <Sparkles className="h-5 w-5 text-primary" />
+          <h4 className="text-base md:text-lg font-medium">Available Amenities</h4>
+          <span className="px-2 py-1 bg-primary/10 text-primary rounded-full text-xs font-medium">
+            {amenities.length} items
+          </span>
+        </div>
+        
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
           {amenities.map((amenity, index) => (
-            <div key={index} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-              {getAmenityIcon(amenity)}
-              <span className="text-sm font-medium text-gray-700">{amenity}</span>
+            <div 
+              key={index} 
+              className={cn(
+                "flex items-center gap-3 p-3 rounded-xl bg-gradient-to-br from-muted/40 to-muted/20 border border-border/30",
+                "hover:border-primary/30 hover:bg-primary/5 transition-all duration-200 hover:-translate-y-1 hover:shadow-md"
+              )}
+            >
+              <div className="flex-shrink-0 p-2 rounded-lg bg-white/80 shadow-sm">
+                {getAmenityIcon(amenity)}
+              </div>
+              <span className="text-sm font-medium text-foreground leading-tight">
+                {amenity}
+              </span>
             </div>
           ))}
         </div>
@@ -179,35 +312,51 @@ const FeaturesAmenitiesSection: React.FC<FeaturesAmenitiesSectionProps> = ({ fea
     }
 
     return (
-      <div className="pt-4 border-t border-gray-200">
-        <h4 className="text-md font-medium mb-3 text-gray-800">Additional Features</h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="pt-4 mt-4 border-t border-border">
+        <div className="flex items-center gap-2 mb-4">
+          <Settings className="h-5 w-5 text-primary" />
+          <h4 className="text-base md:text-lg font-medium">Additional Features</h4>
+          <span className="px-2 py-1 bg-secondary/10 text-secondary-foreground rounded-full text-xs font-medium">
+            {featureEntries.length} items
+          </span>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
           {featureEntries.map(([key, value]) => (
-            <div key={key} className="flex flex-col space-y-1">
-              <span className="text-sm font-medium text-gray-500">
+            <div key={key} className="flex flex-col space-y-2">
+              <span className="text-sm font-medium text-muted-foreground">
                 {formatFieldLabel(key)}
               </span>
-              <span className="text-gray-900 font-medium">
+              <div className="font-medium text-foreground">
                 {Array.isArray(value) ? (
                   <div className="flex flex-wrap gap-1">
                     {value.map((item, idx) => (
                       <span 
                         key={idx} 
-                        className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full"
+                        className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full font-medium"
                       >
                         {item}
                       </span>
                     ))}
                   </div>
                 ) : typeof value === 'boolean' ? (
-                  <span className={`inline-flex items-center gap-1 ${value ? 'text-green-600' : 'text-red-600'}`}>
-                    {value ? <CheckCircle2 className="w-4 h-4" /> : <span className="w-4 h-4 text-center">✗</span>}
+                  <span className={cn(
+                    "inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium",
+                    value ? "text-green-600 bg-green-50 border-green-200" : "text-red-600 bg-red-50 border-red-200"
+                  )}>
+                    {value ? (
+                      <CheckCircle2 className="w-4 h-4" />
+                    ) : (
+                      <span className="w-4 h-4 text-center">✗</span>
+                    )}
                     {formatBoolean(value)}
                   </span>
                 ) : (
-                  formatPropertyValue(value)
+                  <span className="text-foreground">
+                    {String(value)}
+                  </span>
                 )}
-              </span>
+              </div>
             </div>
           ))}
         </div>
@@ -216,9 +365,15 @@ const FeaturesAmenitiesSection: React.FC<FeaturesAmenitiesSectionProps> = ({ fea
   };
 
   return (
-    <Card className="overflow-hidden">
-      <CardContent className="p-6">
-        <h3 className="text-lg font-semibold mb-6">Features & Amenities</h3>
+    <Card className="overflow-hidden shadow-sm border-border/50">
+      <CardContent className="p-4 md:p-6">
+        {/* Header */}
+        <div className="flex items-center gap-3 mb-6">
+          <div className="p-2 rounded-lg bg-primary/10">
+            <CheckCircle2 className="h-5 w-5 text-primary" />
+          </div>
+          <h3 className="text-lg md:text-xl font-semibold">Features & Amenities</h3>
+        </div>
         
         {/* Amenities Section */}
         {renderAmenities(data.amenities)}
