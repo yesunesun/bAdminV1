@@ -1,12 +1,13 @@
 // src/modules/seeker/components/PropertyDetails/PropertyGallery.tsx
-// Version: 9.0.0
-// Last Modified: 27-05-2025 11:30 IST
-// Purpose: Fixed gallery display issues, video playback, and icon visibility
+// Version: 10.0.0
+// Last Modified: 27-05-2025 16:30 IST
+// Purpose: Enhanced control visibility with better contrast and background styling
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { ChevronLeftIcon, ChevronRightIcon, ImageIcon, ExpandIcon, XIcon, Play, Video } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 import { PropertyImage, PropertyVideo } from '../../hooks/usePropertyDetails';
 
 const FALLBACK_IMAGE = '/noimage.png';
@@ -244,9 +245,9 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({
               
               {/* Video overlay with play button */}
               {!videoPlaying && (
-                <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
-                  <div className="bg-white/20 backdrop-blur-sm rounded-full p-4 hover:bg-white/30 transition-colors">
-                    <Play className="h-8 w-8 text-white fill-white" />
+                <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                  <div className="bg-black/70 backdrop-blur-md rounded-full p-4 hover:bg-black/80 transition-all duration-200 shadow-2xl border border-white/20">
+                    <Play className="h-8 w-8 text-white fill-white drop-shadow-lg" />
                   </div>
                 </div>
               )}
@@ -254,8 +255,8 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({
               {/* Video controls overlay */}
               {videoPlaying && (
                 <div className="absolute inset-0 opacity-0 hover:opacity-100 transition-opacity bg-black/20 flex items-center justify-center">
-                  <div className="bg-white/20 backdrop-blur-sm rounded-full p-2">
-                    <svg className="h-6 w-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+                  <div className="bg-black/70 backdrop-blur-md rounded-full p-3 shadow-xl border border-white/20">
+                    <svg className="h-6 w-6 text-white drop-shadow-lg" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
                     </svg>
                   </div>
@@ -263,9 +264,9 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({
               )}
               
               {/* Video indicator badge */}
-              <div className="absolute top-4 left-4 bg-black/60 text-white px-2 py-1 rounded text-sm backdrop-blur-sm flex items-center">
-                <Video className="h-3 w-3 mr-1" />
-                Video
+              <div className="absolute top-4 left-4 bg-black/80 text-white px-3 py-1.5 rounded-lg text-sm backdrop-blur-md flex items-center shadow-lg border border-white/10">
+                <Video className="h-3 w-3 mr-1.5" />
+                <span className="font-medium">Video</span>
               </div>
             </div>
           ) : (
@@ -283,51 +284,51 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({
         {/* Navigation and controls - only show if multiple items */}
         {mediaItems.length > 1 && (
           <>
-            {/* Navigation arrows */}
-            <div className="absolute inset-0 flex items-center justify-between p-4 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+            {/* Navigation arrows with enhanced visibility - always visible */}
+            <div className="absolute inset-0 flex items-center justify-between p-4 opacity-70 group-hover:opacity-100 transition-opacity pointer-events-none">
               <Button
                 variant="secondary"
                 size="icon"
-                className="rounded-full bg-black/40 text-white hover:bg-black/60 border-white/20 pointer-events-auto"
+                className="rounded-full bg-black/80 text-white hover:bg-black/90 border-2 border-white/30 pointer-events-auto shadow-2xl backdrop-blur-md transition-all duration-200 hover:scale-110"
                 onClick={(e) => {
                   e.stopPropagation();
                   goToPrevSlide();
                 }}
               >
-                <ChevronLeftIcon className="h-6 w-6" />
+                <ChevronLeftIcon className="h-6 w-6 drop-shadow-lg" />
               </Button>
               
               <Button
                 variant="secondary"
                 size="icon"
-                className="rounded-full bg-black/40 text-white hover:bg-black/60 border-white/20 pointer-events-auto"
+                className="rounded-full bg-black/80 text-white hover:bg-black/90 border-2 border-white/30 pointer-events-auto shadow-2xl backdrop-blur-md transition-all duration-200 hover:scale-110"
                 onClick={(e) => {
                   e.stopPropagation();
                   goToNextSlide();
                 }}
               >
-                <ChevronRightIcon className="h-6 w-6" />
+                <ChevronRightIcon className="h-6 w-6 drop-shadow-lg" />
               </Button>
             </div>
             
-            {/* Media counter */}
-            <div className="absolute bottom-4 left-4 bg-black/50 text-white px-3 py-1.5 rounded-full text-sm backdrop-blur-sm">
-              {currentIndex + 1} / {mediaItems.length}
+            {/* Media counter with enhanced visibility - always visible */}
+            <div className="absolute bottom-4 left-4 bg-black/80 text-white px-4 py-2 rounded-lg text-sm backdrop-blur-md shadow-lg border border-white/20 opacity-80 group-hover:opacity-100 transition-opacity">
+              <span className="font-medium">{currentIndex + 1} / {mediaItems.length}</span>
             </div>
           </>
         )}
         
-        {/* Fullscreen button */}
+        {/* Fullscreen button with enhanced visibility - always visible */}
         <Button
           variant="secondary"
           size="icon"
-          className="absolute bottom-4 right-4 rounded-full bg-black/40 text-white hover:bg-black/60 border-white/20 opacity-0 group-hover:opacity-100 transition-opacity"
+          className="absolute bottom-4 right-4 rounded-full bg-black/80 text-white hover:bg-black/90 border-2 border-white/30 opacity-70 group-hover:opacity-100 transition-all duration-200 shadow-2xl backdrop-blur-md hover:scale-110"
           onClick={() => {
             setFullscreenIndex(currentIndex);
             setFullscreenOpen(true);
           }}
         >
-          <ExpandIcon className="h-5 w-5" />
+          <ExpandIcon className="h-5 w-5 drop-shadow-lg" />
         </Button>
       </div>
       
@@ -343,7 +344,7 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({
                 onClick={() => goToSlide(index)}
                 className={`flex-shrink-0 rounded-md overflow-hidden transition-all relative ${
                   index === currentIndex 
-                    ? 'ring-2 ring-primary w-20 h-20 opacity-100' 
+                    ? 'ring-3 ring-primary w-20 h-20 opacity-100' 
                     : 'opacity-70 hover:opacity-100 w-16 h-16 hover:w-20 hover:h-20'
                 }`}
               >
@@ -354,10 +355,12 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({
                   onError={(e) => handleMediaError(item.id, e)}
                   loading="lazy"
                 />
-                {/* Video indicator on thumbnail */}
+                {/* Video indicator on thumbnail with enhanced visibility */}
                 {item.type === 'video' && (
-                  <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
-                    <Play className="h-3 w-3 text-white fill-white" />
+                  <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                    <div className="bg-black/70 backdrop-blur-sm rounded-full p-1.5 border border-white/30">
+                      <Play className="h-3 w-3 text-white fill-white" />
+                    </div>
                   </div>
                 )}
               </button>
@@ -368,22 +371,33 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({
       
       {/* Fullscreen gallery dialog */}
       <Dialog open={fullscreenOpen} onOpenChange={setFullscreenOpen}>
-        <DialogContent className="max-w-screen-lg w-11/12 h-[90vh] p-0 bg-black border-none">
+        <DialogContent className="max-w-[95vw] w-[95vw] h-[95vh] p-0 bg-black border-none overflow-hidden">
+          <VisuallyHidden>
+            <DialogTitle>Property Gallery - Image {fullscreenIndex + 1} of {mediaItems.length}</DialogTitle>
+          </VisuallyHidden>
           <div className="relative w-full h-full flex flex-col">
-            {/* Close button */}
+            {/* Close button with enhanced visibility */}
             <Button 
               variant="ghost" 
               size="icon" 
-              className="absolute top-4 right-4 z-20 rounded-full bg-black/60 text-white hover:bg-black/80 border-white/20"
+              className="absolute top-4 right-4 z-20 rounded-full bg-black/80 text-white hover:bg-black/90 border-2 border-white/30 shadow-2xl backdrop-blur-md transition-all duration-200 hover:scale-110"
               onClick={() => setFullscreenOpen(false)}
             >
-              <XIcon className="h-5 w-5" />
+              <XIcon className="h-5 w-5 drop-shadow-lg" />
             </Button>
             
-            {/* Main media container */}
-            <div className="flex-1 flex items-center justify-center p-4">
+            {/* Main media container - 80% of dialog size with proper containment */}
+            <div className="flex-1 flex items-center justify-center p-8">
               {mediaItems[fullscreenIndex]?.type === 'video' ? (
-                <div className="w-full max-w-4xl aspect-video">
+                <div 
+                  className="flex items-center justify-center"
+                  style={{ 
+                    width: '80%', 
+                    height: '80%',
+                    maxWidth: '80%',
+                    maxHeight: '80%'
+                  }}
+                >
                   <video
                     src={mediaItems[fullscreenIndex].url}
                     className="w-full h-full object-contain bg-black"
@@ -398,38 +412,45 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({
                 <img
                   src={getMediaSource(mediaItems[fullscreenIndex])}
                   alt={`Property view ${fullscreenIndex + 1}`}
-                  className="max-h-full max-w-full object-contain"
+                  className="object-contain"
                   onError={(e) => handleMediaError(mediaItems[fullscreenIndex].id, e)}
+                  style={{ 
+                    width: '80%',
+                    height: '80%',
+                    maxWidth: '80%',
+                    maxHeight: '80%',
+                    objectFit: 'contain'
+                  }}
                 />
               )}
             </div>
             
-            {/* Navigation controls for fullscreen */}
+            {/* Navigation controls for fullscreen with enhanced visibility */}
             {mediaItems.length > 1 && (
               <>
-                <div className="absolute inset-0 flex items-center justify-between p-4 pointer-events-none">
+                <div className="absolute inset-0 flex items-center justify-between p-8 pointer-events-none">
                   <Button
                     variant="secondary"
                     size="icon"
-                    className="rounded-full bg-black/40 text-white hover:bg-black/60 border-white/20 pointer-events-auto"
+                    className="rounded-full bg-black/80 text-white hover:bg-black/90 border-2 border-white/30 pointer-events-auto shadow-2xl backdrop-blur-md transition-all duration-200 hover:scale-110"
                     onClick={() => setFullscreenIndex(prev => prev === 0 ? mediaItems.length - 1 : prev - 1)}
                   >
-                    <ChevronLeftIcon className="h-6 w-6" />
+                    <ChevronLeftIcon className="h-6 w-6 drop-shadow-lg" />
                   </Button>
                   
                   <Button
                     variant="secondary"
                     size="icon"
-                    className="rounded-full bg-black/40 text-white hover:bg-black/60 border-white/20 pointer-events-auto"
+                    className="rounded-full bg-black/80 text-white hover:bg-black/90 border-2 border-white/30 pointer-events-auto shadow-2xl backdrop-blur-md transition-all duration-200 hover:scale-110"
                     onClick={() => setFullscreenIndex(prev => prev === mediaItems.length - 1 ? 0 : prev + 1)}
                   >
-                    <ChevronRightIcon className="h-6 w-6" />
+                    <ChevronRightIcon className="h-6 w-6 drop-shadow-lg" />
                   </Button>
                 </div>
                 
-                {/* Media counter */}
-                <div className="absolute bottom-24 left-4 bg-white/10 text-white px-3 py-1.5 rounded-full text-sm backdrop-blur-sm">
-                  {fullscreenIndex + 1} / {mediaItems.length}
+                {/* Media counter with enhanced visibility */}
+                <div className="absolute bottom-6 left-6 bg-black/80 text-white px-4 py-2 rounded-lg text-sm backdrop-blur-md shadow-lg border border-white/20">
+                  <span className="font-medium">{fullscreenIndex + 1} / {mediaItems.length}</span>
                 </div>
               </>
             )}
