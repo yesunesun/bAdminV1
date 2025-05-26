@@ -1,9 +1,9 @@
 // src/modules/seeker/components/PropertyDetails/index.tsx  
-// Version: 18.0.0
-// Last Modified: 27-01-2025 16:30 IST
-// Purpose: Phase 4 visual enhancements - micro-interactions, loading states, and animations
+// Version: 18.1.0
+// Last Modified: 27-05-2025 16:45 IST
+// Purpose: Reordered sections - Features & Amenities moved to last position
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
 import { 
@@ -15,6 +15,9 @@ import {
   RefreshCw,
   Sparkles
 } from 'lucide-react';
+
+// Import AuthContext 
+import { AuthContext } from '@/contexts/AuthContext';
 
 // Import extracted hooks
 import { usePropertyData } from './hooks/usePropertyData';
@@ -100,6 +103,8 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
   directUrls
 }) => {
   const { toast } = useToast();
+  const authContext = useContext(AuthContext); // Get auth context
+  const user = authContext?.user; // Get current user safely
   const [visitDialogOpen, setVisitDialogOpen] = useState(false);
   const [displayTitle, setDisplayTitle] = useState('');
   const [pageLoaded, setPageLoaded] = useState(false);
@@ -125,7 +130,7 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
   // Progressive section reveal effect
   useEffect(() => {
     if (pageLoaded) {
-      const sections = ['header', 'gallery', 'actions', 'details', 'location', 'features', 'sidebar'];
+      const sections = ['header', 'gallery', 'actions', 'details', 'location', 'pricing', 'remaining', 'features', 'sidebar'];
       sections.forEach((section, index) => {
         setTimeout(() => {
           setSectionsVisible(prev => ({ ...prev, [section]: true }));
@@ -307,6 +312,10 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
   // Get property title - use the display title if available (from editing), otherwise use flow.title
   const propertyTitle = displayTitle || flow.title || (basicDetails?.title || property.title || 'Property Listing');
 
+  // Check if current user is the property owner
+  const currentUserId = user?.id;
+  const isPropertyOwner = currentUserId && (currentUserId === ownerId || currentUserId === property.owner_id);
+
   return (
     <div className={cn(
       "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 transition-opacity duration-500",
@@ -364,11 +373,158 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Content Column */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Enhanced Media Gallery */}
+          {/* Quick Navigation Links */}
           <div className={cn(
-            "transition-all duration-700 transform",
-            sectionsVisible.gallery ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
+            "sticky top-20 z-20 bg-background/95 backdrop-blur-sm border border-border rounded-lg p-3 mb-6 transition-all duration-700 transform",
+            sectionsVisible.header ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
           )}>
+            <div className="flex flex-wrap gap-2 items-center">
+              <span className="text-xs font-medium text-muted-foreground mr-2">Quick Nav:</span>
+              
+              <button
+                onClick={() => {
+                  const element = document.getElementById('section-gallery');
+                  if (element) {
+                    const yOffset = -120; // Account for sticky nav height
+                    const y = element.getBoundingClientRect().top + window.pageYOffset + yOffset;
+                    window.scrollTo({ top: y, behavior: 'smooth' });
+                  }
+                }}
+                className="px-3 py-1 text-xs rounded-full bg-primary/10 hover:bg-primary/20 text-primary transition-colors"
+              >
+                Gallery
+              </button>
+              
+              <button
+                onClick={() => {
+                  const element = document.getElementById('section-details');
+                  if (element) {
+                    const yOffset = -120; // Account for sticky nav height
+                    const y = element.getBoundingClientRect().top + window.pageYOffset + yOffset;
+                    window.scrollTo({ top: y, behavior: 'smooth' });
+                  }
+                }}
+                className="px-3 py-1 text-xs rounded-full bg-primary/10 hover:bg-primary/20 text-primary transition-colors"
+              >
+                {isLandSaleProperty ? 'Land Details' 
+                 : isPGHostelProperty ? 'PG Details'
+                 : isFlatmatesProperty ? 'Room Details' 
+                 : isCoworkingProperty ? 'Coworking'
+                 : 'Details'}
+              </button>
+              
+              <button
+                onClick={() => {
+                  const element = document.getElementById('section-location');
+                  if (element) {
+                    const yOffset = -120; // Account for sticky nav height
+                    const y = element.getBoundingClientRect().top + window.pageYOffset + yOffset;
+                    window.scrollTo({ top: y, behavior: 'smooth' });
+                  }
+                }}
+                className="px-3 py-1 text-xs rounded-full bg-primary/10 hover:bg-primary/20 text-primary transition-colors"
+              >
+                Location
+              </button>
+              
+              {isCoworkingProperty && (
+                <button
+                  onClick={() => {
+                    const element = document.getElementById('section-coworking');
+                    if (element) {
+                      const yOffset = -120; // Account for sticky nav height
+                      const y = element.getBoundingClientRect().top + window.pageYOffset + yOffset;
+                      window.scrollTo({ top: y, behavior: 'smooth' });
+                    }
+                  }}
+                  className="px-3 py-1 text-xs rounded-full bg-primary/10 hover:bg-primary/20 text-primary transition-colors"
+                >
+                  Workspace
+                </button>
+              )}
+              
+              {priceDetails && !isPGHostelProperty && !isFlatmatesProperty && !isCoworkingProperty && (
+                <button
+                  onClick={() => {
+                    const element = document.getElementById('section-pricing');
+                    if (element) {
+                      const yOffset = -120; // Account for sticky nav height
+                      const y = element.getBoundingClientRect().top + window.pageYOffset + yOffset;
+                      window.scrollTo({ top: y, behavior: 'smooth' });
+                    }
+                  }}
+                  className="px-3 py-1 text-xs rounded-full bg-primary/10 hover:bg-primary/20 text-primary transition-colors"
+                >
+                  {isCurrentSaleProperty ? 'Sale Details' : 'Pricing'}
+                </button>
+              )}
+              
+              {remainingStepKeys.length > 0 && remainingStepKeys.some(stepId => {
+                const stepData = steps[stepId];
+                return stepData && !(typeof stepData === 'object' && Object.keys(stepData).length === 0);
+              }) && (
+                <button
+                  onClick={() => {
+                    const firstValidStepId = remainingStepKeys.find(stepId => {
+                      const stepData = steps[stepId];
+                      return stepData && !(typeof stepData === 'object' && Object.keys(stepData).length === 0);
+                    });
+                    if (firstValidStepId) {
+                      const element = document.getElementById(`section-${firstValidStepId}`);
+                      if (element) {
+                        const yOffset = -120; // Account for sticky nav height
+                        const y = element.getBoundingClientRect().top + window.pageYOffset + yOffset;
+                        window.scrollTo({ top: y, behavior: 'smooth' });
+                      }
+                    }
+                  }}
+                  className="px-3 py-1 text-xs rounded-full bg-primary/10 hover:bg-primary/20 text-primary transition-colors"
+                >
+                  {remainingStepKeys.find(stepId => {
+                    const stepData = steps[stepId];
+                    return stepData && !(typeof stepData === 'object' && Object.keys(stepData).length === 0);
+                  })?.includes('flatmate') ? 'Flatmate Details' 
+                   : remainingStepKeys.find(stepId => {
+                     const stepData = steps[stepId];
+                     return stepData && !(typeof stepData === 'object' && Object.keys(stepData).length === 0);
+                   })?.includes('pg_details') ? 'Facilities'
+                   : remainingStepKeys.find(stepId => {
+                     const stepData = steps[stepId];
+                     return stepData && !(typeof stepData === 'object' && Object.keys(stepData).length === 0);
+                   })?.includes('coworking') ? 'Workspace'
+                   : remainingStepKeys.find(stepId => {
+                     const stepData = steps[stepId];
+                     return stepData && !(typeof stepData === 'object' && Object.keys(stepData).length === 0);
+                   })?.includes('land') ? 'Features'
+                   : 'More Details'}
+                </button>
+              )}
+              
+              {featuresDetails && (
+                <button
+                  onClick={() => {
+                    const element = document.getElementById('section-features');
+                    if (element) {
+                      const yOffset = -120; // Account for sticky nav height
+                      const y = element.getBoundingClientRect().top + window.pageYOffset + yOffset;
+                      window.scrollTo({ top: y, behavior: 'smooth' });
+                    }
+                  }}
+                  className="px-3 py-1 text-xs rounded-full bg-primary/10 hover:bg-primary/20 text-primary transition-colors"
+                >
+                  Amenities
+                </button>
+              )}
+            </div>
+          </div>
+          {/* Enhanced Media Gallery */}
+          <div 
+            id="section-gallery"
+            className={cn(
+              "transition-all duration-700 transform",
+              sectionsVisible.gallery ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
+            )}
+          >
             <PropertyGallery
               images={propertyImages}
               video={property.property_video}
@@ -447,86 +603,191 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
           </div>
 
           {/* Property-specific details sections with staggered animations */}
-          <div className={cn(
-            "transition-all duration-700 transform",
-            sectionsVisible.details ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
-          )}>
-            {isLandSaleProperty ? (
-              <LandSaleDetailsSection landDetails={steps} />
-            ) : isPGHostelProperty ? (
-              <PGHostelDetailsSection pgDetails={steps} />
-            ) : isFlatmatesProperty ? (
-              <FlatmatesDetailsSection flatmatesDetails={steps} />
-            ) : isCoworkingProperty ? (
-              <CoworkingDetailsSection coworkingDetails={steps} />
-            ) : (
-              basicDetails && (
-                <BasicDetailsSection
-                  basicDetails={basicDetails}
-                  price={price}
-                  listingType={flow.listingType}
-                />
-              )
+          <div 
+            id="section-details"
+            className={cn(
+              "transition-all duration-700 transform",
+              sectionsVisible.details ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
             )}
+          >
+            <div className="relative">
+              {/* Section separator for property details */}
+              <div className="flex items-center mb-6">
+                <div className="flex-1 h-px bg-gradient-to-r from-transparent via-border to-transparent"></div>
+                <div className="px-4 py-2 bg-muted/50 rounded-full text-sm font-medium text-muted-foreground border">
+                  {isLandSaleProperty ? 'Land Details' 
+                   : isPGHostelProperty ? 'PG/Hostel Details'
+                   : isFlatmatesProperty ? 'Room Details' 
+                   : isCoworkingProperty ? 'Coworking Details'
+                   : 'Property Details'}
+                </div>
+                <div className="flex-1 h-px bg-gradient-to-r from-border via-transparent to-transparent"></div>
+              </div>
+              
+              {isLandSaleProperty ? (
+                <LandSaleDetailsSection landDetails={steps} />
+              ) : isPGHostelProperty ? (
+                <PGHostelDetailsSection pgDetails={steps} />
+              ) : isFlatmatesProperty ? (
+                <FlatmatesDetailsSection flatmatesDetails={steps} />
+              ) : isCoworkingProperty ? (
+                <CoworkingDetailsSection coworkingDetails={steps} />
+              ) : (
+                basicDetails && (
+                  <BasicDetailsSection
+                    basicDetails={basicDetails}
+                    price={price}
+                    listingType={flow.listingType}
+                  />
+                )
+              )}
+            </div>
           </div>
 
           {/* Location Section */}
-          <div className={cn(
-            "transition-all duration-700 transform",
-            sectionsVisible.location ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
-          )}>
-            <PropertyLocationSection property={property} />
+          <div 
+            id="section-location"
+            className={cn(
+              "transition-all duration-700 transform",
+              sectionsVisible.location ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
+            )}
+          >
+            <div className="relative">
+              {/* Section separator for location */}
+              <div className="flex items-center mb-6">
+                <div className="flex-1 h-px bg-gradient-to-r from-transparent via-border to-transparent"></div>
+                <div className="px-4 py-2 bg-muted/50 rounded-full text-sm font-medium text-muted-foreground border">
+                  Location & Map
+                </div>
+                <div className="flex-1 h-px bg-gradient-to-r from-border via-transparent to-transparent"></div>
+              </div>
+              
+              <PropertyLocationSection property={property} />
+            </div>
           </div>
 
           {/* Coworking Specific Details */}
           {isCoworkingProperty && (
-            <div className={cn(
-              "transition-all duration-700 transform",
-              sectionsVisible.features ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
-            )}>
-              <CoworkingSpecificDetailsSection coworkingDetails={steps} />
+            <div 
+              id="section-coworking"
+              className={cn(
+                "transition-all duration-700 transform",
+                sectionsVisible.location ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
+              )}
+            >
+              <div className="relative">
+                {/* Section separator for coworking details */}
+                <div className="flex items-center mb-6">
+                  <div className="flex-1 h-px bg-gradient-to-r from-transparent via-border to-transparent"></div>
+                  <div className="px-4 py-2 bg-muted/50 rounded-full text-sm font-medium text-muted-foreground border">
+                    Coworking Specifications
+                  </div>
+                  <div className="flex-1 h-px bg-gradient-to-r from-border via-transparent to-transparent"></div>
+                </div>
+                
+                <CoworkingSpecificDetailsSection coworkingDetails={steps} />
+              </div>
             </div>
           )}
 
           {/* Sale/Rental Details */}
           {priceDetails && !isPGHostelProperty && !isFlatmatesProperty && !isCoworkingProperty && (
-            <div className={cn(
-              "transition-all duration-700 transform",
-              sectionsVisible.features ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
-            )}>
-              <PricingDetailsSection
-                listingType={flow.listingType}
-                pricingDetails={priceDetails}
-              />
-            </div>
-          )}
-
-          {/* Features/Amenities */}
-          {featuresDetails && (
-            <div className={cn(
-              "transition-all duration-700 transform",
-              sectionsVisible.features ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
-            )}>
-              <FeaturesAmenitiesSection featuresData={featuresDetails} />
-            </div>
-          )}
-
-          {/* Remaining sections */}
-          {remainingStepKeys.map((stepId, index) => (
             <div 
-              key={stepId}
+              id="section-pricing"
+              className={cn(
+                "transition-all duration-700 transform",
+                sectionsVisible.pricing ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
+              )}
+            >
+              <div className="relative">
+                {/* Section separator for pricing */}
+                <div className="flex items-center mb-6">
+                  <div className="flex-1 h-px bg-gradient-to-r from-transparent via-border to-transparent"></div>
+                  <div className="px-4 py-2 bg-muted/50 rounded-full text-sm font-medium text-muted-foreground border">
+                    {isCurrentSaleProperty ? 'Sale Details' : 'Rental Details'}
+                  </div>
+                  <div className="flex-1 h-px bg-gradient-to-r from-border via-transparent to-transparent"></div>
+                </div>
+                
+                <PricingDetailsSection
+                  listingType={flow.listingType}
+                  pricingDetails={priceDetails}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* All remaining flow-specific sections - These come BEFORE Features/Amenities */}
+          {remainingStepKeys.length > 0 && remainingStepKeys.map((stepId, index) => {
+            // Only render if there's actual step data
+            const stepData = steps[stepId];
+            if (!stepData || (typeof stepData === 'object' && Object.keys(stepData).length === 0)) {
+              return null;
+            }
+
+            // Generate clean title for the section
+            const cleanTitle = stepId.includes('flatmate') ? 'Flatmate Details' 
+                             : stepId.includes('pg_details') ? 'PG Facilities'
+                             : stepId.includes('coworking') ? 'Workspace Details'
+                             : stepId.includes('land') ? 'Land Features'
+                             : stepId.includes('commercial') ? 'Commercial Features'
+                             : stepId.includes('rental') ? 'Rental Information'
+                             : stepId.includes('sale') ? 'Sale Information'
+                             : 'Additional Details';
+
+            return (
+              <div 
+                key={stepId}
+                id={`section-${stepId}`}
+                className={cn(
+                  "transition-all duration-700 transform",
+                  sectionsVisible.remaining ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
+                )}
+                style={{ transitionDelay: `${index * 100}ms` }}
+              >
+                <div className="relative">
+                  {/* Section separator for additional sections */}
+                  <div className="flex items-center mb-6">
+                    <div className="flex-1 h-px bg-gradient-to-r from-transparent via-border to-transparent"></div>
+                    <div className="px-4 py-2 bg-muted/50 rounded-full text-sm font-medium text-muted-foreground border">
+                      {cleanTitle}
+                    </div>
+                    <div className="flex-1 h-px bg-gradient-to-r from-border via-transparent to-transparent"></div>
+                  </div>
+                  
+                  <StepSection
+                    stepId={stepId}
+                    stepData={stepData}
+                    title={cleanTitle}
+                  />
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Features/Amenities - MOVED TO BE THE ABSOLUTE LAST SECTION */}
+          {featuresDetails && (
+            <div 
+              id="section-features"
               className={cn(
                 "transition-all duration-700 transform",
                 sectionsVisible.features ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
               )}
-              style={{ transitionDelay: `${index * 100}ms` }}
             >
-              <StepSection
-                stepId={stepId}
-                stepData={steps[stepId]}
-              />
+              <div className="relative">
+                {/* Visual separator to emphasize this is the final section */}
+                <div className="flex items-center mb-6">
+                  <div className="flex-1 h-px bg-gradient-to-r from-transparent via-border to-transparent"></div>
+                  <div className="px-4 py-2 bg-muted/50 rounded-full text-sm font-medium text-muted-foreground border">
+                    Features & Amenities
+                  </div>
+                  <div className="flex-1 h-px bg-gradient-to-r from-border via-transparent to-transparent"></div>
+                </div>
+                
+                <FeaturesAmenitiesSection featuresData={featuresDetails} />
+              </div>
             </div>
-          ))}
+          )}
         </div>
 
         {/* Sidebar Column with staggered animations */}
@@ -534,12 +795,15 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
           "space-y-6 transition-all duration-700 transform",
           sectionsVisible.sidebar ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
         )}>
-          <ContactOwnerCard
-            propertyTitle={propertyTitle}
-            propertyId={propertyId}
-            ownerId={ownerId}
-            ownerInfo={property.ownerInfo}
-          />
+          {/* Contact Owner Card - Only show if current user is NOT the property owner */}
+          {!isPropertyOwner && (
+            <ContactOwnerCard
+              propertyTitle={propertyTitle}
+              propertyId={propertyId}
+              ownerId={ownerId}
+              ownerInfo={property.ownerInfo}
+            />
+          )}
 
           {propertyDetails?.highlights && (
             <PropertyHighlightsCard
