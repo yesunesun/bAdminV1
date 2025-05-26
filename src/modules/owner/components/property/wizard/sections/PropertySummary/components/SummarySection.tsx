@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/PropertySummary/components/SummarySection.tsx
-// Version: 1.0.0
-// Last Modified: 19-02-2025 10:30 IST
-// Purpose: Reusable summary card component
+// Version: 1.1.0
+// Last Modified: 26-05-2025 10:45 IST
+// Purpose: Fixed duplicate React key issue by using unique key generation
 
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,20 +17,25 @@ export const SummarySection: React.FC<SummarySectionProps> = ({ title, icon, ite
     </CardHeader>
     <CardContent className="p-4">
       <dl className="grid gap-2">
-        {items.filter(item => item.value !== undefined && item.value !== null && item.value !== '').map(({ label, value }) => (
-          <div key={label} className="grid grid-cols-2 gap-2 py-1 border-b border-border/30 last:border-0">
-            <dt className="text-sm font-medium text-muted-foreground">{label}:</dt>
-            <dd className="text-sm text-foreground font-medium">
-              {typeof value === 'boolean' ? (
-                value ? 'Yes' : 'No'
-              ) : Array.isArray(value) ? (
-                value.length > 0 ? value.join(', ') : '-'
-              ) : typeof value === 'string' || typeof value === 'number' ? (
-                String(value) || '-'
-              ) : '-'}
-            </dd>
-          </div>
-        ))}
+        {items
+          .filter(item => item.value !== undefined && item.value !== null && item.value !== '')
+          .map(({ label, value }, index) => (
+            <div 
+              key={`${title}-${label}-${index}`} 
+              className="grid grid-cols-2 gap-2 py-1 border-b border-border/30 last:border-0"
+            >
+              <dt className="text-sm font-medium text-muted-foreground">{label}:</dt>
+              <dd className="text-sm text-foreground font-medium">
+                {typeof value === 'boolean' ? (
+                  value ? 'Yes' : 'No'
+                ) : Array.isArray(value) ? (
+                  value.length > 0 ? value.join(', ') : '-'
+                ) : typeof value === 'string' || typeof value === 'number' ? (
+                  String(value) || '-'
+                ) : '-'}
+              </dd>
+            </div>
+          ))}
       </dl>
     </CardContent>
   </Card>
