@@ -1,7 +1,21 @@
-// src/modules/seeker/components/PropertyDetails/index.tsx  
-// Version: 15.0.0
-// Last Modified: 27-05-2025 10:00 IST
-// Purpose: Removed separate video upload sections and debug info, consolidated into image upload
+{/* Unified Media Upload Component (Images + Videos) */}
+          <PropertyMediaUpload
+            propertyId={propertyId}
+            onUploadComplete={handleMediaUploaded}
+            onMediaRemoved={(mediaType) => handleMediaUploaded('', mediaType)}
+            onError={(error) => {
+              toast({
+                title: "Upload Error",
+                description: error,
+                variant: "destructive"
+              });
+            }}
+            userIsOwner={property?.owner_id === property?.ownerInfo?.id}
+            userIsAdmin={false} // You might want to get this from auth context
+            currentVideo={property.propertyimport PropertyVideoUploadAlwaysVisible from './PropertyVideoUploadAlwaysVisible'; // NEW - Always visible version// src/modules/seeker/components/PropertyDetails/index.tsx  
+// Version: 13.0.0
+// Last Modified: 26-05-2025 18:00 IST
+// Purpose: Complete integration with video support and enhanced media gallery
 
 import React, { useState, useEffect } from 'react';
 import { PropertyDetails as PropertyDetailsType } from '../../hooks/usePropertyDetails';
@@ -19,11 +33,12 @@ import SimilarProperties from './SimilarProperties';
 import NearbyAmenities from './NearbyAmenities';
 import VisitRequestDialog from './VisitRequestDialog';
 import PropertyImageUpload from './PropertyImageUpload';
+import PropertyVideoUpload from './PropertyVideoUpload'; // NEW
 import PropertyNotFound from './PropertyNotFound';
 import { PropertyDetailsSkeleton } from './PropertyDetailsSkeleton';
 import { extractImagesFromJson } from './utils/propertyDataUtils';
 import PropertyGalleryCard from './PropertyGalleryCard';
-import PropertyGallery from './PropertyGallery';
+import PropertyGallery from './PropertyGallery'; // NEW: Enhanced gallery
 import PropertyLocationMap from './PropertyLocationMap';
 import PropertyLocationSection from './PropertyLocationSection';
 import PropertyTitleEditor from './PropertyTitleEditor';
@@ -569,53 +584,12 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
   useEffect(() => {
     if (!property) return;
 
-    console.log('[PropertyDetails] Processing property for images:', property.id);
-    console.log('[PropertyDetails] Property details:', property.property_details);
-
     // Extract images from the property JSON structure
     const extractedImages = extractImagesFromJson(property);
-    console.log('[PropertyDetails] Extracted images from JSON:', extractedImages);
 
     if (extractedImages.length > 0) {
+      // Use setState to trigger re-render with images
       setPropertyImages(extractedImages);
-    } else {
-      // Fallback: Try to extract from property_details directly
-      const propertyDetails = property.property_details || {};
-      
-      // Check for imageFiles in new format
-      if (propertyDetails.imageFiles && Array.isArray(propertyDetails.imageFiles)) {
-        console.log('[PropertyDetails] Found imageFiles in property_details:', propertyDetails.imageFiles.length);
-        
-        const processedImages = propertyDetails.imageFiles.map((img: any, idx: number) => ({
-          id: img.id || `img-${idx}`,
-          url: img.url || '',
-          dataUrl: img.dataUrl || '',
-          fileName: img.fileName || '',
-          is_primary: !!img.isPrimary,
-          isPrimary: !!img.isPrimary,
-          display_order: idx
-        }));
-        
-        setPropertyImages(processedImages);
-        console.log('[PropertyDetails] Set processed images:', processedImages);
-      } else if (propertyDetails.images && Array.isArray(propertyDetails.images)) {
-        console.log('[PropertyDetails] Found legacy images in property_details:', propertyDetails.images.length);
-        
-        const legacyImages = propertyDetails.images.map((img: any, idx: number) => ({
-          id: img.id || `legacy-img-${idx}`,
-          url: img.dataUrl || img.url || '',
-          dataUrl: img.dataUrl || '',
-          is_primary: !!img.isPrimary,
-          isPrimary: !!img.isPrimary,
-          display_order: idx
-        }));
-        
-        setPropertyImages(legacyImages);
-        console.log('[PropertyDetails] Set legacy images:', legacyImages);
-      } else {
-        console.log('[PropertyDetails] No images found in any format');
-        setPropertyImages([]);
-      }
     }
   }, [property]);
 
@@ -637,10 +611,8 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
     }
   }, [property]);
 
-  // Handle media upload completion (both images and videos)
-  const handleMediaUploaded = (mediaType: 'image' | 'video') => {
-    console.log(`[PropertyDetails] ${mediaType === 'video' ? 'Video' : 'Images'} uploaded - triggering refresh`);
-    
+  // NEW: Handle media upload completion (both images and videos)
+  const handleMediaUploaded = (mediaUrl: string, mediaType: 'image' | 'video') => {
     if (onRefresh) {
       onRefresh();
 
@@ -848,7 +820,7 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Content Column */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Enhanced Media Gallery with Video Support */}
+          {/* NEW: Enhanced Media Gallery with Video Support */}
           <PropertyGallery
             images={propertyImages}
             video={property.property_video}
@@ -856,11 +828,66 @@ const PropertyDetails: React.FC<PropertyDetailsProps> = ({
             directUrls={directUrls}
           />
 
-          {/* Enhanced Image/Video Upload Component (consolidated) */}
+          {/* Image Upload Component (only shown to authorized users) */}
           <PropertyImageUpload
             property={property}
-            onImageUploaded={() => handleMediaUploaded('image')}
-            onVideoUploaded={() => handleMediaUploaded('video')}
+            onImageUploaded={handleImageUploaded}
+          />
+
+          {/* DEBUG: Video Upload Debug Info - Remove this in production */}
+          <Card className="p-4 border-orange-200 bg-orange-50">
+            <div className="flex items-center mb-3">
+              <AlertCircle className="h-5 w-5 text-orange-600 mr-2" />
+              <h3 className="font-semibold text-orange-800">Video Upload Debug Info</h3>
+            </div>
+            
+            <div className="space-y-2 text-sm">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <span className="font-medium text-gray-600">Property ID:</span>
+                  <p className="text-gray-900 font-mono text-xs">{propertyId}</p>
+                </div>
+                <div>
+                  <span className="font-medium text-gray-600">Owner ID:</span>
+                  <p className="text-gray-900 font-mono text-xs">{ownerId}</p>
+                </div>
+              </div>
+
+              <div className="border-t pt-2 mt-3">
+                <div className="flex items-center mb-2">
+                  <span className="font-medium text-gray-600">Current User:</span>
+                </div>
+                {/* Debug user info will be shown here */}
+                <div className="pl-6 space-y-1">
+                  <p>Check browser console for detailed auth info</p>
+                </div>
+              </div>
+
+              <div className="border-t pt-2 mt-3">
+                <div className="font-medium text-gray-700 mb-2">Video Upload Status:</div>
+                <div className="pl-4 space-y-1 text-xs text-gray-600">
+                  <p>• This debug section will help identify why video upload isn't showing</p>
+                  <p>• Check if you're logged in as property owner or admin</p>
+                  <p>• Video upload should appear below this section if permissions are correct</p>
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          {/* NEW: Always Visible Video Upload Component (for debugging) */}
+          <PropertyVideoUploadAlwaysVisible
+            propertyId={propertyId}
+            ownerId={ownerId}
+            currentVideo={property.property_video}
+            onVideoUploaded={handleVideoUploaded}
+            onVideoDeleted={handleVideoUploaded} // Same refresh action
+            onError={(error) => {
+              toast({
+                title: "Video Error",
+                description: error,
+                variant: "destructive"
+              });
+            }}
           />
 
           {/* Quick Actions */}

@@ -1,7 +1,7 @@
 // src/modules/seeker/hooks/usePropertyDetails.ts
-// Version: 8.0.0
-// Last Modified: 09-05-2025 21:45 IST
-// Purpose: Updated to support Supabase storage for property images
+// Version: 9.0.0
+// Last Modified: 26-05-2025 17:00 IST
+// Purpose: Enhanced with video data extraction and updated types
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useLocation } from 'react-router-dom';
@@ -22,6 +22,16 @@ export interface PropertyImage {
   created_at?: string;
 }
 
+// NEW: Video data interface
+export interface PropertyVideo {
+  url: string;
+  fileName: string;
+  thumbnailUrl?: string;
+  uploadedAt: string;
+  fileSize: number;
+  duration?: number;
+}
+
 export interface PropertyDetails {
   id: string;
   title: string;
@@ -37,6 +47,7 @@ export interface PropertyDetails {
   property_details: any;
   owner_id: string;
   property_images: PropertyImage[];
+  property_video?: PropertyVideo | null; // NEW: Video data
   ownerInfo: {
     id: string;
     email: string | null;
@@ -162,6 +173,72 @@ export const usePropertyDetails = (refreshDependency = 0) => {
       return parseInt(value, 10) || 0;
     }
     return 0;
+  };
+
+  // NEW: Helper function to extract video data from property_details
+  const extractVideoFromPropertyDetails = (propertyData: any): PropertyVideo | null => {
+    console.log('[usePropertyDetails] Attempting to extract video from property_details');
+    
+    if (!propertyData || !propertyData.property_details) {
+      console.log('[usePropertyDetails] No property_details available for video extraction');
+      return null;
+    }
+    
+    try {
+      // Parse property_details if it's a string
+      let details = propertyData.property_details;
+      if (typeof details === 'string') {
+        try {
+          details = JSON.parse(details);
+          console.log('[usePropertyDetails] Successfully parsed property_details string for video');
+        } catch (e) {
+          console.error('[usePropertyDetails] Failed to parse property_details as string for video:', e);
+          return null;
+        }
+      }
+      
+      // Check for video data in media.videos structure
+      if (details && details.media && details.media.videos) {
+        const videoData = details.media.videos;
+        
+        // Validate that we have required video properties
+        if (videoData.url && videoData.fileName) {
+          console.log('[usePropertyDetails] Found video data in media.videos');
+          
+          return {
+            url: videoData.url,
+            fileName: videoData.fileName,
+            thumbnailUrl: videoData.thumbnailUrl || undefined,
+            uploadedAt: videoData.uploadedAt || new Date().toISOString(),
+            fileSize: videoData.fileSize || 0,
+            duration: videoData.duration || undefined
+          };
+        }
+      }
+      
+      // Check for video data in other possible locations
+      if (details && details.videos) {
+        const videoData = details.videos;
+        if (videoData.url && videoData.fileName) {
+          console.log('[usePropertyDetails] Found video data in direct videos property');
+          
+          return {
+            url: videoData.url,
+            fileName: videoData.fileName,
+            thumbnailUrl: videoData.thumbnailUrl || undefined,
+            uploadedAt: videoData.uploadedAt || new Date().toISOString(),
+            fileSize: videoData.fileSize || 0,
+            duration: videoData.duration || undefined
+          };
+        }
+      }
+      
+    } catch (error) {
+      console.error('[usePropertyDetails] Error extracting video data:', error);
+    }
+    
+    console.log('[usePropertyDetails] No video found in property_details');
+    return null;
   };
 
   // Helper function to extract images from nested property_details structure
@@ -390,7 +467,13 @@ export const usePropertyDetails = (refreshDependency = 0) => {
       const extractedImages = extractImagesFromPropertyDetails(propertyData);
       console.log('[usePropertyDetails] Images extracted from property_details:', extractedImages.length);
       
-      // 2. As a fallback, fetch images from property_images table
+      // 2. NEW: Extract video from property_details structure
+      const extractedVideo = extractVideoFromPropertyDetails(propertyData);
+      if (extractedVideo) {
+        console.log('[usePropertyDetails] Video extracted from property_details:', extractedVideo.fileName);
+      }
+      
+      // 3. As a fallback, fetch images from property_images table
       const timestamp = new Date().getTime();
       let dbImages: PropertyImage[] = [];
       
@@ -481,8 +564,9 @@ export const usePropertyDetails = (refreshDependency = 0) => {
        };
      }
      
-     // Add images and owner info to the final property object
+     // Add images, video, and owner info to the final property object
      extractedData.property_images = allImages;
+     extractedData.property_video = extractedVideo; // NEW: Add video data
      extractedData.ownerInfo = ownerInfo;
 
      setProperty(extractedData);
