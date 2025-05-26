@@ -17,7 +17,7 @@ const POPULAR_LOCATIONS = [
 const MAX_RECENT_SEARCHES = 10;
 
 // Page size for pagination (changed from 10 to 9 to match initial view)
-const PAGE_SIZE = 9;
+const PAGE_SIZE = 25;
 
 // Helper to safely get nested property value
 const getNestedValue = (obj: any, path: string, defaultValue: any = null) => {
