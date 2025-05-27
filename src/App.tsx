@@ -1,7 +1,7 @@
 // src/App.tsx 
-// Version: 9.3.0
-// Last Modified: 25-05-2025 22:30 IST
-// Purpose: Fixed routing to keep property wizard in SeekerLayout with proper parameter handling
+// Version: 9.4.0
+// Last Modified: 27-05-2025 14:30 IST
+// Purpose: Added /home1 route with Google Maps integration
 
 import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
@@ -15,6 +15,7 @@ import Footer from '@/components/Footer';
 
 // Import components directly
 import HomePage from './pages/HomePage';
+import Home1 from './pages/Home1'; // New Home1 page
 import PropertyMapHome from './modules/seeker';
 import Dashboard from './modules/owner/pages/Dashboard';
 import Properties from './modules/owner/pages/Properties';
@@ -273,6 +274,16 @@ function App() {
                     element={
                       <PublicOrProtectedRoute>
                         <HomePage />
+                      </PublicOrProtectedRoute>
+                    } 
+                  />
+                  
+                  {/* NEW: Home1 route with Google Maps */}
+                  <Route 
+                    path="/home1" 
+                    element={
+                      <PublicOrProtectedRoute>
+                        <Home1 />
                       </PublicOrProtectedRoute>
                     } 
                   />
