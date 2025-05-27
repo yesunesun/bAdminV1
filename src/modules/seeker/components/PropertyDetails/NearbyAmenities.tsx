@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyDetails/NearbyAmenities.tsx
-// Version: 3.0.0
-// Last Modified: 27-05-2025 17:30 IST
-// Purpose: Fixed nearby amenities with Google Places API integration and proper coordinate extraction
+// Version: 4.0.0
+// Last Modified: 27-05-2025 18:15 IST
+// Purpose: Fixed Google Maps timeout by using centralized useGoogleMaps hook
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -23,6 +23,9 @@ import {
   Loader2
 } from 'lucide-react';
 
+// Import the centralized Google Maps hook
+import { useGoogleMaps } from '../../hooks/useGoogleMaps';
+
 // Interface for nearby amenity data
 interface Amenity {
   place_id: string;
@@ -32,7 +35,6 @@ interface Amenity {
   rating?: number;
   type: string;
   price_level?: number;
-  // Removed opening_hours to avoid deprecated open_now property
 }
 
 // Interface for component props
@@ -67,116 +69,24 @@ const NearbyAmenities: React.FC<NearbyAmenitiesProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
-  const [isGoogleMapsLoaded, setIsGoogleMapsLoaded] = useState(false);
-  const [isLoadingGoogleMaps, setIsLoadingGoogleMaps] = useState(false);
   
-  // Google Maps API Key from environment
-  const googleMapsKey = import.meta.env.VITE_GOOGLE_MAPS_KEY;
+  // Use the centralized Google Maps hook with error handling
+  const { isLoaded: isGoogleMapsLoaded, loadError: googleMapsError, isConfigError } = useGoogleMaps();
   
-  // Check if Google Maps API is loaded
-  const checkGoogleMapsAPI = useCallback((): boolean => {
+  // Additional state to track if we've attempted to fetch
+  const [hasFetchAttempted, setHasFetchAttempted] = useState(false);
+  
+  // Check if Google Maps API is ready for use
+  const isGoogleMapsReady = useCallback((): boolean => {
     return !!(
+      isGoogleMapsLoaded &&
       typeof google !== 'undefined' && 
       google.maps && 
       google.maps.places && 
       google.maps.places.PlacesService
     );
-  }, []);
+  }, [isGoogleMapsLoaded]);
 
-  // Load Google Maps API dynamically
-  const loadGoogleMapsAPI = useCallback(async (): Promise<boolean> => {
-    if (checkGoogleMapsAPI()) {
-      console.log('[NearbyAmenities] Google Maps API already loaded');
-      return true;
-    }
-
-    if (!googleMapsKey) {
-      console.error('[NearbyAmenities] Google Maps API key not configured');
-      return false;
-    }
-
-    return new Promise((resolve) => {
-      console.log('[NearbyAmenities] Loading Google Maps API...');
-      setIsLoadingGoogleMaps(true);
-
-      // Check if script is already being loaded
-      const existingScript = document.querySelector('script[src*="maps.googleapis.com"]');
-      if (existingScript) {
-        console.log('[NearbyAmenities] Google Maps script already exists, waiting for load...');
-        
-        // Wait for the existing script to load
-        const checkInterval = setInterval(() => {
-          if (checkGoogleMapsAPI()) {
-            clearInterval(checkInterval);
-            setIsLoadingGoogleMaps(false);
-            setIsGoogleMapsLoaded(true);
-            resolve(true);
-          }
-        }, 100);
-        
-        // Timeout after 10 seconds
-        setTimeout(() => {
-          clearInterval(checkInterval);
-          setIsLoadingGoogleMaps(false);
-          console.error('[NearbyAmenities] Timeout waiting for Google Maps API');
-          resolve(false);
-        }, 10000);
-        
-        return;
-      }
-
-      // Create and load the script
-      const script = document.createElement('script');
-      script.async = true;
-      script.defer = true;
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${googleMapsKey}&libraries=places&callback=initGoogleMapsForAmenities`;
-
-      // Global callback function
-      (window as any).initGoogleMapsForAmenities = () => {
-        console.log('[NearbyAmenities] Google Maps API loaded successfully');
-        setIsLoadingGoogleMaps(false);
-        setIsGoogleMapsLoaded(true);
-        resolve(true);
-        
-        // Clean up the global callback
-        delete (window as any).initGoogleMapsForAmenities;
-      };
-
-      script.onerror = () => {
-        console.error('[NearbyAmenities] Failed to load Google Maps API');
-        setIsLoadingGoogleMaps(false);
-        resolve(false);
-      };
-
-      document.head.appendChild(script);
-
-      // Timeout fallback
-      setTimeout(() => {
-        if (!checkGoogleMapsAPI()) {
-          console.error('[NearbyAmenities] Timeout loading Google Maps API');
-          setIsLoadingGoogleMaps(false);
-          resolve(false);
-        }
-      }, 10000);
-    });
-  }, [googleMapsKey, checkGoogleMapsAPI]);
-
-  // Initialize Google Maps API on component mount
-  useEffect(() => {
-    const initializeGoogleMaps = async () => {
-      if (checkGoogleMapsAPI()) {
-        setIsGoogleMapsLoaded(true);
-        return;
-      }
-
-      const loaded = await loadGoogleMapsAPI();
-      if (!loaded) {
-        setError('Failed to load Google Maps API. Please refresh the page and try again.');
-      }
-    };
-
-    initializeGoogleMaps();
-  }, [checkGoogleMapsAPI, loadGoogleMapsAPI]);
   const getCoordinates = (): { lat: number; lng: number } | null => {
     if (!coordinates) return null;
     
@@ -222,7 +132,7 @@ const NearbyAmenities: React.FC<NearbyAmenitiesProps> = ({
   };
   
   // Fetch nearby amenities using Google Places API
-  const fetchNearbyAmenities = async (placeType: string) => {
+  const fetchNearbyAmenities = useCallback(async (placeType: string) => {
     const coords = getCoordinates();
     
     if (!coords) {
@@ -230,13 +140,16 @@ const NearbyAmenities: React.FC<NearbyAmenitiesProps> = ({
       return;
     }
     
-    if (!googleMapsKey) {
-      setError('Google Maps API key not configured');
-      return;
-    }
-
-    if (!isGoogleMapsLoaded || !checkGoogleMapsAPI()) {
-      setError('Google Maps API not loaded. Please ensure Google Maps is properly initialized.');
+    if (!isGoogleMapsReady()) {
+      if (googleMapsError) {
+        if (isConfigError) {
+          setError('Google Maps API configuration error. Please check the API key and domain settings.');
+        } else {
+          setError('Google Maps failed to load. Please check your internet connection and try again.');
+        }
+      } else {
+        setError('Google Maps is still loading. Please wait and try again.');
+      }
       return;
     }
     
@@ -261,7 +174,7 @@ const NearbyAmenities: React.FC<NearbyAmenitiesProps> = ({
           
           // Process results and calculate distances
           const processedAmenities: Amenity[] = results
-            .slice(0, 6) // Limit to 6 results like the Python script
+            .slice(0, 6) // Limit to 6 results
             .map(place => {
               let distanceText = 'Nearby';
               
@@ -280,7 +193,6 @@ const NearbyAmenities: React.FC<NearbyAmenitiesProps> = ({
                 rating: place.rating,
                 type: placeType,
                 price_level: place.price_level
-                // Removed opening_hours to avoid deprecated open_now
               };
             });
           
@@ -321,53 +233,86 @@ const NearbyAmenities: React.FC<NearbyAmenitiesProps> = ({
       setAmenities([]);
       setLoading(false);
     }
-  };
+  }, [coordinates, radius, isGoogleMapsReady, googleMapsError, isConfigError]);
   
   // Retry function
-  const handleRetry = async () => {
+  const handleRetry = useCallback(async () => {
     setRetryCount(prev => prev + 1);
+    setHasFetchAttempted(false); // Reset fetch attempt flag
     
-    // Try to reload Google Maps API if it's not loaded
-    if (!isGoogleMapsLoaded) {
-      const loaded = await loadGoogleMapsAPI();
-      if (!loaded) {
-        setError('Failed to load Google Maps API. Please check your internet connection and try again.');
-        return;
-      }
+    // Wait a moment for Google Maps to be ready if it's still loading
+    if (!isGoogleMapsReady() && !googleMapsError) {
+      setTimeout(() => {
+        if (isGoogleMapsReady()) {
+          fetchNearbyAmenities(selectedType);
+          setHasFetchAttempted(true);
+        }
+      }, 1000);
+    } else if (isGoogleMapsReady()) {
+      fetchNearbyAmenities(selectedType);
+      setHasFetchAttempted(true);
     }
-    
-    fetchNearbyAmenities(selectedType);
-  };
+  }, [fetchNearbyAmenities, selectedType, isGoogleMapsReady, googleMapsError]);
   
-  // Load amenities when coordinates, selected type, or radius changes
+  // Load amenities when dependencies change
   useEffect(() => {
     const coords = getCoordinates();
     
     if (!coords) {
       setError('Property coordinates not available');
       setAmenities([]);
+      setHasFetchAttempted(true);
       return;
     }
     
-    if (!googleMapsKey) {
-      setError('Google Maps API key not configured');
+    // Handle Google Maps loading states
+    if (googleMapsError) {
+      if (isConfigError) {
+        setError('Google Maps API not configured properly. Please check the API key and settings.');
+      } else {
+        setError('Failed to load Google Maps. Please refresh the page and try again.');
+      }
       setAmenities([]);
+      setHasFetchAttempted(true);
       return;
     }
-
-    // Only fetch if Google Maps is loaded
-    if (isGoogleMapsLoaded && checkGoogleMapsAPI()) {
+    
+    if (!isGoogleMapsLoaded) {
+      setError('Loading Google Maps...');
+      setAmenities([]);
+      setHasFetchAttempted(false);
+      return;
+    }
+    
+    // Only fetch if Google Maps is ready and we haven't attempted yet
+    if (isGoogleMapsReady()) {
       // Add a small delay to ensure everything is ready
       const timer = setTimeout(() => {
         fetchNearbyAmenities(selectedType);
+        setHasFetchAttempted(true);
       }, 100);
       
       return () => clearTimeout(timer);
-    } else if (!isLoadingGoogleMaps) {
-      // If Google Maps is not loaded and we're not currently loading it, show appropriate message
-      setError('Waiting for Google Maps to load...');
+    } else {
+      setError('Waiting for Google Maps to initialize...');
+      setAmenities([]);
+      
+      // Retry after a delay if Maps should be loaded but isn't ready
+      if (!hasFetchAttempted) {
+        const retryTimer = setTimeout(() => {
+          if (isGoogleMapsLoaded && isGoogleMapsReady()) {
+            fetchNearbyAmenities(selectedType);
+            setHasFetchAttempted(true);
+          } else {
+            setError('Google Maps initialization failed. Please refresh the page.');
+            setHasFetchAttempted(true);
+          }
+        }, 3000); // Increased timeout to 3 seconds
+        
+        return () => clearTimeout(retryTimer);
+      }
     }
-  }, [coordinates, selectedType, radius, googleMapsKey, isGoogleMapsLoaded, checkGoogleMapsAPI, isLoadingGoogleMaps]);
+  }, [coordinates, selectedType, radius, isGoogleMapsLoaded, googleMapsError, isConfigError, isGoogleMapsReady, fetchNearbyAmenities, hasFetchAttempted]);
   
   // Get the configuration for the selected type
   const getTypeConfig = (type: string) => {
@@ -395,7 +340,7 @@ const NearbyAmenities: React.FC<NearbyAmenitiesProps> = ({
         </div>
 
         {/* Google Maps Loading State */}
-        {isLoadingGoogleMaps && (
+        {!isGoogleMapsLoaded && !googleMapsError && (
           <div className="p-4 border border-blue-200 rounded-lg bg-blue-50 mb-4">
             <div className="flex items-center gap-3">
               <Loader2 className="h-5 w-5 text-blue-500 animate-spin" />
@@ -426,13 +371,13 @@ const NearbyAmenities: React.FC<NearbyAmenitiesProps> = ({
               <button
                 key={type.value}
                 onClick={() => setSelectedType(type.value)}
-                disabled={loading || isLoadingGoogleMaps}
+                disabled={loading || !isGoogleMapsLoaded}
                 className={cn(
                   "flex items-center gap-2 p-3 rounded-lg border transition-all text-sm font-medium",
                   isSelected 
                     ? colorClasses[type.color as keyof typeof colorClasses]
                     : `border-border text-muted-foreground ${colorClasses[type.color as keyof typeof colorClasses]}`,
-                  loading && "opacity-50 cursor-not-allowed"
+                  (loading || !isGoogleMapsLoaded) && "opacity-50 cursor-not-allowed"
                 )}
               >
                 <TypeIcon className="h-4 w-4 flex-shrink-0" />
@@ -453,16 +398,19 @@ const NearbyAmenities: React.FC<NearbyAmenitiesProps> = ({
               <div className="flex-1">
                 <h4 className="font-medium text-red-800 mb-1">Unable to load amenities</h4>
                 <p className="text-sm text-red-700 mb-3">{error}</p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleRetry}
-                  disabled={loading}
-                  className="text-red-700 border-red-300 hover:bg-red-100"
-                >
-                  <RefreshCw className={cn("h-4 w-4 mr-2", loading && "animate-spin")} />
-                  Try Again
-                </Button>
+                {/* Only show retry button if it's not a configuration error */}
+                {!isConfigError && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRetry}
+                    disabled={loading}
+                    className="text-red-700 border-red-300 hover:bg-red-100"
+                  >
+                    <RefreshCw className={cn("h-4 w-4 mr-2", loading && "animate-spin")} />
+                    Try Again
+                  </Button>
+                )}
               </div>
             </div>
           </div>
@@ -553,7 +501,7 @@ const NearbyAmenities: React.FC<NearbyAmenitiesProps> = ({
         )}
         
         {/* Footer with Google Maps link */}
-        {!error && (
+        {!error && isGoogleMapsLoaded && (
           <div className="text-center mt-6 pt-4 border-t border-border">
             <Button 
               variant="outline" 
