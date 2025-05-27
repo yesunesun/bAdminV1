@@ -1,13 +1,15 @@
 // src/modules/seeker/components/PropertyDetails/PropertyLocationSection.tsx
-// Version: 10.0.0
-// Last Modified: 25-05-2025 15:30 IST
-// Purpose: Fixed location display issue across all flows by dynamically detecting location step
+// Version: 11.0.0
+// Last Modified: 27-05-2025 17:45 IST
+// Purpose: Added nearby properties toggle functionality directly on existing map
 
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { MapPinIcon, LandmarkIcon, MapIcon } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { MapPinIcon, LandmarkIcon, MapIcon, Loader2 } from 'lucide-react';
+import { useToast } from '@/components/ui/use-toast';
 import PropertyLocationMap from './PropertyLocationMap';
-import NearbyPropertiesDialog from './NearbyPropertiesDialog';
+import { fetchNearbyProperties } from '../../services/propertyService';
 
 interface PropertyLocationSectionProps {
   property: any;
@@ -64,6 +66,8 @@ const PropertyLocationSection: React.FC<PropertyLocationSectionProps> = ({
   property,
   isLoading 
 }) => {
+  const { toast } = useToast();
+  
   // State to hold processed location data
   const [locationData, setLocationData] = useState({
     address: '',
@@ -75,6 +79,11 @@ const PropertyLocationSection: React.FC<PropertyLocationSectionProps> = ({
     flatPlotNo: '',
     coordinates: null as { lat: number; lng: number } | null
   });
+
+  // State for nearby properties functionality
+  const [showNearbyProperties, setShowNearbyProperties] = useState(false);
+  const [nearbyProperties, setNearbyProperties] = useState<any[]>([]);
+  const [loadingNearbyProperties, setLoadingNearbyProperties] = useState(false);
 
   // Process property data once when component mounts or property changes
   useEffect(() => {
@@ -233,6 +242,62 @@ const PropertyLocationSection: React.FC<PropertyLocationSectionProps> = ({
     setLocationData(extractLocationData());
   }, [property]);
 
+  // Function to toggle nearby properties
+  const handleToggleNearbyProperties = async () => {
+    if (!locationData.coordinates) {
+      toast({
+        title: "Location not available",
+        description: "Property coordinates are required to find nearby properties.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (showNearbyProperties) {
+      // Hide nearby properties
+      setShowNearbyProperties(false);
+      setNearbyProperties([]);
+      toast({
+        title: "Nearby properties hidden",
+        description: "Map now shows only the current property.",
+        variant: "default"
+      });
+    } else {
+      // Show nearby properties
+      setLoadingNearbyProperties(true);
+      
+      try {
+        console.log('[PropertyLocationSection] Fetching nearby properties...');
+        const nearby = await fetchNearbyProperties(
+          property.id,
+          locationData.coordinates.lat,
+          locationData.coordinates.lng,
+          5, // 5km radius
+          10 // limit to 10 properties
+        );
+        
+        console.log(`[PropertyLocationSection] Found ${nearby.length} nearby properties`);
+        setNearbyProperties(nearby);
+        setShowNearbyProperties(true);
+        
+        toast({
+          title: "Nearby properties loaded",
+          description: `Found ${nearby.length} properties within 5km radius.`,
+          variant: "default"
+        });
+      } catch (error) {
+        console.error('[PropertyLocationSection] Error fetching nearby properties:', error);
+        toast({
+          title: "Error loading nearby properties",
+          description: "Something went wrong. Please try again later.",
+          variant: "destructive"
+        });
+      } finally {
+        setLoadingNearbyProperties(false);
+      }
+    }
+  };
+
   // Handle loading state
   if (isLoading) {
     return (
@@ -287,26 +352,68 @@ const PropertyLocationSection: React.FC<PropertyLocationSectionProps> = ({
           <span>Location</span>
         </CardTitle>
         
-        {/* Add Nearby Properties button */}
+        {/* Nearby Properties toggle button */}
         {hasCoordinates && (
-          <NearbyPropertiesDialog 
-            propertyId={property.id}
-            coordinates={locationData.coordinates}
-            radius={5}
-          />
+          <Button 
+            variant={showNearbyProperties ? "default" : "outline"}
+            size="sm"
+            onClick={handleToggleNearbyProperties}
+            disabled={loadingNearbyProperties}
+            className="font-medium flex items-center gap-2"
+          >
+            {loadingNearbyProperties ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <MapPinIcon className="h-4 w-4" />
+            )}
+            <span>
+              {loadingNearbyProperties 
+                ? 'Loading...' 
+                : showNearbyProperties 
+                  ? 'Hide Nearby Properties' 
+                  : 'Nearby Properties'
+              }
+            </span>
+            {showNearbyProperties && nearbyProperties.length > 0 && (
+              <span className="bg-white/20 text-xs px-1.5 py-0.5 rounded-full">
+                {nearbyProperties.length}
+              </span>
+            )}
+          </Button>
         )}
       </CardHeader>
       
       <CardContent className="space-y-4 pt-2">
-        {/* Map Component */}
+        {/* Map Component with nearby properties */}
         <div className="rounded-lg overflow-hidden border">
           <PropertyLocationMap 
             coordinates={locationData.coordinates}
             address={locationData.address}
             locality={locationData.locality}
             city={locationData.city}
+            nearbyProperties={showNearbyProperties ? nearbyProperties : []}
+            currentProperty={{
+              id: property.id,
+              title: property.title || property.property_details?.flow?.title || 'Current Property',
+              coordinates: locationData.coordinates
+            }}
           />
         </div>
+        
+        {/* Show nearby properties summary */}
+        {showNearbyProperties && nearbyProperties.length > 0 && (
+          <div className="mt-4 p-3 bg-muted/50 rounded-lg">
+            <div className="flex items-center gap-2 text-sm">
+              <MapPinIcon className="h-4 w-4 text-primary" />
+              <span className="font-medium">
+                Showing {nearbyProperties.length} nearby properties within 5km radius
+              </span>
+            </div>
+            <div className="text-xs text-muted-foreground mt-1">
+              Click markers on the map to view property details
+            </div>
+          </div>
+        )}
         
         {/* Address Display - Show prominently with icon */}
         {formattedAddress !== "Address not available" ? (

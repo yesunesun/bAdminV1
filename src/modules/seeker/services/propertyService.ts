@@ -1,12 +1,41 @@
 // src/modules/seeker/services/propertyService.ts
-// Version: 2.0.0
-// Last Modified: 25-05-2025 16:30 IST
-// Purpose: Updated to use properties_v2 exclusively with new data structure
+// Version: 4.0.0
+// Last Modified: 27-05-2025 20:15 IST
+// Purpose: Complete service with optimized nearby properties using property_coordinates table
 
 import { supabase } from '@/lib/supabase';
 import { PropertyFilters } from './seekerService';
 import { SimilarPropertiesOptions } from './constants';
 import { debugTableSchema, processPropertyData, extractImagesFromProperty } from './utilityService';
+
+// Interface for nearby property results
+interface NearbyProperty {
+  id: string;
+  title: string;
+  distance: number;
+  price: number;
+  city: string;
+  coordinates: {
+    lat: number;
+    lng: number;
+  };
+  property_details: {
+    primaryImage: string;
+    flow?: any;
+    steps?: any;
+    [key: string]: any;
+  };
+}
+
+// Interface for coordinate sync results
+interface SyncResult {
+  success: boolean;
+  syncedCount?: number;
+  totalProperties?: number;
+  errors?: string[];
+  error?: string;
+  data?: any;
+}
 
 // Fetch properties with filters and pagination - Only from properties_v2
 export const fetchProperties = async (filters: PropertyFilters = {}) => {
@@ -229,10 +258,39 @@ export const fetchPropertyById = async (propertyId: string) => {
       console.error('[propertyService] Error incrementing view count:', err);
     });
 
+    // Extract and sync coordinates to coordinates table (background operation)
+    syncPropertyCoordinates(propertyId).catch(err => {
+      console.error('[propertyService] Error syncing coordinates:', err);
+    });
+
     return finalProperty;
   } catch (error) {
     console.error(`[propertyService] Error fetching property with ID ${propertyId}:`, error);
     throw error;
+  }
+};
+
+// Helper function to sync property coordinates to the coordinates table
+const syncPropertyCoordinates = async (propertyId: string): Promise<void> => {
+  try {
+    console.log(`[propertyService] Syncing coordinates for property ${propertyId}`);
+    
+    const { data, error } = await supabase.rpc('extract_and_upsert_property_coordinates', {
+      p_property_id: propertyId
+    });
+    
+    if (error) {
+      console.error('[propertyService] Error syncing coordinates:', error);
+      return;
+    }
+    
+    if (data?.success) {
+      console.log(`[propertyService] Successfully synced coordinates for property ${propertyId}`);
+    } else {
+      console.warn(`[propertyService] Failed to sync coordinates for property ${propertyId}:`, data?.error);
+    }
+  } catch (error) {
+    console.error('[propertyService] Error in syncPropertyCoordinates:', error);
   }
 };
 
@@ -285,6 +343,171 @@ const incrementPropertyViewCount = async (propertyId: string) => {
   } catch (error) {
     console.error('[propertyService] Error recording property visit:', error);
     return { success: false };
+  }
+};
+
+// OPTIMIZED: Fetch nearby properties using property_coordinates table
+export const fetchNearbyProperties = async (
+  currentPropertyId: string,
+  latitude: number,
+  longitude: number,
+  radiusKm: number = 2,
+  limit: number = 6
+): Promise<NearbyProperty[]> => {
+  try {
+    console.log(`[propertyService] fetchNearbyProperties - Starting with coordinates: ${latitude}, ${longitude}, radius: ${radiusKm}km`);
+
+    // Validate inputs
+    if (!currentPropertyId || !latitude || !longitude) {
+      console.error('[propertyService] fetchNearbyProperties - Missing required parameters');
+      throw new Error('Missing required parameters: propertyId, latitude, or longitude');
+    }
+
+    if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+      console.error('[propertyService] fetchNearbyProperties - Invalid coordinates');
+      throw new Error('Invalid coordinates provided');
+    }
+
+    // Convert numbers to ensure proper types
+    const lat = Number(latitude);
+    const lng = Number(longitude);
+    const radius = Number(radiusKm);
+    const resultLimit = Number(limit);
+
+    console.log(`[propertyService] Calling find_nearby_properties with: lat=${lat}, lng=${lng}, radius=${radius}, limit=${resultLimit}`);
+
+    // Use the database function to find nearby coordinates
+    const { data: nearbyCoords, error: coordsError } = await supabase.rpc('find_nearby_properties', {
+      p_latitude: lat,
+      p_longitude: lng,
+      p_radius_km: radius,
+      p_exclude_property_id: currentPropertyId,
+      p_limit: resultLimit
+    });
+
+    if (coordsError) {
+      console.error('[propertyService] fetchNearbyProperties - Database function error:', coordsError);
+      throw new Error(`Database error: ${coordsError.message}`);
+    }
+
+    if (!nearbyCoords || nearbyCoords.length === 0) {
+      console.log('[propertyService] fetchNearbyProperties - No nearby properties found');
+      return [];
+    }
+
+    console.log(`[propertyService] fetchNearbyProperties - Found ${nearbyCoords.length} nearby coordinates`);
+
+    // Get the property IDs
+    const propertyIds = nearbyCoords.map((coord: any) => coord.property_id);
+
+    // Fetch the actual property data from properties_v2
+    const { data: properties, error: propertiesError } = await supabase
+      .from('properties_v2')
+      .select('*')
+      .in('id', propertyIds);
+
+    if (propertiesError) {
+      console.error('[propertyService] fetchNearbyProperties - Error fetching property data:', propertiesError);
+      throw new Error(`Error fetching property data: ${propertiesError.message}`);
+    }
+
+    if (!properties || properties.length === 0) {
+      console.log('[propertyService] fetchNearbyProperties - No property data found for nearby coordinates');
+      return [];
+    }
+
+    console.log(`[propertyService] fetchNearbyProperties - Found ${properties.length} properties with data`);
+
+    // Process properties and merge with coordinate data
+    const nearbyProperties: NearbyProperty[] = properties.map(property => {
+      try {
+        // Find the corresponding coordinate data
+        const coordData = nearbyCoords.find((coord: any) => coord.property_id === property.id);
+        
+        if (!coordData) {
+          console.warn(`[propertyService] No coordinate data found for property ${property.id}`);
+          return null;
+        }
+
+        // Process property data using the existing utility function
+        const processedProperty = processPropertyData(property);
+        
+        if (!processedProperty) {
+          console.warn(`[propertyService] Failed to process property ${property.id} for nearby properties`);
+          return null;
+        }
+
+        // Extract images using the existing utility function
+        const extractedImages = extractImagesFromProperty(processedProperty);
+        
+        // Find primary image or first image
+        let primaryImage = '/noimage.png';
+        if (extractedImages.length > 0) {
+          const primary = extractedImages.find(img => img.is_primary);
+          primaryImage = primary ? primary.url : extractedImages[0].url;
+        }
+
+        // Get title from various possible locations
+        let title = 'Property';
+        if (processedProperty.property_details?.flow?.title) {
+          title = processedProperty.property_details.flow.title;
+        } else if (processedProperty.title) {
+          title = processedProperty.title;
+        } else if (processedProperty.property_details?.title) {
+          title = processedProperty.property_details.title;
+        }
+
+        // Get price from various possible locations
+        let price = 0;
+        if (processedProperty.property_details?.flow?.price) {
+          price = Number(processedProperty.property_details.flow.price) || 0;
+        } else if (processedProperty.price) {
+          price = Number(processedProperty.price) || 0;
+        }
+
+        // Create a consistent property object
+        return {
+          id: property.id,
+          title,
+          distance: Math.round(parseFloat(coordData.distance_km) * 100) / 100, // Round to 2 decimal places
+          price,
+          city: coordData.city || processedProperty.city || 'Unknown',
+          coordinates: {
+            lat: parseFloat(coordData.latitude),
+            lng: parseFloat(coordData.longitude)
+          },
+          property_details: {
+            ...processedProperty.property_details,
+            primaryImage,
+            flow: processedProperty.property_details?.flow || { title, price },
+            // Add coordinate data to steps for map display
+            steps: {
+              ...processedProperty.property_details?.steps,
+              location_details: {
+                latitude: parseFloat(coordData.latitude),
+                longitude: parseFloat(coordData.longitude),
+                address: coordData.address,
+                city: coordData.city,
+                state: coordData.state
+              }
+            }
+          }
+        };
+      } catch (error) {
+        console.error(`[propertyService] Error processing nearby property ${property.id}:`, error);
+        return null;
+      }
+    })
+    .filter((property): property is NearbyProperty => property !== null) // Remove null entries with type guard
+    .sort((a, b) => a.distance - b.distance); // Sort by distance
+
+    console.log(`[propertyService] fetchNearbyProperties - Returning ${nearbyProperties.length} processed nearby properties`);
+    return nearbyProperties;
+
+  } catch (error) {
+    console.error('[propertyService] fetchNearbyProperties - Unexpected error:', error);
+    // Instead of throwing, return empty array to prevent UI crashes
+    return [];
   }
 };
 
@@ -346,149 +569,127 @@ export const fetchSimilarProperties = async (options: SimilarPropertiesOptions) 
   }
 };
 
-// New function to fetch nearby properties
-export const fetchNearbyProperties = async (
-  currentPropertyId: string,
-  latitude: number,
-  longitude: number,
-  radiusKm: number = 5,
-  limit: number = 6
-) => {
+// Function to bulk sync all property coordinates
+export const bulkSyncPropertyCoordinates = async (): Promise<SyncResult> => {
   try {
-    console.log(`[propertyService] fetchNearbyProperties - Starting with coordinates: ${latitude}, ${longitude}, radius: ${radiusKm}km`);
+    console.log('[propertyService] Starting bulk sync of property coordinates...');
 
-    if (!currentPropertyId || !latitude || !longitude) {
-      console.error('[propertyService] fetchNearbyProperties - Missing required parameters');
-      return [];
-    }
-
-    // Calculate approximate bounding box for initial filtering
-    const degreePerKm = 0.00904371; // Approximate degree per km (at equator)
-    const latDelta = radiusKm * degreePerKm;
-    const lngDelta = radiusKm * degreePerKm;
-
-    const latMin = latitude - latDelta;
-    const latMax = latitude + latDelta;
-    const lngMin = longitude - lngDelta;
-    const lngMax = longitude + lngDelta;
-
-    console.log(`[propertyService] fetchNearbyProperties - Bounding box: lat(${latMin} to ${latMax}), lng(${lngMin} to ${lngMax})`);
-    
-    // Base query to fetch properties from properties_v2
-    const { data, error } = await supabase
+    // Get all properties from properties_v2
+    const { data: properties, error } = await supabase
       .from('properties_v2')
-      .select('*')
-      .neq('id', currentPropertyId) // Exclude current property
-      .order('created_at', { ascending: false })
-      .limit(limit + 10); // Fetch extra to allow for post-filtering
-    
+      .select('id')
+      .order('created_at', { ascending: false });
+
     if (error) {
-      console.error('[propertyService] fetchNearbyProperties - Error fetching properties:', error);
-      return [];
+      console.error('[propertyService] Error fetching properties for bulk sync:', error);
+      return { success: false, error: error.message };
     }
-    
-    console.log(`[propertyService] fetchNearbyProperties - Found ${data?.length || 0} properties for coordinate filtering`);
-    
-    if (!data || data.length === 0) {
-      return [];
+
+    if (!properties || properties.length === 0) {
+      console.log('[propertyService] No properties found for bulk sync');
+      return { success: true, syncedCount: 0, errors: [] };
     }
-    
-    // Process properties and calculate exact distances
-    const nearbyProperties = data.map(property => {
-      try {
-        // Process property data
-        const processedProperty = processPropertyData(property);
-        
-        if (!processedProperty) {
-          console.warn(`[propertyService] Failed to process property ${property.id} for nearby properties`);
-          return null;
-        }
-        
-        // Extract coordinates from property_details
-        const details = processedProperty.property_details || {};
-        let propLat = null;
-        let propLng = null;
-        
-        // Try to find coordinates in the new data structure (steps)
-        if (details.steps) {
-          for (const [stepId, stepData] of Object.entries(details.steps)) {
-            if (stepId.includes('location') && stepData && typeof stepData === 'object') {
-              const locationData = stepData as any;
-              if (locationData.coordinates) {
-                propLat = parseFloat(locationData.coordinates.latitude || locationData.coordinates.lat);
-                propLng = parseFloat(locationData.coordinates.longitude || locationData.coordinates.lng);
-                break;
-              }
-            }
+
+    console.log(`[propertyService] Found ${properties.length} properties to sync`);
+
+    const errors: string[] = [];
+    let syncedCount = 0;
+
+    // Process properties in batches to avoid overwhelming the database
+    const batchSize = 10;
+    for (let i = 0; i < properties.length; i += batchSize) {
+      const batch = properties.slice(i, i + batchSize);
+      
+      console.log(`[propertyService] Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(properties.length / batchSize)}`);
+
+      // Process batch in parallel
+      const batchPromises = batch.map(async (property) => {
+        try {
+          const { data, error } = await supabase.rpc('extract_and_upsert_property_coordinates', {
+            p_property_id: property.id
+          });
+
+          if (error) {
+            throw new Error(`Property ${property.id}: ${error.message}`);
           }
-        }
-        
-        // Skip properties without coordinates
-        if (!propLat || !propLng) {
-          return null;
-        }
-        
-        // Calculate distance using Haversine formula
-        const distance = calculateDistance(latitude, longitude, propLat, propLng);
-        
-        // Skip properties outside the exact radius
-        if (distance > radiusKm) {
-          return null;
-        }
-        
-        // Extract images
-        const extractedImages = extractImagesFromProperty(processedProperty);
-        
-        // Find primary image or first image
-        let primaryImage = '/noimage.png';
-        if (extractedImages.length > 0) {
-          const primary = extractedImages.find(img => img.is_primary);
-          primaryImage = primary ? primary.url : extractedImages[0].url;
-        }
-        
-        // Add distance and primary image to property
-        return {
-          ...processedProperty,
-          distance,
-          property_details: {
-            ...processedProperty.property_details,
-            primaryImage
+
+          if (data?.success) {
+            syncedCount++;
+            console.log(`[propertyService] ✓ Synced coordinates for property ${property.id}`);
+          } else {
+            errors.push(`Property ${property.id}: ${data?.error || 'Unknown error'}`);
           }
-        };
-      } catch (error) {
-        console.error(`[propertyService] Error processing nearby property ${property.id}:`, error);
-        return null;
+        } catch (error) {
+          const errorMessage = `Property ${property.id}: ${error instanceof Error ? error.message : 'Unknown error'}`;
+          errors.push(errorMessage);
+          console.error(`[propertyService] ✗ Error syncing property ${property.id}:`, error);
+        }
+      });
+
+      // Wait for batch to complete
+      await Promise.all(batchPromises);
+
+      // Small delay between batches to avoid rate limiting
+      if (i + batchSize < properties.length) {
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
-    })
-    .filter(Boolean) // Remove null entries
-    .filter(prop => prop.distance <= radiusKm) // Ensure all properties are within radius
-    .sort((a, b) => a.distance - b.distance) // Sort by distance
-    .slice(0, limit); // Limit to requested number of properties
-    
-    console.log(`[propertyService] fetchNearbyProperties - Returning ${nearbyProperties.length} nearby properties`);
-    return nearbyProperties;
+    }
+
+    console.log(`[propertyService] Bulk sync completed: ${syncedCount} synced, ${errors.length} errors`);
+
+    return {
+      success: true,
+      syncedCount,
+      totalProperties: properties.length,
+      errors: errors.slice(0, 10) // Return first 10 errors to avoid overwhelming the response
+    };
   } catch (error) {
-    console.error('[propertyService] fetchNearbyProperties - Error:', error);
-    return [];
+    console.error('[propertyService] Error in bulk sync:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    };
   }
 };
 
-// Haversine formula to calculate distance between two coordinates in kilometers
-const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-  const R = 6371; // Radius of the earth in km
-  const dLat = deg2rad(lat2 - lat1);
-  const dLon = deg2rad(lon2 - lon1);
-  const a = 
-    Math.sin(dLat/2) * Math.sin(dLat/2) +
-    Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * 
-    Math.sin(dLon/2) * Math.sin(dLon/2); 
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
-  const distance = R * c; // Distance in km
-  return parseFloat(distance.toFixed(1));
-};
+// Function to manually sync coordinates for a specific property
+export const syncSinglePropertyCoordinates = async (propertyId: string): Promise<SyncResult> => {
+  try {
+    console.log(`[propertyService] Manually syncing coordinates for property ${propertyId}`);
 
-const deg2rad = (deg: number) => {
-  return deg * (Math.PI/180);
+    const { data, error } = await supabase.rpc('extract_and_upsert_property_coordinates', {
+      p_property_id: propertyId
+    });
+
+    if (error) {
+      console.error('[propertyService] Error manually syncing coordinates:', error);
+      return { success: false, error: error.message };
+    }
+
+    if (data?.success) {
+      console.log(`[propertyService] Successfully manually synced coordinates for property ${propertyId}`);
+      return { 
+        success: true, 
+        data: {
+          propertyId,
+          latitude: data.latitude,
+          longitude: data.longitude,
+          address: data.address,
+          city: data.city,
+          state: data.state
+        }
+      };
+    } else {
+      console.warn(`[propertyService] Failed to manually sync coordinates for property ${propertyId}:`, data?.error);
+      return { success: false, error: data?.error || 'Unknown error' };
+    }
+  } catch (error) {
+    console.error('[propertyService] Error in syncSinglePropertyCoordinates:', error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error' 
+    };
+  }
 };
 
 // Helper function for processing similar properties

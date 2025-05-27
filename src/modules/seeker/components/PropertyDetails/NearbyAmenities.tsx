@@ -32,9 +32,7 @@ interface Amenity {
   rating?: number;
   type: string;
   price_level?: number;
-  opening_hours?: {
-    open_now?: boolean;
-  };
+  // Removed opening_hours to avoid deprecated open_now property
 }
 
 // Interface for component props
@@ -281,8 +279,8 @@ const NearbyAmenities: React.FC<NearbyAmenitiesProps> = ({
                 distance: distanceText,
                 rating: place.rating,
                 type: placeType,
-                price_level: place.price_level,
-                opening_hours: place.opening_hours
+                price_level: place.price_level
+                // Removed opening_hours to avoid deprecated open_now
               };
             });
           
@@ -531,16 +529,6 @@ const NearbyAmenities: React.FC<NearbyAmenitiesProps> = ({
                               <Star className="h-3 w-3 mr-1 text-amber-400 fill-amber-400" />
                               <span className="font-medium">{amenity.rating}</span>
                             </div>
-                          )}
-                          {amenity.opening_hours?.open_now !== undefined && (
-                            <span className={cn(
-                              "text-xs px-2 py-0.5 rounded-full font-medium",
-                              amenity.opening_hours.open_now 
-                                ? "bg-green-100 text-green-700" 
-                                : "bg-red-100 text-red-700"
-                            )}>
-                              {amenity.opening_hours.open_now ? 'Open' : 'Closed'}
-                            </span>
                           )}
                         </div>
                       </div>
