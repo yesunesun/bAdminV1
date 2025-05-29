@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/CommercialFeatures.tsx
-// Version: 2.1.0
-// Last Modified: 13-05-2025 16:45 IST
-// Purpose: Removed debug information display while keeping Debug button functionality
+// Version: 3.0.0
+// Last Modified: 30-05-2025 17:00 IST
+// Purpose: Added step completion validation system integration
 
 import React, { useCallback, useEffect } from 'react';
 import { FormSectionProps } from '../types';
@@ -11,6 +11,7 @@ import { RequiredLabel } from '@/components/ui/RequiredLabel';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { useStepValidation } from '../hooks/useStepValidation';
 import { cn } from '@/lib/utils';
 import { Info } from 'lucide-react';
 
@@ -99,12 +100,31 @@ const CommercialFeatures: React.FC<FormSectionProps> = ({
   form,
   stepId = 'com_rent_features' // Default stepId for commercial features
 }) => {
+  // ✅ ADDED: Initialize validation system
+  const {
+    validateField,
+    getFieldValidation,
+    shouldShowFieldError,
+    markFieldAsTouched,
+    isValid: stepIsValid,
+    completionPercentage,
+    requiredFields
+  } = useStepValidation({
+    form,
+    flowType: 'commercial_rent',
+    currentStepId: stepId
+  });
+
   // Custom hooks for step data handling
   const saveField = useCallback((fieldName: string, value: any) => {
     const path = `steps.${stepId}.${fieldName}`;
     console.log(`Saving field ${fieldName} at path ${path}:`, value);
     form.setValue(path, value, { shouldValidate: true });
-  }, [form, stepId]);
+    
+    // ✅ ADDED: Mark field as touched and validate
+    markFieldAsTouched(fieldName);
+    validateField(fieldName);
+  }, [form, stepId, markFieldAsTouched, validateField]);
 
   const getField = useCallback((fieldName: string, defaultValue?: any) => {
     const path = `steps.${stepId}.${fieldName}`;
@@ -150,6 +170,26 @@ const CommercialFeatures: React.FC<FormSectionProps> = ({
 
   return (
     <div className="space-y-8">
+      {/* ✅ ADDED: Progress indicator */}
+      {requiredFields.length > 0 && (
+        <div className="mb-6 p-3 bg-blue-50 rounded-lg border border-blue-200">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-blue-900">
+              Step Completion: {completionPercentage}%
+            </span>
+            <span className="text-xs text-blue-700">
+              {stepIsValid ? '✓ Ready to proceed' : 'Please complete required fields'}
+            </span>
+          </div>
+          <div className="w-full bg-blue-200 rounded-full h-2">
+            <div 
+              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+              style={{ width: `${completionPercentage}%` }}
+            />
+          </div>
+        </div>
+      )}
+
       {/* Essential Commercial Facilities - Required Fields */}
       <FormSection title="Essential Facilities" description="Specify key facilities available in your commercial property">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -169,6 +209,12 @@ const CommercialFeatures: React.FC<FormSectionProps> = ({
                 </option>
               ))}
             </select>
+            {/* ✅ ADDED: Error message display */}
+            {shouldShowFieldError('powerBackup') && (
+              <p className="text-sm text-red-600 mt-0.5">
+                {getFieldValidation('powerBackup').error}
+              </p>
+            )}
           </div>
 
           {/* Lift - Required */}
@@ -187,6 +233,12 @@ const CommercialFeatures: React.FC<FormSectionProps> = ({
                 </option>
               ))}
             </select>
+            {/* ✅ ADDED: Error message display */}
+            {shouldShowFieldError('lift') && (
+              <p className="text-sm text-red-600 mt-0.5">
+                {getFieldValidation('lift').error}
+              </p>
+            )}
           </div>
 
           {/* Parking - Required */}
@@ -205,6 +257,12 @@ const CommercialFeatures: React.FC<FormSectionProps> = ({
                 </option>
               ))}
             </select>
+            {/* ✅ ADDED: Error message display */}
+            {shouldShowFieldError('parkingType') && (
+              <p className="text-sm text-red-600 mt-0.5">
+                {getFieldValidation('parkingType').error}
+              </p>
+            )}
           </div>
 
           {/* Washroom(s) - Required */}
@@ -223,6 +281,12 @@ const CommercialFeatures: React.FC<FormSectionProps> = ({
                 </option>
               ))}
             </select>
+            {/* ✅ ADDED: Error message display */}
+            {shouldShowFieldError('washroomType') && (
+              <p className="text-sm text-red-600 mt-0.5">
+                {getFieldValidation('washroomType').error}
+              </p>
+            )}
           </div>
 
           {/* Water Storage Facility */}
@@ -230,7 +294,7 @@ const CommercialFeatures: React.FC<FormSectionProps> = ({
             <label htmlFor="waterStorage" className="block text-sm font-medium mb-1">
               Water Storage Facility
             </label>
-<select
+            <select
               id="waterStorage"
               className="w-full px-4 py-3 rounded-xl border border-border bg-background"
               value={getField('waterStorage', '')}
@@ -285,6 +349,12 @@ const CommercialFeatures: React.FC<FormSectionProps> = ({
                 </option>
               ))}
             </select>
+            {/* ✅ ADDED: Error message display */}
+            {shouldShowFieldError('propertyCondition') && (
+              <p className="text-sm text-red-600 mt-0.5">
+                {getFieldValidation('propertyCondition').error}
+              </p>
+            )}
           </div>
 
           {/* Conditional field if "Own Business" is selected */}

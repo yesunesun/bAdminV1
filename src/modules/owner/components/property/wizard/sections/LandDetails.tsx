@@ -1,13 +1,14 @@
 // src/modules/owner/components/property/wizard/sections/LandDetails.tsx
-// Version: 3.0.0
-// Last Modified: 30-05-2025 15:30 IST
-// Purpose: Removed Length, Width, FSI, and Topography fields to simplify Land Sale flow
+// Version: 4.0.0
+// Last Modified: 30-05-2025 18:15 IST
+// Purpose: Added step completion validation system for progress tracking
 
 import React, { useEffect, useCallback, useState } from 'react';
 import { FormSection } from '@/components/FormSection';
 import { RequiredLabel } from '@/components/ui/RequiredLabel';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { useStepValidation } from '../hooks/useStepValidation';
 import { cn } from '@/lib/utils';
 import { FormSectionProps } from '../types';
 import { 
@@ -44,6 +45,22 @@ const LandDetails: React.FC<FormSectionProps> = ({
     additionalDetails: ''
   });
 
+  // ✅ ADDED: Initialize validation system
+  const flowType = form.getValues('flow.flowType') || 'land_sale';
+  const {
+    validateField,
+    getFieldValidation,
+    shouldShowFieldError,
+    markFieldAsTouched,
+    isValid: stepIsValid,
+    completionPercentage,
+    requiredFields
+  } = useStepValidation({
+    form,
+    flowType,
+    currentStepId: stepId
+  });
+
   // Custom hooks for step data handling
   const saveField = useCallback((fieldName: string, value: any) => {
     const path = `steps.${stepId}.${fieldName}`;
@@ -55,7 +72,11 @@ const LandDetails: React.FC<FormSectionProps> = ({
       ...prev,
       [fieldName]: value
     }));
-  }, [form, stepId]);
+    
+    // ✅ ADDED: Mark field as touched and validate
+    markFieldAsTouched(fieldName);
+    validateField(fieldName);
+  }, [form, stepId, markFieldAsTouched, validateField]);
 
   const getField = useCallback((fieldName: string, defaultValue?: any) => {
     const path = `steps.${stepId}.${fieldName}`;
@@ -106,6 +127,26 @@ const LandDetails: React.FC<FormSectionProps> = ({
       title="Land/Plot Details"
       description="Provide details about your land or plot for sale"
     >
+      {/* ✅ ADDED: Progress indicator */}
+      {requiredFields.length > 0 && (
+        <div className="mb-6 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
+              Step Completion: {completionPercentage}%
+            </span>
+            <span className="text-xs text-blue-700 dark:text-blue-300">
+              {stepIsValid ? '✓ Ready to proceed' : 'Please complete required fields'}
+            </span>
+          </div>
+          <div className="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-2">
+            <div 
+              className="bg-blue-600 dark:bg-blue-400 h-2 rounded-full transition-all duration-300"
+              style={{ width: `${completionPercentage}%` }}
+            />
+          </div>
+        </div>
+      )}
+
       <div className="space-y-6">
         {/* Land Type */}
         <div className="mb-6">
@@ -125,6 +166,12 @@ const LandDetails: React.FC<FormSectionProps> = ({
               </option>
             ))}
           </select>
+          {/* ✅ ADDED: Validation error display */}
+          {shouldShowFieldError('landType') && (
+            <p className="text-sm text-red-600 mt-0.5">
+              {getFieldValidation('landType').error}
+            </p>
+          )}
         </div>
         
         {/* Area Details */}
@@ -141,6 +188,12 @@ const LandDetails: React.FC<FormSectionProps> = ({
               value={localState.builtUpArea}
               onChange={(e) => saveField('builtUpArea', e.target.value)}
             />
+            {/* ✅ ADDED: Validation error display */}
+            {shouldShowFieldError('builtUpArea') && (
+              <p className="text-sm text-red-600 mt-0.5">
+                {getFieldValidation('builtUpArea').error}
+              </p>
+            )}
           </div>
           
           <div>
@@ -180,6 +233,12 @@ const LandDetails: React.FC<FormSectionProps> = ({
                 </option>
               ))}
             </select>
+            {/* ✅ ADDED: Validation error display */}
+            {shouldShowFieldError('plotFacing') && (
+              <p className="text-sm text-red-600 mt-0.5">
+                {getFieldValidation('plotFacing').error}
+              </p>
+            )}
           </div>
           
           <div>
@@ -194,6 +253,12 @@ const LandDetails: React.FC<FormSectionProps> = ({
               value={localState.expectedPrice}
               onChange={(e) => saveField('expectedPrice', e.target.value)}
             />
+            {/* ✅ ADDED: Validation error display */}
+            {shouldShowFieldError('expectedPrice') && (
+              <p className="text-sm text-red-600 mt-0.5">
+                {getFieldValidation('expectedPrice').error}
+              </p>
+            )}
             <div className="flex items-center space-x-2 pt-2 mt-1">
               <input
                 type="checkbox"
@@ -231,6 +296,12 @@ const LandDetails: React.FC<FormSectionProps> = ({
                 </option>
               ))}
             </select>
+            {/* ✅ ADDED: Validation error display */}
+            {shouldShowFieldError('developmentStatus') && (
+              <p className="text-sm text-red-600 mt-0.5">
+                {getFieldValidation('developmentStatus').error}
+              </p>
+            )}
           </div>
           
           <div>
@@ -250,6 +321,12 @@ const LandDetails: React.FC<FormSectionProps> = ({
                 </option>
               ))}
             </select>
+            {/* ✅ ADDED: Validation error display */}
+            {shouldShowFieldError('approvalStatus') && (
+              <p className="text-sm text-red-600 mt-0.5">
+                {getFieldValidation('approvalStatus').error}
+              </p>
+            )}
           </div>
         </div>
         
@@ -272,6 +349,12 @@ const LandDetails: React.FC<FormSectionProps> = ({
                 </option>
               ))}
             </select>
+            {/* ✅ ADDED: Validation error display */}
+            {shouldShowFieldError('soilType') && (
+              <p className="text-sm text-red-600 mt-0.5">
+                {getFieldValidation('soilType').error}
+              </p>
+            )}
           </div>
         )}
         
@@ -293,6 +376,12 @@ const LandDetails: React.FC<FormSectionProps> = ({
               </option>
             ))}
           </select>
+          {/* ✅ ADDED: Validation error display */}
+          {shouldShowFieldError('boundaryType') && (
+            <p className="text-sm text-red-600 mt-0.5">
+              {getFieldValidation('boundaryType').error}
+            </p>
+          )}
         </div>
         
         {/* Utilities */}
@@ -316,6 +405,12 @@ const LandDetails: React.FC<FormSectionProps> = ({
                   </option>
                 ))}
               </select>
+              {/* ✅ ADDED: Validation error display */}
+              {shouldShowFieldError('waterAvailability') && (
+                <p className="text-sm text-red-600 mt-0.5">
+                  {getFieldValidation('waterAvailability').error}
+                </p>
+              )}
             </div>
             
             <div>
@@ -335,6 +430,12 @@ const LandDetails: React.FC<FormSectionProps> = ({
                   </option>
                 ))}
               </select>
+              {/* ✅ ADDED: Validation error display */}
+              {shouldShowFieldError('electricityStatus') && (
+                <p className="text-sm text-red-600 mt-0.5">
+                  {getFieldValidation('electricityStatus').error}
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -357,6 +458,12 @@ const LandDetails: React.FC<FormSectionProps> = ({
               </option>
             ))}
           </select>
+          {/* ✅ ADDED: Validation error display */}
+          {shouldShowFieldError('roadConnectivity') && (
+            <p className="text-sm text-red-600 mt-0.5">
+              {getFieldValidation('roadConnectivity').error}
+            </p>
+          )}
         </div>
         
         {/* Additional Details */}
@@ -375,6 +482,12 @@ const LandDetails: React.FC<FormSectionProps> = ({
             value={localState.additionalDetails}
             onChange={(e) => saveField('additionalDetails', e.target.value)}
           />
+          {/* ✅ ADDED: Validation error display */}
+          {shouldShowFieldError('additionalDetails') && (
+            <p className="text-sm text-red-600 mt-0.5">
+              {getFieldValidation('additionalDetails').error}
+            </p>
+          )}
           <div className="mt-2 flex items-start text-xs text-muted-foreground">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 mr-1 flex-shrink-0 mt-0.5">
               <circle cx="12" cy="12" r="10"></circle>

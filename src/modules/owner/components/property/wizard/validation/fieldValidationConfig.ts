@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/validation/fieldValidationConfig.ts
-// Version: 1.2.0
-// Last Modified: 30-05-2025 16:35 IST
-// Purpose: Fixed sale details validation - added missing required fields
+// Version: 2.1.0
+// Last Modified: 30-05-2025 18:20 IST
+// Purpose: Added PG/Hostel room details validation fields for step completion
 
 // Validation types
 export type ValidationRule = {
@@ -85,7 +85,7 @@ export const COMMON_VALIDATIONS = {
   }
 };
 
-// Basic validation configurations (simplified version)
+// Basic validation configurations - UPDATED: Added commercial and PG fields
 export const BASIC_FIELD_VALIDATIONS: Record<string, ValidationRule> = {
   // Location fields
   address: COMMON_VALIDATIONS.ADDRESS,
@@ -104,13 +104,52 @@ export const BASIC_FIELD_VALIDATIONS: Record<string, ValidationRule> = {
   builtUpArea: { required: true, min: 100 },
   bathrooms: { required: true, min: 1 },
   
-  // FIXED: Added sale details required fields
+  // Sale details fields
   expectedPrice: { required: true, min: 10000 },
   maintenanceCost: { required: true, min: 0 },
   kitchenType: COMMON_VALIDATIONS.REQUIRED,
   availableFrom: COMMON_VALIDATIONS.REQUIRED,
   furnishing: COMMON_VALIDATIONS.REQUIRED,
   parking: COMMON_VALIDATIONS.REQUIRED,
+  
+  // Commercial property fields
+  commercialPropertyType: COMMON_VALIDATIONS.REQUIRED,
+  rentAmount: { required: true, min: 1000 },
+  securityDeposit: { required: true, min: 0 },
+  leaseDuration: COMMON_VALIDATIONS.REQUIRED,
+  maintenance: COMMON_VALIDATIONS.REQUIRED,
+  powerBackup: COMMON_VALIDATIONS.REQUIRED,
+  lockInPeriod: { required: true, min: 0, max: 60 },
+  
+  // Commercial rental fields
+  rentalType: COMMON_VALIDATIONS.REQUIRED,
+  camCharges: { required: true, min: 0 },
+  advanceRent: { required: true, min: 0, max: 12 },
+  operatingHours: COMMON_VALIDATIONS.REQUIRED,
+  businessPreferences: { required: true },
+  
+  // Commercial features fields
+  lift: COMMON_VALIDATIONS.REQUIRED,
+  parkingType: COMMON_VALIDATIONS.REQUIRED,
+  washroomType: COMMON_VALIDATIONS.REQUIRED,
+  propertyCondition: COMMON_VALIDATIONS.REQUIRED,
+  
+  // Commercial sale fields  
+  ownershipType: COMMON_VALIDATIONS.REQUIRED,
+  
+  // ✅ ADDED: PG/Hostel room details fields
+  roomType: COMMON_VALIDATIONS.REQUIRED,
+  roomCapacity: { required: true, min: 1 },
+  expectedRent: { required: true, min: 1000 },
+  expectedDeposit: { required: true, min: 0 },
+  bathroomType: COMMON_VALIDATIONS.REQUIRED,
+  roomSize: { required: true, min: 50 },
+  mealOption: COMMON_VALIDATIONS.REQUIRED,
+  roomFeatures: { required: false }, // Room features are optional
+  
+  // Amenities fields
+  propertyShowOption: COMMON_VALIDATIONS.REQUIRED,
+  amenities: { required: true },
   
   // Coordinates
   latitude: COMMON_VALIDATIONS.REQUIRED,
@@ -169,7 +208,7 @@ export const validateField = (fieldName: string, value: any, formData?: any): st
   return null;
 };
 
-// Get user-friendly field label
+// Get user-friendly field label - UPDATED: Added commercial and PG field labels
 const getFieldLabel = (fieldName: string): string => {
   const labels: Record<string, string> = {
     address: 'Address',
@@ -187,13 +226,53 @@ const getFieldLabel = (fieldName: string): string => {
     bathrooms: 'Bathrooms',
     latitude: 'Latitude',
     longitude: 'Longitude',
-    // FIXED: Added sale details field labels
+    
+    // Sale details field labels
     expectedPrice: 'Expected Price',
     maintenanceCost: 'Maintenance Cost',
     kitchenType: 'Kitchen Type',
     availableFrom: 'Available From',
     furnishing: 'Furnishing',
-    parking: 'Parking'
+    parking: 'Parking',
+    
+    // Commercial property field labels
+    commercialPropertyType: 'Commercial Property Type',
+    rentAmount: 'Rent Amount',
+    securityDeposit: 'Security Deposit',
+    leaseDuration: 'Lease Duration',
+    maintenance: 'Maintenance',
+    powerBackup: 'Power Backup',
+    lockInPeriod: 'Lock-in Period',
+    
+    // Commercial rental field labels
+    rentalType: 'Rental Type',
+    camCharges: 'CAM Charges',
+    advanceRent: 'Advance Rent',
+    operatingHours: 'Operating Hours',
+    businessPreferences: 'Business Preferences',
+    
+    // Commercial features field labels
+    lift: 'Lift/Elevator',
+    parkingType: 'Parking Type',
+    washroomType: 'Washroom Type',
+    propertyCondition: 'Property Condition',
+    
+    // Commercial sale field labels
+    ownershipType: 'Ownership Type',
+    
+    // ✅ ADDED: PG/Hostel room details field labels
+    roomType: 'Room Type',
+    roomCapacity: 'Room Capacity',
+    expectedRent: 'Expected Rent',
+    expectedDeposit: 'Expected Deposit',
+    bathroomType: 'Bathroom Type',
+    roomSize: 'Room Size',
+    mealOption: 'Meal Option',
+    roomFeatures: 'Room Features',
+    
+    // Amenities field labels
+    propertyShowOption: 'Who Shows Property',
+    amenities: 'Amenities'
   };
   return labels[fieldName] || fieldName.charAt(0).toUpperCase() + fieldName.slice(1);
 };
@@ -223,32 +302,47 @@ export const validateStep = (stepId: string, formData: any): { isValid: boolean;
   };
 };
 
-// Get required fields for step - FIXED: Added sale details step fields
+// Get required fields for step - UPDATED: Added commercial and PG step fields
 const getRequiredFieldsForStep = (stepId: string): string[] => {
   const stepFieldMap: Record<string, string[]> = {
     // Residential rent
     'res_rent_basic_details': ['propertyType', 'bhkType', 'floor', 'totalFloors', 'propertyAge', 'facing', 'builtUpArea', 'bathrooms'],
     'res_rent_location': ['address', 'city', 'state', 'pinCode', 'locality'],
+    'res_rent_features': ['bathrooms', 'propertyShowOption', 'propertyCondition', 'amenities'],
     
     // Residential sale
     'res_sale_basic_details': ['propertyType', 'bhkType', 'floor', 'totalFloors', 'propertyAge', 'facing', 'builtUpArea', 'bathrooms'],
     'res_sale_location': ['address', 'city', 'state', 'pinCode', 'locality'],
-    // FIXED: Added all required fields for sale details step
     'res_sale_sale_details': ['expectedPrice', 'maintenanceCost', 'kitchenType', 'availableFrom', 'furnishing', 'parking'],
+    'res_sale_features': ['bathrooms', 'propertyShowOption', 'propertyCondition', 'amenities'],
+    
+    // ✅ ADDED: PG/Hostel steps
+    'res_pg_basic_details': ['roomType', 'roomCapacity', 'expectedRent', 'expectedDeposit', 'bathroomType', 'roomSize', 'mealOption'],
+    'res_pg_location': ['address', 'city', 'state', 'pinCode', 'locality'],
+    'res_pg_pg_details': ['monthlyRent', 'securityDeposit', 'mealOption'],
+    'res_pg_features': ['propertyShowOption', 'propertyCondition', 'amenities'],
     
     // Commercial rent
-    'com_rent_basic_details': ['propertyType', 'floor', 'totalFloors', 'propertyAge', 'builtUpArea'],
+    'com_rent_basic_details': ['commercialPropertyType', 'builtUpArea', 'rentAmount', 'securityDeposit', 'leaseDuration', 'maintenance', 'furnishing', 'parking', 'powerBackup', 'lockInPeriod', 'availableFrom'],
     'com_rent_location': ['address', 'city', 'state', 'pinCode', 'locality'],
+    'com_rent_rental': ['rentalType', 'rentAmount', 'securityDeposit', 'advanceRent', 'maintenance', 'camCharges', 'availableFrom', 'parking', 'operatingHours', 'businessPreferences'],
+    'com_rent_features': ['powerBackup', 'lift', 'parkingType', 'washroomType', 'propertyCondition'],
     
     // Commercial sale
-    'com_sale_basic_details': ['propertyType', 'floor', 'totalFloors', 'propertyAge', 'builtUpArea'],
+    'com_sale_basic_details': ['commercialPropertyType', 'builtUpArea', 'floor', 'totalFloors', 'propertyAge'],
     'com_sale_location': ['address', 'city', 'state', 'pinCode', 'locality'],
-    // FIXED: Added commercial sale details step
-    'com_sale_sale_details': ['expectedPrice', 'maintenanceCost', 'kitchenType', 'availableFrom', 'furnishing', 'parking'],
+    'com_sale_sale_details': ['expectedPrice', 'ownershipType', 'availableFrom'],
+    'com_sale_features': ['powerBackup', 'lift', 'parkingType', 'washroomType', 'propertyCondition'],
+    
+    // Commercial coworking
+    'com_cow_basic_details': ['propertyType', 'spaceType', 'capacity'],
+    'com_cow_location': ['address', 'city', 'state', 'pinCode', 'locality'],
+    'com_cow_features': ['propertyShowOption', 'propertyCondition', 'amenities'],
     
     // Land sale
     'land_sale_basic_details': ['propertyType', 'builtUpArea'],
     'land_sale_location': ['address', 'city', 'state', 'pinCode'],
+    'land_sale_land_features': ['expectedPrice'],
     
     // Default fallback
     'default': ['propertyType', 'address', 'city', 'state']
@@ -275,7 +369,7 @@ export const getStepValidationConfig = (flowType: string, stepId: string): StepV
   };
 };
 
-// Get field type
+// Get field type - UPDATED: Added commercial and PG field types
 const getFieldType = (fieldName: string): FieldConfig['type'] => {
   const typeMap: Record<string, FieldConfig['type']> = {
     address: 'textarea',
@@ -287,34 +381,83 @@ const getFieldType = (fieldName: string): FieldConfig['type'] => {
     totalFloors: 'number',
     bathrooms: 'number',
     builtUpArea: 'number',
-    // FIXED: Added sale details field types
+    
+    // Sale details field types
     expectedPrice: 'number',
     maintenanceCost: 'number',
     kitchenType: 'select',
     availableFrom: 'date',
     furnishing: 'select',
-    parking: 'select'
+    parking: 'select',
+    
+    // Commercial field types
+    commercialPropertyType: 'select',
+    rentAmount: 'number',
+    securityDeposit: 'number',
+    leaseDuration: 'select',
+    maintenance: 'select',
+    powerBackup: 'select',
+    lockInPeriod: 'number',
+    rentalType: 'select',
+    camCharges: 'number',
+    advanceRent: 'number',
+    operatingHours: 'select',
+    businessPreferences: 'checkbox',
+    lift: 'select',
+    parkingType: 'select',
+    washroomType: 'select',
+    propertyCondition: 'select',
+    ownershipType: 'radio',
+    
+    // ✅ ADDED: PG/Hostel field types
+    roomType: 'select',
+    roomCapacity: 'number',
+    expectedRent: 'number',
+    expectedDeposit: 'number',
+    bathroomType: 'select',
+    roomSize: 'number',
+    mealOption: 'select',
+    roomFeatures: 'checkbox',
+    
+    propertyShowOption: 'select',
+    amenities: 'checkbox'
   };
   return typeMap[fieldName] || 'text';
 };
 
-// Get step name
+// Get step name - UPDATED: Added commercial and PG step names
 const getStepName = (stepId: string): string => {
   const nameMap: Record<string, string> = {
     'res_rent_basic_details': 'Property Details',
     'res_rent_location': 'Location Details',
+    'res_rent_features': 'Amenities & Features',
     'res_sale_basic_details': 'Property Details',
     'res_sale_location': 'Location Details',
-    // FIXED: Added sale details step name
     'res_sale_sale_details': 'Sale Details',
+    'res_sale_features': 'Amenities & Features',
+    
+    // ✅ ADDED: PG/Hostel step names
+    'res_pg_basic_details': 'Room Details',
+    'res_pg_location': 'Location Details',
+    'res_pg_pg_details': 'PG Details',
+    'res_pg_features': 'Amenities & Features',
+    
+    // Commercial step names
     'com_rent_basic_details': 'Commercial Details',
     'com_rent_location': 'Location Details',
+    'com_rent_rental': 'Rental Details',
+    'com_rent_features': 'Commercial Features',
     'com_sale_basic_details': 'Commercial Details',
     'com_sale_location': 'Location Details',
-    // FIXED: Added commercial sale details step name
     'com_sale_sale_details': 'Sale Details',
+    'com_sale_features': 'Commercial Features',
+    'com_cow_basic_details': 'Coworking Details',
+    'com_cow_location': 'Location Details',
+    'com_cow_features': 'Coworking Features',
+    
     'land_sale_basic_details': 'Land Details',
-    'land_sale_location': 'Location Details'
+    'land_sale_location': 'Location Details',
+    'land_sale_land_features': 'Land Features'
   };
   return nameMap[stepId] || 'Step Details';
 };

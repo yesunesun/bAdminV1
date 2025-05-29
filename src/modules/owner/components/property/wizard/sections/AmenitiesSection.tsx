@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/AmenitiesSection.tsx
-// Version: 3.0.0
-// Last Modified: 29-05-2025 18:45 IST
-// Purpose: Enhanced with comprehensive field validation system for amenities
+// Version: 4.0.0
+// Last Modified: 31-05-2025 12:00 IST
+// Purpose: Enhanced with Indian phone number validation and UI for alternate contact
 
 import React, { useCallback, useState, useEffect } from 'react';
 import { FormSection } from '@/components/FormSection';
@@ -9,8 +9,10 @@ import { ValidatedInput } from '@/components/ui/ValidatedInput';
 import { ValidatedSelect } from '@/components/ui/ValidatedSelect';
 import { FormFieldLabel } from '@/components/ui/RequiredLabel';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
 import { FormSectionProps } from '../types';
 import { useStepValidation } from '../hooks/useStepValidation';
+import { cn } from '@/lib/utils';
 import {
   Minus,
   Plus,
@@ -35,7 +37,9 @@ import {
   Store,
   Lock,
   PlaySquare,
-  Gamepad
+  Gamepad,
+  CheckCircle,
+  XCircle
 } from 'lucide-react';
 
 import { 
@@ -43,6 +47,11 @@ import {
   PROPERTY_SHOW_OPTIONS, 
   PROPERTY_CONDITION_OPTIONS 
 } from '../constants';
+
+// India Flag Component - Using Unicode flag emoji
+const IndiaFlag = () => (
+  <span className="text-lg" role="img" aria-label="India flag">🇮🇳</span>
+);
 
 export function AmenitiesSection({ form, stepId = 'res_rent_features' }: FormSectionProps) {
   // Initialize validation system
@@ -104,6 +113,13 @@ export function AmenitiesSection({ form, stepId = 'res_rent_features' }: FormSec
     secondaryNumber: getField('secondaryNumber', ''),
     hasSimilarUnits: getField('hasSimilarUnits', false),
     amenities: getField('amenities', [])
+  });
+
+  // Phone number validation state
+  const [phoneValidation, setPhoneValidation] = useState({
+    isValid: false,
+    error: '',
+    isTouched: false
   });
 
   // Initialize steps structure and migrate data
@@ -168,12 +184,60 @@ export function AmenitiesSection({ form, stepId = 'res_rent_features' }: FormSec
     updateFormAndState(type, newValue.toString());
   }, [values, updateFormAndState]);
 
-  // Handle phone number input
+  // ✅ ENHANCED: Indian phone number validation
+  const validateIndianPhone = useCallback((value: string) => {
+    // Remove all non-digits
+    const digits = value.replace(/\D/g, '');
+    
+    if (digits.length === 0) {
+      return { isValid: true, error: '' }; // Empty is valid (optional field)
+    }
+    
+    if (digits.length < 10) {
+      return { isValid: false, error: `Phone number must be exactly 10 digits (${digits.length}/10)` };
+    }
+    
+    if (digits.length > 10) {
+      return { isValid: false, error: 'Phone number cannot exceed 10 digits' };
+    }
+    
+    // Check for valid Indian mobile number patterns
+    const firstDigit = digits.charAt(0);
+    if (!['6', '7', '8', '9'].includes(firstDigit)) {
+      return { isValid: false, error: 'Indian mobile numbers start with 6, 7, 8, or 9' };
+    }
+    
+    return { isValid: true, error: '' };
+  }, []);
+
+  // ✅ ENHANCED: Handle phone number input with strict validation
   const handlePhoneInput = useCallback((value: string) => {
-    // Remove non-digits and limit to 10 digits
-    const numericValue = value.replace(/\D/g, '').slice(0, 10);
-    updateFormAndState('secondaryNumber', numericValue);
-  }, [updateFormAndState]);
+    // Remove all non-digits
+    const numericValue = value.replace(/\D/g, '');
+    
+    // Limit to exactly 10 digits
+    const limitedValue = numericValue.slice(0, 10);
+    
+    // Validate the phone number
+    const validation = validateIndianPhone(limitedValue);
+    
+    setPhoneValidation({
+      isValid: validation.isValid,
+      error: validation.error,
+      isTouched: true
+    });
+    
+    updateFormAndState('secondaryNumber', limitedValue);
+  }, [updateFormAndState, validateIndianPhone]);
+
+  // ✅ ENHANCED: Format phone number for display
+  const formatPhoneDisplay = useCallback((value: string) => {
+    const digits = value.replace(/\D/g, '');
+    if (digits.length === 0) return '';
+    if (digits.length <= 5) return digits;
+    if (digits.length <= 10) return `${digits.slice(0, 5)} ${digits.slice(5)}`;
+    return `${digits.slice(0, 5)} ${digits.slice(5, 10)}`;
+  }, []);
 
   // Handle amenities selection
   const handleAmenityToggle = useCallback((amenity: string, checked: boolean) => {
@@ -231,18 +295,18 @@ export function AmenitiesSection({ form, stepId = 'res_rent_features' }: FormSec
     >
       {/* Validation Progress */}
       {requiredFields.length > 0 && (
-        <div className="mb-6 p-3 bg-blue-50 rounded-lg border border-blue-200">
+        <div className="mb-6 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-blue-900">
+            <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
               Step Completion: {completionPercentage}%
             </span>
-            <span className="text-xs text-blue-700">
+            <span className="text-xs text-blue-700 dark:text-blue-300">
               {stepIsValid ? '✓ Ready to proceed' : 'Please complete required fields'}
             </span>
           </div>
-          <div className="w-full bg-blue-200 rounded-full h-2">
+          <div className="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-2">
             <div 
-              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+              className="bg-blue-600 dark:bg-blue-400 h-2 rounded-full transition-all duration-300"
               style={{ width: `${completionPercentage}%` }}
             />
           </div>
@@ -264,22 +328,22 @@ export function AmenitiesSection({ form, stepId = 'res_rent_features' }: FormSec
             >
               Bathrooms
             </FormFieldLabel>
-            <div className="flex h-12 rounded-lg overflow-hidden border border-gray-200 mt-2">
+            <div className="flex h-12 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 mt-2">
               <button
                 type="button"
                 onClick={() => handleNumberChange('bathrooms', 'decrement')}
                 disabled={parseInt(values.bathrooms) <= 0}
-                className="w-12 flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-12 flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Minus className="h-4 w-4" />
               </button>
-              <div className="flex-1 flex items-center justify-center border-x bg-white">
+              <div className="flex-1 flex items-center justify-center border-x bg-white dark:bg-gray-900">
                 <span className="text-lg font-medium">{values.bathrooms}</span>
               </div>
               <button
                 type="button"
                 onClick={() => handleNumberChange('bathrooms', 'increment')}
-                className="w-12 flex items-center justify-center text-gray-600 hover:bg-gray-50"
+                className="w-12 flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
               >
                 <Plus className="h-4 w-4" />
               </button>
@@ -298,22 +362,22 @@ export function AmenitiesSection({ form, stepId = 'res_rent_features' }: FormSec
             >
               Balconies
             </FormFieldLabel>
-            <div className="flex h-12 rounded-lg overflow-hidden border border-gray-200 mt-2">
+            <div className="flex h-12 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 mt-2">
               <button
                 type="button"
                 onClick={() => handleNumberChange('balconies', 'decrement')}
                 disabled={parseInt(values.balconies) <= 0}
-                className="w-12 flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-12 flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Minus className="h-4 w-4" />
               </button>
-              <div className="flex-1 flex items-center justify-center border-x bg-white">
+              <div className="flex-1 flex items-center justify-center border-x bg-white dark:bg-gray-900">
                 <span className="text-lg font-medium">{values.balconies}</span>
               </div>
               <button
                 type="button"
                 onClick={() => handleNumberChange('balconies', 'increment')}
-                className="w-12 flex items-center justify-center text-gray-600 hover:bg-gray-50"
+                className="w-12 flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
               >
                 <Plus className="h-4 w-4" />
               </button>
@@ -326,7 +390,7 @@ export function AmenitiesSection({ form, stepId = 'res_rent_features' }: FormSec
           {quickAmenities.map(({ id, label, icon: Icon }) => (
             <div
               key={id}
-              className="flex items-center gap-3 p-4 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 transition-colors"
+              className="flex items-center gap-3 p-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
             >
               <Checkbox
                 id={id}
@@ -335,9 +399,9 @@ export function AmenitiesSection({ form, stepId = 'res_rent_features' }: FormSec
               />
               <label
                 htmlFor={id}
-                className="flex items-center gap-2 text-gray-700 cursor-pointer"
+                className="flex items-center gap-2 text-gray-700 dark:text-gray-300 cursor-pointer"
               >
-                <Icon className="h-5 w-5 text-gray-500" />
+                <Icon className="h-5 w-5 text-gray-500 dark:text-gray-400" />
                 <span className="font-medium">{label}</span>
               </label>
             </div>
@@ -379,49 +443,76 @@ export function AmenitiesSection({ form, stepId = 'res_rent_features' }: FormSec
           />
         </div>
 
-        {/* Alternate Contact */}
+        {/* ✅ ENHANCED: Alternate Contact with Indian Phone Validation */}
         <div>
           <FormFieldLabel
             fieldName="secondaryNumber"
             required={false}
-            isValid={getFieldValidation('secondaryNumber').isValid}
-            isTouched={getFieldValidation('secondaryNumber').isTouched}
-            error={shouldShowFieldError('secondaryNumber') ? getFieldValidation('secondaryNumber').error : null}
-            helperText="Optional backup contact number"
+            isValid={phoneValidation.isValid || !phoneValidation.isTouched}
+            isTouched={phoneValidation.isTouched}
+            error={phoneValidation.isTouched && phoneValidation.error ? phoneValidation.error : null}
+            helperText="Optional backup contact number (Indian mobile only)"
             size="lg"
           >
             Alternate Contact
           </FormFieldLabel>
+          
           <div className="relative mt-2">
-            <span className="absolute left-3 inset-y-0 flex items-center text-gray-400">
-              <Phone className="h-4 w-4" />
-            </span>
-            <span className="absolute left-9 inset-y-0 flex items-center text-gray-400">
-              +91
-            </span>
-            <ValidatedInput
-              form={form}
-              name="secondaryNumber"
-              label=""
+            {/* Country Code Prefix */}
+            <div className="absolute left-3 inset-y-0 flex items-center gap-2 pointer-events-none">
+              <IndiaFlag />
+              <span className="text-sm font-medium text-gray-600 dark:text-gray-400">+91</span>
+            </div>
+            
+            {/* Validation Icon */}
+            <div className="absolute right-3 inset-y-0 flex items-center pointer-events-none">
+              {phoneValidation.isTouched && values.secondaryNumber && (
+                phoneValidation.isValid ? (
+                  <CheckCircle className="h-5 w-5 text-green-500" />
+                ) : (
+                  <XCircle className="h-5 w-5 text-red-500" />
+                )
+              )}
+            </div>
+            
+            <Input
               type="tel"
-              placeholder="Additional contact number"
-              value={values.secondaryNumber}
-              required={false}
-              error={shouldShowFieldError('secondaryNumber') ? getFieldValidation('secondaryNumber').error : null}
-              isValid={getFieldValidation('secondaryNumber').isValid}
-              isTouched={getFieldValidation('secondaryNumber').isTouched}
-              onValidation={(field, value) => handlePhoneInput(value)}
+              placeholder="Enter 10-digit mobile number"
+              value={formatPhoneDisplay(values.secondaryNumber)}
               onChange={(e) => handlePhoneInput(e.target.value)}
-              maxLength={10}
-              className="h-12 pl-16"
-              containerClassName="mb-0"
-              size="lg"
+              maxLength={11} // Allow for spacing in display
+              className={cn(
+                "h-12 pl-20 pr-12 text-lg tracking-wider",
+                phoneValidation.isTouched && !phoneValidation.isValid && values.secondaryNumber && "border-red-500 focus-visible:ring-red-500",
+                phoneValidation.isTouched && phoneValidation.isValid && values.secondaryNumber && "border-green-500 focus-visible:ring-green-500"
+              )}
             />
           </div>
+          
+          {/* Phone Number Info */}
+          <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+            <div className="flex items-center gap-2">
+              <Phone className="h-3 w-3" />
+              <span>
+                {values.secondaryNumber 
+                  ? `${values.secondaryNumber.length}/10 digits` 
+                  : 'Indian mobile numbers only (6/7/8/9 starting digits)'
+                }
+              </span>
+            </div>
+          </div>
+          
+          {/* Success Message */}
+          {phoneValidation.isTouched && phoneValidation.isValid && values.secondaryNumber && values.secondaryNumber.length === 10 && (
+            <div className="mt-2 flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
+              <CheckCircle className="h-4 w-4" />
+              <span>Valid Indian mobile number</span>
+            </div>
+          )}
         </div>
 
         {/* Similar Units */}
-        <div className="flex items-center gap-3 p-4 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 transition-colors">
+        <div className="flex items-center gap-3 p-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
           <Checkbox
             id="hasSimilarUnits"
             checked={values.hasSimilarUnits}
@@ -429,7 +520,7 @@ export function AmenitiesSection({ form, stepId = 'res_rent_features' }: FormSec
           />
           <label
             htmlFor="hasSimilarUnits"
-            className="text-gray-700 cursor-pointer font-medium"
+            className="text-gray-700 dark:text-gray-300 cursor-pointer font-medium"
           >
             Have similar units available?
           </label>
@@ -459,8 +550,8 @@ export function AmenitiesSection({ form, stepId = 'res_rent_features' }: FormSec
                   key={amenity}
                   className={`flex items-center gap-3 p-3 rounded-lg border transition-colors cursor-pointer ${
                     isSelected 
-                      ? 'border-blue-300 bg-blue-50 hover:bg-blue-100' 
-                      : 'border-gray-200 bg-white hover:bg-gray-50'
+                      ? 'border-blue-300 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30' 
+                      : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800'
                   }`}
                   onClick={() => handleAmenityToggle(amenity, !isSelected)}
                 >
@@ -471,9 +562,9 @@ export function AmenitiesSection({ form, stepId = 'res_rent_features' }: FormSec
                   />
                   <label
                     htmlFor={`amenity-${amenity}`}
-                    className="flex items-center gap-2 text-gray-700 cursor-pointer flex-1"
+                    className="flex items-center gap-2 text-gray-700 dark:text-gray-300 cursor-pointer flex-1"
                   >
-                    {Icon && <Icon className="h-4 w-4 text-gray-500" />}
+                    {Icon && <Icon className="h-4 w-4 text-gray-500 dark:text-gray-400" />}
                     <span className="text-sm font-medium">{amenity}</span>
                   </label>
                 </div>
@@ -484,15 +575,15 @@ export function AmenitiesSection({ form, stepId = 'res_rent_features' }: FormSec
 
         {/* Summary of Selected Amenities */}
         {values.amenities && values.amenities.length > 0 && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-            <h4 className="text-sm font-medium text-green-900 mb-2">
+          <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+            <h4 className="text-sm font-medium text-green-900 dark:text-green-100 mb-2">
               Selected Amenities ({values.amenities.length})
             </h4>
             <div className="flex flex-wrap gap-2">
               {values.amenities.map((amenity: string) => (
                 <span
                   key={amenity}
-                  className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800"
+                  className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-100"
                 >
                   {amenity}
                 </span>

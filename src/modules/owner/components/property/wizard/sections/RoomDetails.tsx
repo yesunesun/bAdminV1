@@ -1,9 +1,9 @@
 // src/modules/owner/components/property/wizard/sections/RoomDetails.tsx
-// Version: 2.4.0
-// Last Modified: 26-05-2025 11:30 IST
-// Purpose: Fixed data duplication issue - only save to step location, not root
+// Version: 4.0.0
+// Last Modified: 31-05-2025 12:15 IST
+// Purpose: Added mandatory field asterisk indicators for all required fields
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import { FormData, FormSectionProps } from '../types';
 import { ROOM_TYPES, BATHROOM_TYPES, MEAL_OPTIONS, PG_AMENITIES_LIST } from '../constants/pgDetails';
 import { FormSection } from '@/components/FormSection';
@@ -23,6 +23,8 @@ import {
 } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 import { FLOW_TYPES } from '../constants/flows';
+// ✅ ADDED: Import validation hook
+import { useStepValidation } from '../hooks/useStepValidation';
 
 const RoomDetails: React.FC<FormSectionProps> = ({ 
   form,
@@ -40,11 +42,37 @@ const RoomDetails: React.FC<FormSectionProps> = ({
   
   // Default to pg step id if we detect PG flow, otherwise use provided stepId or fallback
   const actualStepId = isPGFlow ? 'res_pg_basic_details' : (stepId || 'res_rent_basic_details');
+  const effectiveStepId = actualStepId;
   
   console.log(`Room Details using step ID: ${actualStepId} for flow type: ${flowType}`);
   
+  // ✅ ADDED: Initialize validation system
+  const {
+    validateField,
+    getFieldValidation,
+    shouldShowFieldError,
+    markFieldAsTouched,
+    isValid: stepIsValid,
+    completionPercentage,
+    requiredFields
+  } = useStepValidation({
+    form,
+    flowType: flowType || 'residential_pghostel',
+    currentStepId: effectiveStepId || 'res_pg_basic_details'
+  });
+  
   // Create path helper to ensure we register fields in the correct step
   const getFieldPath = (field: string) => `steps.${actualStepId}.${field}`;
+  
+  // ✅ ADDED: Enhanced field update with validation
+  const updateFormAndState = useCallback((field: string, value: any) => {
+    // Set the field value
+    setValue(getFieldPath(field), value, { shouldValidate: true });
+    
+    // ✅ NEW: Mark field as touched and validate
+    markFieldAsTouched(field);
+    validateField(field);
+  }, [setValue, markFieldAsTouched, validateField, actualStepId]);
   
   // Direct register for numeric fields to ensure they work properly
   const registerNumericField = (field: string, options = {}) => {
@@ -55,7 +83,7 @@ const RoomDetails: React.FC<FormSectionProps> = ({
       }),
       onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
         const value = e.target.value === '' ? null : Number(e.target.value);
-        setValue(getFieldPath(field), value, { shouldValidate: true });
+        updateFormAndState(field, value);
       }
     };
   };
@@ -76,7 +104,7 @@ const RoomDetails: React.FC<FormSectionProps> = ({
   // Helper to set values ONLY in the correct step path (no more dual registration)
   const setStepValue = (field: string, value: any, options?: any) => {
     // Only set in the proper step location
-    setValue(getFieldPath(field), value, options);
+    updateFormAndState(field, value);
   };
 
   // Get array values (for checkboxes)
@@ -92,7 +120,7 @@ const RoomDetails: React.FC<FormSectionProps> = ({
       ? currentValues.filter(v => v !== value)
       : [...currentValues, value];
     
-    setStepValue(field, newValues, { shouldValidate: true });
+    updateFormAndState(field, newValues);
   };
 
   // When component mounts, migrate any root level fields to step location ONCE
@@ -111,7 +139,7 @@ const RoomDetails: React.FC<FormSectionProps> = ({
       if (rootValue !== undefined && rootValue !== null && rootValue !== '' && 
           (stepValue === undefined || stepValue === null || stepValue === '')) {
         console.log(`Migrating field ${field} from root to step ${actualStepId}`, rootValue);
-        setStepValue(field, rootValue);
+        setValue(getFieldPath(field), rootValue);
         
         // Clear the root level value to prevent duplication
         setValue(field, undefined);
@@ -138,13 +166,33 @@ const RoomDetails: React.FC<FormSectionProps> = ({
       title="Room Details"
       description="Provide details about your PG/Hostel rooms"
     >
+      {/* ✅ ADDED: Progress indicator (like LocationDetails and SaleDetails) */}
+      {requiredFields.length > 0 && (
+        <div className="mb-6 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
+              Step Completion: {completionPercentage}%
+            </span>
+            <span className="text-xs text-blue-700 dark:text-blue-300">
+              {stepIsValid ? '✓ Ready to proceed' : 'Please complete required fields'}
+            </span>
+          </div>
+          <div className="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-2">
+            <div 
+              className="bg-blue-600 dark:bg-blue-400 h-2 rounded-full transition-all duration-300"
+              style={{ width: `${completionPercentage}%` }}
+            />
+          </div>
+        </div>
+      )}
+      
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-        {/* Room Type */}
+        {/* Room Type - MANDATORY */}
         <div className="space-y-2">
-          <RequiredLabel htmlFor={getFieldPath("roomType")}>Room Type</RequiredLabel>
+          <RequiredLabel htmlFor={getFieldPath("roomType")}>Room Type *</RequiredLabel>
           <Select
             value={getValue('roomType') || ''}
-            onValueChange={(value) => setStepValue('roomType', value, { shouldValidate: true })}
+            onValueChange={(value) => updateFormAndState('roomType', value)}
           >
             <SelectTrigger 
               id={getFieldPath("roomType")}
@@ -161,6 +209,12 @@ const RoomDetails: React.FC<FormSectionProps> = ({
               ))}
             </SelectContent>
           </Select>
+          {/* ✅ ADDED: Error messages below required fields */}
+          {shouldShowFieldError('roomType') && (
+            <p className="text-sm text-red-600 mt-0.5">
+              {getFieldValidation('roomType').error}
+            </p>
+          )}
           {errors.steps?.[actualStepId]?.roomType && (
             <p className="text-sm text-destructive mt-1">
               {errors.steps?.[actualStepId]?.roomType?.message as string}
@@ -168,9 +222,9 @@ const RoomDetails: React.FC<FormSectionProps> = ({
           )}
         </div>
 
-        {/* Total Capacity */}
+        {/* Total Capacity - MANDATORY */}
         <div className="space-y-2">
-          <RequiredLabel htmlFor={getFieldPath("roomCapacity")}>Total Capacity (per room)</RequiredLabel>
+          <RequiredLabel htmlFor={getFieldPath("roomCapacity")}>Total Capacity (per room) *</RequiredLabel>
           <Input
             id={getFieldPath("roomCapacity")}
             type="number"
@@ -183,6 +237,12 @@ const RoomDetails: React.FC<FormSectionProps> = ({
               errors.steps?.[actualStepId]?.roomCapacity && "border-destructive focus-visible:ring-destructive"
             )}
           />
+          {/* ✅ ADDED: Error messages below required fields */}
+          {shouldShowFieldError('roomCapacity') && (
+            <p className="text-sm text-red-600 mt-0.5">
+              {getFieldValidation('roomCapacity').error}
+            </p>
+          )}
           {errors.steps?.[actualStepId]?.roomCapacity && (
             <p className="text-sm text-destructive mt-1">
               {errors.steps?.[actualStepId]?.roomCapacity?.message as string}
@@ -192,9 +252,9 @@ const RoomDetails: React.FC<FormSectionProps> = ({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-        {/* Expected Rent */}
+        {/* Expected Rent - MANDATORY */}
         <div className="space-y-2">
-          <RequiredLabel htmlFor={getFieldPath("expectedRent")}>Expected Rent (₹/month)</RequiredLabel>
+          <RequiredLabel htmlFor={getFieldPath("expectedRent")}>Expected Rent (₹/month) *</RequiredLabel>
           <Input
             id={getFieldPath("expectedRent")}
             type="number"
@@ -207,6 +267,12 @@ const RoomDetails: React.FC<FormSectionProps> = ({
               errors.steps?.[actualStepId]?.expectedRent && "border-destructive focus-visible:ring-destructive"
             )}
           />
+          {/* ✅ ADDED: Error messages below required fields */}
+          {shouldShowFieldError('expectedRent') && (
+            <p className="text-sm text-red-600 mt-0.5">
+              {getFieldValidation('expectedRent').error}
+            </p>
+          )}
           {errors.steps?.[actualStepId]?.expectedRent && (
             <p className="text-sm text-destructive mt-1">
               {errors.steps?.[actualStepId]?.expectedRent?.message as string}
@@ -214,9 +280,9 @@ const RoomDetails: React.FC<FormSectionProps> = ({
           )}
         </div>
 
-        {/* Expected Deposit */}
+        {/* Expected Deposit - MANDATORY */}
         <div className="space-y-2">
-          <RequiredLabel htmlFor={getFieldPath("expectedDeposit")}>Expected Deposit (₹)</RequiredLabel>
+          <RequiredLabel htmlFor={getFieldPath("expectedDeposit")}>Expected Deposit (₹) *</RequiredLabel>
           <Input
             id={getFieldPath("expectedDeposit")}
             type="number"
@@ -229,6 +295,12 @@ const RoomDetails: React.FC<FormSectionProps> = ({
               errors.steps?.[actualStepId]?.expectedDeposit && "border-destructive focus-visible:ring-destructive"
             )}
           />
+          {/* ✅ ADDED: Error messages below required fields */}
+          {shouldShowFieldError('expectedDeposit') && (
+            <p className="text-sm text-red-600 mt-0.5">
+              {getFieldValidation('expectedDeposit').error}
+            </p>
+          )}
           {errors.steps?.[actualStepId]?.expectedDeposit && (
             <p className="text-sm text-destructive mt-1">
               {errors.steps?.[actualStepId]?.expectedDeposit?.message as string}
@@ -238,12 +310,12 @@ const RoomDetails: React.FC<FormSectionProps> = ({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-        {/* Bathroom Type */}
+        {/* Bathroom Type - MANDATORY */}
         <div className="space-y-2">
-          <RequiredLabel htmlFor={getFieldPath("bathroomType")}>Bathroom Type</RequiredLabel>
+          <RequiredLabel htmlFor={getFieldPath("bathroomType")}>Bathroom Type *</RequiredLabel>
           <Select
             value={getValue('bathroomType') || ''}
-            onValueChange={(value) => setStepValue('bathroomType', value, { shouldValidate: true })}
+            onValueChange={(value) => updateFormAndState('bathroomType', value)}
           >
             <SelectTrigger 
               id={getFieldPath("bathroomType")}
@@ -260,6 +332,12 @@ const RoomDetails: React.FC<FormSectionProps> = ({
               ))}
             </SelectContent>
           </Select>
+          {/* ✅ ADDED: Error messages below required fields */}
+          {shouldShowFieldError('bathroomType') && (
+            <p className="text-sm text-red-600 mt-0.5">
+              {getFieldValidation('bathroomType').error}
+            </p>
+          )}
           {errors.steps?.[actualStepId]?.bathroomType && (
             <p className="text-sm text-destructive mt-1">
               {errors.steps?.[actualStepId]?.bathroomType?.message as string}
@@ -267,9 +345,9 @@ const RoomDetails: React.FC<FormSectionProps> = ({
           )}
         </div>
 
-        {/* Room Size */}
+        {/* Room Size - MANDATORY */}
         <div className="space-y-2">
-          <RequiredLabel htmlFor={getFieldPath("roomSize")}>Room Size (sqft)</RequiredLabel>
+          <RequiredLabel htmlFor={getFieldPath("roomSize")}>Room Size (sqft) *</RequiredLabel>
           <Input
             id={getFieldPath("roomSize")}
             type="number"
@@ -282,6 +360,12 @@ const RoomDetails: React.FC<FormSectionProps> = ({
               errors.steps?.[actualStepId]?.roomSize && "border-destructive focus-visible:ring-destructive"
             )}
           />
+          {/* ✅ ADDED: Error messages below required fields */}
+          {shouldShowFieldError('roomSize') && (
+            <p className="text-sm text-red-600 mt-0.5">
+              {getFieldValidation('roomSize').error}
+            </p>
+          )}
           {errors.steps?.[actualStepId]?.roomSize && (
             <p className="text-sm text-destructive mt-1">
               {errors.steps?.[actualStepId]?.roomSize?.message as string}
@@ -290,13 +374,13 @@ const RoomDetails: React.FC<FormSectionProps> = ({
         </div>
       </div>
 
-      {/* Meal Options - Added as a new field */}
+      {/* Meal Options - MANDATORY */}
       <div className="mb-6">
         <div className="space-y-2">
-          <RequiredLabel htmlFor={getFieldPath("mealOption")}>Meal Options</RequiredLabel>
+          <RequiredLabel htmlFor={getFieldPath("mealOption")}>Meal Options *</RequiredLabel>
           <Select
             value={getValue('mealOption') || ''}
-            onValueChange={(value) => setStepValue('mealOption', value, { shouldValidate: true })}
+            onValueChange={(value) => updateFormAndState('mealOption', value)}
           >
             <SelectTrigger 
               id={getFieldPath("mealOption")}
@@ -313,6 +397,12 @@ const RoomDetails: React.FC<FormSectionProps> = ({
               ))}
             </SelectContent>
           </Select>
+          {/* ✅ ADDED: Error messages below required fields */}
+          {shouldShowFieldError('mealOption') && (
+            <p className="text-sm text-red-600 mt-0.5">
+              {getFieldValidation('mealOption').error}
+            </p>
+          )}
           {errors.steps?.[actualStepId]?.mealOption && (
             <p className="text-sm text-destructive mt-1">
               {errors.steps?.[actualStepId]?.mealOption?.message as string}
@@ -321,9 +411,9 @@ const RoomDetails: React.FC<FormSectionProps> = ({
         </div>
       </div>
 
-      {/* Room Features section with checkboxes */}
+      {/* Room Features section with checkboxes - OPTIONAL */}
       <div className="mb-6">
-        <h3 className="text-base font-medium mb-4">Room Features</h3>
+        <h3 className="text-base font-medium mb-4">Room Features (Optional)</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
           {PG_AMENITIES_LIST.map(amenity => {
             const amenityId = `${getFieldPath("roomFeatures")}-${amenity}`;
@@ -349,6 +439,12 @@ const RoomDetails: React.FC<FormSectionProps> = ({
             );
           })}
         </div>
+        {/* ✅ ADDED: Error messages for room features if required */}
+        {shouldShowFieldError('roomFeatures') && (
+          <p className="text-sm text-red-600 mt-2">
+            {getFieldValidation('roomFeatures').error}
+          </p>
+        )}
       </div>
     </FormSection>
   );

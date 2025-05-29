@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/hooks/useStepValidation.ts
-// Version: 4.1.0
-// Last Modified: 30-05-2025 16:40 IST
-// Purpose: Fixed validation for sale details step - added all required fields
+// Version: 4.2.0
+// Last Modified: 30-05-2025 18:25 IST
+// Purpose: Added PG/Hostel room details step validation configuration
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { UseFormReturn } from 'react-hook-form';
@@ -38,14 +38,16 @@ export function useStepValidation({
     lastCheckedStep: ''
   });
   
-  // Get required fields for current step - FIXED: Added sale details fields
+  // Get required fields for current step - UPDATED: Added PG room details step
   const getRequiredFieldsForStep = useCallback((stepId: string): string[] => {
     const stepFieldMap: Record<string, string[]> = {
       // Basic details steps - all required fields as shown in UI
       'res_rent_basic_details': ['propertyType', 'bhkType', 'floor', 'totalFloors', 'propertyAge', 'facing', 'builtUpArea', 'bathrooms'],
       'res_sale_basic_details': ['propertyType', 'bhkType', 'floor', 'totalFloors', 'propertyAge', 'facing', 'builtUpArea', 'bathrooms'],
       'res_flat_basic_details': ['propertyType', 'bhkType', 'floor', 'totalFloors', 'propertyAge', 'facing', 'builtUpArea', 'bathrooms'],
-      'res_pg_basic_details': ['propertyType', 'bhkType', 'floor', 'totalFloors', 'propertyAge', 'facing', 'builtUpArea', 'bathrooms'],
+      
+      // ✅ ADDED: PG/Hostel room details step - all required fields from RoomDetails UI
+      'res_pg_basic_details': ['roomType', 'roomCapacity', 'expectedRent', 'expectedDeposit', 'bathroomType', 'roomSize', 'mealOption'],
       
       // Commercial basic details
       'com_rent_basic_details': ['propertyType', 'floor', 'totalFloors', 'propertyAge', 'builtUpArea'],
@@ -69,7 +71,7 @@ export function useStepValidation({
       'res_rent_rental': ['rentAmount', 'securityDeposit', 'availableFrom', 'furnishingStatus', 'preferredTenants'],
       'com_rent_rental': ['rentAmount', 'securityDeposit', 'availableFrom', 'furnishingStatus'],
       
-      // FIXED: Sale details steps - added ALL required fields as shown in UI
+      // Sale details steps - added ALL required fields as shown in UI
       'res_sale_sale_details': ['expectedPrice', 'maintenanceCost', 'kitchenType', 'availableFrom', 'furnishing', 'parking'],
       'com_sale_sale_details': ['expectedPrice', 'maintenanceCost', 'kitchenType', 'availableFrom', 'furnishing', 'parking'],
       
@@ -120,7 +122,7 @@ export function useStepValidation({
           
           // Enhanced validation for different field types
           if (Array.isArray(value)) {
-            // For arrays (like preferredTenants), check if it has at least one item
+            // For arrays (like preferredTenants, roomFeatures), check if it has at least one item
             return value.length > 0;
           } else if (typeof value === 'boolean') {
             // For booleans, consider them valid regardless of true/false
@@ -130,7 +132,7 @@ export function useStepValidation({
             return value.trim() !== '';
           } else if (typeof value === 'number') {
             // For numbers, check if not NaN and greater than 0 (except certain fields which can be 0)
-            if (fieldName === 'bathrooms' || fieldName === 'balconies' || fieldName === 'maintenanceCost') {
+            if (fieldName === 'bathrooms' || fieldName === 'balconies' || fieldName === 'maintenanceCost' || fieldName === 'expectedDeposit') {
               return !isNaN(value) && value >= 0;
             }
             return !isNaN(value) && value > 0;
@@ -157,7 +159,7 @@ export function useStepValidation({
           } else if (typeof rootValue === 'string') {
             return rootValue.trim() !== '';
           } else if (typeof rootValue === 'number') {
-            if (fieldName === 'bathrooms' || fieldName === 'balconies' || fieldName === 'maintenanceCost') {
+            if (fieldName === 'bathrooms' || fieldName === 'balconies' || fieldName === 'maintenanceCost' || fieldName === 'expectedDeposit') {
               return !isNaN(rootValue) && rootValue >= 0;
             }
             return !isNaN(rootValue) && rootValue > 0;
@@ -401,7 +403,7 @@ export function useStepValidation({
   };
 }
 
-// Helper function to get user-friendly field labels - FIXED: Added sale details labels
+// Helper function to get user-friendly field labels - UPDATED: Added PG room details labels
 function getFieldLabel(fieldName: string): string {
   const labels: Record<string, string> = {
     // Property Details fields
@@ -428,12 +430,22 @@ function getFieldLabel(fieldName: string): string {
     furnishingStatus: 'Furnishing Status',
     preferredTenants: 'Preferred Tenants',
     
-    // FIXED: Added sale details field labels
+    // Sale details field labels
     expectedPrice: 'Expected Price',
     maintenanceCost: 'Maintenance Cost',
     kitchenType: 'Kitchen Type',
     furnishing: 'Furnishing',
     parking: 'Parking',
+    
+    // ✅ ADDED: PG/Hostel room details field labels
+    roomType: 'Room Type',
+    roomCapacity: 'Room Capacity',
+    expectedRent: 'Expected Rent',
+    expectedDeposit: 'Expected Deposit',
+    bathroomType: 'Bathroom Type',
+    roomSize: 'Room Size',
+    mealOption: 'Meal Option',
+    roomFeatures: 'Room Features',
     
     // Features fields
     propertyShowOption: 'Who Shows Property',
@@ -446,7 +458,6 @@ function getFieldLabel(fieldName: string): string {
     
     // PG fields
     monthlyRent: 'Monthly Rent',
-    mealOption: 'Meal Option',
     
     // Flatmate fields
     preferredGender: 'Preferred Gender'

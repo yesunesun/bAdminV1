@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/FlatmateDetails.tsx
-// Version: 3.0.0
-// Last Modified: 30-05-2025 16:00 IST
-// Purpose: Removed Secondary Contact field to avoid duplication with Features step
+// Version: 4.0.0
+// Last Modified: 30-05-2025 18:10 IST
+// Purpose: Added step completion validation system for progress tracking
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { FormSection } from '@/components/FormSection';
@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { FormSectionProps } from '../types';
+import { useStepValidation } from '../hooks/useStepValidation';
 import { cn } from '@/lib/utils';
 
 const FlatmateDetails: React.FC<FormSectionProps> = ({ 
@@ -21,13 +22,33 @@ const FlatmateDetails: React.FC<FormSectionProps> = ({
   // States for custom select components
   const [showPersonOptionsOpen, setShowPersonOptionsOpen] = useState(false);
   const [waterSupplyOptionsOpen, setWaterSupplyOptionsOpen] = useState(false);
+
+  // ✅ ADDED: Initialize validation system
+  const flowType = form.getValues('flow.flowType') || 'residential_flatmates';
+  const {
+    validateField,
+    getFieldValidation,
+    shouldShowFieldError,
+    markFieldAsTouched,
+    isValid: stepIsValid,
+    completionPercentage,
+    requiredFields
+  } = useStepValidation({
+    form,
+    flowType,
+    currentStepId: stepId
+  });
   
   // Custom hooks for step data handling
   const saveField = useCallback((fieldName: string, value: any) => {
     const path = `steps.${stepId}.${fieldName}`;
     console.log(`Saving field ${fieldName} at path ${path}:`, value);
     form.setValue(path, value, { shouldValidate: true });
-  }, [form, stepId]);
+    
+    // ✅ ADDED: Mark field as touched and validate
+    markFieldAsTouched(fieldName);
+    validateField(fieldName);
+  }, [form, stepId, markFieldAsTouched, validateField]);
 
   const getField = useCallback((fieldName: string, defaultValue?: any) => {
     const path = `steps.${stepId}.${fieldName}`;
@@ -138,6 +159,26 @@ const FlatmateDetails: React.FC<FormSectionProps> = ({
       title="Flatmate Details"
       description="Specify room facilities and flatmate preferences"
     >
+      {/* ✅ ADDED: Progress indicator */}
+      {requiredFields.length > 0 && (
+        <div className="mb-6 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
+              Step Completion: {completionPercentage}%
+            </span>
+            <span className="text-xs text-blue-700 dark:text-blue-300">
+              {stepIsValid ? '✓ Ready to proceed' : 'Please complete required fields'}
+            </span>
+          </div>
+          <div className="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-2">
+            <div 
+              className="bg-blue-600 dark:bg-blue-400 h-2 rounded-full transition-all duration-300"
+              style={{ width: `${completionPercentage}%` }}
+            />
+          </div>
+        </div>
+      )}
+
       <div className="space-y-5">
         {/* Combined Sections in Two-Column Layout */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -183,6 +224,12 @@ const FlatmateDetails: React.FC<FormSectionProps> = ({
                   onSelect={handleShowPersonSelect}
                 />
               </div>
+              {/* ✅ ADDED: Validation error display */}
+              {shouldShowFieldError('propertyShowPerson') && (
+                <p className="text-sm text-red-600 mt-0.5">
+                  {getFieldValidation('propertyShowPerson').error}
+                </p>
+              )}
             </div>
 
             {/* Water Supply */}
@@ -202,6 +249,12 @@ const FlatmateDetails: React.FC<FormSectionProps> = ({
                   onSelect={handleWaterSupplySelect}
                 />
               </div>
+              {/* ✅ ADDED: Validation error display */}
+              {shouldShowFieldError('waterSupply') && (
+                <p className="text-sm text-red-600 mt-0.5">
+                  {getFieldValidation('waterSupply').error}
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -254,6 +307,12 @@ const FlatmateDetails: React.FC<FormSectionProps> = ({
               value={getField('directions', '')}
               onChange={(e) => saveField('directions', e.target.value)}
             />
+            {/* ✅ ADDED: Validation error display */}
+            {shouldShowFieldError('directions') && (
+              <p className="text-sm text-red-600 mt-0.5">
+                {getFieldValidation('directions').error}
+              </p>
+            )}
           </div>
         )}
 
@@ -270,6 +329,12 @@ const FlatmateDetails: React.FC<FormSectionProps> = ({
             value={getField('about', '')}
             onChange={(e) => saveField('about', e.target.value)}
           />
+          {/* ✅ ADDED: Validation error display */}
+          {shouldShowFieldError('about') && (
+            <p className="text-sm text-red-600 mt-0.5">
+              {getFieldValidation('about').error}
+            </p>
+          )}
         </div>
       </div>
     </FormSection>

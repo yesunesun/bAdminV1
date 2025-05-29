@@ -1,15 +1,16 @@
 // src/modules/owner/components/property/wizard/sections/CoworkingDetails.tsx
-// Version: 1.2.0
-// Last Modified: 17-05-2025 15:45 IST
-// Purpose: Fix utils import to use the correct exports
+// Version: 2.0.0
+// Last Modified: 30-05-2025 18:05 IST
+// Purpose: Added step completion validation system for progress tracking
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import { FormSection } from '@/components/FormSection';
 import { RequiredLabel } from '@/components/ui/RequiredLabel';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { FormSectionProps } from '../types';
 import { useStepForm } from '../hooks/useStepForm';
+import { useStepValidation } from '../hooks/useStepValidation';
 import { 
   COWORKING_PRICING_STRUCTURES,
   COWORKING_LEASE_TERMS,
@@ -17,7 +18,7 @@ import {
   COWORKING_INTERNET_SPEEDS,
   COWORKING_AMENITIES
 } from '../constants/coworkingDetails';
-import { utils } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 
 const CoworkingDetails: React.FC<FormSectionProps> = ({ 
   form,
@@ -31,6 +32,22 @@ const CoworkingDetails: React.FC<FormSectionProps> = ({
     getFieldValue,
     getFieldId
   } = useStepForm(form, stepId);
+
+  // ✅ ADDED: Initialize validation system
+  const flowType = form.getValues('flow.flowType') || 'commercial_coworking';
+  const {
+    validateField,
+    getFieldValidation,
+    shouldShowFieldError,
+    markFieldAsTouched,
+    isValid: stepIsValid,
+    completionPercentage,
+    requiredFields
+  } = useStepValidation({
+    form,
+    flowType,
+    currentStepId: stepId
+  });
   
   // Migrate data from root to step object if needed
   useEffect(() => {
@@ -62,6 +79,15 @@ const CoworkingDetails: React.FC<FormSectionProps> = ({
       setFieldValue('operatingHours', operatingHours);
     }
   }, []);
+
+  // ✅ ADDED: Enhanced field update with validation
+  const updateFormAndState = useCallback((field: string, value: any) => {
+    setFieldValue(field, value);
+    
+    // Mark field as touched and validate
+    markFieldAsTouched(field);
+    validateField(field);
+  }, [setFieldValue, markFieldAsTouched, validateField]);
   
   // Update operating hours when opening or closing time changes
   const handleTimeChange = () => {
@@ -79,6 +105,26 @@ const CoworkingDetails: React.FC<FormSectionProps> = ({
       title="Co-working Space Details"
       description="Provide specific details about your co-working space"
     >
+      {/* ✅ ADDED: Progress indicator */}
+      {requiredFields.length > 0 && (
+        <div className="mb-6 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
+              Step Completion: {completionPercentage}%
+            </span>
+            <span className="text-xs text-blue-700 dark:text-blue-300">
+              {stepIsValid ? '✓ Ready to proceed' : 'Please complete required fields'}
+            </span>
+          </div>
+          <div className="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-2">
+            <div 
+              className="bg-blue-600 dark:bg-blue-400 h-2 rounded-full transition-all duration-300"
+              style={{ width: `${completionPercentage}%` }}
+            />
+          </div>
+        </div>
+      )}
+
       <div className="space-y-6">
         {/* Space Type - This might be redundant with basic details */}
         <div className="mb-6">
@@ -89,6 +135,7 @@ const CoworkingDetails: React.FC<FormSectionProps> = ({
             id={getFieldId('coworkingSpaceType')}
             className="w-full h-12 px-4 py-2 rounded-xl border border-border bg-background"
             {...registerField('coworkingSpaceType')}
+            onChange={(e) => updateFormAndState('coworkingSpaceType', e.target.value)}
           >
             <option value="">Select space type</option>
             <option value="Hot Desk">Hot Desk</option>
@@ -99,6 +146,12 @@ const CoworkingDetails: React.FC<FormSectionProps> = ({
           </select>
           {getFieldError('coworkingSpaceType') && (
             <p className="text-sm text-destructive mt-1">{getFieldError('coworkingSpaceType')?.message as string}</p>
+          )}
+          {/* ✅ ADDED: Validation error display */}
+          {shouldShowFieldError('coworkingSpaceType') && (
+            <p className="text-sm text-red-600 mt-0.5">
+              {getFieldValidation('coworkingSpaceType').error}
+            </p>
           )}
         </div>
         
@@ -114,9 +167,16 @@ const CoworkingDetails: React.FC<FormSectionProps> = ({
               placeholder="e.g., 50"
               className="h-12 px-4 py-2 rounded-xl border border-border bg-background w-full"
               {...registerField('totalCapacity')}
+              onChange={(e) => updateFormAndState('totalCapacity', parseInt(e.target.value) || 0)}
             />
             {getFieldError('totalCapacity') && (
               <p className="text-sm text-destructive mt-1">{getFieldError('totalCapacity')?.message as string}</p>
+            )}
+            {/* ✅ ADDED: Validation error display */}
+            {shouldShowFieldError('totalCapacity') && (
+              <p className="text-sm text-red-600 mt-0.5">
+                {getFieldValidation('totalCapacity').error}
+              </p>
             )}
           </div>
           
@@ -130,9 +190,16 @@ const CoworkingDetails: React.FC<FormSectionProps> = ({
               placeholder="e.g., 20"
               className="h-12 px-4 py-2 rounded-xl border border-border bg-background w-full"
               {...registerField('availableCapacity')}
+              onChange={(e) => updateFormAndState('availableCapacity', parseInt(e.target.value) || 0)}
             />
             {getFieldError('availableCapacity') && (
               <p className="text-sm text-destructive mt-1">{getFieldError('availableCapacity')?.message as string}</p>
+            )}
+            {/* ✅ ADDED: Validation error display */}
+            {shouldShowFieldError('availableCapacity') && (
+              <p className="text-sm text-red-600 mt-0.5">
+                {getFieldValidation('availableCapacity').error}
+              </p>
             )}
           </div>
         </div>
@@ -146,6 +213,7 @@ const CoworkingDetails: React.FC<FormSectionProps> = ({
             id={getFieldId('pricingStructure')}
             className="w-full h-12 px-4 py-2 rounded-xl border border-border bg-background"
             {...registerField('pricingStructure')}
+            onChange={(e) => updateFormAndState('pricingStructure', e.target.value)}
           >
             <option value="">Select pricing structure</option>
             {COWORKING_PRICING_STRUCTURES.map((option) => (
@@ -156,6 +224,12 @@ const CoworkingDetails: React.FC<FormSectionProps> = ({
           </select>
           {getFieldError('pricingStructure') && (
             <p className="text-sm text-destructive mt-1">{getFieldError('pricingStructure')?.message as string}</p>
+          )}
+          {/* ✅ ADDED: Validation error display */}
+          {shouldShowFieldError('pricingStructure') && (
+            <p className="text-sm text-red-600 mt-0.5">
+              {getFieldValidation('pricingStructure').error}
+            </p>
           )}
         </div>
         
@@ -170,9 +244,16 @@ const CoworkingDetails: React.FC<FormSectionProps> = ({
             placeholder="e.g., 5000"
             className="h-12 px-4 py-2 rounded-xl border border-border bg-background w-full"
             {...registerField('basePrice')}
+            onChange={(e) => updateFormAndState('basePrice', parseFloat(e.target.value) || 0)}
           />
           {getFieldError('basePrice') && (
             <p className="text-sm text-destructive mt-1">{getFieldError('basePrice')?.message as string}</p>
+          )}
+          {/* ✅ ADDED: Validation error display */}
+          {shouldShowFieldError('basePrice') && (
+            <p className="text-sm text-red-600 mt-0.5">
+              {getFieldValidation('basePrice').error}
+            </p>
           )}
         </div>
         
@@ -185,6 +266,7 @@ const CoworkingDetails: React.FC<FormSectionProps> = ({
             id={getFieldId('leaseTerm')}
             className="w-full h-12 px-4 py-2 rounded-xl border border-border bg-background"
             {...registerField('leaseTerm')}
+            onChange={(e) => updateFormAndState('leaseTerm', e.target.value)}
           >
             <option value="">Select lease term</option>
             {COWORKING_LEASE_TERMS.map((option) => (
@@ -195,6 +277,12 @@ const CoworkingDetails: React.FC<FormSectionProps> = ({
           </select>
           {getFieldError('leaseTerm') && (
             <p className="text-sm text-destructive mt-1">{getFieldError('leaseTerm')?.message as string}</p>
+          )}
+          {/* ✅ ADDED: Validation error display */}
+          {shouldShowFieldError('leaseTerm') && (
+            <p className="text-sm text-red-600 mt-0.5">
+              {getFieldValidation('leaseTerm').error}
+            </p>
           )}
         </div>
         
@@ -209,9 +297,16 @@ const CoworkingDetails: React.FC<FormSectionProps> = ({
             placeholder="e.g., 10000"
             className="h-12 px-4 py-2 rounded-xl border border-border bg-background w-full"
             {...registerField('securityDeposit')}
+            onChange={(e) => updateFormAndState('securityDeposit', parseFloat(e.target.value) || 0)}
           />
           {getFieldError('securityDeposit') && (
             <p className="text-sm text-destructive mt-1">{getFieldError('securityDeposit')?.message as string}</p>
+          )}
+          {/* ✅ ADDED: Validation error display */}
+          {shouldShowFieldError('securityDeposit') && (
+            <p className="text-sm text-red-600 mt-0.5">
+              {getFieldValidation('securityDeposit').error}
+            </p>
           )}
         </div>
         
@@ -224,6 +319,7 @@ const CoworkingDetails: React.FC<FormSectionProps> = ({
             id={getFieldId('bookingOption')}
             className="w-full h-12 px-4 py-2 rounded-xl border border-border bg-background"
             {...registerField('bookingOption')}
+            onChange={(e) => updateFormAndState('bookingOption', e.target.value)}
           >
             <option value="">Select booking option</option>
             {COWORKING_BOOKING_OPTIONS.map((option) => (
@@ -234,6 +330,12 @@ const CoworkingDetails: React.FC<FormSectionProps> = ({
           </select>
           {getFieldError('bookingOption') && (
             <p className="text-sm text-destructive mt-1">{getFieldError('bookingOption')?.message as string}</p>
+          )}
+          {/* ✅ ADDED: Validation error display */}
+          {shouldShowFieldError('bookingOption') && (
+            <p className="text-sm text-red-600 mt-0.5">
+              {getFieldValidation('bookingOption').error}
+            </p>
           )}
         </div>
         
@@ -251,10 +353,17 @@ const CoworkingDetails: React.FC<FormSectionProps> = ({
               onChange={(e) => {
                 form.setValue(`steps.${stepId}.openingTime`, e.target.value);
                 handleTimeChange();
+                updateFormAndState('openingTime', e.target.value);
               }}
             />
             {getFieldError('openingTime') && (
               <p className="text-sm text-destructive mt-1">{getFieldError('openingTime')?.message as string}</p>
+            )}
+            {/* ✅ ADDED: Validation error display */}
+            {shouldShowFieldError('openingTime') && (
+              <p className="text-sm text-red-600 mt-0.5">
+                {getFieldValidation('openingTime').error}
+              </p>
             )}
           </div>
           
@@ -270,10 +379,17 @@ const CoworkingDetails: React.FC<FormSectionProps> = ({
               onChange={(e) => {
                 form.setValue(`steps.${stepId}.closingTime`, e.target.value);
                 handleTimeChange();
+                updateFormAndState('closingTime', e.target.value);
               }}
             />
             {getFieldError('closingTime') && (
               <p className="text-sm text-destructive mt-1">{getFieldError('closingTime')?.message as string}</p>
+            )}
+            {/* ✅ ADDED: Validation error display */}
+            {shouldShowFieldError('closingTime') && (
+              <p className="text-sm text-red-600 mt-0.5">
+                {getFieldValidation('closingTime').error}
+              </p>
             )}
           </div>
           
@@ -296,6 +412,13 @@ const CoworkingDetails: React.FC<FormSectionProps> = ({
                   id={getFieldId(`operatingDays-${day}`)}
                   {...registerField('operatingDays')}
                   className="rounded border-gray-300 text-primary focus:ring-primary"
+                  onChange={(e) => {
+                    const currentDays = getFieldValue('operatingDays') || [];
+                    const newDays = e.target.checked 
+                      ? [...currentDays, day]
+                      : currentDays.filter((d: string) => d !== day);
+                    updateFormAndState('operatingDays', newDays);
+                  }}
                 />
                 <span>{day}</span>
               </label>
@@ -303,6 +426,12 @@ const CoworkingDetails: React.FC<FormSectionProps> = ({
           </div>
           {getFieldError('operatingDays') && (
             <p className="text-sm text-destructive mt-1">{getFieldError('operatingDays')?.message as string}</p>
+          )}
+          {/* ✅ ADDED: Validation error display */}
+          {shouldShowFieldError('operatingDays') && (
+            <p className="text-sm text-red-600 mt-0.5">
+              {getFieldValidation('operatingDays').error}
+            </p>
           )}
         </div>
         
@@ -315,6 +444,7 @@ const CoworkingDetails: React.FC<FormSectionProps> = ({
             id={getFieldId('internetSpeed')}
             className="w-full h-12 px-4 py-2 rounded-xl border border-border bg-background"
             {...registerField('internetSpeed')}
+            onChange={(e) => updateFormAndState('internetSpeed', e.target.value)}
           >
             <option value="">Select internet speed</option>
             {COWORKING_INTERNET_SPEEDS.map((option) => (
@@ -325,6 +455,12 @@ const CoworkingDetails: React.FC<FormSectionProps> = ({
           </select>
           {getFieldError('internetSpeed') && (
             <p className="text-sm text-destructive mt-1">{getFieldError('internetSpeed')?.message as string}</p>
+          )}
+          {/* ✅ ADDED: Validation error display */}
+          {shouldShowFieldError('internetSpeed') && (
+            <p className="text-sm text-red-600 mt-0.5">
+              {getFieldValidation('internetSpeed').error}
+            </p>
           )}
         </div>
         
@@ -340,9 +476,16 @@ const CoworkingDetails: React.FC<FormSectionProps> = ({
                 <input 
                   type="checkbox" 
                   value={amenity}
-                  id={getFieldId(`coworkingAmenities-${utils.slugify(amenity)}`)} 
+                  id={getFieldId(`coworkingAmenities-${cn(amenity.replace(/\s+/g, '-').toLowerCase())}`)} 
                   {...registerField('coworkingAmenities')}
                   className="rounded border-gray-300 text-primary focus:ring-primary"
+                  onChange={(e) => {
+                    const currentAmenities = getFieldValue('coworkingAmenities') || [];
+                    const newAmenities = e.target.checked 
+                      ? [...currentAmenities, amenity]
+                      : currentAmenities.filter((a: string) => a !== amenity);
+                    updateFormAndState('coworkingAmenities', newAmenities);
+                  }}
                 />
                 <span>{amenity}</span>
               </label>
@@ -350,6 +493,12 @@ const CoworkingDetails: React.FC<FormSectionProps> = ({
           </div>
           {getFieldError('coworkingAmenities') && (
             <p className="text-sm text-destructive mt-1">{getFieldError('coworkingAmenities')?.message as string}</p>
+          )}
+          {/* ✅ ADDED: Validation error display */}
+          {shouldShowFieldError('coworkingAmenities') && (
+            <p className="text-sm text-red-600 mt-0.5">
+              {getFieldValidation('coworkingAmenities').error}
+            </p>
           )}
         </div>
         
@@ -367,6 +516,7 @@ const CoworkingDetails: React.FC<FormSectionProps> = ({
             rows={3}
             className="w-full px-4 py-3 rounded-xl border border-border bg-background min-h-24"
             {...registerField('additionalInformation')}
+            onChange={(e) => updateFormAndState('additionalInformation', e.target.value)}
           />
           {getFieldError('additionalInformation') && (
             <p className="text-sm text-destructive mt-1">{getFieldError('additionalInformation')?.message as string}</p>
@@ -385,9 +535,16 @@ const CoworkingDetails: React.FC<FormSectionProps> = ({
               placeholder="e.g., 500"
               className="h-12 px-4 py-2 rounded-xl border border-border bg-background w-full"
               {...registerField('officeSize')}
+              onChange={(e) => updateFormAndState('officeSize', parseFloat(e.target.value) || 0)}
             />
             {getFieldError('officeSize') && (
               <p className="text-sm text-destructive mt-1">{getFieldError('officeSize')?.message as string}</p>
+            )}
+            {/* ✅ ADDED: Validation error display */}
+            {shouldShowFieldError('officeSize') && (
+              <p className="text-sm text-red-600 mt-0.5">
+                {getFieldValidation('officeSize').error}
+              </p>
             )}
           </div>
           
@@ -401,9 +558,16 @@ const CoworkingDetails: React.FC<FormSectionProps> = ({
               placeholder="e.g., 20"
               className="h-12 px-4 py-2 rounded-xl border border-border bg-background w-full"
               {...registerField('seatingCapacity')}
+              onChange={(e) => updateFormAndState('seatingCapacity', parseInt(e.target.value) || 0)}
             />
             {getFieldError('seatingCapacity') && (
               <p className="text-sm text-destructive mt-1">{getFieldError('seatingCapacity')?.message as string}</p>
+            )}
+            {/* ✅ ADDED: Validation error display */}
+            {shouldShowFieldError('seatingCapacity') && (
+              <p className="text-sm text-red-600 mt-0.5">
+                {getFieldValidation('seatingCapacity').error}
+              </p>
             )}
           </div>
         </div>

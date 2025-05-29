@@ -1,12 +1,13 @@
 // src/modules/owner/components/property/wizard/sections/CommercialSaleDetails.tsx
-// Version: 2.1.0
-// Last Modified: 14-05-2025 14:30 IST
-// Purpose: Removed debug information display while keeping Debug button functionality
+// Version: 3.0.0
+// Last Modified: 30-05-2025 17:30 IST
+// Purpose: Added step completion validation system integration
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { FormSection } from '@/components/FormSection';
 import { RequiredLabel } from '@/components/ui/RequiredLabel';
 import { Input } from '@/components/ui/input';
+import { useStepValidation } from '../hooks/useStepValidation';
 import { cn } from '@/lib/utils';
 import { FormSectionProps } from '../types';
 
@@ -32,12 +33,31 @@ const CommercialSaleDetails: React.FC<FormSectionProps> = ({
   form,
   stepId = 'com_sale_sale_details' // Default stepId for commercial sale details
 }) => {
+  // ✅ ADDED: Initialize validation system
+  const {
+    validateField,
+    getFieldValidation,
+    shouldShowFieldError,
+    markFieldAsTouched,
+    isValid: stepIsValid,
+    completionPercentage,
+    requiredFields
+  } = useStepValidation({
+    form,
+    flowType: 'commercial_sale',
+    currentStepId: stepId
+  });
+
   // Custom hooks for step data handling
   const saveField = useCallback((fieldName: string, value: any) => {
     const path = `steps.${stepId}.${fieldName}`;
     console.log(`Saving field ${fieldName} at path ${path}:`, value);
     form.setValue(path, value, { shouldValidate: true });
-  }, [form, stepId]);
+    
+    // ✅ ADDED: Mark field as touched and validate
+    markFieldAsTouched(fieldName);
+    validateField(fieldName);
+  }, [form, stepId, markFieldAsTouched, validateField]);
 
   const getField = useCallback((fieldName: string, defaultValue?: any) => {
     const path = `steps.${stepId}.${fieldName}`;
@@ -110,6 +130,26 @@ const CommercialSaleDetails: React.FC<FormSectionProps> = ({
       title="Commercial Sale Details"
       description="Provide details about your commercial property for sale"
     >
+      {/* ✅ ADDED: Progress indicator */}
+      {requiredFields.length > 0 && (
+        <div className="mb-6 p-3 bg-blue-50 rounded-lg border border-blue-200">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-blue-900">
+              Step Completion: {completionPercentage}%
+            </span>
+            <span className="text-xs text-blue-700">
+              {stepIsValid ? '✓ Ready to proceed' : 'Please complete required fields'}
+            </span>
+          </div>
+          <div className="w-full bg-blue-200 rounded-full h-2">
+            <div 
+              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+              style={{ width: `${completionPercentage}%` }}
+            />
+          </div>
+        </div>
+      )}
+
       <div className="space-y-6">
         <div className="grid md:grid-cols-2 gap-6">
           {/* Expected Price */}
@@ -148,6 +188,12 @@ const CommercialSaleDetails: React.FC<FormSectionProps> = ({
                 Price Negotiable
               </label>
             </div>
+            {/* ✅ ADDED: Error message display */}
+            {shouldShowFieldError('expectedPrice') && (
+              <p className="text-sm text-red-600 mt-0.5">
+                {getFieldValidation('expectedPrice').error}
+              </p>
+            )}
           </div>
           
           {/* Ownership Type - implemented as radio buttons */}
@@ -175,6 +221,12 @@ const CommercialSaleDetails: React.FC<FormSectionProps> = ({
                 </div>
               ))}
             </div>
+            {/* ✅ ADDED: Error message display */}
+            {shouldShowFieldError('ownershipType') && (
+              <p className="text-sm text-red-600 mt-0.5">
+                {getFieldValidation('ownershipType').error}
+              </p>
+            )}
           </div>
         </div>
         
@@ -193,6 +245,12 @@ const CommercialSaleDetails: React.FC<FormSectionProps> = ({
               className="w-full md:w-1/2"
             />
           </div>
+          {/* ✅ ADDED: Error message display */}
+          {shouldShowFieldError('availableFrom') && (
+            <p className="text-sm text-red-600 mt-0.5">
+              {getFieldValidation('availableFrom').error}
+            </p>
+          )}
         </div>
         
         {/* Ideal For */}
