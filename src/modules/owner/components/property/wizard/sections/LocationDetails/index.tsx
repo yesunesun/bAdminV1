@@ -1,42 +1,65 @@
 // src/modules/owner/components/property/wizard/sections/LocationDetails/index.tsx
-// Version: 6.0.0
-// Last Modified: 19-05-2025 18:45 IST
-// Purpose: Remove pre-populated City/State and ensure coordinates + location fields are populated on all actions
+// Version: 7.1.0
+// Last Modified: 29-05-2025 19:50 IST
+// Purpose: Fixed import paths and validation system - working version
 
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { FormSection } from '@/components/FormSection';
 import { FormSectionProps } from '../../../types';
 import { useGoogleMaps } from './hooks/useGoogleMaps';
-import { LandmarkPincodeInputs } from './components/LandmarkPincodeInputs';
-import { AddressInput } from './components/AddressInput';
-import { FlatPlotInput } from './components/FlatPlotInput';
+import { ValidatedInput } from '@/components/ui/ValidatedInput';
+import { RequiredLabel } from '@/components/ui/RequiredLabel';
 import { Button } from '@/components/ui/button';
 import { MapPin, Navigation } from 'lucide-react';
-import { RequiredLabel } from '@/components/ui/RequiredLabel';
 import ErrorBoundary from '@/components/ui/ErrorBoundary';
-import { Input } from '@/components/ui/input';
+import { useStepValidation } from '../../hooks/useStepValidation';
 
 export function LocationDetails({ form, stepId }: FormSectionProps) {
-  // Custom hooks for step data handling
+  // Initialize validation system
+  const {
+    validateField,
+    getFieldValidation,
+    getFieldConfig,
+    shouldShowFieldError,
+    markFieldAsTouched,
+    validateCurrentStep,
+    isValid: stepIsValid,
+    completionPercentage,
+    requiredFields
+  } = useStepValidation({
+    form,
+    flowType: 'residential_rent',
+    currentStepId: stepId || 'res_rent_location'
+  });
+
+  const effectiveStepId = stepId || 'res_rent_location';
+
+  // Helper functions for form data management
   const saveField = useCallback((fieldName: string, value: any) => {
-    if (!stepId) return;
-    const path = `steps.${stepId}.${fieldName}`;
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`Saving field ${fieldName} at path ${path}:`, value);
+    if (!effectiveStepId) return;
+    const path = `steps.${effectiveStepId}.${fieldName}`;
+    
+    // Ensure steps structure exists
+    const steps = form.getValues('steps') || {};
+    if (!steps[effectiveStepId]) {
+      form.setValue('steps', {
+        ...steps,
+        [effectiveStepId]: {}
+      }, { shouldValidate: false });
     }
+    
     form.setValue(path, value, { shouldValidate: true });
-  }, [form, stepId]);
+    validateField(fieldName);
+  }, [form, effectiveStepId, validateField]);
 
   const getField = useCallback((fieldName: string, defaultValue?: any) => {
-    if (!stepId) return defaultValue;
-    const path = `steps.${stepId}.${fieldName}`;
+    if (!effectiveStepId) return defaultValue;
+    const path = `steps.${effectiveStepId}.${fieldName}`;
     const value = form.getValues(path);
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`Getting field ${fieldName} from path ${path}:`, value);
-    }
     return value ?? defaultValue;
-  }, [form, stepId]);
+  }, [form, effectiveStepId]);
 
+  // State management
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const [isGeolocating, setIsGeolocating] = useState(false);
   const [isGeocoding, setIsGeocoding] = useState(false);
@@ -46,28 +69,61 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
   const [coordinatesVerified, setCoordinatesVerified] = useState(false);
   const [showCoordinateSuccess, setShowCoordinateSuccess] = useState(false);
 
+  // Form values state
+  const [values, setValues] = useState({
+    address: getField('address', ''),
+    flatPlotNo: getField('flatPlotNo', ''),
+    landmark: getField('landmark', ''),
+    locality: getField('locality', ''),
+    city: getField('city', ''),
+    state: getField('state', ''),
+    pinCode: getField('pinCode', ''),
+    latitude: getField('latitude', ''),
+    longitude: getField('longitude', '')
+  });
+
   // Ensure step structure exists
   useEffect(() => {
-    if (!stepId) return;
+    if (!effectiveStepId) return;
     
-    // Initialize step structure if it doesn't exist
     const currentSteps = form.getValues('steps') || {};
-    if (!currentSteps[stepId]) {
+    if (!currentSteps[effectiveStepId]) {
       form.setValue('steps', {
         ...currentSteps,
-        [stepId]: {}
+        [effectiveStepId]: {}
       });
     }
-  }, [stepId, form]);
-  
-  // Get form values
-  const address = getField('address', '');
-  const locality = getField('locality', '');
-  const city = getField('city', '');
-  const latitude = getField('latitude', '');
-  const longitude = getField('longitude', '');
-  
-  // Check for edit mode by looking at URL
+
+    // Update component state from form
+    updateStateFromForm();
+  }, [effectiveStepId, form]);
+
+  // Update component state from form values
+  const updateStateFromForm = useCallback(() => {
+    const stepData = form.getValues(`steps.${effectiveStepId}`) || {};
+    const formValues = form.getValues();
+    
+    setValues({
+      address: stepData.address || formValues.address || '',
+      flatPlotNo: stepData.flatPlotNo || formValues.flatPlotNo || '',
+      landmark: stepData.landmark || formValues.landmark || '',
+      locality: stepData.locality || formValues.locality || '',
+      city: stepData.city || formValues.city || '',
+      state: stepData.state || formValues.state || '',
+      pinCode: stepData.pinCode || formValues.pinCode || '',
+      latitude: stepData.latitude || formValues.latitude || '',
+      longitude: stepData.longitude || formValues.longitude || ''
+    });
+  }, [form, effectiveStepId]);
+
+  // Update form and state with validation
+  const updateFormAndState = useCallback((field: string, value: any) => {
+    setValues(prev => ({ ...prev, [field]: value }));
+    saveField(field, value);
+    markFieldAsTouched(field);
+  }, [saveField, markFieldAsTouched]);
+
+  // Check for edit mode
   const isEditMode = window.location.pathname.includes('/edit');
   
   // Load Google Maps API
@@ -75,8 +131,8 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
   
   // Combined error message
   const mapErrorMessage = mapError || locationError;
-  
-  // Helper function to detect browser
+
+  // Helper functions for browser detection
   const detectBrowser = () => {
     const userAgent = window.navigator.userAgent;
     if (userAgent.indexOf('Edg') > -1) return 'Edge';
@@ -86,25 +142,15 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
     return 'Unknown';
   };
 
-  // Helper function to check if HTTPS is used
-  const isHTTPS = () => {
-    return window.location.protocol === 'https:';
-  };
+  const isHTTPS = () => window.location.protocol === 'https:';
 
-  // Initialize map once when component mounts and maps API is loaded
+  // Initialize map
   useEffect(() => {
     if (!mapLoaded || !mapContainerRef.current || mapInstance) return;
     
-    // Wait to make sure window.google.maps is available
-    if (!window.google || !window.google.maps) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Google Maps not fully loaded yet');
-      }
-      return;
-    }
+    if (!window.google || !window.google.maps) return;
     
     try {
-      // Create map instance
       const map = new window.google.maps.Map(mapContainerRef.current, {
         center: { lat: 17.385, lng: 78.4867 },
         zoom: 15,
@@ -116,36 +162,31 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
       
       setMapInstance(map);
       
-      // Add click listener to map
+      // Add click listener
       map.addListener('click', (event: any) => {
         if (!event.latLng) return;
         
-        // Update form coordinates
-        saveField('latitude', event.latLng.lat());
-        saveField('longitude', event.latLng.lng());
+        const lat = event.latLng.lat();
+        const lng = event.latLng.lng();
+        
+        updateFormAndState('latitude', lat);
+        updateFormAndState('longitude', lng);
         setCoordinatesVerified(true);
         
-        // Show success message
         setShowCoordinateSuccess(true);
         setTimeout(() => setShowCoordinateSuccess(false), 3000);
         
-        // Update marker
         updateMarkerPosition(event.latLng);
-
-        // Perform reverse geocoding to populate address fields
         reverseGeocode(event.latLng);
       });
       
-      // Auto-load address if in edit mode
-      if (isEditMode && address && (!latitude || !longitude)) {
-        setTimeout(() => {
-          geocodeAddress(address);
-        }, 1000);
-      } else if (latitude && longitude) {
-        // If we have coordinates, show them on map
+      // Auto-load for edit mode
+      if (isEditMode && values.address && (!values.latitude || !values.longitude)) {
+        setTimeout(() => geocodeAddress(values.address), 1000);
+      } else if (values.latitude && values.longitude) {
         const position = {
-          lat: parseFloat(String(latitude)),
-          lng: parseFloat(String(longitude))
+          lat: parseFloat(String(values.latitude)),
+          lng: parseFloat(String(values.longitude))
         };
         
         map.setCenter(position);
@@ -156,40 +197,34 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
       console.error('Error initializing map:', error);
       setLocationError('Error initializing map');
     }
-  }, [mapLoaded, mapInstance, isEditMode, address, latitude, longitude]);
+  }, [mapLoaded, mapInstance, isEditMode, values.address, values.latitude, values.longitude]);
   
-  // Function to update marker position
+  // Update marker position
   const updateMarkerPosition = (position: any) => {
     if (!mapInstance || !window.google || !window.google.maps) return;
     
     try {
-      // Remove existing marker if any
       if (markerInstance) {
         markerInstance.setMap(null);
       }
       
-      // Create new marker
       const marker = new window.google.maps.Marker({
         position,
         map: mapInstance,
         draggable: true
       });
       
-      // Add dragend listener
       marker.addListener('dragend', function() {
         const newPosition = marker.getPosition();
         if (!newPosition) return;
         
-        // Update form coordinates
-        saveField('latitude', newPosition.lat());
-        saveField('longitude', newPosition.lng());
+        updateFormAndState('latitude', newPosition.lat());
+        updateFormAndState('longitude', newPosition.lng());
         setCoordinatesVerified(true);
         
-        // Show success message
         setShowCoordinateSuccess(true);
         setTimeout(() => setShowCoordinateSuccess(false), 3000);
         
-        // Reverse geocode to get address details
         reverseGeocode(newPosition);
       });
       
@@ -199,26 +234,18 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
     }
   };
   
-  // Function to geocode address
+  // Geocode address
   const geocodeAddress = (addressText: string) => {
-    if (!mapLoaded || !window.google || !window.google.maps || !addressText) {
-      return;
-    }
+    if (!mapLoaded || !window.google || !window.google.maps || !addressText) return;
     
     setIsGeocoding(true);
     setLocationError(null);
     
     let fullAddress = addressText;
-    // Don't append location data by default to avoid biasing the result
-    if (locality) fullAddress += `, ${locality}`;
-    // Add Telangana, India as a default region to help with geocoding
+    if (values.locality) fullAddress += `, ${values.locality}`;
     fullAddress += ', Telangana, India';
     
     try {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Geocoding address:', fullAddress);
-      }
-      
       const geocoder = new window.google.maps.Geocoder();
       geocoder.geocode({ address: fullAddress }, (results: any, status: string) => {
         setIsGeocoding(false);
@@ -226,66 +253,54 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
         if (status === 'OK' && results && results.length > 0) {
           const location = results[0].geometry.location;
           
-          // Update form
-          saveField('latitude', location.lat());
-          saveField('longitude', location.lng());
+          updateFormAndState('latitude', location.lat());
+          updateFormAndState('longitude', location.lng());
           setCoordinatesVerified(true);
           
-          // Show success message
           setShowCoordinateSuccess(true);
           setTimeout(() => setShowCoordinateSuccess(false), 3000);
           
-          // Update map and marker
           if (mapInstance) {
             mapInstance.setCenter(location);
             updateMarkerPosition(location);
           }
           
-          // Extract address components and update form fields
+          // Extract address components
           const addressComponents = results[0].address_components || [];
           
-          // Extract PIN code
           const postalCodeComponent = addressComponents.find(
             (component: any) => component.types.includes('postal_code')
           );
-          
-          if (postalCodeComponent && postalCodeComponent.long_name) {
-            saveField('pinCode', postalCodeComponent.long_name);
+          if (postalCodeComponent) {
+            updateFormAndState('pinCode', postalCodeComponent.long_name);
           }
           
-          // Extract city
           const cityComponent = addressComponents.find(
             (component: any) => 
               component.types.includes('locality') || 
               component.types.includes('administrative_area_level_2')
           );
-          
-          if (cityComponent && cityComponent.long_name) {
-            saveField('city', cityComponent.long_name);
+          if (cityComponent) {
+            updateFormAndState('city', cityComponent.long_name);
           }
           
-          // Extract locality
           const localityComponent = addressComponents.find(
             (component: any) => 
               component.types.includes('sublocality_level_1') || 
               component.types.includes('sublocality') ||
               component.types.includes('neighborhood')
           );
-          
-          if (localityComponent && localityComponent.long_name) {
-            saveField('locality', localityComponent.long_name);
+          if (localityComponent) {
+            updateFormAndState('locality', localityComponent.long_name);
           }
           
-          // Extract state
           const stateComponent = addressComponents.find(
             (component: any) => component.types.includes('administrative_area_level_1')
           );
-          
-          if (stateComponent && stateComponent.long_name) {
-            saveField('state', stateComponent.long_name);
+          if (stateComponent) {
+            updateFormAndState('state', stateComponent.long_name);
           }
         } else {
-          console.error('Geocoding failed with status:', status);
           setLocationError(`Couldn't find the address on the map`);
         }
       });
@@ -296,7 +311,7 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
     }
   };
   
-  // Function to reverse geocode
+  // Reverse geocode
   const reverseGeocode = (position: any) => {
     if (!window.google || !window.google.maps || !position) return;
     
@@ -305,50 +320,41 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
       geocoder.geocode({ location: position }, (results: any, status: string) => {
         if (status === 'OK' && results && results.length > 0) {
           const address = results[0].formatted_address;
-          saveField('address', address);
+          updateFormAndState('address', address);
           
-          // Extract components from address
           const addressComponents = results[0].address_components || [];
           
-          // Extract PIN code
           const postalCodeComponent = addressComponents.find(
             (component: any) => component.types.includes('postal_code')
           );
-          
-          if (postalCodeComponent && postalCodeComponent.long_name) {
-            saveField('pinCode', postalCodeComponent.long_name);
+          if (postalCodeComponent) {
+            updateFormAndState('pinCode', postalCodeComponent.long_name);
           }
           
-          // Extract city
           const cityComponent = addressComponents.find(
             (component: any) => 
               component.types.includes('locality') || 
               component.types.includes('administrative_area_level_2')
           );
-          
-          if (cityComponent && cityComponent.long_name) {
-            saveField('city', cityComponent.long_name);
+          if (cityComponent) {
+            updateFormAndState('city', cityComponent.long_name);
           }
           
-          // Extract locality
           const localityComponent = addressComponents.find(
             (component: any) => 
               component.types.includes('sublocality_level_1') || 
               component.types.includes('sublocality') ||
               component.types.includes('neighborhood')
           );
-          
-          if (localityComponent && localityComponent.long_name) {
-            saveField('locality', localityComponent.long_name);
+          if (localityComponent) {
+            updateFormAndState('locality', localityComponent.long_name);
           }
           
-          // Extract state
           const stateComponent = addressComponents.find(
             (component: any) => component.types.includes('administrative_area_level_1')
           );
-          
-          if (stateComponent && stateComponent.long_name) {
-            saveField('state', stateComponent.long_name);
+          if (stateComponent) {
+            updateFormAndState('state', stateComponent.long_name);
           }
         }
       });
@@ -357,17 +363,16 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
     }
   };
   
-  // Function to find address on map (called by button)
+  // Find address on map
   const findAddressOnMap = () => {
-    if (!address) {
+    if (!values.address) {
       setLocationError('Please enter an address to search');
       return;
     }
-    
-    geocodeAddress(address);
+    geocodeAddress(values.address);
   };
   
-  // Function to get user's current location - Edge browser compatible
+  // Get current location
   const getUserCurrentLocation = async () => {
     if (!mapLoaded || !window.google || !window.google.maps) {
       setLocationError('Google Maps is not yet loaded');
@@ -382,9 +387,8 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
     const browser = detectBrowser();
     const isSecure = isHTTPS();
     
-    // Check Edge browser and HTTPS requirements
     if (browser === 'Edge' && !isSecure) {
-      setLocationError('Edge browser requires HTTPS to access location services. Please use a secure connection.');
+      setLocationError('Edge browser requires HTTPS to access location services.');
       return;
     }
     
@@ -392,29 +396,22 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
     setLocationError(null);
     
     try {
-      // Use promise-based approach for better error handling
       const getCurrentPosition = (options: PositionOptions) => {
         return new Promise<GeolocationPosition>((resolve, reject) => {
           navigator.geolocation.getCurrentPosition(resolve, reject, options);
         });
       };
       
-      // Attempt to get position with different settings for Edge
       let position: GeolocationPosition | null = null;
       
       try {
-        // First attempt with high accuracy
         position = await getCurrentPosition({
           enableHighAccuracy: true,
           timeout: 10000,
           maximumAge: 0
         });
       } catch (err: any) {
-        // If high accuracy fails on Edge, try with low accuracy
         if (browser === 'Edge' && err.code === 2) {
-          if (process.env.NODE_ENV === 'development') {
-            console.log('Retrying with low accuracy for Edge...');
-          }
           try {
             position = await getCurrentPosition({
               enableHighAccuracy: false,
@@ -432,25 +429,20 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
       if (position) {
         const { latitude, longitude } = position.coords;
         
-        // Update form
-        saveField('latitude', latitude);
-        saveField('longitude', longitude);
+        updateFormAndState('latitude', latitude);
+        updateFormAndState('longitude', longitude);
         setCoordinatesVerified(true);
         
-        // Show success message
         setShowCoordinateSuccess(true);
         setTimeout(() => setShowCoordinateSuccess(false), 3000);
         
-        // Update map
         const latlng = { lat: latitude, lng: longitude };
         if (mapInstance) {
           mapInstance.setCenter(latlng);
           updateMarkerPosition(latlng);
         }
         
-        // Perform reverse geocoding
         reverseGeocode(latlng);
-        
         setIsGeolocating(false);
       }
     } catch (error: any) {
@@ -459,17 +451,16 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
       
       let errorMessage = 'Could not get your location.';
       
-      // Browser-specific error messages
       if (browser === 'Edge') {
         switch(error.code) {
           case 1:
-            errorMessage = 'Location access denied. In Edge, click the lock icon in the address bar and allow location access.';
+            errorMessage = 'Location access denied. In Edge, click the lock icon and allow location access.';
             break;
           case 2:
-            errorMessage = 'Edge is having trouble accessing location services. Try restarting Edge browser and ensure Windows Location services are enabled.';
+            errorMessage = 'Edge is having trouble accessing location services. Try restarting Edge browser.';
             break;
           case 3:
-            errorMessage = 'Location request timed out. Edge may be taking longer than usual. Please try again.';
+            errorMessage = 'Location request timed out. Please try again.';
             break;
         }
       } else {
@@ -478,7 +469,7 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
             errorMessage = 'Location access denied. Please allow location access in your browser settings.';
             break;
           case 2:
-            errorMessage = 'Location service is temporarily unavailable. Please try again in a moment.';
+            errorMessage = 'Location service is temporarily unavailable. Please try again.';
             break;
           case 3:
             errorMessage = 'Location request timed out. Please try again.';
@@ -487,127 +478,13 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
       }
       
       setLocationError(errorMessage);
-      
-      // Offer manual input option
-      if (confirm('Would you like to enter the address manually instead?')) {
-        const addressInput = document.querySelector('textarea[placeholder="Building name, street, area"]') as HTMLTextAreaElement;
-        if (addressInput) {
-          addressInput.focus();
-        }
-      }
     }
   };
   
-  // Reset marker and map view
-  const resetMarker = () => {
-    if (!mapInstance) return;
-    
-    try {
-      // Get current values or use defaults
-      const lat = latitude ? parseFloat(String(latitude)) : 17.385;
-      const lng = longitude ? parseFloat(String(longitude)) : 78.4867;
-      
-      // Center map
-      mapInstance.setCenter({ lat, lng });
-      
-      // Update marker
-      updateMarkerPosition({ lat, lng });
-    } catch (error) {
-      console.error('Error resetting marker:', error);
-    }
-  };
-  
-  // Handle PIN code input to only allow numbers
-  const handlePinCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/\D/g, '').slice(0, 6);
-    saveField('pinCode', value);
-  };
-  
-  // Intercept Next button click
-  useEffect(() => {
-    // Find the Next button by its role in the form
-    const nextButton = Array.from(document.querySelectorAll('button')).find(
-      btn => btn.textContent?.trim() === 'Next' || 
-             btn.getAttribute('aria-label') === 'Next' ||
-             btn.getAttribute('type') === 'submit'
-    );
-    
-    if (!nextButton) return;
-    
-    // Save the original click handler
-    const originalClickHandler = nextButton.onclick;
-    
-    // Replace with our handler
-    const clickHandler = (e: MouseEvent) => {
-      // If we don't have coordinates, try to get them from the address
-      if (!coordinatesVerified && address) {
-        e.preventDefault();
-        e.stopPropagation();
-        
-        // If the "Find on Map" functionality is available, use it
-        findAddressOnMap();
-        
-        // Check if coordinates were captured
-        if (!coordinatesVerified) {
-          // Show error
-          setLocationError('Please mark your property location on the map before continuing');
-          // Scroll to map
-          mapContainerRef.current?.scrollIntoView({ behavior: 'smooth' });
-          return false;
-        }
-      }
-      
-      // If we don't have coordinates at all, prevent moving forward
-      if (!latitude || !longitude) {
-        e.preventDefault();
-        e.stopPropagation();
-        setLocationError('Please mark your property location on the map before continuing');
-        mapContainerRef.current?.scrollIntoView({ behavior: 'smooth' });
-        return false;
-      }
-      
-      // Allow the original handler to run if we have coordinates
-      if (originalClickHandler) {
-        return originalClickHandler.call(nextButton, e);
-      }
-      
-      return true;
-    };
-    
-    nextButton.onclick = clickHandler;
-    
-    // Cleanup
-    return () => {
-      if (nextButton) {
-        nextButton.onclick = originalClickHandler;
-      }
-    };
-  }, [address, latitude, longitude, coordinatesVerified]);
-
-  // Create a modified form object to pass to child components
-  // This ensures child components use the flow-based architecture
-  const modifiedForm = {
-    ...form,
-    register: (name: string, options?: any) => {
-      // Register with the full path
-      const fullPath = stepId ? `steps.${stepId}.${name}` : name;
-      return form.register(fullPath, options);
-    },
-    setValue: (name: string, value: any, options?: any) => {
-      const fullPath = stepId ? `steps.${stepId}.${name}` : name;
-      return form.setValue(fullPath, value, options);
-    },
-    getValues: (name?: string) => {
-      if (name) {
-        const fullPath = stepId ? `steps.${stepId}.${name}` : name;
-        return form.getValues(fullPath);
-      }
-      return form.getValues();
-    },
-    watch: (name: string) => {
-      const fullPath = stepId ? `steps.${stepId}.${name}` : name;
-      return form.watch(fullPath);
-    }
+  // Handle PIN code input
+  const handlePinCodeChange = (value: string) => {
+    const numericValue = value.replace(/\D/g, '').slice(0, 6);
+    updateFormAndState('pinCode', numericValue);
   };
 
   return (
@@ -615,23 +492,70 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
       title="Location Details"
       description="Where is your property located?"
     >
-      <div className="space-y-4">
-        {/* Success notification when coordinates are captured */}
+      {/* Validation Progress */}
+      {requiredFields.length > 0 && (
+        <div className="mb-6 p-3 bg-blue-50 rounded-lg border border-blue-200">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-blue-900">
+              Step Completion: {completionPercentage}%
+            </span>
+            <span className="text-xs text-blue-700">
+              {stepIsValid ? '✓ Ready to proceed' : 'Please complete required fields'}
+            </span>
+          </div>
+          <div className="w-full bg-blue-200 rounded-full h-2">
+            <div 
+              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+              style={{ width: `${completionPercentage}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-6">
+        {/* Success notification */}
         {showCoordinateSuccess && (
           <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded relative">
             <strong className="font-medium">Coordinates captured!</strong>
             <p className="text-sm">
-              Location coordinates have been captured: {latitude ? parseFloat(String(latitude)).toFixed(6) : ''}, {longitude ? parseFloat(String(longitude)).toFixed(6) : ''}
+              Location coordinates: {values.latitude ? parseFloat(String(values.latitude)).toFixed(6) : ''}, {values.longitude ? parseFloat(String(values.longitude)).toFixed(6) : ''}
             </p>
           </div>
         )}
         
-        {/* Flat No/Plot No Field - Placed first as requested */}
-        <FlatPlotInput form={modifiedForm} />
+        {/* Flat/Plot Number */}
+        <ValidatedInput
+          form={form}
+          name="flatPlotNo"
+          label="Flat/Plot Number"
+          placeholder="e.g., A-101, Plot 45"
+          value={values.flatPlotNo}
+          required={false}
+          error={shouldShowFieldError('flatPlotNo') ? getFieldValidation('flatPlotNo').error : null}
+          isValid={getFieldValidation('flatPlotNo').isValid}
+          isTouched={getFieldValidation('flatPlotNo').isTouched}
+          onValidation={(field, value) => updateFormAndState(field, value)}
+          onChange={(e) => updateFormAndState('flatPlotNo', e.target.value)}
+          size="lg"
+        />
         
         {/* Address with Map Controls */}
         <div>
-          <AddressInput form={modifiedForm} />
+          <ValidatedInput
+            form={form}
+            name="address"
+            label="Complete Address"
+            placeholder="Building name, street, area"
+            value={values.address}
+            required={true}
+            helperText="Provide detailed address for better visibility"
+            error={shouldShowFieldError('address') ? getFieldValidation('address').error : null}
+            isValid={getFieldValidation('address').isValid}
+            isTouched={getFieldValidation('address').isTouched}
+            onValidation={(field, value) => updateFormAndState(field, value)}
+            onChange={(e) => updateFormAndState('address', e.target.value)}
+            size="lg"
+          />
           
           <div className="flex justify-end mt-2 gap-4">
             <Button
@@ -640,7 +564,7 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
               size="sm"
               className="flex items-center gap-2 text-slate-700 hover:text-slate-900"
               onClick={findAddressOnMap}
-              disabled={!mapLoaded || !address || isGeocoding}
+              disabled={!mapLoaded || !values.address || isGeocoding}
             >
               <MapPin className="h-5 w-5" />
               <span>{isGeocoding ? 'Finding...' : 'Find on Map'}</span>
@@ -660,176 +584,128 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
           </div>
         </div>
 
-        {/* Locality Field */}
-        <div>
-          <RequiredLabel required>Locality</RequiredLabel>
-          <Input
-            {...modifiedForm.register('locality')}
+        {/* Location Fields */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <ValidatedInput
+            form={form}
+            name="locality"
+            label="Locality"
             placeholder="Enter locality"
-            className="h-11 text-base"
+            value={values.locality}
+            required={true}
+            error={shouldShowFieldError('locality') ? getFieldValidation('locality').error : null}
+            isValid={getFieldValidation('locality').isValid}
+            isTouched={getFieldValidation('locality').isTouched}
+            onValidation={(field, value) => updateFormAndState(field, value)}
+            onChange={(e) => updateFormAndState('locality', e.target.value)}
+            size="lg"
           />
-        </div>
 
-        {/* City Field - Removed default value */}
-        <div>
-          <RequiredLabel required>City</RequiredLabel>
-          <Input
-            {...modifiedForm.register('city')}
+          <ValidatedInput
+            form={form}
+            name="city"
+            label="City"
             placeholder="Enter city"
-            className="h-11 text-base"
+            value={values.city}
+            required={true}
+            error={shouldShowFieldError('city') ? getFieldValidation('city').error : null}
+            isValid={getFieldValidation('city').isValid}
+            isTouched={getFieldValidation('city').isTouched}
+            onValidation={(field, value) => updateFormAndState(field, value)}
+            onChange={(e) => updateFormAndState('city', e.target.value)}
+            size="lg"
           />
         </div>
 
-        {/* State Field - Changed to use regular Input (not pre-populated) */}
-        <div>
-          <RequiredLabel required>State</RequiredLabel>
-          <Input
-            {...modifiedForm.register('state')}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <ValidatedInput
+            form={form}
+            name="state"
+            label="State"
             placeholder="Enter state"
-            className="h-11 text-base"
+            value={values.state}
+            required={true}
+            error={shouldShowFieldError('state') ? getFieldValidation('state').error : null}
+            isValid={getFieldValidation('state').isValid}
+            isTouched={getFieldValidation('state').isTouched}
+            onValidation={(field, value) => updateFormAndState(field, value)}
+            onChange={(e) => updateFormAndState('state', e.target.value)}
+            size="lg"
+          />
+
+          <ValidatedInput
+            form={form}
+            name="pinCode"
+            label="PIN Code"
+            placeholder="Enter 6-digit PIN code"
+            value={values.pinCode}
+            required={true}
+            error={shouldShowFieldError('pinCode') ? getFieldValidation('pinCode').error : null}
+            isValid={getFieldValidation('pinCode').isValid}
+            isTouched={getFieldValidation('pinCode').isTouched}
+            onValidation={(field, value) => handlePinCodeChange(value)}
+            onChange={(e) => handlePinCodeChange(e.target.value)}
+            maxLength={6}
+            size="lg"
           />
         </div>
 
-        {/* PIN Code and Landmark */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <RequiredLabel required>PIN Code</RequiredLabel>
-            <Input
-              {...modifiedForm.register('pinCode')}
-              placeholder="Enter 6-digit PIN code"
-              className="h-11 text-base"
-              maxLength={6}
-              onChange={handlePinCodeChange}
-            />
-          </div>
-          
-          <div>
-            <RequiredLabel>Landmark</RequiredLabel>
-            <Input
-              {...modifiedForm.register('landmark')}
-              placeholder="Enter a nearby landmark"
-              className="h-11 text-base"
-            />
-          </div>
-        </div>
-
-        {/* Map Container - Wrapped in ErrorBoundary */}
-        <div className="space-y-2">
-          <RequiredLabel>Location on Map</RequiredLabel>
-          <ErrorBoundary
-            fallback={
-              <div className="h-64 w-full bg-slate-100 flex items-center justify-center text-red-500 p-4 text-center rounded-xl border border-slate-200">
-                <p>There was an error loading the map. Please refresh the page and try again.</p>
-              </div>
-            }
-          >
-            <div className="relative rounded-xl border border-slate-200 overflow-hidden">
-              {/* Map Container */}
-              <div className="h-64 w-full">
-                {mapErrorMessage ? (
-                  <div className="w-full h-full bg-slate-100 flex items-center justify-center text-red-500 p-4 text-center">
-                    <p>{mapErrorMessage}</p>
-                  </div>
-                ) : (
-                  <div 
-                    id="property-map"
-                    ref={mapContainerRef}
-                    className="w-full h-full bg-slate-100 relative"
-                  >
-                    {!mapLoaded && (
-                      <div className="absolute inset-0 flex items-center justify-center text-slate-500">
-                        <div className="flex flex-col items-center">
-                          <svg className="animate-spin h-8 w-8 text-slate-400 mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                          </svg>
-                          <p className="text-sm">Loading map...</p>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* Loading overlays */}
-                    {mapLoaded && (isGeocoding || isGeolocating) && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-80 z-10">
-                        <div className="flex flex-col items-center">
-                          <svg className="animate-spin h-8 w-8 text-blue-500 mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                          </svg>
-                          <p className="text-sm">
-                            {isGeocoding 
-                              ? 'Finding location...' 
-                              : 'Getting your location...'
-                            }
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-              
-              {/* Map Controls */}
-              <div className="absolute bottom-3 right-3 flex gap-2">
-                <button
-                  type="button"
-                  className="p-2 bg-white rounded-lg shadow-sm border border-slate-200 hover:bg-slate-50"
-                  onClick={resetMarker}
-                  title="Reset marker"
-                  disabled={!mapLoaded || !mapInstance || isGeocoding || isGeolocating}
-                >
-                  <MapPin className="h-4 w-4 text-slate-600" />
-                </button>
-              </div>
-            </div>
-            
-            {/* Location help/error message */}
-            {locationError && (
-              <div className="text-xs text-orange-600 mt-1">
-                <p>{locationError}</p>
-                {detectBrowser() === 'Edge' && (
-                  <p className="mt-1">
-                    Edge troubleshooting steps:
-                    <br />
-                    1. Click the lock/location icon in your address bar
-                    <br />
-                    2. Allow location access for this site
-                    <br />
-                    3. Ensure Windows Location services are ON (Settings &gt; Privacy &gt; Location)
-                    <br />
-                    4. Try restarting Edge if issues persist
-                  </p>
-                )}
-              </div>
-            )}
-            
-            {/* Display selected coordinates if any */}
-            {latitude && longitude && (
-              <div className="text-xs text-slate-500 flex justify-between">
-                <span>Coordinates: {parseFloat(String(latitude)).toFixed(6)}, {parseFloat(String(longitude)).toFixed(6)}</span>
-                <button 
-                  type="button" 
-                  className="text-blue-500 hover:text-blue-700"
-                  onClick={resetMarker}
-                  disabled={isGeocoding || isGeolocating}
-                >
-                  Reset location
-                </button>
-              </div>
-            )}
-            
-            <p className="text-xs text-slate-500 mt-1">
-              * Click on the map to mark your property location or use the "Find on Map" button
-            </p>
-          </ErrorBoundary>
-        </div>
-        
-        {/* Hidden field to track if coordinates are verified */}
-        <input 
-          type="hidden" 
-          {...modifiedForm.register('coordinates_verified')} 
-          value={coordinatesVerified ? 'true' : 'false'}
+        {/* Landmark */}
+        <ValidatedInput
+          form={form}
+          name="landmark"
+          label="Landmark"
+          placeholder="Enter a nearby landmark"
+          value={values.landmark}
+          required={false}
+          error={shouldShowFieldError('landmark') ? getFieldValidation('landmark').error : null}
+          isValid={getFieldValidation('landmark').isValid}
+          isTouched={getFieldValidation('landmark').isTouched}
+          onValidation={(field, value) => updateFormAndState(field, value)}
+          onChange={(e) => updateFormAndState('landmark', e.target.value)}
+          size="lg"
         />
+
+        {/* Map Container */}
+        <div className="space-y-4">
+          <RequiredLabel className="text-base">Map Location</RequiredLabel>
+          <p className="text-sm text-gray-600">Click on the map to select exact location</p>
+          
+          {/* Error Display */}
+          {mapErrorMessage && (
+            <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded">
+              <p className="text-sm">{mapErrorMessage}</p>
+            </div>
+          )}
+          
+          {/* Map Container */}
+          <ErrorBoundary>
+            <div 
+              ref={mapContainerRef}
+              className="w-full h-96 rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 flex items-center justify-center"
+              style={{ 
+                minHeight: '400px',
+                background: mapLoaded ? 'transparent' : '#f9fafb'
+              }}
+            >
+              {!mapLoaded && (
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                  <p className="text-gray-500">Loading Google Maps...</p>
+                </div>
+              )}
+            </div>
+          </ErrorBoundary>
+          
+          {/* Coordinates Display */}
+          {coordinatesVerified && values.latitude && values.longitude && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+              <p className="text-sm text-green-800">
+                <strong>Coordinates:</strong> {parseFloat(String(values.latitude)).toFixed(6)}, {parseFloat(String(values.longitude)).toFixed(6)}
+              </p>
+            </div>
+          )}
+        </div>
       </div>
     </FormSection>
   );

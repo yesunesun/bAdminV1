@@ -1,187 +1,89 @@
 // src/components/ui/RequiredLabel.tsx
-// Version: 2.0.0 
-// Last Modified: 29-05-2025 16:45 IST
-// Purpose: Enhanced RequiredLabel with validation states and better accessibility
+// Version: 2.0.0
+// Last Modified: 29-05-2025 18:15 IST
+// Purpose: Enhanced label component with validation states and feedback
 
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
-import { CheckCircle2, AlertCircle, Info } from 'lucide-react';
 
 export type ValidationState = 'idle' | 'valid' | 'invalid' | 'required';
 
-interface RequiredLabelProps {
-  htmlFor?: string;
+interface RequiredLabelProps extends React.LabelHTMLAttributes<HTMLLabelElement> {
   required?: boolean;
   children: React.ReactNode;
-  helperText?: string;
-  errorText?: string;
-  className?: string;
-  labelClassName?: string;
-  validationState?: ValidationState;
-  showValidationIcon?: boolean;
-  size?: 'sm' | 'md' | 'lg';
-  theme?: 'default' | 'minimal';
 }
 
-export function RequiredLabel({ 
-  htmlFor, 
+interface FormFieldLabelProps extends RequiredLabelProps {
+  fieldName: string;
+  isValid?: boolean;
+  isTouched?: boolean;
+  error?: string | null;
+  helperText?: string;
+  size?: 'sm' | 'md' | 'lg';
+}
+
+// Basic RequiredLabel component (backward compatibility)
+export function RequiredLabel({
   required = false,
-  children, 
-  helperText,
-  errorText,
+  children,
   className,
-  labelClassName,
-  validationState = 'idle',
-  showValidationIcon = true,
-  size = 'md',
-  theme = 'default'
+  ...props
 }: RequiredLabelProps) {
+  return (
+    <Label
+      className={cn(
+        "text-sm font-medium text-gray-700 dark:text-gray-300",
+        className
+      )}
+      {...props}
+    >
+      {children}
+      {required && (
+        <span className="text-red-500 ml-1" aria-label="required">
+          *
+        </span>
+      )}
+    </Label>
+  );
+}
+
+// Enhanced FormFieldLabel with validation states
+export function FormFieldLabel({
+  fieldName,
+  required = false,
+  isValid,
+  isTouched,
+  error,
+  helperText,
+  size = 'md',
+  children,
+  className,
+  ...props
+}: FormFieldLabelProps) {
   
   // Size configurations
   const sizeConfig = {
     sm: {
       label: 'text-xs',
-      icon: 'h-3 w-3',
       helper: 'text-xs',
-      spacing: 'space-y-0.5'
+      error: 'text-xs'
     },
     md: {
       label: 'text-sm',
-      icon: 'h-4 w-4',
       helper: 'text-xs',
-      spacing: 'space-y-1'
+      error: 'text-xs'
     },
     lg: {
       label: 'text-base',
-      icon: 'h-4 w-4',
       helper: 'text-sm',
-      spacing: 'space-y-1.5'
+      error: 'text-sm'
     }
   };
 
   const config = sizeConfig[size];
 
-  // Determine which text to show (error takes priority)
-  const displayText = errorText || helperText;
-  const textType = errorText ? 'error' : 'helper';
-
-  // Get validation icon
-  const getValidationIcon = () => {
-    if (!showValidationIcon) return null;
-    
-    switch (validationState) {
-      case 'valid':
-        return <CheckCircle2 className={cn(config.icon, 'text-green-500')} />;
-      case 'invalid':
-        return <AlertCircle className={cn(config.icon, 'text-red-500')} />;
-      case 'required':
-        return <AlertCircle className={cn(config.icon, 'text-amber-500')} />;
-      default:
-        return null;
-    }
-  };
-
-  // Get theme-specific styles
-  const getThemeStyles = () => {
-    if (theme === 'minimal') {
-      return {
-        label: 'text-slate-700 dark:text-slate-200',
-        required: 'text-red-400',
-        helper: 'text-slate-500 dark:text-slate-400',
-        error: 'text-red-500 dark:text-red-400'
-      };
-    }
-    
-    return {
-      label: 'text-slate-700 dark:text-slate-200 font-medium',
-      required: 'text-red-500',
-      helper: 'text-slate-500 dark:text-slate-400',
-      error: 'text-red-600 dark:text-red-400 font-medium'
-    };
-  };
-
-  const themeStyles = getThemeStyles();
-
-  return (
-    <div className={cn(config.spacing, className)}>
-      {/* Label row with validation icon */}
-      <div className="flex items-center gap-2">
-        <div className="flex items-center gap-1">
-          <Label 
-            htmlFor={htmlFor} 
-            className={cn(
-              config.label,
-              themeStyles.label,
-              labelClassName
-            )}
-          >
-            {children}
-          </Label>
-          {required && (
-            <span 
-              className={cn(
-                'leading-none select-none',
-                config.label,
-                themeStyles.required
-              )}
-              aria-label="Required field"
-              title="This field is required"
-            >
-              *
-            </span>
-          )}
-        </div>
-        
-        {/* Validation icon */}
-        {getValidationIcon()}
-      </div>
-      
-      {/* Helper/Error text */}
-      {displayText && (
-        <div className="flex items-start gap-1">
-          {textType === 'error' && !showValidationIcon && (
-            <AlertCircle className={cn(config.icon, 'text-red-500 mt-0.5 flex-shrink-0')} />
-          )}
-          {textType === 'helper' && helperText && (
-            <Info className={cn(config.icon, 'text-slate-400 mt-0.5 flex-shrink-0')} />
-          )}
-          <p 
-            className={cn(
-              config.helper,
-              'leading-relaxed',
-              textType === 'error' ? themeStyles.error : themeStyles.helper
-            )}
-            role={textType === 'error' ? 'alert' : 'note'}
-            aria-live={textType === 'error' ? 'polite' : 'off'}
-          >
-            {displayText}
-          </p>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// Enhanced required label specifically for form fields
-export interface FormFieldLabelProps extends RequiredLabelProps {
-  fieldName: string;
-  isValid?: boolean;
-  isTouched?: boolean;
-  error?: string | null;
-}
-
-export function FormFieldLabel({
-  fieldName,
-  isValid,
-  isTouched,
-  error,
-  required,
-  children,
-  helperText,
-  ...props
-}: FormFieldLabelProps) {
-  // Determine validation state based on field status
+  // Determine validation state
   const getValidationState = (): ValidationState => {
     if (!isTouched) return 'idle';
     if (error) return 'invalid';
@@ -190,19 +92,95 @@ export function FormFieldLabel({
     return 'idle';
   };
 
+  const validationState = getValidationState();
+
+  // Get label styling based on validation state
+  const getLabelClassName = () => {
+    const baseClasses = cn(
+      config.label,
+      'font-medium transition-colors',
+      className
+    );
+
+    switch (validationState) {
+      case 'valid':
+        return cn(baseClasses, 'text-green-700 dark:text-green-400');
+      case 'invalid':
+      case 'required':
+        return cn(baseClasses, 'text-red-700 dark:text-red-400');
+      default:
+        return cn(baseClasses, 'text-gray-700 dark:text-gray-300');
+    }
+  };
+
+  // Get validation icon
+  const getValidationIcon = () => {
+    switch (validationState) {
+      case 'valid':
+        return (
+          <span className="text-green-500 ml-1" aria-label="valid">
+            ✓
+          </span>
+        );
+      case 'invalid':
+      case 'required':
+        return (
+          <span className="text-red-500 ml-1" aria-label="error">
+            !
+          </span>
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
-    <RequiredLabel
-      htmlFor={fieldName}
-      required={required}
-      helperText={helperText}
-      errorText={error || undefined}
-      validationState={getValidationState()}
-      {...props}
-    >
-      {children}
-    </RequiredLabel>
+    <div className="space-y-1">
+      {/* Main label */}
+      <Label
+        htmlFor={fieldName}
+        className={getLabelClassName()}
+        {...props}
+      >
+        {children}
+        {required && (
+          <span className="text-red-500 ml-1" aria-label="required">
+            *
+          </span>
+        )}
+        {getValidationIcon()}
+      </Label>
+
+      {/* Helper text */}
+      {helperText && !error && (
+        <p 
+          id={`${fieldName}-helper`}
+          className={cn(
+            config.helper,
+            'text-gray-500 dark:text-gray-400'
+          )}
+        >
+          {helperText}
+        </p>
+      )}
+
+      {/* Error message */}
+      {error && isTouched && (
+        <p 
+          id={`${fieldName}-error`}
+          className={cn(
+            config.error,
+            'text-red-600 dark:text-red-400 flex items-center gap-1'
+          )}
+          role="alert"
+        >
+          <span className="text-red-500">⚠</span>
+          {error}
+        </p>
+      )}
+    </div>
   );
 }
 
-// Re-export types for convenience
-export type { RequiredLabelProps, ValidationState };
+// Export both for backward compatibility
+export default RequiredLabel;

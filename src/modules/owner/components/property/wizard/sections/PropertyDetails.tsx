@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/PropertyDetails.tsx
-// Version: 4.2.0
-// Last Modified: 20-05-2025 16:30 IST
-// Purpose: Fix field duplication - stop adding fields to root level when setting step values
+// Version: 4.5.0
+// Last Modified: 29-05-2025 20:15 IST
+// Purpose: Complete working version with proper div structure and validation
 
 import React, { useEffect, useState, useRef } from 'react';
 import { FormSection } from '@/components/FormSection';
@@ -28,39 +28,42 @@ export function PropertyDetails({
   adType,
   stepId: providedStepId 
 }: PropertyDetailsProps) {
-  // Track mount status to avoid updates after unmount
+  // Track mount status
   const isMounted = useRef(true);
-  
-  // Track if initial form values have been processed
   const initialProcessDone = useRef(false);
   
-  // Generate stepId based on current flow if not provided
+  // Generate stepId based on current flow
   const formFlow = form.getValues('flow');
   const flowType = formFlow ? `${formFlow.category}_${formFlow.listingType}` : 'residential_rent';
   
-  // Determine the appropriate stepId based on flow type
+  // Determine the appropriate stepId
   let stepId = providedStepId;
   if (!stepId) {
-    // Generate step ID based on flow
     const prefix = flowType.split('_').map(part => part.substring(0, 3)).join('_');
     stepId = `${prefix}_basic_details`;
   }
-  
-  // Helper functions to work with the form directly
+
+  // Form validation state
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
+
+  // Basic validation rules
+  const requiredFields = [
+    'propertyType', 'bhkType', 'floor', 'totalFloors', 
+    'propertyAge', 'facing', 'builtUpArea', 'bathrooms'
+  ];
+
+  // Helper functions for form data management
   const getField = (fieldName: string, defaultValue?: any) => {
     const path = `steps.${stepId}.${fieldName}`;
     
-    // First try to get from new structure
+    // Try step structure first
     const stepValue = form.getValues(path);
-    if (stepValue !== undefined) {
-      return stepValue;
-    }
+    if (stepValue !== undefined) return stepValue;
     
     // Fallback to legacy structure
     const legacyValue = form.getValues(fieldName);
-    if (legacyValue !== undefined) {
-      return legacyValue;
-    }
+    if (legacyValue !== undefined) return legacyValue;
     
     // Check nested basicDetails structure
     const basicDetails = form.getValues('basicDetails');
@@ -74,48 +77,102 @@ export function PropertyDetails({
   const saveField = (fieldName: string, value: any) => {
     const path = `steps.${stepId}.${fieldName}`;
     
-    // Ensure the steps structure exists
+    // Ensure steps structure exists
     const steps = form.getValues('steps') || {};
     if (!steps[stepId]) {
-      // Create the step object if it doesn't exist 
       form.setValue('steps', {
         ...steps,
         [stepId]: {}
       }, { shouldValidate: false });
     }
     
-    // Set the value in the step structure only
+    // Set value in step structure
     form.setValue(path, value, { shouldValidate: true });
     
-    // REMOVED: No longer update root level for backward compatibility
-    // form.setValue(fieldName, value, { shouldValidate: false });
+    // Basic field validation
+    validateField(fieldName, value);
     
-    // Update nested basicDetails structure if it exists (v2 format)
-    // We keep this for backward compatibility with v2 formats
+    // Update nested basicDetails for backward compatibility
     const basicDetails = form.getValues('basicDetails');
     if (basicDetails) {
-      // Convert value format for nested structure if needed
       let structuredValue = value;
       if (fieldName === 'floor' || fieldName === 'totalFloors' || fieldName === 'builtUpArea') {
         const numValue = parseInt(value);
         structuredValue = !isNaN(numValue) ? numValue : null;
       }
       
-      // Update the nested field
-      const updatedBasicDetails = {
+      form.setValue('basicDetails', {
         ...basicDetails,
         [fieldName]: structuredValue
-      };
-      
-      form.setValue('basicDetails', updatedBasicDetails, { shouldValidate: false });
+      }, { shouldValidate: false });
     }
   };
-  
-  // Get initial form values directly
-  const initialValues = form.getValues();
-  
-  // Use component state to render values with proper initialization
+
+  // Basic field validation
+  const validateField = (fieldName: string, value: any) => {
+    let error = '';
+    
+    // Required field validation
+    if (requiredFields.includes(fieldName)) {
+      if (!value || value === '') {
+        error = `${getFieldLabel(fieldName)} is required`;
+      }
+    }
+    
+    // Specific field validations
+    switch (fieldName) {
+      case 'floor':
+      case 'totalFloors':
+      case 'bathrooms':
+        if (value && (isNaN(parseInt(value)) || parseInt(value) < 0)) {
+          error = `${getFieldLabel(fieldName)} must be a valid number`;
+        }
+        if (fieldName === 'bathrooms' && value && parseInt(value) < 1) {
+          error = 'At least 1 bathroom is required';
+        }
+        break;
+      case 'builtUpArea':
+        if (value && (isNaN(parseInt(value)) || parseInt(value) < 100)) {
+          error = 'Built-up area must be at least 100 sq ft';
+        }
+        break;
+    }
+    
+    // Update validation errors
+    setValidationErrors(prev => ({
+      ...prev,
+      [fieldName]: error
+    }));
+    
+    return error === '';
+  };
+
+  // Get user-friendly field label
+  const getFieldLabel = (fieldName: string): string => {
+    const labels: Record<string, string> = {
+      propertyType: 'Property Type',
+      bhkType: 'BHK Configuration',
+      floor: 'Floor',
+      totalFloors: 'Total Floors',
+      propertyAge: 'Property Age',
+      facing: 'Facing Direction',
+      builtUpArea: 'Built-up Area',
+      bathrooms: 'Bathrooms'
+    };
+    return labels[fieldName] || fieldName;
+  };
+
+  const markFieldTouched = (fieldName: string) => {
+    setTouchedFields(prev => new Set([...prev, fieldName]));
+  };
+
+  const shouldShowError = (fieldName: string) => {
+    return touchedFields.has(fieldName) && validationErrors[fieldName];
+  };
+
+  // State for form values
   const [values, setValues] = useState({
+    title: getField('title', ''),
     propertyType: getField('propertyType', '') || category || '',
     bhkType: getField('bhkType', ''),
     floor: getField('floor', ''),
@@ -123,201 +180,75 @@ export function PropertyDetails({
     propertyAge: getField('propertyAge', ''),
     facing: getField('facing', ''),
     builtUpArea: getField('builtUpArea', ''),
-    builtUpAreaUnit: getField('builtUpAreaUnit', 'sqft'), // Always default to sqft
-    possessionDate: getField('possessionDate', ''),
-    title: getField('title', '')
+    builtUpAreaUnit: getField('builtUpAreaUnit', 'sqft'),
+    bathrooms: getField('bathrooms', ''),
+    possessionDate: getField('possessionDate', '')
   });
-  
-  // Debug counter to track re-renders and updates
-  const updateCounter = useRef(0);
-  
-  // Clean up on unmount
+
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
       isMounted.current = false;
     };
   }, []);
-  
-  // Subscribe to form changes with improved handling
+
+  // Initialize and migrate data
   useEffect(() => {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('Setting up form subscription');
+    if (initialProcessDone.current) return;
+    
+    initialProcessDone.current = true;
+    
+    // Ensure default area unit
+    if (!getField('builtUpAreaUnit')) {
+      saveField('builtUpAreaUnit', 'sqft');
     }
     
-    // Watch all fields that we're interested in
-    const watchFields = [
-      'propertyType', 
-      'bhkType', 
-      'floor', 
-      'totalFloors', 
-      'propertyAge', 
-      'facing', 
-      'builtUpArea', 
-      'builtUpAreaUnit', 
-      'possessionDate', 
-      'title',
-      // Also watch v2 nested structure fields
-      'basicDetails'
+    // Process nested structure (v2 format)
+    const basicDetails = form.getValues('basicDetails');
+    if (basicDetails) {
+      const fieldsToMigrate = [
+        'title', 'propertyType', 'bhkType', 'floor', 'totalFloors', 
+        'propertyAge', 'facing', 'builtUpArea', 'builtUpAreaUnit', 'bathrooms'
+      ];
+      
+      fieldsToMigrate.forEach(field => {
+        if (basicDetails[field] && !getField(field)) {
+          const value = typeof basicDetails[field] === 'number' 
+            ? basicDetails[field].toString() 
+            : basicDetails[field];
+          saveField(field, value);
+        }
+      });
+    }
+    
+    // Migrate from root to step structure
+    const rootFields = [
+      'title', 'propertyType', 'bhkType', 'floor', 'totalFloors', 
+      'propertyAge', 'facing', 'builtUpArea', 'builtUpAreaUnit', 'bathrooms', 'possessionDate'
     ];
     
-    // Subscribe to form changes for specific fields
-    const subscription = form.watch((value, { name, type }) => {
-      updateCounter.current += 1;
-      const count = updateCounter.current;
+    rootFields.forEach(field => {
+      const rootValue = form.getValues(field);
+      const stepValue = form.getValues(`steps.${stepId}.${field}`);
       
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`[${count}] Form update - Changed field: ${name}, Type: ${type}`);
-      }
-      
-      // If specific fields we care about change, update our state
-      if (watchFields.includes(name as string) || name === undefined) {
-        if (process.env.NODE_ENV === 'development') {
-          console.log(`[${count}] Updating component state from form values`);
-        }
-        updateStateFromForm(true, `subscription-${count}`);
-      }
-      
-      // For nested structure changes (v2 format)
-      if (name === 'basicDetails') {
-        if (process.env.NODE_ENV === 'development') {
-          console.log(`[${count}] Updating from nested basicDetails structure`);
-        }
-        const basicDetails = form.getValues('basicDetails');
-        if (basicDetails) {
-          // Update flat fields from nested structure
-          const nestedValues = {
-            title: basicDetails.title || values.title,
-            propertyType: basicDetails.propertyType || values.propertyType,
-            bhkType: basicDetails.bhkType || values.bhkType,
-            floor: basicDetails.floor?.toString() || values.floor,
-            totalFloors: basicDetails.totalFloors?.toString() || values.totalFloors,
-            propertyAge: basicDetails.propertyAge || values.propertyAge,
-            facing: basicDetails.facing || values.facing,
-            builtUpArea: basicDetails.builtUpArea?.toString() || values.builtUpArea,
-            builtUpAreaUnit: basicDetails.builtUpAreaUnit || values.builtUpAreaUnit
-          };
-          
-          if (process.env.NODE_ENV === 'development') {
-            console.log(`[${count}] Updating flat fields from nested values:`, nestedValues);
-          }
-          
-          // Set local state
-          if (isMounted.current) {
-            setValues(prev => ({...prev, ...nestedValues}));
-          }
-          
-          // Also set fields in step structure if they're not already set
-          Object.entries(nestedValues).forEach(([field, value]) => {
-            const stepPath = `steps.${stepId}.${field}`;
-            const currentStepValue = form.getValues(stepPath);
-            
-            if (!currentStepValue && value) {
-              if (process.env.NODE_ENV === 'development') {
-                console.log(`[${count}] Setting field ${field} from nested structure to step:`, value);
-              }
-              // Only set in the step structure, not at root
-              form.setValue(stepPath, value, { shouldValidate: false });
-            }
-          });
-        }
+      if (rootValue !== undefined && stepValue === undefined) {
+        form.setValue(`steps.${stepId}.${field}`, rootValue, { shouldValidate: false });
       }
     });
     
-    // One-time initialization
-    if (!initialProcessDone.current) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('First-time processing of initial values');
-      }
-      initialProcessDone.current = true;
-      
-      // Ensure builtUpAreaUnit has a default value of 'sqft'
-      if (!getField('builtUpAreaUnit')) {
-        if (process.env.NODE_ENV === 'development') {
-          console.log('Setting default builtUpAreaUnit to sqft');
-        }
-        saveField('builtUpAreaUnit', 'sqft');
-      }
-      
-      // Process nested structure (v2 format)
-      const basicDetails = form.getValues('basicDetails');
-      if (basicDetails) {
-        if (process.env.NODE_ENV === 'development') {
-          console.log('Processing nested basicDetails:', basicDetails);
-        }
-        
-        // Map nested values to fields in the step structure if they're not set
-        if (basicDetails.propertyType && !getField('propertyType')) {
-          saveField('propertyType', basicDetails.propertyType);
-        }
-        if (basicDetails.bhkType && !getField('bhkType')) {
-          saveField('bhkType', basicDetails.bhkType);
-        }
-        if (basicDetails.floor && !getField('floor')) {
-          saveField('floor', basicDetails.floor.toString());
-        }
-        if (basicDetails.totalFloors && !getField('totalFloors')) {
-          saveField('totalFloors', basicDetails.totalFloors.toString());
-        }
-        if (basicDetails.propertyAge && !getField('propertyAge')) {
-          saveField('propertyAge', basicDetails.propertyAge);
-        }
-        if (basicDetails.facing && !getField('facing')) {
-          saveField('facing', basicDetails.facing);
-        }
-        if (basicDetails.builtUpArea && !getField('builtUpArea')) {
-          saveField('builtUpArea', basicDetails.builtUpArea.toString());
-        }
-        if (basicDetails.builtUpAreaUnit && !getField('builtUpAreaUnit')) {
-          saveField('builtUpAreaUnit', basicDetails.builtUpAreaUnit);
-        }
-      }
-      
-      // Also handle migration from root to step structure for legacy data
-      const rootFields = [
-        'propertyType', 'bhkType', 'floor', 'totalFloors', 'propertyAge', 
-        'facing', 'builtUpArea', 'builtUpAreaUnit', 'possessionDate', 'title'
-      ];
-      
-      rootFields.forEach(field => {
-        const rootValue = form.getValues(field);
-        const stepValue = form.getValues(`steps.${stepId}.${field}`);
-        
-        // If value exists at root but not in step, migrate it
-        if (rootValue !== undefined && stepValue === undefined) {
-          if (process.env.NODE_ENV === 'development') {
-            console.log(`Migrating ${field} from root to step:`, rootValue);
-          }
-          
-          // Set in step structure without updating root again
-          const path = `steps.${stepId}.${field}`;
-          form.setValue(path, rootValue, { shouldValidate: false });
-        }
-      });
-      
-      // Update state after processing initial values
-      updateStateFromForm(false, 'initial-process');
-    }
-    
-    return () => subscription.unsubscribe();
-  }, [form, category, stepId]);
-  
-  // Function to update component state from form values
-  const updateStateFromForm = (validateAfter = false, source = 'unknown') => {
+    // Update component state
+    updateStateFromForm();
+  }, []);
+
+  // Update component state from form values
+  const updateStateFromForm = () => {
     if (!isMounted.current) return;
     
-    const formValues = form.getValues();
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`Updating state from form values (source: ${source})`, formValues);
-    }
-    
-    // Get current step data
     const stepData = form.getValues(`steps.${stepId}`) || {};
+    const formValues = form.getValues();
     
-    // Ensure builtUpAreaUnit has a value
-    const areaUnit = stepData.builtUpAreaUnit || formValues.builtUpAreaUnit || 'sqft';
-    
-    // Create new state object based on current form values
     const newValues = {
+      title: stepData.title || formValues.title || '',
       propertyType: stepData.propertyType || formValues.propertyType || category || '',
       bhkType: stepData.bhkType || formValues.bhkType || '',
       floor: stepData.floor?.toString() || formValues.floor || '',
@@ -325,54 +256,22 @@ export function PropertyDetails({
       propertyAge: stepData.propertyAge || formValues.propertyAge || '',
       facing: stepData.facing || formValues.facing || '',
       builtUpArea: stepData.builtUpArea?.toString() || formValues.builtUpArea || '',
-      builtUpAreaUnit: areaUnit,
-      possessionDate: stepData.possessionDate || formValues.possessionDate || '',
-      title: stepData.title || formValues.title || ''
+      builtUpAreaUnit: stepData.builtUpAreaUnit || formValues.builtUpAreaUnit || 'sqft',
+      bathrooms: stepData.bathrooms?.toString() || formValues.bathrooms || '',
+      possessionDate: stepData.possessionDate || formValues.possessionDate || ''
     };
     
-    // Only update state if any values have changed
-    const hasChanges = Object.entries(newValues).some(([key, value]) => {
-      const currentValue = values[key as keyof typeof values];
-      return currentValue !== value;
-    });
-    
-    if (hasChanges) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`State needs update - Changes detected (source: ${source})`, newValues);
-      }
-      setValues(newValues);
-      
-      // Validate form after update if requested
-      if (validateAfter) {
-        setTimeout(() => {
-          form.trigger();
-        }, 100);
-      }
-    } else {
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`No state changes needed (source: ${source})`);
-      }
-    }
+    setValues(newValues);
   };
-  
-  // Update form when local state changes
+
+  // Update form and trigger validation
   const updateFormAndState = (field: string, value: any) => {
-    // Update local state
-    setValues(prev => ({
-      ...prev,
-      [field]: value
-    }));
-    
-    // Save using the step-based structure
+    setValues(prev => ({ ...prev, [field]: value }));
     saveField(field, value);
-    
-    // Debug log
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`Updated ${field} to:`, value);
-    }
+    markFieldTouched(field);
   };
-  
-  // Process numeric input
+
+  // Handle numeric input with validation
   const handleNumberInput = (value: string, fieldName: string) => {
     if (value === '') {
       updateFormAndState(fieldName, '');
@@ -380,42 +279,83 @@ export function PropertyDetails({
     }
     
     const numValue = parseInt(value);
-    if (isNaN(numValue)) {
-      return;
-    }
-    
-    if (numValue < 0) {
-      updateFormAndState(fieldName, '0');
+    if (isNaN(numValue) || numValue < 0) {
       return;
     }
     
     updateFormAndState(fieldName, numValue.toString());
   };
 
-  // Force a unit value to avoid blank display
-  const unitValue = values.builtUpAreaUnit || 'sqft';
-  
-  // Get tomorrow's date in YYYY-MM-DD format for min date
+  // Calculate completion percentage
+  const completionPercentage = () => {
+    const completedFields = requiredFields.filter(field => {
+      const value = values[field as keyof typeof values];
+      return value && value !== '';
+    }).length;
+    
+    return Math.round((completedFields / requiredFields.length) * 100);
+  };
+
+  // Get tomorrow's date for min date
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   const minDate = tomorrow.toISOString().split('T')[0];
+
+  const currentCompletion = completionPercentage();
+  const isStepValid = currentCompletion === 100;
 
   return (
     <FormSection
       title="Property Details"
       description="Tell us about your property"
-      className="text-base"
     >
-      <div className="space-y-4">
+      {/* Progress Indicator */}
+      <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-sm font-medium text-blue-900">
+            Step Completion: {currentCompletion}%
+          </span>
+          <span className="text-xs text-blue-700">
+            {isStepValid ? '✅ Ready to proceed' : '⚠️ Please complete required fields'}
+          </span>
+        </div>
+        <div className="w-full bg-blue-200 rounded-full h-2">
+          <div 
+            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+            style={{ width: `${currentCompletion}%` }}
+          />
+        </div>
+        {!isStepValid && (
+          <p className="text-xs text-blue-600 mt-2">
+            Required fields: Property Type, BHK, Floor, Total Floors, Age, Facing, Built-up Area, Bathrooms
+          </p>
+        )}
+      </div>
+
+      <div className="space-y-6">
+        {/* Property Title (Edit mode only) */}
+        {mode === 'edit' && (
+          <div>
+            <RequiredLabel className="text-base">Property Title</RequiredLabel>
+            <Input
+              className="h-12 text-base mt-2"
+              value={values.title}
+              onChange={(e) => updateFormAndState('title', e.target.value)}
+              onBlur={() => markFieldTouched('title')}
+              placeholder="E.g., Spacious 2BHK in Gachibowli"
+            />
+          </div>
+        )}
+
         {/* Basic Property Info - Two Column */}
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <RequiredLabel required className="text-base">Type</RequiredLabel>
+            <RequiredLabel required className="text-base">Property Type</RequiredLabel>
             <Select 
               value={values.propertyType}
               onValueChange={(value) => updateFormAndState('propertyType', value)}
             >
-              <SelectTrigger className="h-11 text-base">
+              <SelectTrigger className="h-12 text-base mt-2">
                 <SelectValue placeholder="Type of property?" />
               </SelectTrigger>
               <SelectContent className="text-base">
@@ -426,15 +366,18 @@ export function PropertyDetails({
                 ))}
               </SelectContent>
             </Select>
+            {shouldShowError('propertyType') && (
+              <p className="text-sm text-red-500 mt-2">⚠️ {validationErrors.propertyType}</p>
+            )}
           </div>
 
           <div>
-            <RequiredLabel required className="text-base">BHK</RequiredLabel>
+            <RequiredLabel required className="text-base">BHK Configuration</RequiredLabel>
             <Select 
               value={values.bhkType}
               onValueChange={(value) => updateFormAndState('bhkType', value)}
             >
-              <SelectTrigger className="h-11 text-base">
+              <SelectTrigger className="h-12 text-base mt-2">
                 <SelectValue placeholder="Number of bedrooms?" />
               </SelectTrigger>
               <SelectContent className="text-base">
@@ -445,6 +388,9 @@ export function PropertyDetails({
                 ))}
               </SelectContent>
             </Select>
+            {shouldShowError('bhkType') && (
+              <p className="text-sm text-red-500 mt-2">⚠️ {validationErrors.bhkType}</p>
+            )}
           </div>
         </div>
 
@@ -455,11 +401,15 @@ export function PropertyDetails({
             <Input
               type="number"
               min="0"
-              className="h-11 text-base"
+              className="h-12 text-base mt-2"
               value={values.floor}
               placeholder="Floor number (0 = ground)"
               onChange={(e) => handleNumberInput(e.target.value, 'floor')}
+              onBlur={() => markFieldTouched('floor')}
             />
+            {shouldShowError('floor') && (
+              <p className="text-sm text-red-500 mt-2">⚠️ {validationErrors.floor}</p>
+            )}
           </div>
 
           <div>
@@ -467,23 +417,44 @@ export function PropertyDetails({
             <Input
               type="number"
               min="1"
-              className="h-11 text-base"
+              className="h-12 text-base mt-2"
               value={values.totalFloors}
               placeholder="Building total floors"
               onChange={(e) => handleNumberInput(e.target.value, 'totalFloors')}
+              onBlur={() => markFieldTouched('totalFloors')}
             />
+            {shouldShowError('totalFloors') && (
+              <p className="text-sm text-red-500 mt-2">⚠️ {validationErrors.totalFloors}</p>
+            )}
           </div>
         </div>
 
-        {/* Property Age and Facing - Two Column */}
+        {/* Bathrooms and Property Age */}
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <RequiredLabel required className="text-base">Age</RequiredLabel>
+            <RequiredLabel required className="text-base">Bathrooms</RequiredLabel>
+            <Input
+              type="number"
+              min="1"
+              max="10"
+              className="h-12 text-base mt-2"
+              value={values.bathrooms}
+              placeholder="Number of bathrooms"
+              onChange={(e) => handleNumberInput(e.target.value, 'bathrooms')}
+              onBlur={() => markFieldTouched('bathrooms')}
+            />
+            {shouldShowError('bathrooms') && (
+              <p className="text-sm text-red-500 mt-2">⚠️ {validationErrors.bathrooms}</p>
+            )}
+          </div>
+
+          <div>
+            <RequiredLabel required className="text-base">Property Age</RequiredLabel>
             <Select 
               value={values.propertyAge}
               onValueChange={(value) => updateFormAndState('propertyAge', value)}
             >
-              <SelectTrigger className="h-11 text-base">
+              <SelectTrigger className="h-12 text-base mt-2">
                 <SelectValue placeholder="Property age?" />
               </SelectTrigger>
               <SelectContent className="text-base">
@@ -494,15 +465,21 @@ export function PropertyDetails({
                 ))}
               </SelectContent>
             </Select>
+            {shouldShowError('propertyAge') && (
+              <p className="text-sm text-red-500 mt-2">⚠️ {validationErrors.propertyAge}</p>
+            )}
           </div>
+        </div>
 
+        {/* Facing Direction */}
+        <div className="grid grid-cols-2 gap-4">
           <div>
-            <RequiredLabel required className="text-base">Facing</RequiredLabel>
+            <RequiredLabel required className="text-base">Facing Direction</RequiredLabel>
             <Select 
               value={values.facing}
               onValueChange={(value) => updateFormAndState('facing', value)}
             >
-              <SelectTrigger className="h-11 text-base">
+              <SelectTrigger className="h-12 text-base mt-2">
                 <SelectValue placeholder="Direction facing?" />
               </SelectTrigger>
               <SelectContent className="text-base">
@@ -513,58 +490,62 @@ export function PropertyDetails({
                 ))}
               </SelectContent>
             </Select>
+            {shouldShowError('facing') && (
+              <p className="text-sm text-red-500 mt-2">⚠️ {validationErrors.facing}</p>
+            )}
+          </div>
+
+          <div>
+            <RequiredLabel className="text-base">Available From</RequiredLabel>
+            <Input
+              type="date"
+              className="h-12 text-base mt-2"
+              min={minDate}
+              value={values.possessionDate}
+              onChange={(e) => updateFormAndState('possessionDate', e.target.value)}
+              onBlur={() => markFieldTouched('possessionDate')}
+            />
           </div>
         </div>
 
-        {/* Area and Possession Date - Two Column */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <RequiredLabel required className="text-base">Built-up Area</RequiredLabel>
-            <div className="flex space-x-2">
-              <div className="relative flex-grow">
-                <Input
-                  type="text"
-                  inputMode="numeric"
-                  className="h-11 text-base"
-                  value={values.builtUpArea}
-                  placeholder="Area (min. 100)"
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    
-                    // Allow empty value for manual editing
-                    if (val === '') {
-                      updateFormAndState('builtUpArea', '');
-                      return;
-                    }
-                    
-                    // Allow typing numbers only
-                    if (/^\d*$/.test(val)) {
-                      updateFormAndState('builtUpArea', val);
-                    }
-                  }}
-                  onBlur={(e) => {
-                    // Validate minimum value when field loses focus
-                    const val = e.target.value;
-                    if (val && parseInt(val) < 100) {
-                      updateFormAndState('builtUpArea', '100');
-                    }
-                  }}
-                />
-              </div>
-              <Select 
-                // Ensure a default value is always set
-                defaultValue="sqft"
-                value={unitValue}
-                onValueChange={(value) => {
-                  if (process.env.NODE_ENV === 'development') {
-                    console.log('Area unit selected:', value);
+        {/* Built-up Area with Unit Selector */}
+        <div>
+          <RequiredLabel required className="text-base mb-2">Built-up Area</RequiredLabel>
+          <div className="grid grid-cols-3 gap-2">
+            <div className="col-span-2">
+              <Input
+                type="text"
+                inputMode="numeric"
+                className="h-12 text-base"
+                value={values.builtUpArea}
+                placeholder="Area (min. 100)"
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === '' || /^\d*$/.test(val)) {
+                    updateFormAndState('builtUpArea', val);
                   }
-                  updateFormAndState('builtUpAreaUnit', value);
                 }}
+                onBlur={(e) => {
+                  markFieldTouched('builtUpArea');
+                  const val = e.target.value;
+                  if (val && parseInt(val) < 100) {
+                    updateFormAndState('builtUpArea', '100');
+                  }
+                }}
+              />
+              {shouldShowError('builtUpArea') && (
+                <p className="text-sm text-red-500 mt-1">⚠️ {validationErrors.builtUpArea}</p>
+              )}
+            </div>
+            <div>
+              <Select 
+                defaultValue="sqft"
+                value={values.builtUpAreaUnit}
+                onValueChange={(value) => updateFormAndState('builtUpAreaUnit', value)}
               >
-                <SelectTrigger className="h-11 text-base w-28">
+                <SelectTrigger className="h-12 text-base">
                   <SelectValue>
-                    {unitValue === 'sqft' ? 'sq ft' : 'sq yard'}
+                    {values.builtUpAreaUnit === 'sqft' ? 'sq ft' : 'sq yard'}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent className="text-base">
@@ -577,31 +558,7 @@ export function PropertyDetails({
               </Select>
             </div>
           </div>
-
-          <div>
-            <RequiredLabel className="text-base">Possession Date</RequiredLabel>
-            <Input
-              type="date"
-              className="h-11 text-base"
-              min={minDate}
-              value={values.possessionDate}
-              onChange={(e) => updateFormAndState('possessionDate', e.target.value)}
-            />
-          </div>
         </div>
-
-        {/* Title (Only in edit mode) */}
-        {mode === 'edit' && (
-          <div>
-            <RequiredLabel className="text-base">Title</RequiredLabel>
-            <Input
-              className="h-11 text-base"
-              value={values.title}
-              onChange={(e) => updateFormAndState('title', e.target.value)}
-              placeholder="E.g., Spacious 2BHK in Gachibowli"
-            />
-          </div>
-        )}
       </div>
     </FormSection>
   );
