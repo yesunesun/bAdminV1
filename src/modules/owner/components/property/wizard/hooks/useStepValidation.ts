@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/hooks/useStepValidation.ts
-// Version: 4.2.0
-// Last Modified: 30-05-2025 18:25 IST
-// Purpose: Added PG/Hostel room details step validation configuration
+// Version: 4.3.0
+// Last Modified: 30-05-2025 21:00 IST
+// Purpose: Updated required fields for Property Details step to include availableFrom
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { UseFormReturn } from 'react-hook-form';
@@ -38,13 +38,13 @@ export function useStepValidation({
     lastCheckedStep: ''
   });
   
-  // Get required fields for current step - UPDATED: Added PG room details step
+  // Get required fields for current step - ✅ UPDATED: Added availableFrom to property details steps
   const getRequiredFieldsForStep = useCallback((stepId: string): string[] => {
     const stepFieldMap: Record<string, string[]> = {
-      // Basic details steps - all required fields as shown in UI
-      'res_rent_basic_details': ['propertyType', 'bhkType', 'floor', 'totalFloors', 'propertyAge', 'facing', 'builtUpArea', 'bathrooms'],
-      'res_sale_basic_details': ['propertyType', 'bhkType', 'floor', 'totalFloors', 'propertyAge', 'facing', 'builtUpArea', 'bathrooms'],
-      'res_flat_basic_details': ['propertyType', 'bhkType', 'floor', 'totalFloors', 'propertyAge', 'facing', 'builtUpArea', 'bathrooms'],
+      // Basic details steps - ✅ UPDATED: Added availableFrom to all property details steps
+      'res_rent_basic_details': ['propertyType', 'bhkType', 'floor', 'totalFloors', 'propertyAge', 'facing', 'builtUpArea', 'bathrooms', 'availableFrom'],
+      'res_sale_basic_details': ['propertyType', 'bhkType', 'floor', 'totalFloors', 'propertyAge', 'facing', 'builtUpArea', 'bathrooms', 'availableFrom'],
+      'res_flat_basic_details': ['propertyType', 'bhkType', 'floor', 'totalFloors', 'propertyAge', 'facing', 'builtUpArea', 'bathrooms', 'availableFrom'],
       
       // ✅ ADDED: PG/Hostel room details step - all required fields from RoomDetails UI
       'res_pg_basic_details': ['roomType', 'roomCapacity', 'expectedRent', 'expectedDeposit', 'bathroomType', 'roomSize', 'mealOption'],
@@ -403,7 +403,7 @@ export function useStepValidation({
   };
 }
 
-// Helper function to get user-friendly field labels - UPDATED: Added PG room details labels
+// Helper function to get user-friendly field labels - ✅ UPDATED: Added availableFrom label
 function getFieldLabel(fieldName: string): string {
   const labels: Record<string, string> = {
     // Property Details fields
@@ -415,6 +415,7 @@ function getFieldLabel(fieldName: string): string {
     facing: 'Facing Direction',
     builtUpArea: 'Built-up Area',
     bathrooms: 'Bathrooms',
+    availableFrom: 'Available From', // ✅ ADDED: Label for availableFrom
     
     // Location fields
     address: 'Complete Address',
@@ -426,7 +427,6 @@ function getFieldLabel(fieldName: string): string {
     // Rental/Sale fields
     rentAmount: 'Monthly Rent Amount',
     securityDeposit: 'Security Deposit',
-    availableFrom: 'Available From',
     furnishingStatus: 'Furnishing Status',
     preferredTenants: 'Preferred Tenants',
     

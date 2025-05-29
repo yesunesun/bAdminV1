@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/validation/fieldValidationConfig.ts
-// Version: 2.1.0
-// Last Modified: 30-05-2025 18:20 IST
-// Purpose: Added PG/Hostel room details validation fields for step completion
+// Version: 2.2.0
+// Last Modified: 30-05-2025 20:55 IST
+// Purpose: Updated Property Details step validation to include availableFrom as required
 
 // Validation types
 export type ValidationRule = {
@@ -85,7 +85,7 @@ export const COMMON_VALIDATIONS = {
   }
 };
 
-// Basic validation configurations - UPDATED: Added commercial and PG fields
+// Basic validation configurations - UPDATED: Added availableFrom as required for property details
 export const BASIC_FIELD_VALIDATIONS: Record<string, ValidationRule> = {
   // Location fields
   address: COMMON_VALIDATIONS.ADDRESS,
@@ -94,7 +94,7 @@ export const BASIC_FIELD_VALIDATIONS: Record<string, ValidationRule> = {
   pinCode: COMMON_VALIDATIONS.PIN_CODE,
   locality: COMMON_VALIDATIONS.REQUIRED,
   
-  // Property details
+  // Property details - ✅ UPDATED: Added availableFrom as required
   propertyType: COMMON_VALIDATIONS.REQUIRED,
   bhkType: COMMON_VALIDATIONS.REQUIRED,
   floor: { required: true, min: 0 },
@@ -103,12 +103,12 @@ export const BASIC_FIELD_VALIDATIONS: Record<string, ValidationRule> = {
   facing: COMMON_VALIDATIONS.REQUIRED,
   builtUpArea: { required: true, min: 100 },
   bathrooms: { required: true, min: 1 },
+  availableFrom: COMMON_VALIDATIONS.REQUIRED, // ✅ ADDED: Now required for property details
   
   // Sale details fields
   expectedPrice: { required: true, min: 10000 },
   maintenanceCost: { required: true, min: 0 },
   kitchenType: COMMON_VALIDATIONS.REQUIRED,
-  availableFrom: COMMON_VALIDATIONS.REQUIRED,
   furnishing: COMMON_VALIDATIONS.REQUIRED,
   parking: COMMON_VALIDATIONS.REQUIRED,
   
@@ -208,7 +208,7 @@ export const validateField = (fieldName: string, value: any, formData?: any): st
   return null;
 };
 
-// Get user-friendly field label - UPDATED: Added commercial and PG field labels
+// Get user-friendly field label - UPDATED: Added availableFrom label
 const getFieldLabel = (fieldName: string): string => {
   const labels: Record<string, string> = {
     address: 'Address',
@@ -226,12 +226,12 @@ const getFieldLabel = (fieldName: string): string => {
     bathrooms: 'Bathrooms',
     latitude: 'Latitude',
     longitude: 'Longitude',
+    availableFrom: 'Available From', // ✅ ADDED: Label for availableFrom
     
     // Sale details field labels
     expectedPrice: 'Expected Price',
     maintenanceCost: 'Maintenance Cost',
     kitchenType: 'Kitchen Type',
-    availableFrom: 'Available From',
     furnishing: 'Furnishing',
     parking: 'Parking',
     
@@ -302,16 +302,16 @@ export const validateStep = (stepId: string, formData: any): { isValid: boolean;
   };
 };
 
-// Get required fields for step - UPDATED: Added commercial and PG step fields
+// Get required fields for step - ✅ UPDATED: Added availableFrom to property details steps
 const getRequiredFieldsForStep = (stepId: string): string[] => {
   const stepFieldMap: Record<string, string[]> = {
-    // Residential rent
-    'res_rent_basic_details': ['propertyType', 'bhkType', 'floor', 'totalFloors', 'propertyAge', 'facing', 'builtUpArea', 'bathrooms'],
+    // Residential rent - ✅ UPDATED: Added availableFrom to basic details
+    'res_rent_basic_details': ['propertyType', 'bhkType', 'floor', 'totalFloors', 'propertyAge', 'facing', 'builtUpArea', 'bathrooms', 'availableFrom'],
     'res_rent_location': ['address', 'city', 'state', 'pinCode', 'locality'],
     'res_rent_features': ['bathrooms', 'propertyShowOption', 'propertyCondition', 'amenities'],
     
-    // Residential sale
-    'res_sale_basic_details': ['propertyType', 'bhkType', 'floor', 'totalFloors', 'propertyAge', 'facing', 'builtUpArea', 'bathrooms'],
+    // Residential sale - ✅ UPDATED: Added availableFrom to basic details
+    'res_sale_basic_details': ['propertyType', 'bhkType', 'floor', 'totalFloors', 'propertyAge', 'facing', 'builtUpArea', 'bathrooms', 'availableFrom'],
     'res_sale_location': ['address', 'city', 'state', 'pinCode', 'locality'],
     'res_sale_sale_details': ['expectedPrice', 'maintenanceCost', 'kitchenType', 'availableFrom', 'furnishing', 'parking'],
     'res_sale_features': ['bathrooms', 'propertyShowOption', 'propertyCondition', 'amenities'],
@@ -369,7 +369,7 @@ export const getStepValidationConfig = (flowType: string, stepId: string): StepV
   };
 };
 
-// Get field type - UPDATED: Added commercial and PG field types
+// Get field type - UPDATED: Added availableFrom field type
 const getFieldType = (fieldName: string): FieldConfig['type'] => {
   const typeMap: Record<string, FieldConfig['type']> = {
     address: 'textarea',
@@ -381,12 +381,12 @@ const getFieldType = (fieldName: string): FieldConfig['type'] => {
     totalFloors: 'number',
     bathrooms: 'number',
     builtUpArea: 'number',
+    availableFrom: 'date', // ✅ ADDED: availableFrom field type
     
     // Sale details field types
     expectedPrice: 'number',
     maintenanceCost: 'number',
     kitchenType: 'select',
-    availableFrom: 'date',
     furnishing: 'select',
     parking: 'select',
     

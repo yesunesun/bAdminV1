@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/RentalDetails.tsx
-// Version: 3.0.0
-// Last Modified: 29-05-2025 18:30 IST
-// Purpose: Enhanced with comprehensive field validation system for rental details
+// Version: 3.1.0
+// Last Modified: 30-05-2025 20:50 IST
+// Purpose: Updated Additional Preferences section to match UI requirements with radio buttons
 
 import React, { useEffect, useState } from 'react';
 import { FormData, FormSectionProps } from '../types';
@@ -84,10 +84,11 @@ export const RentalDetails: React.FC<FormSectionProps> = ({
     availableFrom: getField('availableFrom', ''),
     furnishingStatus: getField('furnishingStatus', ''),
     preferredTenants: getField('preferredTenants', []),
-    nonVegAllowed: getField('nonVegAllowed', false),
-    petsAllowed: getField('petsAllowed', false),
-    hasLockInPeriod: getField('hasLockInPeriod', false),
-    lockInPeriod: getField('lockInPeriod', '')
+    // ✅ UPDATED: Updated preference fields to match UI requirements
+    nonVegCooking: getField('nonVegCooking', 'doesntMatter'), // Changed from nonVegAllowed
+    pets: getField('pets', 'doesntMatter'), // Changed from petsAllowed
+    lockInPeriod: getField('lockInPeriod', 'no'), // Changed from hasLockInPeriod
+    lockInPeriodMonths: getField('lockInPeriodMonths', '') // New field for months
   });
 
   // Migrate existing data from root to step object
@@ -95,7 +96,7 @@ export const RentalDetails: React.FC<FormSectionProps> = ({
     const fieldsToMigrate = [
       'rentAmount', 'rentNegotiable', 'securityDeposit', 'maintenanceCharges',
       'availableFrom', 'furnishingStatus', 'preferredTenants', 
-      'nonVegAllowed', 'petsAllowed', 'hasLockInPeriod', 'lockInPeriod'
+      'nonVegCooking', 'pets', 'lockInPeriod', 'lockInPeriodMonths'
     ];
     
     fieldsToMigrate.forEach(field => {
@@ -106,6 +107,22 @@ export const RentalDetails: React.FC<FormSectionProps> = ({
         saveField(field, rootValue);
       }
     });
+    
+    // Migrate old field names to new ones
+    const oldNonVegAllowed = getField('nonVegAllowed');
+    if (oldNonVegAllowed !== undefined && !getField('nonVegCooking')) {
+      saveField('nonVegCooking', oldNonVegAllowed ? 'allowed' : 'notAllowed');
+    }
+    
+    const oldPetsAllowed = getField('petsAllowed');
+    if (oldPetsAllowed !== undefined && !getField('pets')) {
+      saveField('pets', oldPetsAllowed ? 'allowed' : 'notAllowed');
+    }
+    
+    const oldHasLockInPeriod = getField('hasLockInPeriod');
+    if (oldHasLockInPeriod !== undefined && !getField('lockInPeriod')) {
+      saveField('lockInPeriod', oldHasLockInPeriod ? 'yes' : 'no');
+    }
     
     // Update component state
     updateStateFromForm();
@@ -124,10 +141,10 @@ export const RentalDetails: React.FC<FormSectionProps> = ({
       availableFrom: stepData.availableFrom || formValues.availableFrom || '',
       furnishingStatus: stepData.furnishingStatus || formValues.furnishingStatus || '',
       preferredTenants: stepData.preferredTenants || formValues.preferredTenants || [],
-      nonVegAllowed: stepData.nonVegAllowed || formValues.nonVegAllowed || false,
-      petsAllowed: stepData.petsAllowed || formValues.petsAllowed || false,
-      hasLockInPeriod: stepData.hasLockInPeriod || formValues.hasLockInPeriod || false,
-      lockInPeriod: stepData.lockInPeriod || formValues.lockInPeriod || ''
+      nonVegCooking: stepData.nonVegCooking || formValues.nonVegCooking || 'doesntMatter',
+      pets: stepData.pets || formValues.pets || 'doesntMatter',
+      lockInPeriod: stepData.lockInPeriod || formValues.lockInPeriod || 'no',
+      lockInPeriodMonths: stepData.lockInPeriodMonths || formValues.lockInPeriodMonths || ''
     });
   };
 
@@ -153,6 +170,40 @@ export const RentalDetails: React.FC<FormSectionProps> = ({
 
   // Get minimum date (today)
   const today = new Date().toISOString().split('T')[0];
+
+  // ✅ NEW: Radio button component for preferences
+  const PreferenceRadioGroup = ({ 
+    name, 
+    label, 
+    value, 
+    onChange, 
+    options 
+  }: {
+    name: string;
+    label: string;
+    value: string;
+    onChange: (value: string) => void;
+    options: Array<{ value: string; label: string }>;
+  }) => (
+    <div>
+      <h4 className="text-sm font-medium text-gray-900 mb-3">{label}</h4>
+      <div className="flex gap-6">
+        {options.map((option) => (
+          <label key={option.value} className="flex items-center cursor-pointer">
+            <input
+              type="radio"
+              name={name}
+              value={option.value}
+              checked={value === option.value}
+              onChange={(e) => onChange(e.target.value)}
+              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-2"
+            />
+            <span className="ml-2 text-sm text-gray-700">{option.label}</span>
+          </label>
+        ))}
+      </div>
+    </div>
+  );
 
   return (
     <FormSection
@@ -337,81 +388,79 @@ export const RentalDetails: React.FC<FormSectionProps> = ({
           </div>
         </div>
 
-        {/* Additional Preferences */}
-        <div>
+        {/* ✅ UPDATED: Additional Preferences with Radio Buttons */}
+        <div className="space-y-6">
           <h3 className="text-lg font-medium text-gray-900 mb-4">Additional Preferences</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="flex items-start space-x-2">
-              <Checkbox
-                id="nonVegAllowed"
-                checked={values.nonVegAllowed}
-                onCheckedChange={(checked) => updateFormAndState('nonVegAllowed', !!checked)}
-              />
-              <label
-                htmlFor="nonVegAllowed"
-                className="text-sm font-medium leading-none cursor-pointer"
-              >
-                Non-Veg Cooking Allowed
-              </label>
-            </div>
-            
-            <div className="flex items-start space-x-2">
-              <Checkbox
-                id="petsAllowed"
-                checked={values.petsAllowed}
-                onCheckedChange={(checked) => updateFormAndState('petsAllowed', !!checked)}
-              />
-              <label
-                htmlFor="petsAllowed"
-                className="text-sm font-medium leading-none cursor-pointer"
-              >
-                Pets Allowed
-              </label>
-            </div>
-            
-            <div className="flex items-start space-x-2">
-              <Checkbox
-                id="hasLockInPeriod"
-                checked={values.hasLockInPeriod}
-                onCheckedChange={(checked) => {
-                  updateFormAndState('hasLockInPeriod', !!checked);
-                  if (!checked) {
-                    updateFormAndState('lockInPeriod', '');
-                  }
-                }}
-              />
-              <label
-                htmlFor="hasLockInPeriod"
-                className="text-sm font-medium leading-none cursor-pointer"
-              >
-                Has Lock-in Period
-              </label>
-            </div>
-          </div>
           
-          {/* Lock-in Period Input */}
-          {values.hasLockInPeriod && (
-            <div className="mt-4 max-w-xs">
-              <ValidatedInput
-                form={form}
-                name="lockInPeriod"
-                label="Lock-in Period"
-                type="number"
-                placeholder="e.g., 6"
-                value={values.lockInPeriod}
-                required={values.hasLockInPeriod}
-                helperText="Lock-in period in months"
-                error={shouldShowFieldError('lockInPeriod') ? getFieldValidation('lockInPeriod').error : null}
-                isValid={getFieldValidation('lockInPeriod').isValid}
-                isTouched={getFieldValidation('lockInPeriod').isTouched}
-                onValidation={(field, value) => updateFormAndState(field, value)}
-                onChange={(e) => updateFormAndState('lockInPeriod', e.target.value)}
-                min="1"
-                max="36"
-                size="lg"
-              />
-            </div>
-          )}
+          {/* Non-Veg Cooking */}
+          <PreferenceRadioGroup
+            name="nonVegCooking"
+            label="Non-Veg Cooking"
+            value={values.nonVegCooking}
+            onChange={(value) => updateFormAndState('nonVegCooking', value)}
+            options={[
+              { value: 'allowed', label: 'Allowed' },
+              { value: 'notAllowed', label: 'Not Allowed' },
+              { value: 'doesntMatter', label: "Doesn't Matter" }
+            ]}
+          />
+
+          {/* Pets */}
+          <PreferenceRadioGroup
+            name="pets"
+            label="Pets"
+            value={values.pets}
+            onChange={(value) => updateFormAndState('pets', value)}
+            options={[
+              { value: 'allowed', label: 'Allowed' },
+              { value: 'notAllowed', label: 'Not Allowed' },
+              { value: 'doesntMatter', label: "Doesn't Matter" }
+            ]}
+          />
+
+          {/* Lock-in Period */}
+          <div>
+            <PreferenceRadioGroup
+              name="lockInPeriod"
+              label="Lock-in Period"
+              value={values.lockInPeriod}
+              onChange={(value) => {
+                updateFormAndState('lockInPeriod', value);
+                if (value === 'no') {
+                  updateFormAndState('lockInPeriodMonths', '');
+                }
+              }}
+              options={[
+                { value: 'yes', label: 'Yes (show field)' },
+                { value: 'no', label: 'No' },
+                { value: 'doesntMatter', label: "Doesn't Matter" }
+              ]}
+            />
+            
+            {/* Lock-in Period Input - shown when "Yes" is selected */}
+            {values.lockInPeriod === 'yes' && (
+              <div className="mt-4 max-w-xs">
+                <ValidatedInput
+                  form={form}
+                  name="lockInPeriodMonths"
+                  label="Lock-in Period in Months"
+                  type="number"
+                  placeholder="e.g., 6"
+                  value={values.lockInPeriodMonths}
+                  required={values.lockInPeriod === 'yes'}
+                  helperText="Lock-in period in months"
+                  error={shouldShowFieldError('lockInPeriodMonths') ? getFieldValidation('lockInPeriodMonths').error : null}
+                  isValid={getFieldValidation('lockInPeriodMonths').isValid}
+                  isTouched={getFieldValidation('lockInPeriodMonths').isTouched}
+                  onValidation={(field, value) => updateFormAndState(field, value)}
+                  onChange={(e) => updateFormAndState('lockInPeriodMonths', e.target.value)}
+                  min="1"
+                  max="36"
+                  size="lg"
+                />
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </FormSection>

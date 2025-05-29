@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/PropertyDetails.tsx
-// Version: 4.5.0
-// Last Modified: 29-05-2025 20:15 IST
-// Purpose: Complete working version with proper div structure and validation
+// Version: 4.6.0
+// Last Modified: 30-05-2025 20:45 IST
+// Purpose: Fixed Property Type placeholder, progress calculation, and made Available From mandatory
 
 import React, { useEffect, useState, useRef } from 'react';
 import { FormSection } from '@/components/FormSection';
@@ -47,10 +47,10 @@ export function PropertyDetails({
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
 
-  // Basic validation rules
+  // ✅ FIXED: Updated required fields to include availableFrom
   const requiredFields = [
     'propertyType', 'bhkType', 'floor', 'totalFloors', 
-    'propertyAge', 'facing', 'builtUpArea', 'bathrooms'
+    'propertyAge', 'facing', 'builtUpArea', 'bathrooms', 'availableFrom'
   ];
 
   // Helper functions for form data management
@@ -136,6 +136,17 @@ export function PropertyDetails({
           error = 'Built-up area must be at least 100 sq ft';
         }
         break;
+      case 'availableFrom':
+        if (value) {
+          const selectedDate = new Date(value);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          
+          if (selectedDate < today) {
+            error = 'Available date cannot be in the past';
+          }
+        }
+        break;
     }
     
     // Update validation errors
@@ -157,7 +168,8 @@ export function PropertyDetails({
       propertyAge: 'Property Age',
       facing: 'Facing Direction',
       builtUpArea: 'Built-up Area',
-      bathrooms: 'Bathrooms'
+      bathrooms: 'Bathrooms',
+      availableFrom: 'Available From'
     };
     return labels[fieldName] || fieldName;
   };
@@ -173,7 +185,7 @@ export function PropertyDetails({
   // State for form values
   const [values, setValues] = useState({
     title: getField('title', ''),
-    propertyType: getField('propertyType', '') || category || '',
+    propertyType: getField('propertyType', '') || category || 'Apartment', // ✅ FIXED: Default to 'Apartment'
     bhkType: getField('bhkType', ''),
     floor: getField('floor', ''),
     totalFloors: getField('totalFloors', ''),
@@ -182,7 +194,7 @@ export function PropertyDetails({
     builtUpArea: getField('builtUpArea', ''),
     builtUpAreaUnit: getField('builtUpAreaUnit', 'sqft'),
     bathrooms: getField('bathrooms', ''),
-    possessionDate: getField('possessionDate', '')
+    availableFrom: getField('availableFrom', '')
   });
 
   // Cleanup on unmount
@@ -198,6 +210,12 @@ export function PropertyDetails({
     
     initialProcessDone.current = true;
     
+    // ✅ FIXED: Set default property type if none exists
+    if (!getField('propertyType')) {
+      const defaultPropertyType = category || 'Apartment';
+      saveField('propertyType', defaultPropertyType);
+    }
+    
     // Ensure default area unit
     if (!getField('builtUpAreaUnit')) {
       saveField('builtUpAreaUnit', 'sqft');
@@ -208,7 +226,7 @@ export function PropertyDetails({
     if (basicDetails) {
       const fieldsToMigrate = [
         'title', 'propertyType', 'bhkType', 'floor', 'totalFloors', 
-        'propertyAge', 'facing', 'builtUpArea', 'builtUpAreaUnit', 'bathrooms'
+        'propertyAge', 'facing', 'builtUpArea', 'builtUpAreaUnit', 'bathrooms', 'availableFrom'
       ];
       
       fieldsToMigrate.forEach(field => {
@@ -224,7 +242,7 @@ export function PropertyDetails({
     // Migrate from root to step structure
     const rootFields = [
       'title', 'propertyType', 'bhkType', 'floor', 'totalFloors', 
-      'propertyAge', 'facing', 'builtUpArea', 'builtUpAreaUnit', 'bathrooms', 'possessionDate'
+      'propertyAge', 'facing', 'builtUpArea', 'builtUpAreaUnit', 'bathrooms', 'availableFrom'
     ];
     
     rootFields.forEach(field => {
@@ -249,7 +267,7 @@ export function PropertyDetails({
     
     const newValues = {
       title: stepData.title || formValues.title || '',
-      propertyType: stepData.propertyType || formValues.propertyType || category || '',
+      propertyType: stepData.propertyType || formValues.propertyType || category || 'Apartment', // ✅ FIXED: Default to 'Apartment'
       bhkType: stepData.bhkType || formValues.bhkType || '',
       floor: stepData.floor?.toString() || formValues.floor || '',
       totalFloors: stepData.totalFloors?.toString() || formValues.totalFloors || '',
@@ -258,7 +276,7 @@ export function PropertyDetails({
       builtUpArea: stepData.builtUpArea?.toString() || formValues.builtUpArea || '',
       builtUpAreaUnit: stepData.builtUpAreaUnit || formValues.builtUpAreaUnit || 'sqft',
       bathrooms: stepData.bathrooms?.toString() || formValues.bathrooms || '',
-      possessionDate: stepData.possessionDate || formValues.possessionDate || ''
+      availableFrom: stepData.availableFrom || formValues.availableFrom || ''
     };
     
     setValues(newValues);
@@ -286,13 +304,16 @@ export function PropertyDetails({
     updateFormAndState(fieldName, numValue.toString());
   };
 
-  // Calculate completion percentage
+  // ✅ FIXED: Calculate completion percentage properly - only count fields that actually have values
   const completionPercentage = () => {
     const completedFields = requiredFields.filter(field => {
       const value = values[field as keyof typeof values];
-      return value && value !== '';
+      // Only count non-empty values
+      return value && value !== '' && value.toString().trim() !== '';
     }).length;
     
+    // Return 0 if no fields are completed, otherwise calculate percentage
+    if (completedFields === 0) return 0;
     return Math.round((completedFields / requiredFields.length) * 100);
   };
 
@@ -327,7 +348,7 @@ export function PropertyDetails({
         </div>
         {!isStepValid && (
           <p className="text-xs text-blue-600 mt-2">
-            Required fields: Property Type, BHK, Floor, Total Floors, Age, Facing, Built-up Area, Bathrooms
+            Required fields: Property Type, BHK, Floor, Total Floors, Age, Facing, Built-up Area, Bathrooms, Available From
           </p>
         )}
       </div>
@@ -356,7 +377,8 @@ export function PropertyDetails({
               onValueChange={(value) => updateFormAndState('propertyType', value)}
             >
               <SelectTrigger className="h-12 text-base mt-2">
-                <SelectValue placeholder="Type of property?" />
+                {/* ✅ FIXED: Changed placeholder to "Select Property Type" */}
+                <SelectValue placeholder="Select Property Type" />
               </SelectTrigger>
               <SelectContent className="text-base">
                 {PROPERTY_TYPES.map(type => (
@@ -471,7 +493,7 @@ export function PropertyDetails({
           </div>
         </div>
 
-        {/* Facing Direction */}
+        {/* Facing Direction and Available From */}
         <div className="grid grid-cols-2 gap-4">
           <div>
             <RequiredLabel required className="text-base">Facing Direction</RequiredLabel>
@@ -495,16 +517,20 @@ export function PropertyDetails({
             )}
           </div>
 
+          {/* ✅ FIXED: Made Available From mandatory */}
           <div>
-            <RequiredLabel className="text-base">Available From</RequiredLabel>
+            <RequiredLabel required className="text-base">Available From</RequiredLabel>
             <Input
               type="date"
               className="h-12 text-base mt-2"
               min={minDate}
-              value={values.possessionDate}
-              onChange={(e) => updateFormAndState('possessionDate', e.target.value)}
-              onBlur={() => markFieldTouched('possessionDate')}
+              value={values.availableFrom}
+              onChange={(e) => updateFormAndState('availableFrom', e.target.value)}
+              onBlur={() => markFieldTouched('availableFrom')}
             />
+            {shouldShowError('availableFrom') && (
+              <p className="text-sm text-red-500 mt-2">⚠️ {validationErrors.availableFrom}</p>
+            )}
           </div>
         </div>
 
