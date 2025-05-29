@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/validation/fieldValidationConfig.ts
-// Version: 1.1.0
-// Last Modified: 29-05-2025 20:05 IST
-// Purpose: Simplified validation configuration without circular imports
+// Version: 1.2.0
+// Last Modified: 30-05-2025 16:35 IST
+// Purpose: Fixed sale details validation - added missing required fields
 
 // Validation types
 export type ValidationRule = {
@@ -104,6 +104,14 @@ export const BASIC_FIELD_VALIDATIONS: Record<string, ValidationRule> = {
   builtUpArea: { required: true, min: 100 },
   bathrooms: { required: true, min: 1 },
   
+  // FIXED: Added sale details required fields
+  expectedPrice: { required: true, min: 10000 },
+  maintenanceCost: { required: true, min: 0 },
+  kitchenType: COMMON_VALIDATIONS.REQUIRED,
+  availableFrom: COMMON_VALIDATIONS.REQUIRED,
+  furnishing: COMMON_VALIDATIONS.REQUIRED,
+  parking: COMMON_VALIDATIONS.REQUIRED,
+  
   // Coordinates
   latitude: COMMON_VALIDATIONS.REQUIRED,
   longitude: COMMON_VALIDATIONS.REQUIRED
@@ -137,10 +145,10 @@ export const validateField = (fieldName: string, value: any, formData?: any): st
   // Number validations
   if (typeof value === 'number' || (typeof value === 'string' && !isNaN(Number(value)))) {
     const numValue = Number(value);
-    if (validation.min && numValue < validation.min) {
+    if (validation.min !== undefined && numValue < validation.min) {
       return `${getFieldLabel(fieldName)} must be at least ${validation.min}`;
     }
-    if (validation.max && numValue > validation.max) {
+    if (validation.max !== undefined && numValue > validation.max) {
       return `${getFieldLabel(fieldName)} must not exceed ${validation.max}`;
     }
   }
@@ -178,7 +186,14 @@ const getFieldLabel = (fieldName: string): string => {
     builtUpArea: 'Built-up Area',
     bathrooms: 'Bathrooms',
     latitude: 'Latitude',
-    longitude: 'Longitude'
+    longitude: 'Longitude',
+    // FIXED: Added sale details field labels
+    expectedPrice: 'Expected Price',
+    maintenanceCost: 'Maintenance Cost',
+    kitchenType: 'Kitchen Type',
+    availableFrom: 'Available From',
+    furnishing: 'Furnishing',
+    parking: 'Parking'
   };
   return labels[fieldName] || fieldName.charAt(0).toUpperCase() + fieldName.slice(1);
 };
@@ -208,7 +223,7 @@ export const validateStep = (stepId: string, formData: any): { isValid: boolean;
   };
 };
 
-// Get required fields for step
+// Get required fields for step - FIXED: Added sale details step fields
 const getRequiredFieldsForStep = (stepId: string): string[] => {
   const stepFieldMap: Record<string, string[]> = {
     // Residential rent
@@ -218,10 +233,18 @@ const getRequiredFieldsForStep = (stepId: string): string[] => {
     // Residential sale
     'res_sale_basic_details': ['propertyType', 'bhkType', 'floor', 'totalFloors', 'propertyAge', 'facing', 'builtUpArea', 'bathrooms'],
     'res_sale_location': ['address', 'city', 'state', 'pinCode', 'locality'],
+    // FIXED: Added all required fields for sale details step
+    'res_sale_sale_details': ['expectedPrice', 'maintenanceCost', 'kitchenType', 'availableFrom', 'furnishing', 'parking'],
     
     // Commercial rent
     'com_rent_basic_details': ['propertyType', 'floor', 'totalFloors', 'propertyAge', 'builtUpArea'],
     'com_rent_location': ['address', 'city', 'state', 'pinCode', 'locality'],
+    
+    // Commercial sale
+    'com_sale_basic_details': ['propertyType', 'floor', 'totalFloors', 'propertyAge', 'builtUpArea'],
+    'com_sale_location': ['address', 'city', 'state', 'pinCode', 'locality'],
+    // FIXED: Added commercial sale details step
+    'com_sale_sale_details': ['expectedPrice', 'maintenanceCost', 'kitchenType', 'availableFrom', 'furnishing', 'parking'],
     
     // Land sale
     'land_sale_basic_details': ['propertyType', 'builtUpArea'],
@@ -263,7 +286,14 @@ const getFieldType = (fieldName: string): FieldConfig['type'] => {
     floor: 'number',
     totalFloors: 'number',
     bathrooms: 'number',
-    builtUpArea: 'number'
+    builtUpArea: 'number',
+    // FIXED: Added sale details field types
+    expectedPrice: 'number',
+    maintenanceCost: 'number',
+    kitchenType: 'select',
+    availableFrom: 'date',
+    furnishing: 'select',
+    parking: 'select'
   };
   return typeMap[fieldName] || 'text';
 };
@@ -275,8 +305,14 @@ const getStepName = (stepId: string): string => {
     'res_rent_location': 'Location Details',
     'res_sale_basic_details': 'Property Details',
     'res_sale_location': 'Location Details',
+    // FIXED: Added sale details step name
+    'res_sale_sale_details': 'Sale Details',
     'com_rent_basic_details': 'Commercial Details',
     'com_rent_location': 'Location Details',
+    'com_sale_basic_details': 'Commercial Details',
+    'com_sale_location': 'Location Details',
+    // FIXED: Added commercial sale details step name
+    'com_sale_sale_details': 'Sale Details',
     'land_sale_basic_details': 'Land Details',
     'land_sale_location': 'Location Details'
   };

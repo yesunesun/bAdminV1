@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/hooks/useStepValidation.ts
-// Version: 4.0.0
-// Last Modified: 30-05-2025 15:45 IST
-// Purpose: Fixed validation logic to properly account for all required fields in rental details
+// Version: 4.1.0
+// Last Modified: 30-05-2025 16:40 IST
+// Purpose: Fixed validation for sale details step - added all required fields
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { UseFormReturn } from 'react-hook-form';
@@ -38,7 +38,7 @@ export function useStepValidation({
     lastCheckedStep: ''
   });
   
-  // Get required fields for current step (FIXED - includes all required fields)
+  // Get required fields for current step - FIXED: Added sale details fields
   const getRequiredFieldsForStep = useCallback((stepId: string): string[] => {
     const stepFieldMap: Record<string, string[]> = {
       // Basic details steps - all required fields as shown in UI
@@ -65,11 +65,15 @@ export function useStepValidation({
       'com_cow_location': ['address', 'city', 'state', 'pinCode', 'locality'],
       'land_sale_location': ['address', 'city', 'state', 'pinCode'],
       
-      // FIXED: Rental steps - now includes ALL required fields as shown in UI
+      // Rental steps - includes ALL required fields as shown in UI
       'res_rent_rental': ['rentAmount', 'securityDeposit', 'availableFrom', 'furnishingStatus', 'preferredTenants'],
       'com_rent_rental': ['rentAmount', 'securityDeposit', 'availableFrom', 'furnishingStatus'],
       
-      // FIXED: Features steps - now includes ALL required fields as shown in UI
+      // FIXED: Sale details steps - added ALL required fields as shown in UI
+      'res_sale_sale_details': ['expectedPrice', 'maintenanceCost', 'kitchenType', 'availableFrom', 'furnishing', 'parking'],
+      'com_sale_sale_details': ['expectedPrice', 'maintenanceCost', 'kitchenType', 'availableFrom', 'furnishing', 'parking'],
+      
+      // Features steps - includes ALL required fields as shown in UI
       'res_rent_features': ['bathrooms', 'propertyShowOption', 'propertyCondition', 'amenities'],
       'res_sale_features': ['bathrooms', 'propertyShowOption', 'propertyCondition', 'amenities'],
       'res_flat_features': ['bathrooms', 'propertyShowOption', 'propertyCondition', 'amenities'],
@@ -78,10 +82,6 @@ export function useStepValidation({
       'com_sale_features': ['bathrooms', 'propertyShowOption', 'propertyCondition', 'amenities'],
       'com_cow_features': ['propertyShowOption', 'propertyCondition', 'amenities'],
       'land_sale_land_features': ['propertyShowOption', 'propertyCondition'],
-      
-      // Sale steps
-      'res_sale_sale_details': ['expectedPrice'],
-      'com_sale_sale_details': ['expectedPrice'],
       
       // Flatmate details
       'res_flat_flatmate_details': ['preferredGender', 'rentAmount'],
@@ -129,8 +129,8 @@ export function useStepValidation({
             // For strings, check if not empty after trimming
             return value.trim() !== '';
           } else if (typeof value === 'number') {
-            // For numbers, check if not NaN and greater than 0 (except bathrooms which can be 0)
-            if (fieldName === 'bathrooms' || fieldName === 'balconies') {
+            // For numbers, check if not NaN and greater than 0 (except certain fields which can be 0)
+            if (fieldName === 'bathrooms' || fieldName === 'balconies' || fieldName === 'maintenanceCost') {
               return !isNaN(value) && value >= 0;
             }
             return !isNaN(value) && value > 0;
@@ -157,7 +157,7 @@ export function useStepValidation({
           } else if (typeof rootValue === 'string') {
             return rootValue.trim() !== '';
           } else if (typeof rootValue === 'number') {
-            if (fieldName === 'bathrooms' || fieldName === 'balconies') {
+            if (fieldName === 'bathrooms' || fieldName === 'balconies' || fieldName === 'maintenanceCost') {
               return !isNaN(rootValue) && rootValue >= 0;
             }
             return !isNaN(rootValue) && rootValue > 0;
@@ -401,7 +401,7 @@ export function useStepValidation({
   };
 }
 
-// Helper function to get user-friendly field labels
+// Helper function to get user-friendly field labels - FIXED: Added sale details labels
 function getFieldLabel(fieldName: string): string {
   const labels: Record<string, string> = {
     // Property Details fields
@@ -427,10 +427,15 @@ function getFieldLabel(fieldName: string): string {
     availableFrom: 'Available From',
     furnishingStatus: 'Furnishing Status',
     preferredTenants: 'Preferred Tenants',
+    
+    // FIXED: Added sale details field labels
     expectedPrice: 'Expected Price',
+    maintenanceCost: 'Maintenance Cost',
+    kitchenType: 'Kitchen Type',
+    furnishing: 'Furnishing',
+    parking: 'Parking',
     
     // Features fields
-    bathrooms: 'Number of Bathrooms',
     propertyShowOption: 'Who Shows Property',
     propertyCondition: 'Property Condition',
     amenities: 'Amenities',

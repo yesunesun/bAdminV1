@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/PropertyForm/index.tsx
-// Version: 11.3.0
-// Last Modified: 29-05-2025 21:00 IST
-// Purpose: Added validation blocking to prevent navigation with incomplete fields
+// Version: 11.4.0
+// Last Modified: 30-01-2025 15:35 IST
+// Purpose: Fixed step validation status passing to FormNavigation component
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -175,6 +175,21 @@ export function PropertyForm({
   // Track form data changes
   useFormDataChangeTracking(form);
 
+  // Create step validation status for all steps (FIXED)
+  const stepValidationStatus = React.useMemo(() => {
+    const status: Record<number, { isValid: boolean; completionPercentage: number }> = {};
+    
+    // For now, only calculate for current step to avoid performance issues
+    // In a full implementation, you might want to calculate for all steps
+    status[formStep] = {
+      isValid: stepIsValid,
+      completionPercentage: completionPercentage
+    };
+    
+    console.log('[PropertyForm] Step validation status:', status);
+    return status;
+  }, [formStep, stepIsValid, completionPercentage]);
+
   // ENHANCED: Next step handler with validation blocking
   const handleNextStepWithValidation = () => {
     console.log('[PropertyForm] handleNextStepWithValidation called:', {
@@ -206,7 +221,13 @@ export function PropertyForm({
         city: 'City',
         state: 'State',
         pinCode: 'PIN Code',
-        locality: 'Locality'
+        locality: 'Locality',
+        expectedPrice: 'Expected Price',
+        maintenanceCost: 'Maintenance Cost',
+        kitchenType: 'Kitchen Type',
+        availableFrom: 'Available From',
+        furnishing: 'Furnishing',
+        parking: 'Parking'
       };
 
       const missingFieldLabels = missingFields.map(field => 
@@ -383,7 +404,8 @@ export function PropertyForm({
     stepIsValid,
     canProceed: canProceedToNextStep(),
     completionPercentage,
-    validationErrors
+    validationErrors,
+    stepValidationStatus
   });
 
   return (
@@ -403,6 +425,7 @@ export function PropertyForm({
           />
         </div>
 
+        {/* FIXED: Pass stepValidationStatus to FormNavigation */}
         <FormNavigation 
           currentStep={formStep} 
           onStepChange={(newStep) => {
@@ -416,6 +439,7 @@ export function PropertyForm({
           category={category}
           adType={listingType}
           steps={visibleSteps}
+          stepValidationStatus={stepValidationStatus}
         />
 
         <div className="p-6">

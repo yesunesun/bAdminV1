@@ -1,9 +1,9 @@
 // src/modules/owner/components/property/wizard/sections/SaleDetails.tsx
-// Version: 5.1.0
-// Last Modified: 30-01-2025 15:20 IST
-// Purpose: Remove debug information from Sale Details step in Residential Sale flow
+// Version: 6.0.0
+// Last Modified: 30-05-2025 16:30 IST
+// Purpose: Fixed step completion indicator and validation for Residential Sale flow
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { FormSection } from '@/components/FormSection';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -11,7 +11,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { IndianRupee } from 'lucide-react';
 import { FormSectionProps } from '../types';
 import { RequiredLabel } from '@/components/ui/RequiredLabel';
+import { ValidatedInput } from '@/components/ui/ValidatedInput';
 import { supabase } from '@/lib/supabase';
+import { useStepValidation } from '../hooks/useStepValidation';
 import {
   FURNISHING_OPTIONS,
   PARKING_OPTIONS,
@@ -33,22 +35,40 @@ export function SaleDetails({ form, adType, stepId: providedStepId }: SaleDetail
   const flowType = formFlow ? `${formFlow.category}_${formFlow.listingType}` : 'residential_sale';
   
   // Determine the appropriate stepId based on flow type
-  let stepId = providedStepId;
-  if (!stepId) {
+  let effectiveStepId = providedStepId;
+  if (!effectiveStepId) {
     // Generate step ID based on flow - for sale flows it should be sale_details
     if (flowType.includes('sale')) {
       const prefix = flowType.split('_').map(part => part.substring(0, 3)).join('_');
-      stepId = `${prefix}_sale_details`;
+      effectiveStepId = `${prefix}_sale_details`;
     } else {
-      stepId = 'res_sale_sale_details'; // fallback
+      effectiveStepId = 'res_sale_sale_details'; // fallback
     }
   }
   
-  console.log('[SaleDetails] Using stepId:', stepId, 'for flowType:', flowType);
+  console.log('[SaleDetails] Using stepId:', effectiveStepId, 'for flowType:', flowType);
+  
+  // Initialize validation system - FIXED: Added step validation integration
+  const {
+    validateField,
+    getFieldValidation,
+    getFieldConfig,
+    shouldShowFieldError,
+    markFieldAsTouched,
+    validateCurrentStep,
+    isValid: stepIsValid,
+    completionPercentage,
+    requiredFields
+  } = useStepValidation({
+    form,
+    flowType: flowType || 'residential_sale',
+    currentStepId: effectiveStepId || 'res_sale_sale_details'
+  });
   
   // Helper functions to work with the step-based form structure
-  const getField = (fieldName: string, defaultValue?: any) => {
-    const path = `steps.${stepId}.${fieldName}`;
+  const getField = useCallback((fieldName: string, defaultValue?: any) => {
+    if (!effectiveStepId) return defaultValue;
+    const path = `steps.${effectiveStepId}.${fieldName}`;
     
     // First try to get from step structure
     const stepValue = form.getValues(path);
@@ -66,31 +86,57 @@ export function SaleDetails({ form, adType, stepId: providedStepId }: SaleDetail
     }
     
     return defaultValue;
-  };
+  }, [form, effectiveStepId]);
   
-  const saveField = (fieldName: string, value: any) => {
-    const path = `steps.${stepId}.${fieldName}`;
+  const saveField = useCallback((fieldName: string, value: any) => {
+    if (!effectiveStepId) return;
+    const path = `steps.${effectiveStepId}.${fieldName}`;
     
     // Ensure the steps structure exists
     const steps = form.getValues('steps') || {};
-    if (!steps[stepId]) {
+    if (!steps[effectiveStepId]) {
       // Create the step object if it doesn't exist 
       form.setValue('steps', {
         ...steps,
-        [stepId]: {}
+        [effectiveStepId]: {}
       }, { shouldValidate: false });
     }
     
     // Set the value in the step structure
     form.setValue(path, value, { shouldValidate: true });
     
-    console.log(`[SaleDetails] Saved ${fieldName} to step ${stepId}:`, value);
-  };
+    console.log(`[SaleDetails] Saved ${fieldName} to step ${effectiveStepId}:`, value);
+  }, [form, effectiveStepId]);
   
   // Component state
   const [expectedPriceValue, setExpectedPriceValue] = useState('');
   const [maintenanceCostValue, setMaintenanceCostValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Ensure step structure exists
+  useEffect(() => {
+    if (!effectiveStepId) return;
+    
+    const currentSteps = form.getValues('steps') || {};
+    if (!currentSteps[effectiveStepId]) {
+      form.setValue('steps', {
+        ...currentSteps,
+        [effectiveStepId]: {}
+      });
+    }
+
+    // Update component state from form
+    updateStateFromForm();
+  }, [effectiveStepId, form]);
+
+  // Update component state from form values
+  const updateStateFromForm = useCallback(() => {
+    const stepData = form.getValues(`steps.${effectiveStepId}`) || {};
+    const formValues = form.getValues();
+    
+    setExpectedPriceValue(stepData.expectedPrice || formValues.expectedPrice || '');
+    setMaintenanceCostValue(stepData.maintenanceCost || formValues.maintenanceCost || '');
+  }, [form, effectiveStepId]);
   
   // Initialize local state from form values
   useEffect(() => {
@@ -103,9 +149,9 @@ export function SaleDetails({ form, adType, stepId: providedStepId }: SaleDetail
     console.log('[SaleDetails] Initialized with values:', {
       expectedPrice,
       maintenanceCost,
-      stepId
+      stepId: effectiveStepId
     });
-  }, [form, stepId]);
+  }, [form, effectiveStepId, getField]);
   
   // Clean up on unmount
   useEffect(() => {
@@ -114,8 +160,8 @@ export function SaleDetails({ form, adType, stepId: providedStepId }: SaleDetail
     };
   }, []);
   
-  // Update form and local state
-  const updateFormAndState = (field: string, value: any) => {
+  // Update form and local state with validation - FIXED: Added validation integration
+  const updateFormAndState = useCallback((field: string, value: any) => {
     // Update local state first
     if (field === 'expectedPrice') {
       setExpectedPriceValue(value);
@@ -126,8 +172,12 @@ export function SaleDetails({ form, adType, stepId: providedStepId }: SaleDetail
     // Save to step structure
     saveField(field, value);
     
+    // Mark field as touched and validate - FIXED: Added validation call
+    markFieldAsTouched(field);
+    validateField(field);
+    
     console.log(`[SaleDetails] Updated ${field} to:`, value);
-  };
+  }, [saveField, markFieldAsTouched, validateField]);
   
   // Handle direct input changes for price fields
   const handleExpectedPriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -173,7 +223,7 @@ export function SaleDetails({ form, adType, stepId: providedStepId }: SaleDetail
       let newMaintenanceCost = '';
       
       // Check if data exists in step structure first
-      const stepData = data.property_details?.steps?.[stepId];
+      const stepData = data.property_details?.steps?.[effectiveStepId];
       if (stepData?.expectedPrice) {
         newExpectedPrice = stepData.expectedPrice;
         console.log('[SaleDetails] Found expectedPrice in step data:', newExpectedPrice);
@@ -242,6 +292,26 @@ export function SaleDetails({ form, adType, stepId: providedStepId }: SaleDetail
       title="Sale Details"
       description="Specify your property sale details"
     >
+      {/* FIXED: Added validation progress indicator like LocationDetails */}
+      {requiredFields.length > 0 && (
+        <div className="mb-6 p-3 bg-blue-50 rounded-lg border border-blue-200">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-blue-900">
+              Step Completion: {completionPercentage}%
+            </span>
+            <span className="text-xs text-blue-700">
+              {stepIsValid ? '✓ Ready to proceed' : 'Please complete required fields'}
+            </span>
+          </div>
+          <div className="w-full bg-blue-200 rounded-full h-2">
+            <div 
+              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+              style={{ width: `${completionPercentage}%` }}
+            />
+          </div>
+        </div>
+      )}
+
       <div className="space-y-4">
         {/* Expected Price and Maintenance Cost - Two Column */}
         <div className="grid grid-cols-2 gap-4">
@@ -260,8 +330,11 @@ export function SaleDetails({ form, adType, stepId: providedStepId }: SaleDetail
                 name="expectedPrice"
               />
             </div>
-            {errors.expectedPrice && (
-              <p className="text-sm text-red-600 mt-0.5">{errors.expectedPrice.message}</p>
+            {/* FIXED: Added proper validation error display */}
+            {shouldShowFieldError('expectedPrice') && (
+              <p className="text-sm text-red-600 mt-0.5">
+                {getFieldValidation('expectedPrice').error}
+              </p>
             )}
           </div>
 
@@ -283,8 +356,11 @@ export function SaleDetails({ form, adType, stepId: providedStepId }: SaleDetail
                 per month
               </span>
             </div>
-            {errors.maintenanceCost && (
-              <p className="text-sm text-red-600 mt-0.5">{errors.maintenanceCost.message}</p>
+            {/* FIXED: Added proper validation error display */}
+            {shouldShowFieldError('maintenanceCost') && (
+              <p className="text-sm text-red-600 mt-0.5">
+                {getFieldValidation('maintenanceCost').error}
+              </p>
             )}
           </div>
         </div>
@@ -319,8 +395,11 @@ export function SaleDetails({ form, adType, stepId: providedStepId }: SaleDetail
                 ))}
               </SelectContent>
             </Select>
-            {errors.kitchenType && (
-              <p className="text-sm text-red-600 mt-0.5">{errors.kitchenType.message}</p>
+            {/* FIXED: Added proper validation error display */}
+            {shouldShowFieldError('kitchenType') && (
+              <p className="text-sm text-red-600 mt-0.5">
+                {getFieldValidation('kitchenType').error}
+              </p>
             )}
           </div>
         </div>
@@ -336,8 +415,11 @@ export function SaleDetails({ form, adType, stepId: providedStepId }: SaleDetail
               value={availableFrom}
               onChange={(e) => updateFormAndState('availableFrom', e.target.value)}
             />
-            {errors.availableFrom && (
-              <p className="text-sm text-red-600 mt-0.5">{errors.availableFrom.message}</p>
+            {/* FIXED: Added proper validation error display */}
+            {shouldShowFieldError('availableFrom') && (
+              <p className="text-sm text-red-600 mt-0.5">
+                {getFieldValidation('availableFrom').error}
+              </p>
             )}
           </div>
 
@@ -358,8 +440,11 @@ export function SaleDetails({ form, adType, stepId: providedStepId }: SaleDetail
                 ))}
               </SelectContent>
             </Select>
-            {errors.furnishing && (
-              <p className="text-sm text-red-600 mt-0.5">{errors.furnishing.message}</p>
+            {/* FIXED: Added proper validation error display */}
+            {shouldShowFieldError('furnishing') && (
+              <p className="text-sm text-red-600 mt-0.5">
+                {getFieldValidation('furnishing').error}
+              </p>
             )}
           </div>
         </div>
@@ -382,8 +467,11 @@ export function SaleDetails({ form, adType, stepId: providedStepId }: SaleDetail
               ))}
             </SelectContent>
           </Select>
-          {errors.parking && (
-            <p className="text-sm text-red-600 mt-0.5">{errors.parking.message}</p>
+          {/* FIXED: Added proper validation error display */}
+          {shouldShowFieldError('parking') && (
+            <p className="text-sm text-red-600 mt-0.5">
+              {getFieldValidation('parking').error}
+            </p>
           )}
         </div>
 
