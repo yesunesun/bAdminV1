@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/SaleDetails.tsx
-// Version: 5.0.0
-// Last Modified: 25-05-2025 23:45 IST
-// Purpose: Fix data storage to use step-based structure instead of root level
+// Version: 5.1.0
+// Last Modified: 30-01-2025 15:20 IST
+// Purpose: Remove debug information from Sale Details step in Residential Sale flow
 
 import React, { useEffect, useState, useRef } from 'react';
 import { FormSection } from '@/components/FormSection';
@@ -140,20 +140,6 @@ export function SaleDetails({ form, adType, stepId: providedStepId }: SaleDetail
     updateFormAndState('maintenanceCost', value);
   };
   
-  // Debug function to view current values
-  const debugFields = () => {
-    const values = form.getValues();
-    const stepData = form.getValues(`steps.${stepId}`) || {};
-    
-    console.log('[SaleDetails] Debug - Current form values:', values);
-    console.log('[SaleDetails] Debug - Step data:', stepData);
-    console.log('[SaleDetails] Debug - Local state:', {
-      expectedPriceValue,
-      maintenanceCostValue,
-      stepId
-    });
-  };
-  
   // Function to load price data directly from database
   const loadPriceData = async () => {
     const propertyId = form.getValues('id');
@@ -257,30 +243,6 @@ export function SaleDetails({ form, adType, stepId: providedStepId }: SaleDetail
       description="Specify your property sale details"
     >
       <div className="space-y-4">
-        {/* Debug button in development */}
-        {process.env.NODE_ENV === 'development' && (
-          <div className="mb-4">
-            <button
-              type="button"
-              onClick={debugFields}
-              className="px-3 py-1 text-xs bg-blue-500 text-white rounded"
-            >
-              Debug Sale Details
-            </button>
-            <button
-              type="button"
-              onClick={loadPriceData}
-              className="ml-2 px-3 py-1 text-xs bg-green-500 text-white rounded"
-              disabled={isLoading}
-            >
-              {isLoading ? 'Loading...' : 'Load Price Data'}
-            </button>
-            <div className="text-xs text-gray-600 mt-1">
-              Step ID: {stepId} | Flow: {flowType}
-            </div>
-          </div>
-        )}
-
         {/* Expected Price and Maintenance Cost - Two Column */}
         <div className="grid grid-cols-2 gap-4">
           <div>
