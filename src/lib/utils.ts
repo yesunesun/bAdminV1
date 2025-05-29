@@ -1,13 +1,250 @@
 // src/lib/utils.ts
-// Version: 3.1.0
-// Last Modified: 27-01-2025 11:50 IST
-// Purpose: Fixed utilities with Indian formatting and design system
+// Version: 3.2.0
+// Last Modified: 29-05-2025 14:30 IST
+// Purpose: Added generatePropertyCode utility with meta.code persistence
 
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
+import { supabase } from './supabase'
  
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
+}
+
+/**
+ * ===============================
+ * PROPERTY CODE UTILITIES
+ * ===============================
+ */
+
+/**
+ * Generates or retrieves a unique 6-character property code
+ * First checks if meta.code exists in property data, if not generates and saves one
+ */
+export async function generatePropertyCode(propertyId: string, propertyData?: any): Promise<string> {
+  if (!propertyId) {
+    throw new Error('Property ID is required to generate property code');
+  }
+
+  try {
+    // If property data is provided, check for existing code
+    if (propertyData) {
+      const existingCode = getExistingPropertyCode(propertyData);
+      if (existingCode) {
+        console.log(`[generatePropertyCode] Found existing code for property ${propertyId}: ${existingCode}`);
+        return existingCode;
+      }
+    } else {
+      // If no property data provided, fetch it to check for existing code
+      const fetchedData = await fetchPropertyData(propertyId);
+      if (fetchedData) {
+        const existingCode = getExistingPropertyCode(fetchedData);
+        if (existingCode) {
+          console.log(`[generatePropertyCode] Found existing code in fetched data for property ${propertyId}: ${existingCode}`);
+          return existingCode;
+        }
+        propertyData = fetchedData;
+      }
+    }
+
+    // Generate new code
+    const newCode = await generateUniqueCode(propertyId);
+    console.log(`[generatePropertyCode] Generated new code for property ${propertyId}: ${newCode}`);
+
+    // Save the new code to meta.code
+    await savePropertyCode(propertyId, newCode, propertyData);
+
+    return newCode;
+  } catch (error) {
+    console.error('[generatePropertyCode] Error:', error);
+    // Fallback: generate code without saving
+    return await generateUniqueCode(propertyId);
+  }
+}
+
+/**
+ * Checks for existing property code in various locations within property data
+ */
+function getExistingPropertyCode(propertyData: any): string | null {
+  if (!propertyData) return null;
+
+  try {
+    // Check direct meta.code path
+    if (propertyData.meta?.code) {
+      return propertyData.meta.code;
+    }
+
+    // Check property_details.meta.code path
+    let details = propertyData.property_details;
+    
+    // Parse property_details if it's a string
+    if (typeof details === 'string') {
+      try {
+        details = JSON.parse(details);
+      } catch (e) {
+        console.warn('[getExistingPropertyCode] Failed to parse property_details JSON');
+        return null;
+      }
+    }
+
+    // Check parsed property_details.meta.code
+    if (details?.meta?.code) {
+      return details.meta.code;
+    }
+
+    // Check other possible locations
+    if (details?.code) {
+      return details.code;
+    }
+
+    if (propertyData.code) {
+      return propertyData.code;
+    }
+
+  } catch (error) {
+    console.error('[getExistingPropertyCode] Error checking for existing code:', error);
+  }
+
+  return null;
+}
+
+/**
+ * Fetches property data from database to check for existing code
+ */
+async function fetchPropertyData(propertyId: string): Promise<any | null> {
+  try {
+    // Try properties_v2 first
+    let { data, error } = await supabase
+      .from('properties_v2')
+      .select('id, property_details, meta')
+      .eq('id', propertyId)
+      .single();
+
+    // Fall back to properties table if not found
+    if (error || !data) {
+      const result = await supabase
+        .from('properties')
+        .select('id, property_details')
+        .eq('id', propertyId)
+        .single();
+      
+      data = result.data;
+      error = result.error;
+    }
+
+    if (error) {
+      console.warn(`[fetchPropertyData] Could not fetch property ${propertyId}:`, error.message);
+      return null;
+    }
+
+    return data;
+  } catch (error) {
+    console.error('[fetchPropertyData] Error fetching property data:', error);
+    return null;
+  }
+}
+
+/**
+ * Generates a unique 6-character code using SHA-256 and Base36 encoding
+ */
+async function generateUniqueCode(propertyId: string): Promise<string> {
+  try {
+    // Step 1: Take the Property ID as string input
+    const input = propertyId.toString();
+    
+    // Step 2: Hash the UUID using SHA-256
+    const encoder = new TextEncoder();
+    const data = encoder.encode(input);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    
+    // Step 3: Convert the hash to an integer (using first 8 bytes for precision)
+    const hashArray = new Uint8Array(hashBuffer);
+    let hashInt = 0;
+    for (let i = 0; i < 8; i++) {
+      hashInt = hashInt * 256 + hashArray[i];
+    }
+    
+    // Step 4: Convert the integer to a Base36 string
+    const base36String = hashInt.toString(36).toUpperCase();
+    
+    // Step 5: Take the first 6 characters
+    return base36String.substring(0, 6).padEnd(6, '0');
+  } catch (error) {
+    console.error('[generateUniqueCode] Error generating unique code:', error);
+    // Fallback: use first 6 characters of property ID
+    return propertyId.replace(/-/g, '').substring(0, 6).toUpperCase();
+  }
+}
+
+/**
+ * Saves the generated property code to the database in meta.code field
+ */
+async function savePropertyCode(propertyId: string, code: string, existingData?: any): Promise<void> {
+  try {
+    // Prepare the meta object with the new code
+    const newMeta = {
+      ...(existingData?.meta || {}),
+      code: code,
+      codeGeneratedAt: new Date().toISOString()
+    };
+
+    // Prepare property_details with updated meta
+    let updatedPropertyDetails: any = {};
+
+    if (existingData?.property_details) {
+      // Parse existing property_details if it's a string
+      if (typeof existingData.property_details === 'string') {
+        try {
+          updatedPropertyDetails = JSON.parse(existingData.property_details);
+        } catch (e) {
+          console.warn('[savePropertyCode] Failed to parse existing property_details, creating new object');
+          updatedPropertyDetails = {};
+        }
+      } else {
+        updatedPropertyDetails = { ...existingData.property_details };
+      }
+    }
+
+    // Update the meta section within property_details
+    updatedPropertyDetails.meta = {
+      ...updatedPropertyDetails.meta,
+      ...newMeta
+    };
+
+    // Try to update properties_v2 first (only property_details column, no separate meta column)
+    let { error } = await supabase
+      .from('properties_v2')
+      .update({ 
+        property_details: updatedPropertyDetails
+      })
+      .eq('id', propertyId);
+
+    // If properties_v2 update failed, try properties table
+    if (error) {
+      console.log('[savePropertyCode] properties_v2 update failed, trying properties table');
+      console.error('[savePropertyCode] properties_v2 error details:', error);
+      
+      const { error: propertiesError } = await supabase
+        .from('properties')
+        .update({ 
+          property_details: updatedPropertyDetails
+        })
+        .eq('id', propertyId);
+
+      if (propertiesError) {
+        console.error('[savePropertyCode] Failed to save to both tables:', propertiesError);
+        throw propertiesError;
+      } else {
+        console.log(`[savePropertyCode] Successfully saved code ${code} to properties table for property ${propertyId}`);
+      }
+    } else {
+      console.log(`[savePropertyCode] Successfully saved code ${code} to properties_v2 table for property ${propertyId}`);
+    }
+
+  } catch (error) {
+    console.error('[savePropertyCode] Error saving property code:', error);
+    // Don't throw error - we can still return the generated code even if save fails
+  }
 }
 
 /**
@@ -290,6 +527,7 @@ export const utils = {
   formatBoolean,
   formatCapacity,
   slugify,
+  generatePropertyCode,
   gridPatterns,
   spacing,
   typography,

@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/CommercialBasicDetails.tsx
-// Version: 1.5.0
-// Last Modified: 26-05-2025 12:00 IST
-// Purpose: Fixed data duplication issue - only save to step location, not root
+// Version: 1.6.0
+// Last Modified: 29-05-2025 14:45 IST
+// Purpose: Removed duplicate furnishing field - now handled in Features step only
 
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { FormSection } from '@/components/FormSection';
@@ -11,7 +11,6 @@ import { FormSectionProps } from '../types';
 import { RequiredLabel } from '@/components/ui/RequiredLabel';
 import {
   COMMERCIAL_PROPERTY_TYPES,
-  COMMERCIAL_FURNISHING_OPTIONS,
   PROPERTY_TO_BUILDING_TYPES,
   COMMERCIAL_AGE_OPTIONS
 } from '../constants/commercialDetails';
@@ -39,7 +38,6 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
     cabins: initialStepValues.cabins || initialValues.cabins || '',
     conferenceRooms: initialStepValues.conferenceRooms || initialValues.conferenceRooms || '',
     receptionArea: initialStepValues.receptionArea || initialValues.receptionArea || 'Yes',
-    furnishing: initialStepValues.furnishing || initialValues.furnishing || '',
     carParking: initialStepValues.carParking || initialValues.carParking || '',
     bikeParking: initialStepValues.bikeParking || initialValues.bikeParking || '',
     title: initialStepValues.title || initialValues.title || ''
@@ -88,7 +86,7 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
   useEffect(() => {
     console.log('Setting up form subscription for commercial basic details');
     
-    // Watch all fields that we're interested in
+    // Watch all fields that we're interested in (removed furnishing)
     const watchFields = [
       'propertyType',
       'buildingType',
@@ -100,7 +98,6 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
       'cabins', 
       'conferenceRooms', 
       'receptionArea', 
-      'furnishing', 
       'carParking', 
       'bikeParking', 
       'title',
@@ -144,11 +141,11 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
         setFieldValue('builtUpAreaUnit', 'sqft', false);
       }
       
-      // Migrate root level values to step structure if they exist and clear root
+      // Migrate root level values to step structure if they exist and clear root (removed furnishing)
       const fieldsToMove = [
         'propertyType', 'buildingType', 'ageOfProperty', 'builtUpArea',
         'builtUpAreaUnit', 'floor', 'totalFloors', 'cabins', 'conferenceRooms',
-        'receptionArea', 'furnishing', 'carParking', 'bikeParking', 'title'
+        'receptionArea', 'carParking', 'bikeParking', 'title'
       ];
       
       fieldsToMove.forEach(field => {
@@ -177,7 +174,7 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
   const updateStateFromForm = (validateAfter = false, source = 'unknown') => {
     if (!isMounted.current) return;
     
-    // Get values from step structure first, then fall back to root level
+    // Get values from step structure first, then fall back to root level (removed furnishing)
     const newValues = {
       propertyType: getFieldValue('propertyType', ''),
       buildingType: getFieldValue('buildingType', ''),
@@ -189,7 +186,6 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
       cabins: getFieldValue('cabins', ''),
       conferenceRooms: getFieldValue('conferenceRooms', ''),
       receptionArea: getFieldValue('receptionArea', 'Yes'),
-      furnishing: getFieldValue('furnishing', ''),
       carParking: getFieldValue('carParking', ''),
       bikeParking: getFieldValue('bikeParking', ''),
       title: getFieldValue('title', '')
@@ -458,9 +454,9 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
           </div>
         )}
 
-        {/* Reception Area & Furnishing - Two Column */}
-        <div className="grid grid-cols-2 gap-4">
-          {isOfficeType ? (
+        {/* Reception Area - Single Column (removed furnishing field) */}
+        {isOfficeType && (
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <RequiredLabel className="text-base">Reception Area</RequiredLabel>
               <Select 
@@ -479,34 +475,11 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
                 </SelectContent>
               </Select>
             </div>
-          ) : (
             <div className="invisible">
               {/* Empty placeholder to maintain grid layout */}
             </div>
-          )}
-
-          <div>
-            <RequiredLabel required className="text-base">Furnishing</RequiredLabel>
-            <Select 
-              value={values.furnishing}
-              onValueChange={(value) => {
-                updateFormAndState('furnishing', value);
-                setFieldValue('furnishingStatus', value, false);
-              }}
-            >
-              <SelectTrigger className="h-11 text-base">
-                <SelectValue placeholder="Furnishing status?" />
-              </SelectTrigger>
-              <SelectContent className="text-base">
-                {COMMERCIAL_FURNISHING_OPTIONS.map(option => (
-                  <SelectItem key={option} value={option} className="text-base">
-                    {option}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
-        </div>
+        )}
 
         {/* Parking Details - Two Column */}
         <div className="grid grid-cols-2 gap-4">

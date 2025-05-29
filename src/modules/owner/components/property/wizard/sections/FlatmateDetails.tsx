@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/FlatmateDetails.tsx
-// Version: 2.4.0
-// Last Modified: 19-05-2025 22:15 IST
-// Purpose: Removed inline debug information from Flatmate Details component
+// Version: 3.0.0
+// Last Modified: 30-05-2025 16:00 IST
+// Purpose: Removed Secondary Contact field to avoid duplication with Features step
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { FormSection } from '@/components/FormSection';
@@ -200,26 +200,6 @@ const FlatmateDetails: React.FC<FormSectionProps> = ({
                   isOpen={waterSupplyOptionsOpen}
                   options={['Corporation', 'Borewell', 'Both']}
                   onSelect={handleWaterSupplySelect}
-                />
-              </div>
-            </div>
-
-            {/* Secondary Contact Number - More Compact */}
-            <div className="md:col-span-2">
-              <p className="text-sm font-medium mb-1">Secondary Contact Number</p>
-              <div className="flex">
-                <div className="w-[60px] flex items-center justify-center bg-gray-100 dark:bg-gray-700 border border-r-0 border-gray-200 dark:border-gray-600 rounded-l-md p-1">
-                  <div className="flex items-center space-x-1">
-                    <span className="text-xs">🇮🇳</span>
-                    <span className="text-xs font-medium">+91</span>
-                  </div>
-                </div>
-                <Input
-                  id="secondaryContactNumber"
-                  placeholder="Enter phone number"
-                  className="flex-1 rounded-l-none h-8 text-sm"
-                  value={getField('secondaryContactNumber', '')}
-                  onChange={(e) => saveField('secondaryContactNumber', e.target.value)}
                 />
               </div>
             </div>

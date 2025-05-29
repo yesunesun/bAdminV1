@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/LandFeaturesDetails.tsx
-// Version: 2.1.0
-// Last Modified: 13-05-2025 16:45 IST
-// Purpose: Removed debug information display while keeping Debug button functionality
+// Version: 2.2.0
+// Last Modified: 30-05-2025 16:15 IST
+// Purpose: Added km unit indicators to distance fields for better user experience
 
 import React, { useEffect, useCallback } from 'react';
 import { FormSection } from '@/components/FormSection';
@@ -458,34 +458,46 @@ const LandFeaturesDetails: React.FC<FormSectionProps> = ({
         </div>
       )}
       
-      {/* Distance from Key Landmarks */}
+      {/* Distance from Key Landmarks - Updated with km indicators */}
       <div>
-        <p className="text-sm font-medium mb-3">Distance from Key Locations (in km)</p>
+        <p className="text-sm font-medium mb-3">Distance from Key Locations</p>
         <div className="grid md:grid-cols-2 gap-4">
           <div className="grid gap-3">
             <RequiredLabel htmlFor="distanceFromCity">
               Distance from City Center
             </RequiredLabel>
-            <Input
-              id="distanceFromCity"
-              type="number"
-              placeholder="e.g., 5"
-              value={getField('distanceFromCity', '')}
-              onChange={(e) => saveField('distanceFromCity', e.target.value)}
-            />
+            <div className="flex">
+              <Input
+                id="distanceFromCity"
+                type="number"
+                placeholder="e.g., 5"
+                className="flex-1 rounded-r-none"
+                value={getField('distanceFromCity', '')}
+                onChange={(e) => saveField('distanceFromCity', e.target.value)}
+              />
+              <div className="w-12 flex items-center justify-center bg-gray-100 dark:bg-gray-700 border border-l-0 border-gray-200 dark:border-gray-600 rounded-r-md">
+                <span className="text-sm font-medium text-gray-600 dark:text-gray-300">km</span>
+              </div>
+            </div>
           </div>
           
           <div className="grid gap-3">
             <RequiredLabel htmlFor="distanceFromHighway">
               Distance from Highway
             </RequiredLabel>
-            <Input
-              id="distanceFromHighway"
-              type="number"
-              placeholder="e.g., 2"
-              value={getField('distanceFromHighway', '')}
-              onChange={(e) => saveField('distanceFromHighway', e.target.value)}
-            />
+            <div className="flex">
+              <Input
+                id="distanceFromHighway"
+                type="number"
+                placeholder="e.g., 2"
+                className="flex-1 rounded-r-none"
+                value={getField('distanceFromHighway', '')}
+                onChange={(e) => saveField('distanceFromHighway', e.target.value)}
+              />
+              <div className="w-12 flex items-center justify-center bg-gray-100 dark:bg-gray-700 border border-l-0 border-gray-200 dark:border-gray-600 rounded-r-md">
+                <span className="text-sm font-medium text-gray-600 dark:text-gray-300">km</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>

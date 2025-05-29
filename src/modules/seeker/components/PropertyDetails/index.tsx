@@ -1,11 +1,12 @@
 // src/modules/seeker/components/PropertyDetails/index.tsx  
-// Version: 18.1.0
-// Last Modified: 27-05-2025 16:45 IST
-// Purpose: Reordered sections - Features & Amenities moved to last position
+// Version: 18.2.0
+// Last Modified: 29-05-2025 14:30 IST
+// Purpose: Updated to use generatePropertyCode utility with meta.code persistence
 
 import React, { useState, useEffect } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
+import { generatePropertyCode } from '@/lib/utils';
 import { 
   Heart,
   Share2,
@@ -120,50 +121,49 @@ const PropertyDetails: React.FC<EnhancedPropertyDetailsProps> = ({
   const propertyData = usePropertyData(property);
   const { propertyImages, handleMediaUploaded } = usePropertyMedia(property, onRefresh);
 
-  // Generate 6-character property code from property ID
-  const generatePropertyCode = async (propertyId: string): Promise<string> => {
-    try {
-      // Step 1: Take the Property ID as string input
-      const input = propertyId.toString();
-      
-      // Step 2: Hash the UUID using SHA-256
-      const encoder = new TextEncoder();
-      const data = encoder.encode(input);
-      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-      
-      // Step 3: Convert the hash to an integer (using first 8 bytes for precision)
-      const hashArray = new Uint8Array(hashBuffer);
-      let hashInt = 0;
-      for (let i = 0; i < 8; i++) {
-        hashInt = hashInt * 256 + hashArray[i];
-      }
-      
-      // Step 4: Convert the integer to a Base36 string
-      const base36String = hashInt.toString(36).toUpperCase();
-      
-      // Step 5: Take the first 6 characters
-      return base36String.substring(0, 6).padEnd(6, '0');
-    } catch (error) {
-      console.error('Error generating property code:', error);
-      // Fallback: use first 6 characters of property ID
-      return propertyId.replace(/-/g, '').substring(0, 6).toUpperCase();
-    }
-  };
-
   // State for property code
   const [propertyCode, setPropertyCode] = useState<string>('');
+  const [isLoadingCode, setIsLoadingCode] = useState<boolean>(false);
+  
+  // State for success message visibility
+  const [showSuccessMessage, setShowSuccessMessage] = useState<boolean>(false);
 
-  // Generate property code when component mounts
+  // Generate or retrieve property code when component mounts
   useEffect(() => {
     if (propertyData?.propertyId) {
-      generatePropertyCode(propertyData.propertyId).then(setPropertyCode);
+      setIsLoadingCode(true);
+      generatePropertyCode(propertyData.propertyId, property)
+        .then((code) => {
+          setPropertyCode(code);
+          console.log(`[PropertyDetails] Property code ready: ${code}`);
+        })
+        .catch((error) => {
+          console.error('[PropertyDetails] Error getting property code:', error);
+          // Fallback to basic code generation
+          const fallbackCode = propertyData.propertyId.replace(/-/g, '').substring(0, 6).toUpperCase();
+          setPropertyCode(fallbackCode);
+        })
+        .finally(() => {
+          setIsLoadingCode(false);
+        });
     }
-  }, [propertyData?.propertyId]);
+  }, [propertyData?.propertyId, property]);
 
   // Page load animation effect
   useEffect(() => {
     if (!isLoading && propertyData) {
-      const timer = setTimeout(() => setPageLoaded(true), 100);
+      const timer = setTimeout(() => {
+        setPageLoaded(true);
+        // Show success message briefly
+        setShowSuccessMessage(true);
+        
+        // Hide success message after 3 seconds
+        const successTimer = setTimeout(() => {
+          setShowSuccessMessage(false);
+        }, 3000);
+        
+        return () => clearTimeout(successTimer);
+      }, 100);
       return () => clearTimeout(timer);
     }
   }, [isLoading, propertyData]);
@@ -586,67 +586,67 @@ const PropertyDetails: React.FC<EnhancedPropertyDetailsProps> = ({
             />
           </div>
 
-          {/* Property Code Section */}
-          <div className={cn(
-            "transition-all duration-700 transform",
-            sectionsVisible.gallery ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
-          )}>
-          </div>
-
-          {/* Enhanced Quick Actions */}
+          {/* Enhanced Quick Actions - Mobile Responsive */}
           <div className={cn(
             "transition-all duration-700 transform",
             sectionsVisible.actions ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
           )}>
-            <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-muted/30 to-muted/10 rounded-xl border border-border/50">
-              <button
-                onClick={handleLikeToggle}
-                disabled={actionStates.liking}
-                className={cn(
-                  "flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-200",
-                  "hover:scale-105 hover:shadow-md",
-                  isLiked 
-                    ? "bg-gradient-to-r from-red-100 to-pink-100 text-red-700 border border-red-300" 
-                    : "bg-gradient-to-r from-gray-100 to-gray-50 text-gray-700 border border-gray-300 hover:from-red-50 hover:to-pink-50",
-                  actionStates.liking && "opacity-50 cursor-not-allowed"
-                )}
-              >
-                <Heart className={cn(
-                  "h-4 w-4 transition-all duration-200",
-                  isLiked && "fill-red-500 text-red-500",
-                  actionStates.liking && "animate-pulse"
-                )} />
-                {actionStates.liking ? "Updating..." : (isLiked ? "Liked" : "Like")}
-              </button>
+            <div className="p-4 bg-gradient-to-r from-muted/30 to-muted/10 rounded-xl border border-border/50">
+              {/* Mobile: Stack buttons vertically, Desktop: Horizontal layout */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                <button
+                  onClick={handleLikeToggle}
+                  disabled={actionStates.liking}
+                  className={cn(
+                    "flex items-center justify-center gap-2 px-4 py-3 sm:py-2 rounded-lg font-medium transition-all duration-200",
+                    "hover:scale-105 hover:shadow-md text-sm",
+                    isLiked 
+                      ? "bg-gradient-to-r from-red-100 to-pink-100 text-red-700 border border-red-300" 
+                      : "bg-gradient-to-r from-gray-100 to-gray-50 text-gray-700 border border-gray-300 hover:from-red-50 hover:to-pink-50",
+                    actionStates.liking && "opacity-50 cursor-not-allowed"
+                  )}
+                >
+                  <Heart className={cn(
+                    "h-4 w-4 transition-all duration-200",
+                    isLiked && "fill-red-500 text-red-500",
+                    actionStates.liking && "animate-pulse"
+                  )} />
+                  <span className="whitespace-nowrap">
+                    {actionStates.liking ? "Updating..." : (isLiked ? "Liked" : "Like")}
+                  </span>
+                </button>
 
-              <button
-                onClick={handleShare}
-                disabled={actionStates.sharing}
-                className={cn(
-                  "flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-200",
-                  "bg-gradient-to-r from-blue-100 to-blue-50 text-blue-700 border border-blue-300",
-                  "hover:scale-105 hover:shadow-md hover:from-blue-200 hover:to-blue-100",
-                  actionStates.sharing && "opacity-50 cursor-not-allowed"
-                )}
-              >
-                <Share2 className={cn(
-                  "h-4 w-4 transition-all duration-200",
-                  actionStates.sharing && "animate-pulse"
-                )} />
-                {actionStates.sharing ? "Sharing..." : "Share"}
-              </button>
+                <button
+                  onClick={handleShare}
+                  disabled={actionStates.sharing}
+                  className={cn(
+                    "flex items-center justify-center gap-2 px-4 py-3 sm:py-2 rounded-lg font-medium transition-all duration-200",
+                    "bg-gradient-to-r from-blue-100 to-blue-50 text-blue-700 border border-blue-300",
+                    "hover:scale-105 hover:shadow-md hover:from-blue-200 hover:to-blue-100 text-sm",
+                    actionStates.sharing && "opacity-50 cursor-not-allowed"
+                  )}
+                >
+                  <Share2 className={cn(
+                    "h-4 w-4 transition-all duration-200",
+                    actionStates.sharing && "animate-pulse"
+                  )} />
+                  <span className="whitespace-nowrap">
+                    {actionStates.sharing ? "Sharing..." : "Share"}
+                  </span>
+                </button>
 
-              <button
-                onClick={handleScheduleVisit}
-                className={cn(
-                  "flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-200",
-                  "bg-gradient-to-r from-green-100 to-green-50 text-green-700 border border-green-300",
-                  "hover:scale-105 hover:shadow-md hover:from-green-200 hover:to-green-100"
-                )}
-              >
-                <Calendar className="h-4 w-4" />
-                Schedule Visit
-              </button>
+                <button
+                  onClick={handleScheduleVisit}
+                  className={cn(
+                    "flex items-center justify-center gap-2 px-4 py-3 sm:py-2 rounded-lg font-medium transition-all duration-200",
+                    "bg-gradient-to-r from-green-100 to-green-50 text-green-700 border border-green-300",
+                    "hover:scale-105 hover:shadow-md hover:from-green-200 hover:to-green-100 text-sm"
+                  )}
+                >
+                  <Calendar className="h-4 w-4" />
+                  <span className="whitespace-nowrap">Schedule Visit</span>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -853,7 +853,7 @@ const PropertyDetails: React.FC<EnhancedPropertyDetailsProps> = ({
                 </div>
                 <div className="flex items-center gap-2 bg-background/80 backdrop-blur-sm border border-border rounded-lg px-4 py-2">
                   <span className="text-xl font-bold font-mono text-primary tracking-wider">
-                    {propertyCode || 'LOADING'}
+                    {isLoadingCode ? 'LOADING' : (propertyCode || 'PENDING')}
                   </span>
                 </div>
               </div>
@@ -874,7 +874,7 @@ const PropertyDetails: React.FC<EnhancedPropertyDetailsProps> = ({
                   "bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20",
                   "hover:scale-105 hover:shadow-sm"
                 )}
-                disabled={!propertyCode}
+                disabled={!propertyCode || isLoadingCode}
               >
                 <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 002 2z" />
@@ -934,13 +934,13 @@ const PropertyDetails: React.FC<EnhancedPropertyDetailsProps> = ({
         onOpenChange={setVisitDialogOpen}
       />
 
-      {/* Success feedback overlay */}
-      {pageLoaded && (
-        <div className="fixed bottom-4 right-4 pointer-events-none">
+      {/* Success feedback overlay - Auto-hide after 3 seconds */}
+      {pageLoaded && showSuccessMessage && (
+        <div className="fixed bottom-4 right-4 pointer-events-none z-50">
           <div className={cn(
             "bg-green-100 border border-green-300 text-green-800 px-4 py-2 rounded-lg shadow-lg",
             "transition-all duration-500 transform",
-            "translate-y-0 opacity-100"
+            "translate-y-0 opacity-100 animate-in slide-in-from-bottom-2"
           )}>
             <div className="flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4" />

@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/CommercialRentalDetails.tsx
-// Version: 1.0.0
-// Last Modified: 26-05-2025 10:30 IST
-// Purpose: Commercial-specific rental details component
+// Version: 1.1.0
+// Last Modified: 29-05-2025 14:50 IST
+// Purpose: Removed duplicate furnishing field - now handled in Features step only
 
 import React, { useEffect } from 'react';
 import { FormData, FormSectionProps } from '../types';
@@ -9,7 +9,6 @@ import {
   COMMERCIAL_RENTAL_TYPES,
   COMMERCIAL_MAINTENANCE_OPTIONS,
   COMMERCIAL_BUSINESS_PREFERENCES,
-  COMMERCIAL_FURNISHING_OPTIONS,
   COMMERCIAL_PARKING_OPTIONS,
   LEASE_TERMS,
   OPERATING_HOURS_OPTIONS
@@ -51,11 +50,11 @@ export const CommercialRentalDetails: React.FC<FormSectionProps> = ({
     migrateRootFields
   } = useStepForm(form, stepId);
   
-  // Migrate existing data from root to step object on component mount
+  // Migrate existing data from root to step object on component mount (removed furnishing)
   useEffect(() => {
     const fieldsToMigrate = [
       'rentalType', 'rentAmount', 'rentNegotiable', 'securityDeposit', 
-      'availableFrom', 'maintenance', 'furnishing', 'parking', 
+      'availableFrom', 'maintenance', 'parking', 
       'businessPreferences', 'operatingHours', 'hasLockInPeriod', 
       'lockInPeriod', 'advanceRent', 'includesUtilities', 'camCharges'
     ];
@@ -252,7 +251,7 @@ export const CommercialRentalDetails: React.FC<FormSectionProps> = ({
           </div>
         </div>
 
-        {/* Fourth Row - Available From and Furnishing */}
+        {/* Fourth Row - Available From and Parking (removed furnishing) */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Available From */}
           <div className="space-y-2">
@@ -270,38 +269,6 @@ export const CommercialRentalDetails: React.FC<FormSectionProps> = ({
             )}
           </div>
 
-          {/* Furnishing Status */}
-          <div className="space-y-2">
-            <RequiredLabel htmlFor={getFieldId('furnishing')}>Furnishing Status</RequiredLabel>
-            <Select
-              value={getFieldValue('furnishing') || ''}
-              onValueChange={(value) => setFieldValue('furnishing', value)}
-            >
-              <SelectTrigger 
-                id={getFieldId('furnishing')}
-                className={cn(
-                  "w-full",
-                  getFieldError('furnishing') && "border-destructive focus-visible:ring-destructive"
-                )}
-              >
-                <SelectValue placeholder="Select Furnishing Status" />
-              </SelectTrigger>
-              <SelectContent>
-                {COMMERCIAL_FURNISHING_OPTIONS.map((option) => (
-                  <SelectItem key={option} value={option}>
-                    {option}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {getFieldError('furnishing') && (
-              <p className="text-sm text-destructive mt-1">{getFieldError('furnishing')?.message as string}</p>
-            )}
-          </div>
-        </div>
-
-        {/* Fifth Row - Parking and Operating Hours */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Parking */}
           <div className="space-y-2">
             <RequiredLabel htmlFor={getFieldId('parking')}>Parking</RequiredLabel>
@@ -330,7 +297,10 @@ export const CommercialRentalDetails: React.FC<FormSectionProps> = ({
               <p className="text-sm text-destructive mt-1">{getFieldError('parking')?.message as string}</p>
             )}
           </div>
+        </div>
 
+        {/* Fifth Row - Operating Hours (single column since furnishing was removed) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Operating Hours */}
           <div className="space-y-2">
             <RequiredLabel htmlFor={getFieldId('operatingHours')}>Operating Hours</RequiredLabel>
@@ -358,6 +328,11 @@ export const CommercialRentalDetails: React.FC<FormSectionProps> = ({
             {getFieldError('operatingHours') && (
               <p className="text-sm text-destructive mt-1">{getFieldError('operatingHours')?.message as string}</p>
             )}
+          </div>
+
+          {/* Empty column to maintain layout */}
+          <div className="invisible">
+            {/* Empty placeholder */}
           </div>
         </div>
 

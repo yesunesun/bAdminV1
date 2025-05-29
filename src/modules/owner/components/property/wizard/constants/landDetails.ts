@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/constants/landDetails.ts
-// Version: 1.0.0
-// Last Modified: 10-04-2025 22:45 IST
-// Purpose: Constants for Land/Plot Sale property flow
+// Version: 2.0.0
+// Last Modified: 30-05-2025 15:35 IST
+// Purpose: Removed TOPOGRAPHY_TYPES constant to simplify Land/Plot Sale flow
 
 export const LAND_TYPES = [
   'Residential Plot',
@@ -45,15 +45,6 @@ export const SOIL_TYPES = [
   'Clay Soil',
   'Loamy Soil',
   'Rocky Land'
-] as const;
-
-export const TOPOGRAPHY_TYPES = [
-  'Flat',
-  'Sloped',
-  'Undulating',
-  'Hilltop',
-  'Riverside',
-  'Lakefront'
 ] as const;
 
 export const WATER_AVAILABILITY = [

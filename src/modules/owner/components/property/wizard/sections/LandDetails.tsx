@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/LandDetails.tsx
-// Version: 2.2.0
-// Last Modified: 13-05-2025 16:45 IST
-// Purpose: Removed debug information display while keeping Debug button functionality
+// Version: 3.0.0
+// Last Modified: 30-05-2025 15:30 IST
+// Purpose: Removed Length, Width, FSI, and Topography fields to simplify Land Sale flow
 
 import React, { useEffect, useCallback, useState } from 'react';
 import { FormSection } from '@/components/FormSection';
@@ -16,40 +16,11 @@ import {
   APPROVAL_STATUS,
   BOUNDARY_TYPES,
   SOIL_TYPES,
-  TOPOGRAPHY_TYPES,
   WATER_AVAILABILITY,
   ELECTRICITY_STATUS,
   ROAD_CONNECTIVITY,
   DEVELOPMENT_STATUS
 } from '../constants/landDetails';
-
-// Conversion factors for area units
-const AREA_CONVERSION = {
-  sqft: {
-    sqft: 1,
-    sqyd: 0.111111,
-    acre: 0.0000229568,
-    hectare: 0.00000929,
-  },
-  sqyd: {
-    sqft: 9,
-    sqyd: 1,
-    acre: 0.000206612,
-    hectare: 0.0000836127,
-  },
-  acre: {
-    sqft: 43560,
-    sqyd: 4840,
-    acre: 1,
-    hectare: 0.404686,
-  },
-  hectare: {
-    sqft: 107639,
-    sqyd: 11960,
-    acre: 2.47105,
-    hectare: 1,
-  },
-};
 
 const LandDetails: React.FC<FormSectionProps> = ({ 
   form,
@@ -58,8 +29,6 @@ const LandDetails: React.FC<FormSectionProps> = ({
   // Local state to ensure proper updates
   const [localState, setLocalState] = useState({
     landType: '',
-    plotLength: '',
-    plotWidth: '',
     builtUpArea: '',
     areaUnit: 'sqft',
     expectedPrice: '',
@@ -67,10 +36,8 @@ const LandDetails: React.FC<FormSectionProps> = ({
     plotFacing: '',
     developmentStatus: '',
     approvalStatus: '',
-    floorSpaceIndex: '',
     soilType: '',
     boundaryType: '',
-    topographyType: '',
     waterAvailability: '',
     electricityStatus: '',
     roadConnectivity: '',
@@ -132,64 +99,6 @@ const LandDetails: React.FC<FormSectionProps> = ({
     return () => subscription.unsubscribe();
   }, [form, stepId]);
 
-  const previousAreaUnit = React.useRef(localState.areaUnit);
-
-  // Effect to calculate area when dimensions change
-  useEffect(() => {
-    if (localState.plotLength && localState.plotWidth && 
-        !isNaN(Number(localState.plotLength)) && !isNaN(Number(localState.plotWidth))) {
-      const totalAreaInSqft = Math.round(Number(localState.plotLength) * Number(localState.plotWidth));
-      
-      // Convert to the selected unit
-      let convertedArea = totalAreaInSqft;
-      if (localState.areaUnit !== 'sqft') {
-        convertedArea = totalAreaInSqft * AREA_CONVERSION.sqft[localState.areaUnit];
-      }
-
-      const newArea = convertedArea.toFixed(
-        localState.areaUnit === 'sqft' || localState.areaUnit === 'sqyd' ? 0 : 4
-      );
-
-      saveField('builtUpArea', newArea);
-      saveField('builtUpAreaUnit', localState.areaUnit);
-    }
-  }, [localState.plotLength, localState.plotWidth, localState.areaUnit, saveField]);
-
-  // Effect to handle area unit changes
-  useEffect(() => {
-    if (previousAreaUnit.current === localState.areaUnit || !localState.builtUpArea) {
-      previousAreaUnit.current = localState.areaUnit;
-      return;
-    }
-
-    if (localState.builtUpArea && previousAreaUnit.current) {
-      const currentArea = parseFloat(localState.builtUpArea);
-      
-      // First convert to sqft (our base unit)
-      let areaInSqft;
-      if (previousAreaUnit.current === 'sqft') {
-        areaInSqft = currentArea;
-      } else {
-        areaInSqft = currentArea / AREA_CONVERSION.sqft[previousAreaUnit.current];
-      }
-
-      // Then convert from sqft to target unit
-      let convertedArea = areaInSqft;
-      if (localState.areaUnit !== 'sqft') {
-        convertedArea = areaInSqft * AREA_CONVERSION.sqft[localState.areaUnit];
-      }
-
-      const newArea = convertedArea.toFixed(
-        localState.areaUnit === 'sqft' || localState.areaUnit === 'sqyd' ? 0 : 4
-      );
-
-      saveField('builtUpArea', newArea);
-      saveField('builtUpAreaUnit', localState.areaUnit);
-    }
-
-    previousAreaUnit.current = localState.areaUnit;
-  }, [localState.areaUnit, localState.builtUpArea, saveField]);
-
   const isAgricultural = localState.landType === 'Agricultural Land';
   
   return (
@@ -218,40 +127,6 @@ const LandDetails: React.FC<FormSectionProps> = ({
           </select>
         </div>
         
-        {/* Plot Dimensions */}
-        <div className="mb-6">
-          <p className="text-sm font-medium mb-2 block">Plot Dimensions</p>
-          <div className="grid md:grid-cols-2 gap-4">
-            <div>
-              <RequiredLabel htmlFor="plotLength" className="mb-2 block">
-                Length (ft)
-              </RequiredLabel>
-              <Input
-                id="plotLength"
-                type="number"
-                placeholder="e.g., 60"
-                className="h-12 px-4 py-2 rounded-xl border border-border bg-background w-full"
-                value={localState.plotLength}
-                onChange={(e) => saveField('plotLength', e.target.value)}
-              />
-            </div>
-            
-            <div>
-              <RequiredLabel htmlFor="plotWidth" className="mb-2 block">
-                Width (ft)
-              </RequiredLabel>
-              <Input
-                id="plotWidth"
-                type="number"
-                placeholder="e.g., 40"
-                className="h-12 px-4 py-2 rounded-xl border border-border bg-background w-full"
-                value={localState.plotWidth}
-                onChange={(e) => saveField('plotWidth', e.target.value)}
-              />
-            </div>
-          </div>
-        </div>
-        
         {/* Area Details */}
         <div className="grid md:grid-cols-2 gap-4 mb-6">
           <div>
@@ -261,10 +136,10 @@ const LandDetails: React.FC<FormSectionProps> = ({
             <Input
               id="builtUpArea"
               type="text"
-              placeholder="Auto-calculated"
-              readOnly
+              placeholder="e.g., 2400"
               className="h-12 px-4 py-2 rounded-xl border border-border bg-background w-full"
               value={localState.builtUpArea}
+              onChange={(e) => saveField('builtUpArea', e.target.value)}
             />
           </div>
           
@@ -378,23 +253,6 @@ const LandDetails: React.FC<FormSectionProps> = ({
           </div>
         </div>
         
-        {/* Floor Space Index (FSI) - Only for non-agricultural land */}
-        {!isAgricultural && (
-          <div className="mb-6">
-            <RequiredLabel htmlFor="floorSpaceIndex" className="mb-2 block">
-              Floor Space Index (FSI)
-            </RequiredLabel>
-            <Input
-              id="floorSpaceIndex"
-              type="text"
-              placeholder="e.g., 1.5"
-              className="h-12 px-4 py-2 rounded-xl border border-border bg-background w-full"
-              value={localState.floorSpaceIndex}
-              onChange={(e) => saveField('floorSpaceIndex', e.target.value)}
-            />
-          </div>
-        )}
-        
         {/* Soil type - Only for agricultural land */}
         {isAgricultural && (
           <div className="mb-6">
@@ -417,45 +275,24 @@ const LandDetails: React.FC<FormSectionProps> = ({
           </div>
         )}
         
-        {/* Boundary and Topography */}
-        <div className="grid md:grid-cols-2 gap-4 mb-6">
-          <div>
-            <RequiredLabel htmlFor="boundaryType" className="mb-2 block">
-              Boundary Type
-            </RequiredLabel>
-            <select
-              id="boundaryType"
-              className="w-full h-12 px-4 py-2 rounded-xl border border-border bg-background"
-              value={localState.boundaryType}
-              onChange={(e) => saveField('boundaryType', e.target.value)}
-            >
-              <option value="">Select boundary type</option>
-              {BOUNDARY_TYPES.map((type) => (
-                <option key={type} value={type}>
-                  {type}
-                </option>
-              ))}
-            </select>
-          </div>
-          
-          <div>
-            <RequiredLabel htmlFor="topographyType" className="mb-2 block">
-              Topography
-            </RequiredLabel>
-            <select
-              id="topographyType"
-              className="w-full h-12 px-4 py-2 rounded-xl border border-border bg-background"
-              value={localState.topographyType}
-              onChange={(e) => saveField('topographyType', e.target.value)}
-            >
-              <option value="">Select topography</option>
-              {TOPOGRAPHY_TYPES.map((type) => (
-                <option key={type} value={type}>
-                  {type}
-                </option>
-              ))}
-            </select>
-          </div>
+        {/* Boundary Type */}
+        <div className="mb-6">
+          <RequiredLabel htmlFor="boundaryType" className="mb-2 block">
+            Boundary Type
+          </RequiredLabel>
+          <select
+            id="boundaryType"
+            className="w-full h-12 px-4 py-2 rounded-xl border border-border bg-background"
+            value={localState.boundaryType}
+            onChange={(e) => saveField('boundaryType', e.target.value)}
+          >
+            <option value="">Select boundary type</option>
+            {BOUNDARY_TYPES.map((type) => (
+              <option key={type} value={type}>
+                {type}
+              </option>
+            ))}
+          </select>
         </div>
         
         {/* Utilities */}

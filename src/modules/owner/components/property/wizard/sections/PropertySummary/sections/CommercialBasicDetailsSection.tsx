@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/PropertySummary/sections/CommercialBasicDetailsSection.tsx
-// Version: 1.1.0
-// Last Modified: 19-05-2025 23:30 IST
-// Purpose: Updated to correctly display commercial property details from the step structure
+// Version: 1.2.0
+// Last Modified: 29-05-2025 14:55 IST
+// Purpose: Removed furnishing status display - now handled in Features section only
 
 import React from 'react';
 import { FieldText } from '../components/fields/FieldText';
@@ -32,7 +32,6 @@ export const CommercialBasicDetailsSection: React.FC<SectionComponentProps> = ({
     floor: stepData.floor || data.floor,
     totalFloors: stepData.totalFloors || data.totalFloors,
     constructionAge: stepData.ageOfProperty || data.constructionAge || data.ageOfProperty,
-    furnishingStatus: stepData.furnishing || data.furnishingStatus || data.furnishing,
     parking: data.parking || (stepData.carParking ? `${stepData.carParking} car space(s)` : null),
     washrooms: data.washrooms || stepData.totalFloors, // Using totalFloors as a fallback if washrooms not specified
     hasPantry: stepData.receptionArea === 'Yes' || data.hasPantry,
@@ -74,12 +73,6 @@ export const CommercialBasicDetailsSection: React.FC<SectionComponentProps> = ({
       <FieldText 
         label="Construction Age" 
         value={combinedData.constructionAge || combinedData.ageOfProperty} 
-      />
-      
-      {/* Furnishing Status */}
-      <FieldText 
-        label="Furnishing Status" 
-        value={combinedData.furnishingStatus || combinedData.furnishing} 
       />
       
       {/* Parking */}
