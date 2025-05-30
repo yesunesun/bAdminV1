@@ -1,10 +1,10 @@
 // src/modules/seeker/components/PropertyDetails/PropertyGallery.tsx
-// Version: 12.0.0
-// Last Modified: 27-05-2025 21:00 IST
-// Purpose: Fixed video playback issues and improved video URL resolution
+// Version: 13.0.0
+// Last Modified: 30-05-2025 15:45 IST
+// Purpose: FIXED video audio controls and autoplay policy compliance
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { ChevronLeftIcon, ChevronRightIcon, ImageIcon, ExpandIcon, XIcon, Play, Video } from 'lucide-react';
+import { ChevronLeftIcon, ChevronRightIcon, ImageIcon, ExpandIcon, XIcon, Play, Video, Volume2, VolumeX, Pause } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
@@ -163,6 +163,12 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({
   const [loadingStates, setLoadingStates] = useState<Record<string, boolean>>({});
   const [videoPlaying, setVideoPlaying] = useState(false);
   const [videoError, setVideoError] = useState<Record<string, boolean>>({});
+  
+  // FIXED: Audio control states
+  const [videoMuted, setVideoMuted] = useState(true); // Start muted to comply with autoplay policies
+  const [videoVolume, setVideoVolume] = useState(1);
+  const [userInteracted, setUserInteracted] = useState(false); // Track if user has interacted
+  
   const videoRef = useRef<HTMLVideoElement>(null);
   const fullscreenVideoRef = useRef<HTMLVideoElement>(null);
 
@@ -371,17 +377,25 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({
     setLoadingStates(prev => ({ ...prev, [mediaId]: false }));
   }, [mediaItems, videoError, propertyId, getFallbackVideoSource]);
 
-  // ENHANCED: Video play/pause handler with better error handling
+  // FIXED: Video play/pause handler with proper audio controls
   const handleVideoClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     const currentItem = mediaItems[currentIndex];
     
     if (currentItem.type === 'video' && videoRef.current) {
+      setUserInteracted(true); // Track user interaction
+      
       try {
         if (videoPlaying) {
           videoRef.current.pause();
           setVideoPlaying(false);
         } else {
+          // Unmute on first user interaction if user wants audio
+          if (!userInteracted && videoMuted) {
+            setVideoMuted(false);
+            videoRef.current.muted = false;
+          }
+          
           const playPromise = videoRef.current.play();
           if (playPromise !== undefined) {
             playPromise
@@ -391,6 +405,13 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({
               .catch((error) => {
                 console.error('[PropertyGallery] Video play failed:', error);
                 setVideoPlaying(false);
+                // If autoplay fails, try with muted
+                if (!videoMuted) {
+                  console.log('[PropertyGallery] Retrying with muted audio...');
+                  setVideoMuted(true);
+                  videoRef.current!.muted = true;
+                  videoRef.current!.play().catch(console.error);
+                }
               });
           } else {
             setVideoPlaying(true);
@@ -400,7 +421,41 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({
         console.error('[PropertyGallery] Video control error:', error);
       }
     }
-  }, [currentIndex, mediaItems, videoPlaying]);
+  }, [currentIndex, mediaItems, videoPlaying, videoMuted, userInteracted]);
+
+  // FIXED: Video mute/unmute handler
+  const handleVideoMuteToggle = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    if (videoRef.current) {
+      const newMutedState = !videoMuted;
+      setVideoMuted(newMutedState);
+      videoRef.current.muted = newMutedState;
+      setUserInteracted(true);
+      
+      console.log('[PropertyGallery] Video mute toggled:', newMutedState ? 'muted' : 'unmuted');
+    }
+  }, [videoMuted]);
+
+  // FIXED: Video volume handler
+  const handleVideoVolumeChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    e.stopPropagation();
+    
+    const newVolume = parseFloat(e.target.value);
+    setVideoVolume(newVolume);
+    
+    if (videoRef.current) {
+      videoRef.current.volume = newVolume;
+      
+      // Automatically unmute if volume is increased from 0
+      if (newVolume > 0 && videoMuted) {
+        setVideoMuted(false);
+        videoRef.current.muted = false;
+      }
+      
+      setUserInteracted(true);
+    }
+  }, [videoMuted]);
 
   // Navigation functions
   const goToNextSlide = useCallback(() => {
@@ -431,6 +486,14 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({
     setVideoPlaying(false);
   }, []);
 
+  // FIXED: Sync video mute state when video loads
+  const handleVideoLoadedMetadata = useCallback(() => {
+    if (videoRef.current) {
+      videoRef.current.muted = videoMuted;
+      videoRef.current.volume = videoVolume;
+    }
+  }, [videoMuted, videoVolume]);
+
   // Show placeholder if no valid media
   if (!mediaItems || mediaItems.length === 0) {
     return (
@@ -460,12 +523,13 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({
           {/* Render media based on type */}
           {currentItem.type === 'video' ? (
             <div className="relative w-full h-full cursor-pointer" onClick={handleVideoClick}>
-              {/* ENHANCED: Video element with better error handling and source management */}
+              {/* FIXED: Video element with proper audio controls */}
               <video
                 ref={videoRef}
                 src={getVideoSource(currentItem)}
                 className="w-full h-full object-cover"
                 onLoadedData={() => handleMediaLoad(currentItem.id)}
+                onLoadedMetadata={handleVideoLoadedMetadata}
                 onError={(e) => handleMediaError(currentItem.id, e)}
                 onPlay={handleVideoPlay}
                 onPause={handleVideoPause}
@@ -473,7 +537,7 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({
                 playsInline
                 poster={currentMediaUrl}
                 preload="metadata"
-                muted={false} // Allow unmuted playback
+                muted={videoMuted} // Use state-controlled mute
                 controls={false} // We handle controls manually
               />
               
@@ -486,14 +550,52 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({
                 </div>
               )}
               
-              {/* Video controls overlay */}
+              {/* FIXED: Video controls overlay with audio controls */}
               {videoPlaying && (
-                <div className="absolute inset-0 opacity-0 hover:opacity-100 transition-opacity bg-black/20 flex items-center justify-center">
-                  <div className="bg-black/70 backdrop-blur-md rounded-full p-3 shadow-xl border border-white/20">
-                    <svg className="h-6 w-6 text-white drop-shadow-lg" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
-                    </svg>
+                <div className="absolute inset-0 opacity-0 hover:opacity-100 transition-opacity bg-black/20 flex flex-col justify-between p-4">
+                  {/* Top controls */}
+                  <div className="flex justify-end">
+                    {/* Audio controls */}
+                    <div className="flex items-center gap-2 bg-black/70 backdrop-blur-md rounded-lg px-3 py-2 border border-white/20">
+                      <button
+                        onClick={handleVideoMuteToggle}
+                        className="text-white hover:text-white/80 transition-colors p-1"
+                        title={videoMuted ? "Unmute" : "Mute"}
+                      >
+                        {videoMuted ? (
+                          <VolumeX className="h-4 w-4" />
+                        ) : (
+                          <Volume2 className="h-4 w-4" />
+                        )}
+                      </button>
+                      
+                      {!videoMuted && (
+                        <input
+                          type="range"
+                          min="0"
+                          max="1"
+                          step="0.1"
+                          value={videoVolume}
+                          onChange={handleVideoVolumeChange}
+                          className="w-20 h-1 bg-white/30 rounded-lg appearance-none cursor-pointer"
+                          style={{
+                            background: `linear-gradient(to right, #ffffff ${videoVolume * 100}%, #ffffff50 ${videoVolume * 100}%)`
+                          }}
+                          title="Volume"
+                        />
+                      )}
+                    </div>
                   </div>
+                  
+                  {/* Center pause button */}
+                  <div className="flex items-center justify-center">
+                    <div className="bg-black/70 backdrop-blur-md rounded-full p-3 shadow-xl border border-white/20">
+                      <Pause className="h-6 w-6 text-white drop-shadow-lg" />
+                    </div>
+                  </div>
+                  
+                  {/* Bottom spacer */}
+                  <div></div>
                 </div>
               )}
               
@@ -501,6 +603,9 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({
               <div className="absolute top-4 left-4 bg-black/80 text-white px-3 py-1.5 rounded-lg text-sm backdrop-blur-md flex items-center shadow-lg border border-white/10">
                 <Video className="h-3 w-3 mr-1.5" />
                 <span className="font-medium">Video</span>
+                {!videoMuted && (
+                  <Volume2 className="h-3 w-3 ml-1.5 text-green-400" />
+                )}
               </div>
             </div>
           ) : (
@@ -637,11 +742,12 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({
                     ref={fullscreenVideoRef}
                     src={getVideoSource(mediaItems[fullscreenIndex])}
                     className="w-full h-full object-contain bg-black"
-                    controls={true} // Enable native controls in fullscreen
+                    controls={true} // Enable native controls in fullscreen for better audio control
                     autoPlay={false}
                     poster={getOptimizedMediaSource(mediaItems[fullscreenIndex])}
                     preload="metadata"
                     onError={(e) => handleMediaError(mediaItems[fullscreenIndex].id, e)}
+                    muted={false} // Allow unmuted playback in fullscreen
                   >
                     Your browser does not support video playback.
                   </video>
