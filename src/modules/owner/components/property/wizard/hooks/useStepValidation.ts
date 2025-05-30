@@ -364,12 +364,21 @@ export function useStepValidation({
           if (hasValue) {
             completedFields++;
           } else {
-            // ✅ UPDATED: Don't add "required" error messages to invalidFields since asterisks show this
-            // Just track that field is incomplete for percentage calculation
+            // ✅ UPDATED: Track incomplete fields for step validation (but don't show error messages)
+            invalidFields.push({
+              name: fieldName,
+              label: getFieldLabel(fieldName),
+              error: `${getFieldLabel(fieldName)} is required` // Keep for internal tracking
+            });
           }
         } catch (error) {
           console.error(`[getValidationSummary] Error validating field ${fieldName}:`, error);
-          // On error, assume field is invalid for required fields - but don't show error message
+          // On error, assume field is invalid for required fields
+          invalidFields.push({
+            name: fieldName,
+            label: getFieldLabel(fieldName),
+            error: `${getFieldLabel(fieldName)} validation error`
+          });
         }
       }
 
@@ -489,6 +498,7 @@ export function useStepValidation({
 
   const shouldShowFieldError = useCallback((fieldName: string) => {
     // ✅ UPDATED: Only show cross-field validation errors for totalFloors field
+    // But still track all validation for step completion
     if (fieldName !== 'totalFloors') {
       return false; // No validation messages for any other fields
     }
@@ -498,6 +508,20 @@ export function useStepValidation({
     
     return hasCrossFieldError;
   }, [validateCrossFields]);
+  
+  // ✅ NEW: Additional function to check if field has validation error (for internal use)
+  const hasValidationError = useCallback((fieldName: string) => {
+    const requiredFields = getRequiredFieldsForStep(currentStepId);
+    if (requiredFields.includes(fieldName) && !hasFieldValue(fieldName)) {
+      return true; // Field is required but empty
+    }
+    
+    // Check cross-field validation errors
+    const crossFieldErrors = validateCrossFields();
+    const hasCrossFieldError = crossFieldErrors.some(error => error.name === fieldName);
+    
+    return hasCrossFieldError;
+  }, [currentStepId, getRequiredFieldsForStep, hasFieldValue, validateCrossFields]);
 
   const getFieldConfig = useCallback((fieldName: string) => {
     const requiredFields = getRequiredFieldsForStep(currentStepId);
@@ -583,7 +607,8 @@ export function useStepValidation({
     getFieldValidation,
     getFieldConfig,
     shouldShowFieldError,
-    markFieldAsTouched
+    markFieldAsTouched,
+    hasValidationError // ✅ NEW: Added for internal validation checking
   };
 }
 

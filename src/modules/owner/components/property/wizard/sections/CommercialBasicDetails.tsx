@@ -61,7 +61,7 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
     title: initialStepValues.title || initialValues.title || ''
   });
   
-  // ✅ NEW: Track cross-field validation errors
+  // ✅ SIMPLIFIED: Remove complex cross-field validation since we handle it directly
   const [crossFieldErrors, setCrossFieldErrors] = useState<Record<string, string>>({});
   
   // Get available building types based on selected property type
@@ -79,49 +79,8 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
   // Debug counter to track re-renders and updates
   const updateCounter = useRef(0);
   
-  // ✅ UPDATED: Validate floor vs totalFloors relationship - show error on totalFloors field
-  const validateFloorRelationship = useCallback((floor: string, totalFloors: string) => {
-    console.log(`[validateFloorRelationship] Checking: floor=${floor}, totalFloors=${totalFloors}`);
-    
-    const floorNum = parseInt(floor);
-    const totalFloorsNum = parseInt(totalFloors);
-    
-    console.log(`[validateFloorRelationship] Parsed: floorNum=${floorNum}, totalFloorsNum=${totalFloorsNum}`);
-    
-    if (isNaN(floorNum) || isNaN(totalFloorsNum)) {
-      console.log(`[validateFloorRelationship] Skipping validation - one or both values are NaN`);
-      return null; // Skip validation if either is not a number
-    }
-    
-    if (totalFloorsNum < floorNum) {
-      console.log(`[validateFloorRelationship] VALIDATION FAILED: ${totalFloorsNum} < ${floorNum}`);
-      return 'Total Floors should be equal to or greater than Floor';
-    }
-    
-    console.log(`[validateFloorRelationship] Validation passed`);
-    return null;
-  }, []);
-  
-  // ✅ UPDATED: Update cross-field validation errors and use validation hook
-  const updateCrossFieldValidation = useCallback(() => {
-    console.log(`[updateCrossFieldValidation] Running with floor=${values.floor}, totalFloors=${values.totalFloors}`);
-    
-    const errors: Record<string, string> = {};
-    
-    const floorError = validateFloorRelationship(values.floor, values.totalFloors);
-    if (floorError) {
-      console.log(`[updateCrossFieldValidation] Setting error: ${floorError}`);
-      errors.totalFloors = floorError; // Show error on totalFloors field only
-    } else {
-      console.log(`[updateCrossFieldValidation] No validation error`);
-    }
-    
-    setCrossFieldErrors(errors);
-    
-    // ✅ NEW: Also trigger validation in the validation hook for both fields
-    validateField('floor');
-    validateField('totalFloors');
-  }, [values.floor, values.totalFloors, validateFloorRelationship, validateField]);
+  // ✅ SIMPLIFIED: Remove complex validation functions since we handle it directly in UI
+  // The validation is now handled directly in the onBlur event and display logic
   
   // Clean up on unmount
   useEffect(() => {
@@ -299,7 +258,7 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
     }
   };
   
-  // ✅ UPDATED: Update form and state with validation and cross-field checks
+  // ✅ UPDATED: Update form and state with validation
   const updateFormAndState = useCallback((field: string, value: any) => {
     // Update local state
     setValues(prev => ({
@@ -313,23 +272,10 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
     
     // Debug log
     console.log(`Updated ${field} to:`, value);
-    
-    // ✅ NEW: Trigger cross-field validation after a short delay
-    setTimeout(() => {
-      updateCrossFieldValidation();
-    }, 50);
-  }, [saveField, markFieldAsTouched, updateCrossFieldValidation]);
+  }, [saveField, markFieldAsTouched]);
   
-  // ✅ UPDATED: Update cross-field validation when floor or totalFloors change - with immediate effect
-  useEffect(() => {
-    // Only run validation if both values exist
-    if (values.floor !== '' && values.totalFloors !== '') {
-      updateCrossFieldValidation();
-    } else {
-      // Clear errors if either field is empty
-      setCrossFieldErrors({});
-    }
-  }, [values.floor, values.totalFloors, updateCrossFieldValidation]);
+  // ✅ SIMPLIFIED: Remove complex useEffect since validation is now handled directly
+  // No need for complex cross-field validation watching
   
   // Process numeric input with immediate validation
   const handleNumberInput = (value: string, fieldName: string) => {
@@ -349,13 +295,6 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
     }
     
     updateFormAndState(fieldName, numValue.toString());
-    
-    // ✅ NEW: Immediately validate cross-field relationship for floor fields
-    if (fieldName === 'floor' || fieldName === 'totalFloors') {
-      setTimeout(() => {
-        updateCrossFieldValidation();
-      }, 100);
-    }
   };
 
   // Force a unit value to avoid blank display
@@ -556,12 +495,21 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
               value={values.totalFloors}
               placeholder="Building total floors"
               onChange={(e) => handleNumberInput(e.target.value, 'totalFloors')}
+              onBlur={(e) => {
+                // ✅ NEW: Validate minimum value when field loses focus
+                const val = e.target.value;
+                const floorVal = values.floor;
+                
+                if (val && floorVal && parseInt(val) < parseInt(floorVal)) {
+                  console.log(`Auto-correcting totalFloors from ${val} to ${floorVal}`);
+                  updateFormAndState('totalFloors', floorVal);
+                }
+              }}
             />
-            {/* ✅ UPDATED: Show validation message directly from component state OR manual check */}
-            {(crossFieldErrors.totalFloors || 
-              (values.floor && values.totalFloors && parseInt(values.totalFloors) < parseInt(values.floor))) && (
+            {/* ✅ NEW: Show validation message like built-up area */}
+            {values.totalFloors && values.floor && parseInt(values.totalFloors) < parseInt(values.floor) && (
               <p className="text-sm text-red-600 mt-1">
-                Total Floors should be equal to or greater than Floor
+                Total floors should be greater than or equal to Floor
               </p>
             )}
           </div>
