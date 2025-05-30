@@ -142,10 +142,10 @@ export function useStepValidation({
               return { isValid: true }; // Skip validation if either is not a number
             }
             
-            if (floor > totalFloors) {
+            if (totalFloors < floor) {
               return { 
                 isValid: false, 
-                error: 'Floor number cannot be greater than total floors' 
+                error: 'Total Floors should be equal to or greater than Floor' 
               };
             }
             
@@ -164,10 +164,10 @@ export function useStepValidation({
               return { isValid: true };
             }
             
-            if (floor > totalFloors) {
+            if (totalFloors < floor) {
               return { 
                 isValid: false, 
-                error: 'Floor number cannot be greater than total floors' 
+                error: 'Total Floors should be equal to or greater than Floor' 
               };
             }
             
@@ -186,10 +186,10 @@ export function useStepValidation({
               return { isValid: true };
             }
             
-            if (floor > totalFloors) {
+            if (totalFloors < floor) {
               return { 
                 isValid: false, 
-                error: 'Floor number cannot be greater than total floors' 
+                error: 'Total Floors should be equal to or greater than Floor' 
               };
             }
             
@@ -208,10 +208,10 @@ export function useStepValidation({
               return { isValid: true };
             }
             
-            if (floor > totalFloors) {
+            if (totalFloors < floor) {
               return { 
                 isValid: false, 
-                error: 'Floor number cannot be greater than total floors' 
+                error: 'Total Floors should be equal to or greater than Floor' 
               };
             }
             
@@ -321,10 +321,10 @@ export function useStepValidation({
         // Run the validation
         const result = rule.validate(values);
         if (!result.isValid && result.error) {
-          // Add error for the first field in the rule (typically the dependent field)
+          // ✅ UPDATED: Add error for totalFloors field (the second field in the rule)
           crossFieldErrors.push({
-            name: rule.fields[0],
-            label: getFieldLabel(rule.fields[0]),
+            name: 'totalFloors', // Always show error on totalFloors field
+            label: getFieldLabel('totalFloors'),
             error: result.error
           });
         }
@@ -364,20 +364,12 @@ export function useStepValidation({
           if (hasValue) {
             completedFields++;
           } else {
-            invalidFields.push({
-              name: fieldName,
-              label: getFieldLabel(fieldName),
-              error: `${getFieldLabel(fieldName)} is required`
-            });
+            // ✅ UPDATED: Don't add "required" error messages to invalidFields since asterisks show this
+            // Just track that field is incomplete for percentage calculation
           }
         } catch (error) {
           console.error(`[getValidationSummary] Error validating field ${fieldName}:`, error);
-          // On error, assume field is invalid for required fields
-          invalidFields.push({
-            name: fieldName,
-            label: getFieldLabel(fieldName),
-            error: `${getFieldLabel(fieldName)} validation error`
-          });
+          // On error, assume field is invalid for required fields - but don't show error message
         }
       }
 
@@ -457,9 +449,10 @@ export function useStepValidation({
         };
       }
       
+      // ✅ UPDATED: Don't show "required" messages since asterisks already indicate this
       return {
         isValid: hasValue,
-        error: hasValue ? null : `${getFieldLabel(fieldName)} is required`,
+        error: null, // No error message for required fields
         isTouched: true
       };
     } catch (error) {
@@ -483,9 +476,10 @@ export function useStepValidation({
         };
       }
       
+      // ✅ UPDATED: Don't show "required" messages since asterisks already indicate this
       return {
         isValid: hasValue,
-        error: hasValue ? null : `${getFieldLabel(fieldName)} is required`,
+        error: null, // No error message for required fields
         isTouched: false
       };
     } catch (error) {
@@ -494,18 +488,16 @@ export function useStepValidation({
   }, [hasFieldValue, validateCrossFields]);
 
   const shouldShowFieldError = useCallback((fieldName: string) => {
-    // Show errors for required fields that are empty
-    const requiredFields = getRequiredFieldsForStep(currentStepId);
-    if (!requiredFields.includes(fieldName)) {
-      return false;
+    // ✅ UPDATED: Only show cross-field validation errors for totalFloors field
+    if (fieldName !== 'totalFloors') {
+      return false; // No validation messages for any other fields
     }
     
-    // Check for cross-field validation errors
     const crossFieldErrors = validateCrossFields();
     const hasCrossFieldError = crossFieldErrors.some(error => error.name === fieldName);
     
-    return !hasFieldValue(fieldName) || hasCrossFieldError;
-  }, [currentStepId, getRequiredFieldsForStep, hasFieldValue, validateCrossFields]);
+    return hasCrossFieldError;
+  }, [validateCrossFields]);
 
   const getFieldConfig = useCallback((fieldName: string) => {
     const requiredFields = getRequiredFieldsForStep(currentStepId);
