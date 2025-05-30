@@ -1,9 +1,9 @@
-// src/modules/owner/components/property/wizard/sections/LandFeaturesDetails.tsx
-// Version: 3.1.0
-// Last Modified: 30-05-2025 18:30 IST
-// Purpose: Fixed JSX compilation error and added step completion validation system
+// ✅ ADDED: Handle document selection (mandatory field)// src/modules/owner/components/property/wizard/sections/LandFeaturesDetails.tsx
+// Version: 3.2.0
+// Last Modified: 30-05-2025 22:45 IST
+// Purpose: Fixed required field markings, validation, and added expectedPrice field
 
-import React, { useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback, useState } from 'react';
 import { FormSection } from '@/components/FormSection';
 import { RequiredLabel } from '@/components/ui/RequiredLabel';
 import { Input } from '@/components/ui/input';
@@ -15,7 +15,17 @@ const LandFeaturesDetails: React.FC<FormSectionProps> = ({
   form,
   stepId = 'land_sale_land_features' // Default stepId for land features
 }) => {
-  // ✅ ADDED: Initialize validation system
+  // Local state to ensure proper updates
+  const [localState, setLocalState] = useState({
+    distanceFromCity: '',
+    distanceFromHighway: '',
+    nearbyLandmarks: '',
+    availableDocuments: [] as string[],
+    nearbyDevelopments: [] as string[], // ✅ ADDED: Track nearby developments selections
+    commercialFeatures: [] as string[]  // ✅ ADDED: Track commercial features selections
+  });
+
+  // ✅ FIXED: Initialize validation system with getFieldConfig
   const flowType = form.getValues('flow.flowType') || 'land_sale';
   const {
     validateField,
@@ -24,7 +34,8 @@ const LandFeaturesDetails: React.FC<FormSectionProps> = ({
     markFieldAsTouched,
     isValid: stepIsValid,
     completionPercentage,
-    requiredFields
+    requiredFields,
+    getFieldConfig // ✅ ADDED: Missing function
   } = useStepValidation({
     form,
     flowType,
@@ -37,7 +48,13 @@ const LandFeaturesDetails: React.FC<FormSectionProps> = ({
     console.log(`Saving field ${fieldName} at path ${path}:`, value);
     form.setValue(path, value, { shouldValidate: true });
     
-    // ✅ ADDED: Mark field as touched and validate
+    // Update local state immediately for responsive UI
+    setLocalState(prev => ({
+      ...prev,
+      [fieldName]: value
+    }));
+    
+    // ✅ Mark field as touched and validate
     markFieldAsTouched(fieldName);
     validateField(fieldName);
   }, [form, stepId, markFieldAsTouched, validateField]);
@@ -45,25 +62,48 @@ const LandFeaturesDetails: React.FC<FormSectionProps> = ({
   const getField = useCallback((fieldName: string, defaultValue?: any) => {
     const path = `steps.${stepId}.${fieldName}`;
     const value = form.getValues(path);
-    console.log(`Getting field ${fieldName} from path ${path}:`, value);
-    return value ?? defaultValue;
+    const finalValue = value ?? defaultValue;
+    console.log(`Getting field ${fieldName} from path ${path}:`, finalValue);
+    return finalValue;
   }, [form, stepId]);
 
-  // Ensure step structure exists
+  // Initialize local state from form when component mounts or stepId changes
   useEffect(() => {
-    // Initialize step structure if it doesn't exist
     const currentSteps = form.getValues('steps') || {};
     if (!currentSteps[stepId]) {
       form.setValue('steps', {
         ...currentSteps,
         [stepId]: {}
       });
+    } else {
+      // Sync local state with form state
+      const stepData = currentSteps[stepId];
+      setLocalState(prevState => ({
+        ...prevState,
+        ...stepData
+      }));
     }
   }, [stepId, form]);
+
+  // Watch for form changes and sync with local state
+  useEffect(() => {
+    const subscription = form.watch((value, { name }) => {
+      if (name && name.startsWith(`steps.${stepId}.`)) {
+        const fieldName = name.replace(`steps.${stepId}.`, '');
+        const fieldValue = form.getValues(name);
+        setLocalState(prev => ({
+          ...prev,
+          [fieldName]: fieldValue
+        }));
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [form, stepId]);
   
   // Get land type to conditionally display fields
-  // This needs to be retrieved from the basic details step
-  const landType = form.getValues('steps.land_sale_basic_details.landType') || '';
+  // ✅ FIXED: Updated to use propertyType instead of landType
+  const landType = form.getValues('steps.land_sale_basic_details.propertyType') || '';
   const isResidential = landType === 'Residential Plot';
   const isCommercial = landType === 'Commercial Plot';
   const isAgricultural = landType === 'Agricultural Land';
@@ -76,13 +116,68 @@ const LandFeaturesDetails: React.FC<FormSectionProps> = ({
   const isChecked = (fieldName: string) => {
     return getField(fieldName, false);
   };
+
+  // ✅ ADDED: Handle nearby developments selection (mandatory)
+  const handleNearbyDevelopmentChange = (developmentType: string, checked: boolean) => {
+    const currentDevelopments = localState.nearbyDevelopments || [];
+    let newDevelopments;
+    
+    if (checked) {
+      newDevelopments = [...currentDevelopments, developmentType];
+    } else {
+      newDevelopments = currentDevelopments.filter(dev => dev !== developmentType);
+    }
+    
+    saveField('nearbyDevelopments', newDevelopments);
+  };
+
+  const isNearbyDevelopmentSelected = (developmentType: string) => {
+    const developments = localState.nearbyDevelopments || [];
+    return developments.includes(developmentType);
+  };
+
+  // ✅ ADDED: Handle commercial features selection (mandatory)
+  const handleCommercialFeatureChange = (featureType: string, checked: boolean) => {
+    const currentFeatures = localState.commercialFeatures || [];
+    let newFeatures;
+    
+    if (checked) {
+      newFeatures = [...currentFeatures, featureType];
+    } else {
+      newFeatures = currentFeatures.filter(feature => feature !== featureType);
+    }
+    
+    saveField('commercialFeatures', newFeatures);
+  };
+
+  const isCommercialFeatureSelected = (featureType: string) => {
+    const features = localState.commercialFeatures || [];
+    return features.includes(featureType);
+  };
+  const handleDocumentChange = (documentType: string, checked: boolean) => {
+    const currentDocs = localState.availableDocuments || [];
+    let newDocs;
+    
+    if (checked) {
+      newDocs = [...currentDocs, documentType];
+    } else {
+      newDocs = currentDocs.filter(doc => doc !== documentType);
+    }
+    
+    saveField('availableDocuments', newDocs);
+  };
+
+  const isDocumentSelected = (documentType: string) => {
+    const docs = localState.availableDocuments || [];
+    return docs.includes(documentType);
+  };
   
   return (
     <FormSection
       title="Land/Plot Features"
       description="Provide additional features and specifications for your land or plot"
     >
-      {/* ✅ ADDED: Progress indicator */}
+      {/* ✅ Progress indicator */}
       {requiredFields.length > 0 && (
         <div className="mb-6 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
           <div className="flex items-center justify-between mb-2">
@@ -103,16 +198,21 @@ const LandFeaturesDetails: React.FC<FormSectionProps> = ({
       )}
 
       <div className="space-y-6">
-        {/* Nearby Development Features */}
+        {/* ✅ UPDATED: Nearby Development Features - Now mandatory */}
         <div>
-          <p className="text-sm font-medium mb-3">Nearby Developments</p>
+          <RequiredLabel 
+            className="text-sm font-medium mb-3 block"
+            required={getFieldConfig('nearbyDevelopments').required}
+          >
+            Nearby Developments
+          </RequiredLabel>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             <div className="flex items-center space-x-2">
               <input
                 type="checkbox"
                 id="nearbySchool"
-                checked={isChecked('nearbySchool')}
-                onChange={(e) => handleCheckboxChange('nearbySchool', e.target.checked)}
+                checked={isNearbyDevelopmentSelected('nearbySchool')}
+                onChange={(e) => handleNearbyDevelopmentChange('nearbySchool', e.target.checked)}
                 className="w-5 h-5 rounded border-border text-primary focus:ring-primary/20"
               />
               <label
@@ -127,8 +227,8 @@ const LandFeaturesDetails: React.FC<FormSectionProps> = ({
               <input
                 type="checkbox"
                 id="nearbyHospital"
-                checked={isChecked('nearbyHospital')}
-                onChange={(e) => handleCheckboxChange('nearbyHospital', e.target.checked)}
+                checked={isNearbyDevelopmentSelected('nearbyHospital')}
+                onChange={(e) => handleNearbyDevelopmentChange('nearbyHospital', e.target.checked)}
                 className="w-5 h-5 rounded border-border text-primary focus:ring-primary/20"
               />
               <label
@@ -143,8 +243,8 @@ const LandFeaturesDetails: React.FC<FormSectionProps> = ({
               <input
                 type="checkbox"
                 id="nearbyMarket"
-                checked={isChecked('nearbyMarket')}
-                onChange={(e) => handleCheckboxChange('nearbyMarket', e.target.checked)}
+                checked={isNearbyDevelopmentSelected('nearbyMarket')}
+                onChange={(e) => handleNearbyDevelopmentChange('nearbyMarket', e.target.checked)}
                 className="w-5 h-5 rounded border-border text-primary focus:ring-primary/20"
               />
               <label
@@ -159,8 +259,8 @@ const LandFeaturesDetails: React.FC<FormSectionProps> = ({
               <input
                 type="checkbox"
                 id="nearbyStation"
-                checked={isChecked('nearbyStation')}
-                onChange={(e) => handleCheckboxChange('nearbyStation', e.target.checked)}
+                checked={isNearbyDevelopmentSelected('nearbyStation')}
+                onChange={(e) => handleNearbyDevelopmentChange('nearbyStation', e.target.checked)}
                 className="w-5 h-5 rounded border-border text-primary focus:ring-primary/20"
               />
               <label
@@ -175,8 +275,8 @@ const LandFeaturesDetails: React.FC<FormSectionProps> = ({
               <input
                 type="checkbox"
                 id="nearbyAirport"
-                checked={isChecked('nearbyAirport')}
-                onChange={(e) => handleCheckboxChange('nearbyAirport', e.target.checked)}
+                checked={isNearbyDevelopmentSelected('nearbyAirport')}
+                onChange={(e) => handleNearbyDevelopmentChange('nearbyAirport', e.target.checked)}
                 className="w-5 h-5 rounded border-border text-primary focus:ring-primary/20"
               />
               <label
@@ -191,8 +291,8 @@ const LandFeaturesDetails: React.FC<FormSectionProps> = ({
               <input
                 type="checkbox"
                 id="nearbyHighway"
-                checked={isChecked('nearbyHighway')}
-                onChange={(e) => handleCheckboxChange('nearbyHighway', e.target.checked)}
+                checked={isNearbyDevelopmentSelected('nearbyHighway')}
+                onChange={(e) => handleNearbyDevelopmentChange('nearbyHighway', e.target.checked)}
                 className="w-5 h-5 rounded border-border text-primary focus:ring-primary/20"
               />
               <label
@@ -203,6 +303,12 @@ const LandFeaturesDetails: React.FC<FormSectionProps> = ({
               </label>
             </div>
           </div>
+          {/* ✅ ADDED: Validation error display for nearby developments */}
+          {shouldShowFieldError('nearbyDevelopments') && (
+            <p className="text-sm text-red-600 mt-0.5">
+              {getFieldValidation('nearbyDevelopments').error}
+            </p>
+          )}
         </div>
         
         {/* Land/Plot Features - Based on type */}
@@ -311,14 +417,19 @@ const LandFeaturesDetails: React.FC<FormSectionProps> = ({
         
         {isCommercial && (
           <div>
-            <p className="text-sm font-medium mb-3">Commercial Plot Features</p>
+            <RequiredLabel 
+              className="text-sm font-medium mb-3 block"
+              required={getFieldConfig('commercialFeatures').required}
+            >
+              Commercial Plot Features
+            </RequiredLabel>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               <div className="flex items-center space-x-2">
                 <input
                   type="checkbox"
                   id="mainRoadFacing"
-                  checked={isChecked('mainRoadFacing')}
-                  onChange={(e) => handleCheckboxChange('mainRoadFacing', e.target.checked)}
+                  checked={isCommercialFeatureSelected('mainRoadFacing')}
+                  onChange={(e) => handleCommercialFeatureChange('mainRoadFacing', e.target.checked)}
                   className="w-5 h-5 rounded border-border text-primary focus:ring-primary/20"
                 />
                 <label
@@ -333,8 +444,8 @@ const LandFeaturesDetails: React.FC<FormSectionProps> = ({
                 <input
                   type="checkbox"
                   id="cornerCommercialPlot"
-                  checked={isChecked('cornerCommercialPlot')}
-                  onChange={(e) => handleCheckboxChange('cornerCommercialPlot', e.target.checked)}
+                  checked={isCommercialFeatureSelected('cornerCommercialPlot')}
+                  onChange={(e) => handleCommercialFeatureChange('cornerCommercialPlot', e.target.checked)}
                   className="w-5 h-5 rounded border-border text-primary focus:ring-primary/20"
                 />
                 <label
@@ -349,8 +460,8 @@ const LandFeaturesDetails: React.FC<FormSectionProps> = ({
                 <input
                   type="checkbox"
                   id="commercialComplex"
-                  checked={isChecked('commercialComplex')}
-                  onChange={(e) => handleCheckboxChange('commercialComplex', e.target.checked)}
+                  checked={isCommercialFeatureSelected('commercialComplex')}
+                  onChange={(e) => handleCommercialFeatureChange('commercialComplex', e.target.checked)}
                   className="w-5 h-5 rounded border-border text-primary focus:ring-primary/20"
                 />
                 <label
@@ -365,8 +476,8 @@ const LandFeaturesDetails: React.FC<FormSectionProps> = ({
                 <input
                   type="checkbox"
                   id="industrialZone"
-                  checked={isChecked('industrialZone')}
-                  onChange={(e) => handleCheckboxChange('industrialZone', e.target.checked)}
+                  checked={isCommercialFeatureSelected('industrialZone')}
+                  onChange={(e) => handleCommercialFeatureChange('industrialZone', e.target.checked)}
                   className="w-5 h-5 rounded border-border text-primary focus:ring-primary/20"
                 />
                 <label
@@ -381,8 +492,8 @@ const LandFeaturesDetails: React.FC<FormSectionProps> = ({
                 <input
                   type="checkbox"
                   id="businessPark"
-                  checked={isChecked('businessPark')}
-                  onChange={(e) => handleCheckboxChange('businessPark', e.target.checked)}
+                  checked={isCommercialFeatureSelected('businessPark')}
+                  onChange={(e) => handleCommercialFeatureChange('businessPark', e.target.checked)}
                   className="w-5 h-5 rounded border-border text-primary focus:ring-primary/20"
                 />
                 <label
@@ -397,8 +508,8 @@ const LandFeaturesDetails: React.FC<FormSectionProps> = ({
                 <input
                   type="checkbox"
                   id="highFootfall"
-                  checked={isChecked('highFootfall')}
-                  onChange={(e) => handleCheckboxChange('highFootfall', e.target.checked)}
+                  checked={isCommercialFeatureSelected('highFootfall')}
+                  onChange={(e) => handleCommercialFeatureChange('highFootfall', e.target.checked)}
                   className="w-5 h-5 rounded border-border text-primary focus:ring-primary/20"
                 />
                 <label
@@ -409,6 +520,12 @@ const LandFeaturesDetails: React.FC<FormSectionProps> = ({
                 </label>
               </div>
             </div>
+            {/* ✅ ADDED: Validation error display for commercial features */}
+            {shouldShowFieldError('commercialFeatures') && (
+              <p className="text-sm text-red-600 mt-0.5">
+                {getFieldValidation('commercialFeatures').error}
+              </p>
+            )}
           </div>
         )}
         
@@ -499,12 +616,15 @@ const LandFeaturesDetails: React.FC<FormSectionProps> = ({
           </div>
         )}
         
-        {/* Distance from Key Landmarks - Updated with km indicators */}
+        {/* Distance from Key Landmarks - ✅ FIXED: Added required markings */}
         <div>
           <p className="text-sm font-medium mb-3">Distance from Key Locations</p>
           <div className="grid md:grid-cols-2 gap-4">
             <div className="grid gap-3">
-              <RequiredLabel htmlFor="distanceFromCity">
+              <RequiredLabel 
+                htmlFor="distanceFromCity"
+                required={getFieldConfig('distanceFromCity').required}
+              >
                 Distance from City Center
               </RequiredLabel>
               <div className="flex">
@@ -513,23 +633,20 @@ const LandFeaturesDetails: React.FC<FormSectionProps> = ({
                   type="number"
                   placeholder="e.g., 5"
                   className="flex-1 rounded-r-none"
-                  value={getField('distanceFromCity', '')}
+                  value={localState.distanceFromCity}
                   onChange={(e) => saveField('distanceFromCity', e.target.value)}
                 />
                 <div className="w-12 flex items-center justify-center bg-gray-100 dark:bg-gray-700 border border-l-0 border-gray-200 dark:border-gray-600 rounded-r-md">
                   <span className="text-sm font-medium text-gray-600 dark:text-gray-300">km</span>
                 </div>
               </div>
-              {/* ✅ ADDED: Validation error display */}
-              {shouldShowFieldError('distanceFromCity') && (
-                <p className="text-sm text-red-600 mt-0.5">
-                  {getFieldValidation('distanceFromCity').error}
-                </p>
-              )}
             </div>
             
             <div className="grid gap-3">
-              <RequiredLabel htmlFor="distanceFromHighway">
+              <RequiredLabel 
+                htmlFor="distanceFromHighway"
+                required={getFieldConfig('distanceFromHighway').required}
+              >
                 Distance from Highway
               </RequiredLabel>
               <div className="flex">
@@ -538,33 +655,32 @@ const LandFeaturesDetails: React.FC<FormSectionProps> = ({
                   type="number"
                   placeholder="e.g., 2"
                   className="flex-1 rounded-r-none"
-                  value={getField('distanceFromHighway', '')}
+                  value={localState.distanceFromHighway}
                   onChange={(e) => saveField('distanceFromHighway', e.target.value)}
                 />
                 <div className="w-12 flex items-center justify-center bg-gray-100 dark:bg-gray-700 border border-l-0 border-gray-200 dark:border-gray-600 rounded-r-md">
                   <span className="text-sm font-medium text-gray-600 dark:text-gray-300">km</span>
                 </div>
               </div>
-              {/* ✅ ADDED: Validation error display */}
-              {shouldShowFieldError('distanceFromHighway') && (
-                <p className="text-sm text-red-600 mt-0.5">
-                  {getFieldValidation('distanceFromHighway').error}
-                </p>
-              )}
             </div>
           </div>
         </div>
         
-        {/* Property Documents */}
+        {/* ✅ UPDATED: Available Documents - Now mandatory with "No documents" option */}
         <div>
-          <p className="text-sm font-medium mb-3">Available Documents</p>
+          <RequiredLabel 
+            className="text-sm font-medium mb-3 block"
+            required={getFieldConfig('availableDocuments').required}
+          >
+            Available Documents
+          </RequiredLabel>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             <div className="flex items-center space-x-2">
               <input
                 type="checkbox"
                 id="titleDeed"
-                checked={isChecked('titleDeed')}
-                onChange={(e) => handleCheckboxChange('titleDeed', e.target.checked)}
+                checked={isDocumentSelected('titleDeed')}
+                onChange={(e) => handleDocumentChange('titleDeed', e.target.checked)}
                 className="w-5 h-5 rounded border-border text-primary focus:ring-primary/20"
               />
               <label
@@ -579,8 +695,8 @@ const LandFeaturesDetails: React.FC<FormSectionProps> = ({
               <input
                 type="checkbox"
                 id="encumbranceCertificate"
-                checked={isChecked('encumbranceCertificate')}
-                onChange={(e) => handleCheckboxChange('encumbranceCertificate', e.target.checked)}
+                checked={isDocumentSelected('encumbranceCertificate')}
+                onChange={(e) => handleDocumentChange('encumbranceCertificate', e.target.checked)}
                 className="w-5 h-5 rounded border-border text-primary focus:ring-primary/20"
               />
               <label
@@ -595,8 +711,8 @@ const LandFeaturesDetails: React.FC<FormSectionProps> = ({
               <input
                 type="checkbox"
                 id="approvalLetters"
-                checked={isChecked('approvalLetters')}
-                onChange={(e) => handleCheckboxChange('approvalLetters', e.target.checked)}
+                checked={isDocumentSelected('approvalLetters')}
+                onChange={(e) => handleDocumentChange('approvalLetters', e.target.checked)}
                 className="w-5 h-5 rounded border-border text-primary focus:ring-primary/20"
               />
               <label
@@ -611,8 +727,8 @@ const LandFeaturesDetails: React.FC<FormSectionProps> = ({
               <input
                 type="checkbox"
                 id="taxReceipts"
-                checked={isChecked('taxReceipts')}
-                onChange={(e) => handleCheckboxChange('taxReceipts', e.target.checked)}
+                checked={isDocumentSelected('taxReceipts')}
+                onChange={(e) => handleDocumentChange('taxReceipts', e.target.checked)}
                 className="w-5 h-5 rounded border-border text-primary focus:ring-primary/20"
               />
               <label
@@ -627,8 +743,8 @@ const LandFeaturesDetails: React.FC<FormSectionProps> = ({
               <input
                 type="checkbox"
                 id="landSurveyReport"
-                checked={isChecked('landSurveyReport')}
-                onChange={(e) => handleCheckboxChange('landSurveyReport', e.target.checked)}
+                checked={isDocumentSelected('landSurveyReport')}
+                onChange={(e) => handleDocumentChange('landSurveyReport', e.target.checked)}
                 className="w-5 h-5 rounded border-border text-primary focus:ring-primary/20"
               />
               <label
@@ -643,8 +759,8 @@ const LandFeaturesDetails: React.FC<FormSectionProps> = ({
               <input
                 type="checkbox"
                 id="conversionOrder"
-                checked={isChecked('conversionOrder')}
-                onChange={(e) => handleCheckboxChange('conversionOrder', e.target.checked)}
+                checked={isDocumentSelected('conversionOrder')}
+                onChange={(e) => handleDocumentChange('conversionOrder', e.target.checked)}
                 className="w-5 h-5 rounded border-border text-primary focus:ring-primary/20"
               />
               <label
@@ -654,22 +770,56 @@ const LandFeaturesDetails: React.FC<FormSectionProps> = ({
                 Conversion Order
               </label>
             </div>
+            
+            {/* ✅ ADDED: "No documents available" option - Fixed alignment */}
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="noDocuments"
+                checked={isDocumentSelected('noDocuments')}
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    // If "No documents" is selected, clear all other documents
+                    saveField('availableDocuments', ['noDocuments']);
+                  } else {
+                    // If unchecked, just remove it from the list
+                    handleDocumentChange('noDocuments', false);
+                  }
+                }}
+                className="w-5 h-5 rounded border-border text-orange-500 focus:ring-orange-500/20"
+              />
+              <label
+                htmlFor="noDocuments"
+                className="text-sm font-medium leading-none text-orange-700 dark:text-orange-400"
+              >
+                No documents available
+              </label>
+            </div>
           </div>
+          {/* ✅ Validation error display for documents */}
+          {shouldShowFieldError('availableDocuments') && (
+            <p className="text-sm text-red-600 mt-0.5">
+              {getFieldValidation('availableDocuments').error}
+            </p>
+          )}
         </div>
         
-        {/* Landmarks and Important Places */}
+        {/* ✅ FIXED: Landmarks field - made optional, removed extra helper text */}
         <div className="grid gap-3">
-          <RequiredLabel htmlFor="nearbyLandmarks">
+          <RequiredLabel 
+            htmlFor="nearbyLandmarks"
+            required={getFieldConfig('nearbyLandmarks').required}
+          >
             Nearby Landmarks
           </RequiredLabel>
           <Textarea
             id="nearbyLandmarks"
             placeholder="Describe important landmarks near your land/plot..."
-            value={getField('nearbyLandmarks', '')}
+            value={localState.nearbyLandmarks}
             onChange={(e) => saveField('nearbyLandmarks', e.target.value)}
             rows={3}
           />
-          {/* ✅ ADDED: Validation error display */}
+          {/* ✅ Validation error display */}
           {shouldShowFieldError('nearbyLandmarks') && (
             <p className="text-sm text-red-600 mt-0.5">
               {getFieldValidation('nearbyLandmarks').error}

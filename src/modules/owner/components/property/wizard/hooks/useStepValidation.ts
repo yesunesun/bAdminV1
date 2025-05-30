@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/hooks/useStepValidation.ts
-// Version: 4.3.0
-// Last Modified: 30-05-2025 21:00 IST
-// Purpose: Updated required fields for Property Details step to include availableFrom
+// Version: 4.4.0
+// Last Modified: 30-05-2025 22:35 IST
+// Purpose: Updated land sale validation to include all required land-specific fields
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { UseFormReturn } from 'react-hook-form';
@@ -38,7 +38,7 @@ export function useStepValidation({
     lastCheckedStep: ''
   });
   
-  // Get required fields for current step - ✅ UPDATED: Added availableFrom to property details steps
+  // Get required fields for current step - ✅ UPDATED: Complete land sale validation
   const getRequiredFieldsForStep = useCallback((stepId: string): string[] => {
     const stepFieldMap: Record<string, string[]> = {
       // Basic details steps - ✅ UPDATED: Added availableFrom to all property details steps
@@ -46,7 +46,7 @@ export function useStepValidation({
       'res_sale_basic_details': ['propertyType', 'bhkType', 'floor', 'totalFloors', 'propertyAge', 'facing', 'builtUpArea', 'bathrooms', 'availableFrom'],
       'res_flat_basic_details': ['propertyType', 'bhkType', 'floor', 'totalFloors', 'propertyAge', 'facing', 'builtUpArea', 'bathrooms', 'availableFrom'],
       
-      // ✅ ADDED: PG/Hostel room details step - all required fields from RoomDetails UI
+      // ✅ PG/Hostel room details step - all required fields from RoomDetails UI
       'res_pg_basic_details': ['roomType', 'roomCapacity', 'expectedRent', 'expectedDeposit', 'bathroomType', 'roomSize', 'mealOption'],
       
       // Commercial basic details
@@ -54,8 +54,19 @@ export function useStepValidation({
       'com_sale_basic_details': ['propertyType', 'floor', 'totalFloors', 'propertyAge', 'builtUpArea'],
       'com_cow_basic_details': ['propertyType', 'spaceType', 'capacity'],
       
-      // Land basic details
-      'land_sale_basic_details': ['propertyType', 'builtUpArea'],
+      // ✅ UPDATED: Land basic details - now includes expectedPrice as required
+      'land_sale_basic_details': [
+        'propertyType',           // Land/Plot Type (required)
+        'builtUpArea',           // Total Area (required)
+        'expectedPrice',         // Expected Price (required) - ADDED
+        'plotFacing',            // Plot Facing (required for validation)
+        'developmentStatus',     // Development Status (required for validation)
+        'approvalStatus',        // Approval Status (required for validation)
+        'boundaryType',          // Boundary Type (required for validation)
+        'waterAvailability',     // Water Availability (required for validation)
+        'electricityStatus',     // Electricity Status (required for validation)
+        'roadConnectivity'       // Road Connectivity (required for validation)
+      ],
       
       // Location steps - including locality as required
       'res_rent_location': ['address', 'city', 'state', 'pinCode', 'locality'],
@@ -94,8 +105,13 @@ export function useStepValidation({
       // Coworking details
       'com_cow_coworking_details': ['spaceType', 'capacity', 'rentAmount'],
       
-      // Land features
-      'land_sale_land_features': ['expectedPrice'],
+      // ✅ UPDATED: Land features step - added mandatory sections
+      'land_sale_land_features': [
+        'nearbyDevelopments',    // Nearby Developments (required - at least one option)
+        'commercialFeatures',    // Commercial Plot Features (required - at least one option, if commercial land)
+        'availableDocuments'     // Available Documents (required - at least one option)
+        // nearbyLandmarks is optional - removed from required fields
+      ],
       
       // Default fallback
       'default': []
@@ -403,7 +419,7 @@ export function useStepValidation({
   };
 }
 
-// Helper function to get user-friendly field labels - ✅ UPDATED: Added availableFrom label
+// Helper function to get user-friendly field labels - ✅ UPDATED: Added all land-specific field labels
 function getFieldLabel(fieldName: string): string {
   const labels: Record<string, string> = {
     // Property Details fields
@@ -415,7 +431,7 @@ function getFieldLabel(fieldName: string): string {
     facing: 'Facing Direction',
     builtUpArea: 'Built-up Area',
     bathrooms: 'Bathrooms',
-    availableFrom: 'Available From', // ✅ ADDED: Label for availableFrom
+    availableFrom: 'Available From',
     
     // Location fields
     address: 'Complete Address',
@@ -437,7 +453,7 @@ function getFieldLabel(fieldName: string): string {
     furnishing: 'Furnishing',
     parking: 'Parking',
     
-    // ✅ ADDED: PG/Hostel room details field labels
+    // ✅ PG/Hostel room details field labels
     roomType: 'Room Type',
     roomCapacity: 'Room Capacity',
     expectedRent: 'Expected Rent',
@@ -460,7 +476,26 @@ function getFieldLabel(fieldName: string): string {
     monthlyRent: 'Monthly Rent',
     
     // Flatmate fields
-    preferredGender: 'Preferred Gender'
+    preferredGender: 'Preferred Gender',
+    
+    // ✅ ADDED: Land-specific field labels
+    plotFacing: 'Plot Facing',
+    developmentStatus: 'Development Status',
+    approvalStatus: 'Approval Status',
+    soilType: 'Soil Type',
+    boundaryType: 'Boundary Type',
+    waterAvailability: 'Water Availability',
+    electricityStatus: 'Electricity Status',
+    roadConnectivity: 'Road Connectivity',
+    additionalDetails: 'Additional Details',
+    
+    // ✅ ADDED: Land features field labels
+    distanceFromCity: 'Distance from City Center',
+    distanceFromHighway: 'Distance from Highway',
+    nearbyLandmarks: 'Nearby Landmarks',
+    availableDocuments: 'Available Documents',
+    nearbyDevelopments: 'Nearby Developments',
+    commercialFeatures: 'Commercial Plot Features'
   };
   return labels[fieldName] || fieldName.charAt(0).toUpperCase() + fieldName.slice(1);
 }

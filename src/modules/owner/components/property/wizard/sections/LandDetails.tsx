@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/LandDetails.tsx
-// Version: 4.0.0
-// Last Modified: 30-05-2025 18:15 IST
-// Purpose: Added step completion validation system for progress tracking
+// Version: 4.1.0
+// Last Modified: 30-05-2025 22:30 IST
+// Purpose: Fixed required field markings (*) and aligned field names with validation system
 
 import React, { useEffect, useCallback, useState } from 'react';
 import { FormSection } from '@/components/FormSection';
@@ -29,7 +29,7 @@ const LandDetails: React.FC<FormSectionProps> = ({
 }) => {
   // Local state to ensure proper updates
   const [localState, setLocalState] = useState({
-    landType: '',
+    propertyType: '', // ✅ FIXED: Changed from landType to propertyType to match validation
     builtUpArea: '',
     areaUnit: 'sqft',
     expectedPrice: '',
@@ -45,7 +45,7 @@ const LandDetails: React.FC<FormSectionProps> = ({
     additionalDetails: ''
   });
 
-  // ✅ ADDED: Initialize validation system
+  // ✅ Initialize validation system
   const flowType = form.getValues('flow.flowType') || 'land_sale';
   const {
     validateField,
@@ -54,7 +54,8 @@ const LandDetails: React.FC<FormSectionProps> = ({
     markFieldAsTouched,
     isValid: stepIsValid,
     completionPercentage,
-    requiredFields
+    requiredFields,
+    getFieldConfig
   } = useStepValidation({
     form,
     flowType,
@@ -73,7 +74,7 @@ const LandDetails: React.FC<FormSectionProps> = ({
       [fieldName]: value
     }));
     
-    // ✅ ADDED: Mark field as touched and validate
+    // ✅ Mark field as touched and validate
     markFieldAsTouched(fieldName);
     validateField(fieldName);
   }, [form, stepId, markFieldAsTouched, validateField]);
@@ -120,14 +121,14 @@ const LandDetails: React.FC<FormSectionProps> = ({
     return () => subscription.unsubscribe();
   }, [form, stepId]);
 
-  const isAgricultural = localState.landType === 'Agricultural Land';
+  const isAgricultural = localState.propertyType === 'Agricultural Land';
   
   return (
     <FormSection
       title="Land/Plot Details"
       description="Provide details about your land or plot for sale"
     >
-      {/* ✅ ADDED: Progress indicator */}
+      {/* ✅ Progress indicator */}
       {requiredFields.length > 0 && (
         <div className="mb-6 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
           <div className="flex items-center justify-between mb-2">
@@ -148,16 +149,20 @@ const LandDetails: React.FC<FormSectionProps> = ({
       )}
 
       <div className="space-y-6">
-        {/* Land Type */}
+        {/* Land Type - ✅ FIXED: Now uses propertyType and has required=true */}
         <div className="mb-6">
-          <RequiredLabel htmlFor="landType" className="mb-2 block">
+          <RequiredLabel 
+            htmlFor="propertyType" 
+            className="mb-2 block"
+            required={getFieldConfig('propertyType').required}
+          >
             Land/Plot Type
           </RequiredLabel>
           <select
-            id="landType"
+            id="propertyType"
             className="w-full h-12 px-4 py-2 rounded-xl border border-border bg-background"
-            value={localState.landType}
-            onChange={(e) => saveField('landType', e.target.value)}
+            value={localState.propertyType}
+            onChange={(e) => saveField('propertyType', e.target.value)}
           >
             <option value="">Select land type</option>
             {LAND_TYPES.map((type) => (
@@ -166,18 +171,16 @@ const LandDetails: React.FC<FormSectionProps> = ({
               </option>
             ))}
           </select>
-          {/* ✅ ADDED: Validation error display */}
-          {shouldShowFieldError('landType') && (
-            <p className="text-sm text-red-600 mt-0.5">
-              {getFieldValidation('landType').error}
-            </p>
-          )}
         </div>
         
-        {/* Area Details */}
+        {/* Area Details - ✅ FIXED: builtUpArea now has required=true */}
         <div className="grid md:grid-cols-2 gap-4 mb-6">
           <div>
-            <RequiredLabel htmlFor="builtUpArea" className="mb-2 block">
+            <RequiredLabel 
+              htmlFor="builtUpArea" 
+              className="mb-2 block"
+              required={getFieldConfig('builtUpArea').required}
+            >
               Total Area
             </RequiredLabel>
             <Input
@@ -188,16 +191,14 @@ const LandDetails: React.FC<FormSectionProps> = ({
               value={localState.builtUpArea}
               onChange={(e) => saveField('builtUpArea', e.target.value)}
             />
-            {/* ✅ ADDED: Validation error display */}
-            {shouldShowFieldError('builtUpArea') && (
-              <p className="text-sm text-red-600 mt-0.5">
-                {getFieldValidation('builtUpArea').error}
-              </p>
-            )}
           </div>
           
           <div>
-            <RequiredLabel htmlFor="areaUnit" className="mb-2 block">
+            <RequiredLabel 
+              htmlFor="areaUnit" 
+              className="mb-2 block"
+              required={false}
+            >
               Area Unit
             </RequiredLabel>
             <select
@@ -217,7 +218,11 @@ const LandDetails: React.FC<FormSectionProps> = ({
         {/* Plot Facing and Price */}
         <div className="grid md:grid-cols-2 gap-4 mb-6">
           <div>
-            <RequiredLabel htmlFor="plotFacing" className="mb-2 block">
+            <RequiredLabel 
+              htmlFor="plotFacing" 
+              className="mb-2 block"
+              required={getFieldConfig('plotFacing').required}
+            >
               Plot Facing
             </RequiredLabel>
             <select
@@ -233,16 +238,14 @@ const LandDetails: React.FC<FormSectionProps> = ({
                 </option>
               ))}
             </select>
-            {/* ✅ ADDED: Validation error display */}
-            {shouldShowFieldError('plotFacing') && (
-              <p className="text-sm text-red-600 mt-0.5">
-                {getFieldValidation('plotFacing').error}
-              </p>
-            )}
           </div>
           
           <div>
-            <RequiredLabel htmlFor="expectedPrice" className="mb-2 block">
+            <RequiredLabel 
+              htmlFor="expectedPrice" 
+              className="mb-2 block"
+              required={true}
+            >
               Expected Price (₹)
             </RequiredLabel>
             <Input
@@ -253,12 +256,6 @@ const LandDetails: React.FC<FormSectionProps> = ({
               value={localState.expectedPrice}
               onChange={(e) => saveField('expectedPrice', e.target.value)}
             />
-            {/* ✅ ADDED: Validation error display */}
-            {shouldShowFieldError('expectedPrice') && (
-              <p className="text-sm text-red-600 mt-0.5">
-                {getFieldValidation('expectedPrice').error}
-              </p>
-            )}
             <div className="flex items-center space-x-2 pt-2 mt-1">
               <input
                 type="checkbox"
@@ -277,10 +274,14 @@ const LandDetails: React.FC<FormSectionProps> = ({
           </div>
         </div>
         
-        {/* Development Status */}
+        {/* Development Status - ✅ FIXED: Both fields now have proper required markings */}
         <div className="grid md:grid-cols-2 gap-4 mb-6">
           <div>
-            <RequiredLabel htmlFor="developmentStatus" className="mb-2 block">
+            <RequiredLabel 
+              htmlFor="developmentStatus" 
+              className="mb-2 block"
+              required={getFieldConfig('developmentStatus').required}
+            >
               Development Status
             </RequiredLabel>
             <select
@@ -296,16 +297,14 @@ const LandDetails: React.FC<FormSectionProps> = ({
                 </option>
               ))}
             </select>
-            {/* ✅ ADDED: Validation error display */}
-            {shouldShowFieldError('developmentStatus') && (
-              <p className="text-sm text-red-600 mt-0.5">
-                {getFieldValidation('developmentStatus').error}
-              </p>
-            )}
           </div>
           
           <div>
-            <RequiredLabel htmlFor="approvalStatus" className="mb-2 block">
+            <RequiredLabel 
+              htmlFor="approvalStatus" 
+              className="mb-2 block"
+              required={getFieldConfig('approvalStatus').required}
+            >
               Approval Status
             </RequiredLabel>
             <select
@@ -321,19 +320,17 @@ const LandDetails: React.FC<FormSectionProps> = ({
                 </option>
               ))}
             </select>
-            {/* ✅ ADDED: Validation error display */}
-            {shouldShowFieldError('approvalStatus') && (
-              <p className="text-sm text-red-600 mt-0.5">
-                {getFieldValidation('approvalStatus').error}
-              </p>
-            )}
           </div>
         </div>
         
-        {/* Soil type - Only for agricultural land */}
+        {/* Soil type - Only for agricultural land - ✅ FIXED: Has proper required marking */}
         {isAgricultural && (
           <div className="mb-6">
-            <RequiredLabel htmlFor="soilType" className="mb-2 block">
+            <RequiredLabel 
+              htmlFor="soilType" 
+              className="mb-2 block"
+              required={getFieldConfig('soilType').required}
+            >
               Soil Type
             </RequiredLabel>
             <select
@@ -349,47 +346,68 @@ const LandDetails: React.FC<FormSectionProps> = ({
                 </option>
               ))}
             </select>
-            {/* ✅ ADDED: Validation error display */}
-            {shouldShowFieldError('soilType') && (
-              <p className="text-sm text-red-600 mt-0.5">
-                {getFieldValidation('soilType').error}
-              </p>
-            )}
           </div>
         )}
         
-        {/* Boundary Type */}
-        <div className="mb-6">
-          <RequiredLabel htmlFor="boundaryType" className="mb-2 block">
-            Boundary Type
-          </RequiredLabel>
-          <select
-            id="boundaryType"
-            className="w-full h-12 px-4 py-2 rounded-xl border border-border bg-background"
-            value={localState.boundaryType}
-            onChange={(e) => saveField('boundaryType', e.target.value)}
-          >
-            <option value="">Select boundary type</option>
-            {BOUNDARY_TYPES.map((type) => (
-              <option key={type} value={type}>
-                {type}
-              </option>
-            ))}
-          </select>
-          {/* ✅ ADDED: Validation error display */}
-          {shouldShowFieldError('boundaryType') && (
-            <p className="text-sm text-red-600 mt-0.5">
-              {getFieldValidation('boundaryType').error}
-            </p>
-          )}
+        {/* Boundary Type and Road Connectivity - ✅ FIXED: Moved to 2-column layout */}
+        <div className="grid md:grid-cols-2 gap-4 mb-6">
+          <div>
+            <RequiredLabel 
+              htmlFor="boundaryType" 
+              className="mb-2 block"
+              required={getFieldConfig('boundaryType').required}
+            >
+              Boundary Type
+            </RequiredLabel>
+            <select
+              id="boundaryType"
+              className="w-full h-12 px-4 py-2 rounded-xl border border-border bg-background"
+              value={localState.boundaryType}
+              onChange={(e) => saveField('boundaryType', e.target.value)}
+            >
+              <option value="">Select boundary type</option>
+              {BOUNDARY_TYPES.map((type) => (
+                <option key={type} value={type}>
+                  {type}
+                </option>
+              ))}
+            </select>
+          </div>
+          
+          <div>
+            <RequiredLabel 
+              htmlFor="roadConnectivity" 
+              className="mb-2 block"
+              required={getFieldConfig('roadConnectivity').required}
+            >
+              Road Connectivity
+            </RequiredLabel>
+            <select
+              id="roadConnectivity"
+              className="w-full h-12 px-4 py-2 rounded-xl border border-border bg-background"
+              value={localState.roadConnectivity}
+              onChange={(e) => saveField('roadConnectivity', e.target.value)}
+            >
+              <option value="">Select road connectivity</option>
+              {ROAD_CONNECTIVITY.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
         
-        {/* Utilities */}
-        <div className="bg-gray-50 p-4 rounded-lg mb-6">
+        {/* Utilities - ✅ FIXED: Both fields now have proper required markings */}
+        <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg mb-6">
           <p className="text-sm font-medium mb-3 block">Utilities</p>
           <div className="grid md:grid-cols-2 gap-4">
             <div>
-              <RequiredLabel htmlFor="waterAvailability" className="mb-2 block">
+              <RequiredLabel 
+                htmlFor="waterAvailability" 
+                className="mb-2 block"
+                required={getFieldConfig('waterAvailability').required}
+              >
                 Water Availability
               </RequiredLabel>
               <select
@@ -405,7 +423,7 @@ const LandDetails: React.FC<FormSectionProps> = ({
                   </option>
                 ))}
               </select>
-              {/* ✅ ADDED: Validation error display */}
+              {/* ✅ Validation error display */}
               {shouldShowFieldError('waterAvailability') && (
                 <p className="text-sm text-red-600 mt-0.5">
                   {getFieldValidation('waterAvailability').error}
@@ -414,7 +432,11 @@ const LandDetails: React.FC<FormSectionProps> = ({
             </div>
             
             <div>
-              <RequiredLabel htmlFor="electricityStatus" className="mb-2 block">
+              <RequiredLabel 
+                htmlFor="electricityStatus" 
+                className="mb-2 block"
+                required={getFieldConfig('electricityStatus').required}
+              >
                 Electricity Status
               </RequiredLabel>
               <select
@@ -430,7 +452,7 @@ const LandDetails: React.FC<FormSectionProps> = ({
                   </option>
                 ))}
               </select>
-              {/* ✅ ADDED: Validation error display */}
+              {/* ✅ Validation error display */}
               {shouldShowFieldError('electricityStatus') && (
                 <p className="text-sm text-red-600 mt-0.5">
                   {getFieldValidation('electricityStatus').error}
@@ -440,9 +462,13 @@ const LandDetails: React.FC<FormSectionProps> = ({
           </div>
         </div>
         
-        {/* Road Connectivity */}
+        {/* Road Connectivity - ✅ FIXED: Has proper required marking */}
         <div className="mb-6">
-          <RequiredLabel htmlFor="roadConnectivity" className="mb-2 block">
+          <RequiredLabel 
+            htmlFor="roadConnectivity" 
+            className="mb-2 block"
+            required={getFieldConfig('roadConnectivity').required}
+          >
             Road Connectivity
           </RequiredLabel>
           <select
@@ -458,21 +484,20 @@ const LandDetails: React.FC<FormSectionProps> = ({
               </option>
             ))}
           </select>
-          {/* ✅ ADDED: Validation error display */}
-          {shouldShowFieldError('roadConnectivity') && (
-            <p className="text-sm text-red-600 mt-0.5">
-              {getFieldValidation('roadConnectivity').error}
-            </p>
-          )}
         </div>
         
-        {/* Additional Details */}
+        {/* Additional Details - ✅ FIXED: Has proper required marking (optional field) */}
         <div>
           <div className="flex items-center justify-between mb-2">
-            <RequiredLabel htmlFor="additionalDetails">
+            <RequiredLabel 
+              htmlFor="additionalDetails"
+              required={getFieldConfig('additionalDetails').required}
+            >
               Additional Details
             </RequiredLabel>
-            <div className="text-xs text-muted-foreground italic">Recommended</div>
+            <div className="text-xs text-muted-foreground italic">
+              {getFieldConfig('additionalDetails').required ? 'Required' : 'Optional'}
+            </div>
           </div>
           <Textarea
             id="additionalDetails"
@@ -482,7 +507,7 @@ const LandDetails: React.FC<FormSectionProps> = ({
             value={localState.additionalDetails}
             onChange={(e) => saveField('additionalDetails', e.target.value)}
           />
-          {/* ✅ ADDED: Validation error display */}
+          {/* ✅ Validation error display */}
           {shouldShowFieldError('additionalDetails') && (
             <p className="text-sm text-red-600 mt-0.5">
               {getFieldValidation('additionalDetails').error}
