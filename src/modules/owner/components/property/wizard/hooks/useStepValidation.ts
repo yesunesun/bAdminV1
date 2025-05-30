@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/hooks/useStepValidation.ts
-// Version: 4.4.0
-// Last Modified: 30-05-2025 22:35 IST
-// Purpose: Updated land sale validation to include all required land-specific fields
+// Version: 5.0.0
+// Last Modified: 30-05-2025 23:15 IST
+// Purpose: Added cross-field validation and fixed commercial rent step validation
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { UseFormReturn } from 'react-hook-form';
@@ -25,6 +25,11 @@ interface ValidationSummary {
   }>;
 }
 
+interface CrossFieldValidationRule {
+  fields: string[];
+  validate: (values: Record<string, any>) => { isValid: boolean; error?: string };
+}
+
 export function useStepValidation({
   form,
   flowType,
@@ -38,7 +43,7 @@ export function useStepValidation({
     lastCheckedStep: ''
   });
   
-  // Get required fields for current step - ✅ UPDATED: Complete land sale validation
+  // ✅ UPDATED: Get required fields for current step - fixed commercial rent fields
   const getRequiredFieldsForStep = useCallback((stepId: string): string[] => {
     const stepFieldMap: Record<string, string[]> = {
       // Basic details steps - ✅ UPDATED: Added availableFrom to all property details steps
@@ -49,9 +54,9 @@ export function useStepValidation({
       // ✅ PG/Hostel room details step - all required fields from RoomDetails UI
       'res_pg_basic_details': ['roomType', 'roomCapacity', 'expectedRent', 'expectedDeposit', 'bathroomType', 'roomSize', 'mealOption'],
       
-      // Commercial basic details
-      'com_rent_basic_details': ['propertyType', 'floor', 'totalFloors', 'propertyAge', 'builtUpArea'],
-      'com_sale_basic_details': ['propertyType', 'floor', 'totalFloors', 'propertyAge', 'builtUpArea'],
+      // ✅ FIXED: Commercial basic details - exactly matching UI requirements
+      'com_rent_basic_details': ['propertyType', 'buildingType', 'ageOfProperty', 'builtUpArea', 'floor', 'totalFloors'],
+      'com_sale_basic_details': ['propertyType', 'buildingType', 'ageOfProperty', 'builtUpArea', 'floor', 'totalFloors'],
       'com_cow_basic_details': ['propertyType', 'spaceType', 'capacity'],
       
       // ✅ UPDATED: Land basic details - now includes expectedPrice as required
@@ -78,9 +83,11 @@ export function useStepValidation({
       'com_cow_location': ['address', 'city', 'state', 'pinCode', 'locality'],
       'land_sale_location': ['address', 'city', 'state', 'pinCode'],
       
+      // ✅ FIXED: Commercial rental step - exactly matching UI requirements
+      'com_rent_rental': ['rentAmount', 'securityDeposit', 'advanceRent', 'maintenance', 'camCharges', 'availableFrom', 'parking', 'operatingHours', 'businessPreferences'],
+      
       // Rental steps - includes ALL required fields as shown in UI
       'res_rent_rental': ['rentAmount', 'securityDeposit', 'availableFrom', 'furnishingStatus', 'preferredTenants'],
-      'com_rent_rental': ['rentAmount', 'securityDeposit', 'availableFrom', 'furnishingStatus'],
       
       // Sale details steps - added ALL required fields as shown in UI
       'res_sale_sale_details': ['expectedPrice', 'maintenanceCost', 'kitchenType', 'availableFrom', 'furnishing', 'parking'],
@@ -120,6 +127,103 @@ export function useStepValidation({
     return stepFieldMap[stepId] || stepFieldMap['default'];
   }, []);
 
+  // ✅ NEW: Cross-field validation rules
+  const getCrossFieldValidationRules = useCallback((stepId: string): CrossFieldValidationRule[] => {
+    const rules: Record<string, CrossFieldValidationRule[]> = {
+      // Commercial and residential basic details steps - floor validation
+      'com_rent_basic_details': [
+        {
+          fields: ['floor', 'totalFloors'],
+          validate: (values) => {
+            const floor = parseInt(values.floor);
+            const totalFloors = parseInt(values.totalFloors);
+            
+            if (isNaN(floor) || isNaN(totalFloors)) {
+              return { isValid: true }; // Skip validation if either is not a number
+            }
+            
+            if (floor > totalFloors) {
+              return { 
+                isValid: false, 
+                error: 'Floor number cannot be greater than total floors' 
+              };
+            }
+            
+            return { isValid: true };
+          }
+        }
+      ],
+      'com_sale_basic_details': [
+        {
+          fields: ['floor', 'totalFloors'],
+          validate: (values) => {
+            const floor = parseInt(values.floor);
+            const totalFloors = parseInt(values.totalFloors);
+            
+            if (isNaN(floor) || isNaN(totalFloors)) {
+              return { isValid: true };
+            }
+            
+            if (floor > totalFloors) {
+              return { 
+                isValid: false, 
+                error: 'Floor number cannot be greater than total floors' 
+              };
+            }
+            
+            return { isValid: true };
+          }
+        }
+      ],
+      'res_rent_basic_details': [
+        {
+          fields: ['floor', 'totalFloors'],
+          validate: (values) => {
+            const floor = parseInt(values.floor);
+            const totalFloors = parseInt(values.totalFloors);
+            
+            if (isNaN(floor) || isNaN(totalFloors)) {
+              return { isValid: true };
+            }
+            
+            if (floor > totalFloors) {
+              return { 
+                isValid: false, 
+                error: 'Floor number cannot be greater than total floors' 
+              };
+            }
+            
+            return { isValid: true };
+          }
+        }
+      ],
+      'res_sale_basic_details': [
+        {
+          fields: ['floor', 'totalFloors'],
+          validate: (values) => {
+            const floor = parseInt(values.floor);
+            const totalFloors = parseInt(values.totalFloors);
+            
+            if (isNaN(floor) || isNaN(totalFloors)) {
+              return { isValid: true };
+            }
+            
+            if (floor > totalFloors) {
+              return { 
+                isValid: false, 
+                error: 'Floor number cannot be greater than total floors' 
+              };
+            }
+            
+            return { isValid: true };
+          }
+        }
+      ]
+    };
+    
+    return rules[stepId] || [];
+  }, []);
+
   // Enhanced field checker that properly validates different field types
   const hasFieldValue = useCallback((fieldName: string): boolean => {
     if (!form || !currentStepId || !fieldName) {
@@ -148,7 +252,7 @@ export function useStepValidation({
             return value.trim() !== '';
           } else if (typeof value === 'number') {
             // For numbers, check if not NaN and greater than 0 (except certain fields which can be 0)
-            if (fieldName === 'bathrooms' || fieldName === 'balconies' || fieldName === 'maintenanceCost' || fieldName === 'expectedDeposit') {
+            if (fieldName === 'bathrooms' || fieldName === 'balconies' || fieldName === 'maintenanceCost' || fieldName === 'expectedDeposit' || fieldName === 'floor') {
               return !isNaN(value) && value >= 0;
             }
             return !isNaN(value) && value > 0;
@@ -175,7 +279,7 @@ export function useStepValidation({
           } else if (typeof rootValue === 'string') {
             return rootValue.trim() !== '';
           } else if (typeof rootValue === 'number') {
-            if (fieldName === 'bathrooms' || fieldName === 'balconies' || fieldName === 'maintenanceCost' || fieldName === 'expectedDeposit') {
+            if (fieldName === 'bathrooms' || fieldName === 'balconies' || fieldName === 'maintenanceCost' || fieldName === 'expectedDeposit' || fieldName === 'floor') {
               return !isNaN(rootValue) && rootValue >= 0;
             }
             return !isNaN(rootValue) && rootValue > 0;
@@ -194,6 +298,43 @@ export function useStepValidation({
       return false;
     }
   }, [form, currentStepId]);
+
+  // ✅ NEW: Cross-field validation checker
+  const validateCrossFields = useCallback((): Array<{ name: string; label: string; error: string }> => {
+    const rules = getCrossFieldValidationRules(currentStepId);
+    const crossFieldErrors: Array<{ name: string; label: string; error: string }> = [];
+    
+    for (const rule of rules) {
+      try {
+        // Get values for all fields in the rule
+        const values: Record<string, any> = {};
+        for (const fieldName of rule.fields) {
+          // Check step data first, then root level
+          const stepData = form.getValues(`steps.${currentStepId}`);
+          if (stepData && stepData[fieldName] !== undefined) {
+            values[fieldName] = stepData[fieldName];
+          } else {
+            values[fieldName] = form.getValues(fieldName);
+          }
+        }
+        
+        // Run the validation
+        const result = rule.validate(values);
+        if (!result.isValid && result.error) {
+          // Add error for the first field in the rule (typically the dependent field)
+          crossFieldErrors.push({
+            name: rule.fields[0],
+            label: getFieldLabel(rule.fields[0]),
+            error: result.error
+          });
+        }
+      } catch (error) {
+        console.error('[validateCrossFields] Error validating cross-field rule:', error);
+      }
+    }
+    
+    return crossFieldErrors;
+  }, [currentStepId, form, getCrossFieldValidationRules]);
 
   // Enhanced validation summary
   const getValidationSummary = useCallback((): ValidationSummary => {
@@ -240,6 +381,10 @@ export function useStepValidation({
         }
       }
 
+      // ✅ NEW: Add cross-field validation errors
+      const crossFieldErrors = validateCrossFields();
+      invalidFields.push(...crossFieldErrors);
+
       const totalRequiredFields = requiredFields.length;
       const completionPercentage = totalRequiredFields > 0 
         ? Math.round((completedFields / totalRequiredFields) * 100)
@@ -265,7 +410,7 @@ export function useStepValidation({
         invalidFields: []
       };
     }
-  }, [currentStepId, getRequiredFieldsForStep, hasFieldValue]);
+  }, [currentStepId, getRequiredFieldsForStep, hasFieldValue, validateCrossFields]);
 
   // Simple step validation
   const validateCurrentStep = useCallback(() => {
@@ -299,6 +444,19 @@ export function useStepValidation({
   const validateField = useCallback((fieldName: string) => {
     try {
       const hasValue = hasFieldValue(fieldName);
+      
+      // ✅ NEW: Check for cross-field validation errors specific to this field
+      const crossFieldErrors = validateCrossFields();
+      const crossFieldError = crossFieldErrors.find(error => error.name === fieldName);
+      
+      if (crossFieldError) {
+        return {
+          isValid: false,
+          error: crossFieldError.error,
+          isTouched: true
+        };
+      }
+      
       return {
         isValid: hasValue,
         error: hasValue ? null : `${getFieldLabel(fieldName)} is required`,
@@ -307,11 +465,24 @@ export function useStepValidation({
     } catch (error) {
       return { isValid: false, error: 'Validation error', isTouched: false };
     }
-  }, [hasFieldValue]);
+  }, [hasFieldValue, validateCrossFields]);
 
   const getFieldValidation = useCallback((fieldName: string) => {
     try {
       const hasValue = hasFieldValue(fieldName);
+      
+      // ✅ NEW: Check for cross-field validation errors specific to this field
+      const crossFieldErrors = validateCrossFields();
+      const crossFieldError = crossFieldErrors.find(error => error.name === fieldName);
+      
+      if (crossFieldError) {
+        return {
+          isValid: false,
+          error: crossFieldError.error,
+          isTouched: false
+        };
+      }
+      
       return {
         isValid: hasValue,
         error: hasValue ? null : `${getFieldLabel(fieldName)} is required`,
@@ -320,7 +491,7 @@ export function useStepValidation({
     } catch (error) {
       return { isValid: false, error: null, isTouched: false };
     }
-  }, [hasFieldValue]);
+  }, [hasFieldValue, validateCrossFields]);
 
   const shouldShowFieldError = useCallback((fieldName: string) => {
     // Show errors for required fields that are empty
@@ -328,8 +499,13 @@ export function useStepValidation({
     if (!requiredFields.includes(fieldName)) {
       return false;
     }
-    return !hasFieldValue(fieldName);
-  }, [currentStepId, getRequiredFieldsForStep, hasFieldValue]);
+    
+    // Check for cross-field validation errors
+    const crossFieldErrors = validateCrossFields();
+    const hasCrossFieldError = crossFieldErrors.some(error => error.name === fieldName);
+    
+    return !hasFieldValue(fieldName) || hasCrossFieldError;
+  }, [currentStepId, getRequiredFieldsForStep, hasFieldValue, validateCrossFields]);
 
   const getFieldConfig = useCallback((fieldName: string) => {
     const requiredFields = getRequiredFieldsForStep(currentStepId);
@@ -424,6 +600,8 @@ function getFieldLabel(fieldName: string): string {
   const labels: Record<string, string> = {
     // Property Details fields
     propertyType: 'Property Type',
+    buildingType: 'Building Type',
+    ageOfProperty: 'Age of Property',
     bhkType: 'BHK Configuration',
     floor: 'Floor',
     totalFloors: 'Total Floors',
@@ -443,6 +621,12 @@ function getFieldLabel(fieldName: string): string {
     // Rental/Sale fields
     rentAmount: 'Monthly Rent Amount',
     securityDeposit: 'Security Deposit',
+    advanceRent: 'Advance Rent',
+    maintenance: 'Maintenance',
+    camCharges: 'CAM Charges',
+    parking: 'Parking',
+    operatingHours: 'Operating Hours',
+    businessPreferences: 'Business Preferences',
     furnishingStatus: 'Furnishing Status',
     preferredTenants: 'Preferred Tenants',
     
@@ -451,7 +635,6 @@ function getFieldLabel(fieldName: string): string {
     maintenanceCost: 'Maintenance Cost',
     kitchenType: 'Kitchen Type',
     furnishing: 'Furnishing',
-    parking: 'Parking',
     
     // ✅ PG/Hostel room details field labels
     roomType: 'Room Type',

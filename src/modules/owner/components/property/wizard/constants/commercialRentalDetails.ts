@@ -1,67 +1,60 @@
 // src/modules/owner/components/property/wizard/constants/commercialRentalDetails.ts
 // Version: 1.0.0
-// Last Modified: 26-05-2025 10:30 IST
-// Purpose: Constants for Commercial Rental Details section
+// Last Modified: 30-05-2025 23:25 IST
+// Purpose: Constants for commercial rental details form
 
 export const COMMERCIAL_RENTAL_TYPES = [
-  { id: 'rent', label: 'Rent' },
+  { id: 'rent', label: 'Monthly Rent' },
   { id: 'lease', label: 'Lease' }
 ] as const;
 
 export const COMMERCIAL_MAINTENANCE_OPTIONS = [
-  'Maintenance Included',
-  'Maintenance Extra',
-  'No Maintenance',
-  'CAM Charges Separate',
-  'Triple Net Lease'
-] as const;
-
-export const COMMERCIAL_BUSINESS_PREFERENCES = [
-  'Retail Business',
-  'Office Use',
-  'Service Industry', 
-  'Food & Beverage',
-  'Healthcare Services',
-  'Educational Institute',
-  'Financial Services',
-  'IT/Software Company',
-  'Manufacturing Unit',
-  'Warehouse/Storage',
-  'Any Business Type'
-] as const;
-
-export const COMMERCIAL_FURNISHING_OPTIONS = [
-  'Fully Furnished',
-  'Semi Furnished', 
-  'Bare Shell',
-  'Unfurnished',
-  'Built-to-Suit'
+  'Included in Rent',
+  'Exclusive',
+  'Fixed Amount',
+  'None'
 ] as const;
 
 export const COMMERCIAL_PARKING_OPTIONS = [
-  'No Parking',
-  'Open Parking',
-  'Covered Parking',
-  'Reserved Slots',
-  'Valet Available',
-  'Multi-level Parking'
+  'Reserved Parking',
+  'Shared Parking',
+  'Paid Parking',
+  'No Parking'
+] as const;
+
+export const COMMERCIAL_BUSINESS_PREFERENCES = [
+  'IT/Software Company',
+  'Consulting Firm',
+  'Finance/Banking',
+  'Healthcare/Medical',
+  'Legal Services',
+  'Real Estate',
+  'Education/Training',
+  'Marketing/Advertising',
+  'Manufacturing',
+  'Retail Business',
+  'Food & Beverage',
+  'NGO/Non-Profit',
+  'Government Office',
+  'Startup',
+  'Any Business Type'
 ] as const;
 
 export const LEASE_TERMS = [
+  '6 months',
   '11 months',
   '1 year',
-  '2 years', 
+  '2 years',
   '3 years',
   '5 years',
-  '9 years',
-  '15+ years',
-  'Custom'
+  '10+ years'
 ] as const;
 
 export const OPERATING_HOURS_OPTIONS = [
   '24/7 Access',
-  'Business Hours Only',
-  'Extended Hours (6 AM - 10 PM)',
-  'Flexible Hours',
-  'Custom Schedule'
+  'Business Hours (9 AM - 6 PM)',
+  'Extended Hours (7 AM - 9 PM)',
+  'Custom Hours',
+  'Weekdays Only',
+  'Flexible Hours'
 ] as const;

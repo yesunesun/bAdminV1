@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/CommercialBasicDetails.tsx
-// Version: 2.0.0
-// Last Modified: 30-05-2025 20:30 IST
-// Purpose: Added Step Completion indicator and validation system integration
+// Version: 3.0.0
+// Last Modified: 30-05-2025 23:20 IST
+// Purpose: Added cross-field validation for floor vs totalFloors and improved ageOfProperty tracking
 
 import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { FormSection } from '@/components/FormSection';
@@ -61,6 +61,9 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
     title: initialStepValues.title || initialValues.title || ''
   });
   
+  // ✅ NEW: Track cross-field validation errors
+  const [crossFieldErrors, setCrossFieldErrors] = useState<Record<string, string>>({});
+  
   // Get available building types based on selected property type
   const availableBuildingTypes = useMemo(() => {
     if (!values.propertyType) return [];
@@ -75,6 +78,34 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
   
   // Debug counter to track re-renders and updates
   const updateCounter = useRef(0);
+  
+  // ✅ NEW: Validate floor vs totalFloors relationship
+  const validateFloorRelationship = useCallback((floor: string, totalFloors: string) => {
+    const floorNum = parseInt(floor);
+    const totalFloorsNum = parseInt(totalFloors);
+    
+    if (isNaN(floorNum) || isNaN(totalFloors)) {
+      return null; // Skip validation if either is not a number
+    }
+    
+    if (floorNum > totalFloorsNum) {
+      return 'Floor number cannot be greater than total floors';
+    }
+    
+    return null;
+  }, []);
+  
+  // ✅ NEW: Update cross-field validation errors
+  const updateCrossFieldValidation = useCallback(() => {
+    const errors: Record<string, string> = {};
+    
+    const floorError = validateFloorRelationship(values.floor, values.totalFloors);
+    if (floorError) {
+      errors.floor = floorError;
+    }
+    
+    setCrossFieldErrors(errors);
+  }, [values.floor, values.totalFloors, validateFloorRelationship]);
   
   // Clean up on unmount
   useEffect(() => {
@@ -252,7 +283,7 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
     }
   };
   
-  // Update form and state with validation
+  // ✅ UPDATED: Update form and state with validation and cross-field checks
   const updateFormAndState = useCallback((field: string, value: any) => {
     // Update local state
     setValues(prev => ({
@@ -266,7 +297,17 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
     
     // Debug log
     console.log(`Updated ${field} to:`, value);
-  }, [saveField, markFieldAsTouched]);
+    
+    // ✅ NEW: Trigger cross-field validation after a short delay
+    setTimeout(() => {
+      updateCrossFieldValidation();
+    }, 50);
+  }, [saveField, markFieldAsTouched, updateCrossFieldValidation]);
+  
+  // ✅ UPDATED: Update cross-field validation when floor or totalFloors change
+  useEffect(() => {
+    updateCrossFieldValidation();
+  }, [values.floor, values.totalFloors, updateCrossFieldValidation]);
   
   // Process numeric input
   const handleNumberInput = (value: string, fieldName: string) => {
@@ -314,18 +355,18 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
     >
       {/* Validation Progress */}
       {requiredFields.length > 0 && (
-        <div className="mb-6 p-3 bg-blue-50 rounded-lg border border-blue-200">
+        <div className="mb-6 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-blue-900">
+            <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
               Step Completion: {completionPercentage}%
             </span>
-            <span className="text-xs text-blue-700">
+            <span className="text-xs text-blue-700 dark:text-blue-300">
               {stepIsValid ? '✓ Ready to proceed' : 'Please complete required fields'}
             </span>
           </div>
-          <div className="w-full bg-blue-200 rounded-full h-2">
+          <div className="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-2">
             <div 
-              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+              className="bg-blue-600 dark:bg-blue-400 h-2 rounded-full transition-all duration-300"
               style={{ width: `${completionPercentage}%` }}
             />
           </div>
@@ -353,7 +394,7 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
               </SelectContent>
             </Select>
             {shouldShowFieldError('propertyType') && (
-              <p className="text-sm text-red-600 mt-0.5">
+              <p className="text-sm text-red-600 mt-1">
                 {getFieldValidation('propertyType').error}
               </p>
             )}
@@ -381,7 +422,7 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
               </SelectContent>
             </Select>
             {shouldShowFieldError('buildingType') && (
-              <p className="text-sm text-red-600 mt-0.5">
+              <p className="text-sm text-red-600 mt-1">
                 {getFieldValidation('buildingType').error}
               </p>
             )}
@@ -395,6 +436,7 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
             <Select 
               value={values.ageOfProperty}
               onValueChange={(value) => {
+                console.log('Age of Property selected:', value);
                 updateFormAndState('ageOfProperty', value);
                 setFieldValue('constructionAge', value, false);
               }}
@@ -411,7 +453,7 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
               </SelectContent>
             </Select>
             {shouldShowFieldError('ageOfProperty') && (
-              <p className="text-sm text-red-600 mt-0.5">
+              <p className="text-sm text-red-600 mt-1">
                 {getFieldValidation('ageOfProperty').error}
               </p>
             )}
@@ -450,7 +492,7 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
                   }}
                 />
                 {shouldShowFieldError('builtUpArea') && (
-                  <p className="text-sm text-red-600 mt-0.5">
+                  <p className="text-sm text-red-600 mt-1">
                     {getFieldValidation('builtUpArea').error}
                   </p>
                 )}
@@ -489,8 +531,14 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
               placeholder="Floor number (0 = ground)"
               onChange={(e) => handleNumberInput(e.target.value, 'floor')}
             />
-            {shouldShowFieldError('floor') && (
-              <p className="text-sm text-red-600 mt-0.5">
+            {/* ✅ NEW: Show cross-field validation error for floor */}
+            {crossFieldErrors.floor && (
+              <p className="text-sm text-red-600 mt-1">
+                {crossFieldErrors.floor}
+              </p>
+            )}
+            {shouldShowFieldError('floor') && !crossFieldErrors.floor && (
+              <p className="text-sm text-red-600 mt-1">
                 {getFieldValidation('floor').error}
               </p>
             )}
@@ -507,7 +555,7 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
               onChange={(e) => handleNumberInput(e.target.value, 'totalFloors')}
             />
             {shouldShowFieldError('totalFloors') && (
-              <p className="text-sm text-red-600 mt-0.5">
+              <p className="text-sm text-red-600 mt-1">
                 {getFieldValidation('totalFloors').error}
               </p>
             )}
