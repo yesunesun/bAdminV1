@@ -1,7 +1,7 @@
 // src/modules/seeker/services/propertyService.ts
-// Version: 4.0.0
-// Last Modified: 27-05-2025 20:15 IST
-// Purpose: Complete service with optimized nearby properties using property_coordinates table
+// Version: 4.1.0
+// Last Modified: 01-06-2025 10:30 IST
+// Purpose: Added coordinate fetching to property listings for AllProperties page display
 
 import { supabase } from '@/lib/supabase';
 import { PropertyFilters } from './seekerService';
@@ -37,10 +37,23 @@ interface SyncResult {
   data?: any;
 }
 
-// Fetch properties with filters and pagination - Only from properties_v2
+// Interface for property coordinates
+interface PropertyCoordinates {
+  id: string;
+  property_id: string;
+  latitude: number;
+  longitude: number;
+  address?: string;
+  city?: string;
+  state?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Fetch properties with filters and pagination - Only from properties_v2, now with coordinates
 export const fetchProperties = async (filters: PropertyFilters = {}) => {
   try {
-    console.log('[propertyService] Fetching properties from properties_v2 table exclusively');
+    console.log('[propertyService] Fetching properties from properties_v2 table exclusively with coordinates');
     
     // First check if the table exists
     const schemaCheck = await debugTableSchema('properties_v2');
@@ -76,7 +89,7 @@ export const fetchProperties = async (filters: PropertyFilters = {}) => {
       console.log(`[propertyService] Total records in properties_v2: ${totalRecords}`);
     }
     
-    // Build the query for properties_v2
+    // Build the query for properties_v2 with coordinates
     let query = supabase
       .from('properties_v2')
       .select(`
@@ -84,6 +97,16 @@ export const fetchProperties = async (filters: PropertyFilters = {}) => {
         profiles:owner_id (
           id,
           email
+        ),
+        property_coordinates (
+          id,
+          latitude,
+          longitude,
+          address,
+          city,
+          state,
+          created_at,
+          updated_at
         )
       `, { count: 'exact' });
     
@@ -106,7 +129,7 @@ export const fetchProperties = async (filters: PropertyFilters = {}) => {
     // Apply pagination
     query = query.range(startIndex, startIndex + pageSize - 1);
     
-    console.log(`[propertyService] Executing query for properties_v2`);
+    console.log(`[propertyService] Executing query for properties_v2 with coordinates`);
     
     // Execute query
     const { data, error, count } = await query;
@@ -122,6 +145,7 @@ export const fetchProperties = async (filters: PropertyFilters = {}) => {
     if (data && data.length > 0) {
       console.log('[propertyService] First record ID:', data[0].id);
       console.log('[propertyService] First record property_details type:', typeof data[0].property_details);
+      console.log('[propertyService] First record coordinates:', data[0].property_coordinates);
       
       // Check if the first property has the new data structure
       const firstProperty = data[0];
@@ -129,6 +153,13 @@ export const fetchProperties = async (filters: PropertyFilters = {}) => {
         console.log('[propertyService] ✓ New data structure detected with flow.title');
       } else {
         console.log('[propertyService] ⚠ Property missing flow.title in new structure');
+      }
+      
+      // Check coordinates
+      if (firstProperty.property_coordinates) {
+        console.log('[propertyService] ✓ Coordinates found for first property');
+      } else {
+        console.log('[propertyService] ⚠ No coordinates found for first property');
       }
     } else {
       console.warn('[propertyService] No properties returned from query');
@@ -158,10 +189,28 @@ export const fetchProperties = async (filters: PropertyFilters = {}) => {
           return (a.display_order || 0) - (b.display_order || 0);
         });
         
-        // Add sorted images to the property
+        // Process coordinates data
+        let coordinates = null;
+        if (property.property_coordinates && property.property_coordinates.length > 0) {
+          const coord = property.property_coordinates[0]; // Take first coordinate if multiple exist
+          coordinates = {
+            id: coord.id,
+            property_id: property.id,
+            latitude: parseFloat(coord.latitude),
+            longitude: parseFloat(coord.longitude),
+            address: coord.address || null,
+            city: coord.city || null,
+            state: coord.state || null,
+            created_at: coord.created_at,
+            updated_at: coord.updated_at
+          };
+        }
+        
+        // Add sorted images and coordinates to the property
         return {
           ...processedProperty,
-          property_images: sortedImages
+          property_images: sortedImages,
+          coordinates: coordinates
         };
       } catch (error) {
         console.error(`[propertyService] Error processing property ${property.id}:`, error);
@@ -170,6 +219,11 @@ export const fetchProperties = async (filters: PropertyFilters = {}) => {
     }).filter(Boolean); // Remove any null entries
 
     console.log(`[propertyService] Successfully processed ${processedProperties.length} properties`);
+    
+    // Log coordinates statistics
+    const propertiesWithCoords = processedProperties.filter(p => p.coordinates);
+    const propertiesWithoutCoords = processedProperties.filter(p => !p.coordinates);
+    console.log(`[propertyService] Coordinate stats: ${propertiesWithCoords.length} with coordinates, ${propertiesWithoutCoords.length} without coordinates`);
 
     return {
       properties: processedProperties,
@@ -188,12 +242,12 @@ export const fetchProperties = async (filters: PropertyFilters = {}) => {
   }
 };
 
-// Fetch a single property by ID - Only from properties_v2
+// Fetch a single property by ID - Only from properties_v2, now with coordinates
 export const fetchPropertyById = async (propertyId: string) => {
   try {
-    console.log(`[propertyService] Fetching property with ID: ${propertyId} from properties_v2`);
+    console.log(`[propertyService] Fetching property with ID: ${propertyId} from properties_v2 with coordinates`);
     
-    // Fetch from properties_v2 table
+    // Fetch from properties_v2 table with coordinates
     const { data, error } = await supabase
       .from('properties_v2')
       .select(`
@@ -202,6 +256,16 @@ export const fetchPropertyById = async (propertyId: string) => {
           id,
           email,
           phone
+        ),
+        property_coordinates (
+          id,
+          latitude,
+          longitude,
+          address,
+          city,
+          state,
+          created_at,
+          updated_at
         )
       `)
       .eq('id', propertyId)
@@ -226,6 +290,13 @@ export const fetchPropertyById = async (propertyId: string) => {
       console.log('[propertyService] ⚠ Property missing flow.title in new structure');
     }
     
+    // Check coordinates
+    if (data.property_coordinates) {
+      console.log('[propertyService] ✓ Coordinates found for property');
+    } else {
+      console.log('[propertyService] ⚠ No coordinates found for property');
+    }
+    
     // Process property to ensure consistent structure
     const processedProperty = processPropertyData(data);
     
@@ -247,10 +318,28 @@ export const fetchPropertyById = async (propertyId: string) => {
       return (a.display_order || 0) - (b.display_order || 0);
     });
     
-    // Add sorted images to the property
+    // Process coordinates data
+    let coordinates = null;
+    if (data.property_coordinates && data.property_coordinates.length > 0) {
+      const coord = data.property_coordinates[0]; // Take first coordinate if multiple exist
+      coordinates = {
+        id: coord.id,
+        property_id: propertyId,
+        latitude: parseFloat(coord.latitude),
+        longitude: parseFloat(coord.longitude),
+        address: coord.address || null,
+        city: coord.city || null,
+        state: coord.state || null,
+        created_at: coord.created_at,
+        updated_at: coord.updated_at
+      };
+    }
+    
+    // Add sorted images and coordinates to the property
     const finalProperty = {
       ...processedProperty,
-      property_images: sortedImages
+      property_images: sortedImages,
+      coordinates: coordinates
     };
 
     // Record view count increment in the background (don't await)

@@ -1,7 +1,7 @@
 // src/modules/seeker/pages/AllProperties/components/PropertyCard.tsx
-// Version: 7.1.0
-// Last Modified: 25-05-2025 19:20 IST
-// Purpose: Fixed copy icons visibility - ensuring all copy buttons are properly displayed
+// Version: 7.3.0
+// Last Modified: 01-06-2025 11:00 IST
+// Purpose: Fixed coordinate detection to check both property_coordinates table and embedded coordinates in steps
 
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
@@ -20,7 +20,19 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/lib/supabase';
-import { Trash2, Pencil, ShieldAlert, Info, User, Mail, Hash, Copy, Check } from 'lucide-react';
+import { 
+  Trash2, 
+  Pencil, 
+  ShieldAlert, 
+  Info, 
+  User, 
+  Mail, 
+  Hash, 
+  Copy, 
+  Check, 
+  MapPin, 
+  Navigation
+} from 'lucide-react';
 import { 
   Dialog,
   DialogContent, 
@@ -35,6 +47,17 @@ interface PropertyCardProps {
   property: PropertyType;
   onPropertyDeleted?: () => void;
   onPropertyUpdated?: () => void;
+}
+
+// Interface for coordinate data (can come from table or embedded in steps)
+interface CoordinateInfo {
+  latitude: number;
+  longitude: number;
+  address?: string;
+  city?: string;
+  state?: string;
+  source: 'table' | 'embedded';
+  stepName?: string;
 }
 
 const PropertyCard: React.FC<PropertyCardProps> = ({ 
@@ -64,6 +87,68 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
 
   // Get property details for display
   const propertyDetails = property.property_details || {};
+
+  // Function to extract coordinates from various sources
+  const getCoordinateInfo = (): CoordinateInfo | null => {
+    // Priority 1: Check property_coordinates table (if available)
+    if (property.coordinates) {
+      return {
+        latitude: property.coordinates.latitude,
+        longitude: property.coordinates.longitude,
+        address: property.coordinates.address || undefined,
+        city: property.coordinates.city || undefined,
+        state: property.coordinates.state || undefined,
+        source: 'table'
+      };
+    }
+
+    // Priority 2: Check embedded coordinates in steps
+    if (propertyDetails.steps) {
+      for (const [stepId, stepData] of Object.entries(propertyDetails.steps)) {
+        if (stepData && typeof stepData === 'object') {
+          const data = stepData as any;
+          
+          // Check if this step has latitude and longitude
+          if (data.latitude && data.longitude && 
+              typeof data.latitude === 'number' && 
+              typeof data.longitude === 'number') {
+            return {
+              latitude: data.latitude,
+              longitude: data.longitude,
+              address: data.address || undefined,
+              city: data.city || undefined,
+              state: data.state || undefined,
+              source: 'embedded',
+              stepName: stepId
+            };
+          }
+        }
+      }
+    }
+
+    // Priority 3: Check direct coordinates in property_details
+    if (propertyDetails.coordinates) {
+      const coords = propertyDetails.coordinates;
+      if (coords.latitude && coords.longitude && 
+          typeof coords.latitude === 'number' && 
+          typeof coords.longitude === 'number') {
+        return {
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+          address: coords.address || undefined,
+          city: coords.city || undefined,
+          state: coords.state || undefined,
+          source: 'embedded',
+          stepName: 'direct'
+        };
+      }
+    }
+
+    return null;
+  };
+
+  // Get coordinates info
+  const coordinatesInfo = getCoordinateInfo();
 
   // Copy function with visual feedback
   const handleCopy = async (value: string, label: string, fieldId: string) => {
@@ -165,14 +250,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
 
   // Function to fix property title using existing utility
   const handleFixTitle = async () => {
-    console.log('=== FIX TITLE DEBUG START ===');
-    console.log('Fix Title: Button clicked for property:', property.id);
-    console.log('Fix Title: Property flow type:', propertyFlow);
-    console.log('Fix Title: Property type:', propertyType);
-    console.log('Fix Title: Listing type:', listingType);
-    
     if (!property.id || !user?.id) {
-      console.error('Fix Title: FAILED - Missing property ID or user ID');
       toast({
         title: "Error",
         description: "Unable to fix title: missing required information",
@@ -184,22 +262,14 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
     try {
       setIsFixingTitle(true);
       
-      // Log current title
       const currentTitle = property.property_details?.flow?.title || 'No current title';
-      console.log('Fix Title: Current title:', currentTitle);
-      
-      // Generate the new title
-      console.log('Fix Title: Calling generatePropertyTitle...');
       const newTitle = generatePropertyTitle(property);
-      console.log('Fix Title: Generated new title:', newTitle);
       
       if (!newTitle || newTitle.trim() === '') {
-        console.error('Fix Title: FAILED - Generated title is empty');
         throw new Error('Generated title is empty');
       }
       
       if (currentTitle === newTitle) {
-        console.warn('Fix Title: WARNING - New title is same as current title');
         toast({
           title: "Title already correct",
           description: `Current title: "${currentTitle}"`,
@@ -207,7 +277,6 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
         return;
       }
       
-      // Prepare the update
       const currentPropertyDetails = property.property_details || {};
       const currentFlow = currentPropertyDetails.flow || {};
       
@@ -219,7 +288,6 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
         }
       };
 
-      // First, let's verify the property exists and check current user permissions
       const { data: existsData, error: existsError } = await supabase
         .from('properties_v2')
         .select('id, owner_id, property_details')
@@ -227,11 +295,9 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
         .single();
       
       if (existsError) {
-        console.error('Fix Title: Error checking property existence:', existsError);
         throw new Error(`Property check failed: ${existsError.message}`);
       }
       
-      // Check if user has permission to update
       const userIsOwner = existsData?.owner_id === user.id;
       const userCanUpdate = userIsOwner || isAdmin;
       
@@ -239,7 +305,6 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
         throw new Error(`Permission denied. User is owner: ${userIsOwner}, User is admin: ${isAdmin}`);
       }
       
-      // Direct update
       let updateResult;
       
       if (isAdmin) {
@@ -268,12 +333,10 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
       const { error, data } = updateResult;
       
       if (error) {
-        console.error('Fix Title: Database update error:', error);
         throw error;
       }
       
       if (!data || data.length === 0) {
-        console.error('Fix Title: No rows were updated! This suggests a permissions or RLS policy issue.');
         throw new Error('Database update failed - no rows were affected. This may be due to Row Level Security policies.');
       }
       
@@ -287,8 +350,6 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
       }
       
     } catch (error) {
-      console.error('=== FIX TITLE ERROR ===');
-      console.error('Fix Title: ERROR:', error);
       toast({
         title: "Failed to update title",
         description: error instanceof Error ? error.message : "An unexpected error occurred",
@@ -296,11 +357,10 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
       });
     } finally {
       setIsFixingTitle(false);
-      console.log('=== FIX TITLE DEBUG END ===');
     }
   };
   
-  // Function to delete property - Simplified working solution without non-existent functions
+  // Function to delete property
   const deleteProperty = async (propertyId: string) => {
     if (!user) {
       toast({
@@ -313,12 +373,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
     
     try {
       setIsDeleting(true);
-      console.log('=== DELETE PROPERTY DEBUG START ===');
-      console.log('Attempting to delete property:', propertyId);
-      console.log('User ID:', user.id);
-      console.log('Is Admin:', isAdmin);
       
-      // First check if the property exists and get owner info
       const { data: propertyData, error: fetchError } = await supabase
         .from('properties_v2')
         .select('owner_id, property_details')
@@ -326,24 +381,16 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
         .single();
       
       if (fetchError) {
-        console.error('Error fetching property:', fetchError);
         throw new Error(`Property not found: ${fetchError.message}`);
       }
       
-      console.log('Property found - Owner ID:', propertyData.owner_id);
-      
-      // Check permissions: user must be property owner or admin
       const isOwner = propertyData.owner_id === user.id;
-      console.log('User is owner:', isOwner);
-      console.log('User is admin:', isAdmin);
       
       if (!isOwner && !isAdmin) {
         throw new Error('You do not have permission to delete this property');
       }
       
-      console.log('Starting deletion process...');
-      
-      // Delete related records first (these usually work fine)
+      // Delete related records first
       const deletionSteps = [
         { table: 'property_likes', field: 'property_id', name: 'Property Likes' },
         { table: 'properties_v2_likes', field: 'property_id', name: 'V2 Property Likes' },
@@ -351,67 +398,41 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
         { table: 'property_visits', field: 'property_id', name: 'Property Visits' },
         { table: 'owner_notifications', field: 'property_id', name: 'Owner Notifications' },
         { table: 'property_images', field: 'property_id', name: 'Property Images' },
+        { table: 'property_coordinates', field: 'property_id', name: 'Property Coordinates' },
         { table: 'temp_property_listing', field: 'id', name: 'Temp Property Listing' }
       ];
       
-      console.log('Deleting related records...');
       for (const step of deletionSteps) {
         try {
-          const { error, count } = await supabase
+          await supabase
             .from(step.table)
             .delete()
             .eq(step.field, propertyId);
-          
-          if (error) {
-            console.warn(`Warning: Could not delete from ${step.name}:`, error.message);
-          } else {
-            console.log(`✅ ${step.name} deleted successfully (${count || 0} records)`);
-          }
         } catch (err) {
           console.warn(`Warning: ${step.name} deletion failed:`, err);
         }
       }
       
-      // Now delete the main property record
-      console.log('Deleting main property record...');
-      
       let deleteResult;
       
       if (isAdmin) {
-        console.log('Admin deletion: Attempting to delete any property...');
-        // For admins, try to delete without owner constraint
         deleteResult = await supabase
           .from('properties_v2')
           .delete()
           .eq('id', propertyId)
-          .select('id'); // Select minimal data to confirm deletion
+          .select('id');
       } else {
-        console.log('Owner deletion: Attempting to delete own property...');
-        // For owners, only delete if they own it
         deleteResult = await supabase
           .from('properties_v2')
           .delete()
           .eq('id', propertyId)
           .eq('owner_id', user.id)
-          .select('id'); // Select minimal data to confirm deletion
+          .select('id');
       }
       
       const { error: deleteError, data: deleteData } = deleteResult;
       
-      console.log('Delete result error:', deleteError);
-      console.log('Delete result data:', deleteData);
-      console.log('Number of records deleted:', deleteData ? deleteData.length : 0);
-      
       if (deleteError) {
-        console.error('Error deleting property:', deleteError);
-        console.error('Delete error details:', {
-          code: deleteError.code,
-          message: deleteError.message,
-          details: deleteError.details,
-          hint: deleteError.hint
-        });
-        
-        // Provide specific error messages based on error type
         if (deleteError.code === '42501') {
           throw new Error('Permission denied: Admin users need additional database permissions to delete properties owned by other users.');
         } else if (deleteError.message.includes('permission') || deleteError.message.includes('policy')) {
@@ -421,20 +442,14 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
         }
       }
       
-      // Check if any rows were actually deleted
       const deletedCount = deleteData ? deleteData.length : 0;
       if (deletedCount === 0) {
-        console.error('No rows were deleted - this indicates an RLS policy issue');
-        
         if (isAdmin && !isOwner) {
           throw new Error('Admin deletion failed: The database Row Level Security policies do not allow admins to delete properties owned by other users. This needs to be configured at the database level.');
         } else {
           throw new Error('Property deletion failed: No rows were affected. This may be due to database security policies or the property may not exist.');
         }
       }
-      
-      console.log('✅ Property deleted successfully!');
-      console.log(`Deleted ${deletedCount} property record(s)`);
       
       toast({
         title: "Property deleted successfully",
@@ -443,21 +458,16 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
           : "Your property has been removed successfully",
       });
       
-      // Notify parent component to refresh the list
       if (onPropertyDeleted) {
         onPropertyDeleted();
       }
       
     } catch (err) {
-      console.error('=== DELETE PROPERTY ERROR ===');
-      console.error('Delete error:', err);
-      
       let errorMessage = "Failed to delete property";
       if (err instanceof Error) {
         errorMessage = err.message;
       }
       
-      // Show user-friendly error message
       toast({
         title: "Delete failed",
         description: errorMessage,
@@ -465,11 +475,9 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
       });
     } finally {
       setIsDeleting(false);
-      console.log('=== DELETE PROPERTY DEBUG END ===');
     }
   };
   
-  // Confirm deletion
   const confirmDelete = () => {
     if (property.id) {
       deleteProperty(property.id);
@@ -483,23 +491,19 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
   let area = '';
   let price = property.price || 0;
 
-  // Extract data from steps based on flow type
   if (propertyDetails.steps) {
     for (const [stepId, stepData] of Object.entries(propertyDetails.steps)) {
       if (stepData && typeof stepData === 'object') {
         const data = stepData as any;
         
-        // Extract bedroom info
         if (data.bhkType && !bedrooms) {
           bedrooms = data.bhkType;
         }
         
-        // Extract bathroom info
         if (data.bathrooms && !bathrooms) {
           bathrooms = `${data.bathrooms} Bath`;
         }
         
-        // Extract area info
         if (data.builtUpArea && !area) {
           const unit = data.builtUpAreaUnit === 'sqft' ? 'sq.ft' : 
                       data.builtUpAreaUnit === 'sqyd' ? 'sq.yd' : 
@@ -507,7 +511,6 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
           area = `${data.builtUpArea} ${unit}`;
         }
         
-        // Extract price info (rent/sale)
         if (data.rentAmount && price === 0) {
           price = data.rentAmount;
         } else if (data.expectedPrice && price === 0) {
@@ -546,14 +549,12 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
             className="w-full h-full object-cover"
           />
           
-          {/* Main Flow Badge */}
           <div className="absolute top-2 left-2">
             <Badge className="bg-blue-500 hover:bg-blue-600 text-white">
               {flowLabel}
             </Badge>
           </div>
           
-          {/* Version Badge */}
           <div className="absolute bottom-2 right-2">
             <Badge 
               className="bg-gray-500 hover:bg-gray-600 text-white flex items-center gap-1"
@@ -564,7 +565,6 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
             </Badge>
           </div>
           
-          {/* Admin Badge */}
           {isAdmin && (
             <div className="absolute top-2 right-2">
               <Badge className="bg-purple-600 hover:bg-purple-700 text-white flex items-center gap-1">
@@ -584,7 +584,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
                   {address}, {city}, {state}
                 </p>
                 
-                {/* Property ID - Prominent Display with Copy Button */}
+                {/* Property ID Section */}
                 <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-3">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
@@ -610,7 +610,141 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
                   </div>
                 </div>
                 
-                {/* Property Type and Listing Type - Clean Display */}
+                {/* Coordinates Display Section */}
+                <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-3 mb-3">
+                  <div className="flex items-center gap-2 text-sm mb-3">
+                    <MapPin className="h-4 w-4 text-green-600 dark:text-green-400" />
+                    <span className="font-medium text-green-800 dark:text-green-200">Coordinates</span>
+                    {coordinatesInfo && (
+                      <Badge 
+                        variant="outline" 
+                        className="border-green-400 text-green-600 dark:text-green-400 text-xs"
+                      >
+                        {coordinatesInfo.source === 'table' ? 'DB' : 'Embedded'}
+                      </Badge>
+                    )}
+                  </div>
+                  
+                  {coordinatesInfo ? (
+                    <>
+                      {/* Latitude */}
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <Navigation className="h-4 w-4 text-gray-500 dark:text-gray-400 flex-shrink-0" />
+                          <div className="min-w-0 flex-1">
+                            <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Latitude</div>
+                            <div className="font-mono text-sm text-gray-700 dark:text-gray-300 truncate select-all">
+                              {coordinatesInfo.latitude.toFixed(6)}
+                            </div>
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleCopy(
+                            coordinatesInfo.latitude.toString(), 
+                            'Latitude', 
+                            'latitude'
+                          )}
+                          className="h-8 w-8 p-0 ml-2 flex-shrink-0 hover:bg-green-100 dark:hover:bg-green-900"
+                          title="Copy Latitude"
+                        >
+                          {copiedField === 'latitude' ? (
+                            <Check className="h-4 w-4 text-green-600 dark:text-green-400" />
+                          ) : (
+                            <Copy className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                          )}
+                        </Button>
+                      </div>
+                      
+                      {/* Longitude */}
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <Navigation className="h-4 w-4 text-gray-500 dark:text-gray-400 flex-shrink-0 rotate-90" />
+                          <div className="min-w-0 flex-1">
+                            <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Longitude</div>
+                            <div className="font-mono text-sm text-gray-700 dark:text-gray-300 truncate select-all">
+                              {coordinatesInfo.longitude.toFixed(6)}
+                            </div>
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleCopy(
+                            coordinatesInfo.longitude.toString(), 
+                            'Longitude', 
+                            'longitude'
+                          )}
+                          className="h-8 w-8 p-0 ml-2 flex-shrink-0 hover:bg-green-100 dark:hover:bg-green-900"
+                          title="Copy Longitude"
+                        >
+                          {copiedField === 'longitude' ? (
+                            <Check className="h-4 w-4 text-green-600 dark:text-green-400" />
+                          ) : (
+                            <Copy className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                          )}
+                        </Button>
+                      </div>
+                      
+                      {/* Combined Coordinates */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Combined (Lat, Lng)</div>
+                          <div className="font-mono text-sm text-gray-600 dark:text-gray-400 break-all select-all">
+                            {coordinatesInfo.latitude.toFixed(6)}, {coordinatesInfo.longitude.toFixed(6)}
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleCopy(
+                            `${coordinatesInfo.latitude.toFixed(6)}, ${coordinatesInfo.longitude.toFixed(6)}`, 
+                            'Combined Coordinates', 
+                            'combined_coords'
+                          )}
+                          className="h-8 w-8 p-0 ml-2 flex-shrink-0 hover:bg-green-100 dark:hover:bg-green-900"
+                          title="Copy Combined Coordinates"
+                        >
+                          {copiedField === 'combined_coords' ? (
+                            <Check className="h-4 w-4 text-green-600 dark:text-green-400" />
+                          ) : (
+                            <Copy className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                          )}
+                        </Button>
+                      </div>
+                      
+                      {/* Additional coordinate info */}
+                      {(coordinatesInfo.address || coordinatesInfo.city || coordinatesInfo.stepName) && (
+                        <div className="mt-3 pt-2 border-t border-green-200 dark:border-green-800">
+                          <div className="text-xs text-green-600 dark:text-green-400">
+                            {coordinatesInfo.address && (
+                              <div>Address: {coordinatesInfo.address}</div>
+                            )}
+                            {coordinatesInfo.city && coordinatesInfo.state && (
+                              <div>Location: {coordinatesInfo.city}, {coordinatesInfo.state}</div>
+                            )}
+                            {coordinatesInfo.stepName && coordinatesInfo.source === 'embedded' && (
+                              <div>Source: {coordinatesInfo.stepName}</div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="flex items-center justify-center py-4">
+                      <Badge 
+                        variant="outline" 
+                        className="border-orange-300 text-orange-600 dark:border-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950"
+                      >
+                        <MapPin className="h-3 w-3 mr-1" />
+                        No Coordinates Available
+                      </Badge>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Property Type and Listing Type */}
                 <div className="flex flex-wrap gap-2 mb-3">
                   <Badge variant="outline" className="border-blue-500 text-blue-600 dark:text-blue-400">
                     {propertyType}
@@ -620,7 +754,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
                   </Badge>
                 </div>
                 
-                {/* Owner Information - Enhanced with Copy Buttons */}
+                {/* Owner Information */}
                 {property.profiles && (
                   <div className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 mb-2">
                     <div className="flex items-center gap-2 text-sm mb-3">
@@ -628,7 +762,6 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
                       <span className="font-medium text-blue-600 dark:text-blue-400">Property Owner</span>
                     </div>
                     
-                    {/* Owner Email with Copy Button */}
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2 flex-1 min-w-0">
                         <Mail className="h-4 w-4 text-gray-500 dark:text-gray-400 flex-shrink-0" />
@@ -654,7 +787,6 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
                       </Button>
                     </div>
                     
-                    {/* Owner ID with Copy Button */}
                     <div className="flex items-center justify-between">
                       <div className="flex-1 min-w-0">
                         <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Owner ID</div>
@@ -679,7 +811,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
                   </div>
                 )}
                 
-                {/* Technical Details - Collapsed */}
+                {/* Technical Details */}
                 {isAdmin && (
                   <details className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                     <summary className="cursor-pointer hover:text-gray-700 dark:hover:text-gray-300">
@@ -688,6 +820,10 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
                     <div className="mt-1 pl-2 border-l-2 border-gray-200 dark:border-gray-700">
                       <p>Flow: <span className="font-medium text-blue-600 dark:text-blue-400">{propertyFlow}</span></p>
                       <p>Version: <span className="font-medium">{propertyVersion}</span></p>
+                      <p>Coordinates: <span className="font-medium">{coordinatesInfo ? `Available (${coordinatesInfo.source})` : 'Missing'}</span></p>
+                      {coordinatesInfo?.stepName && (
+                        <p>Coord Source: <span className="font-medium">{coordinatesInfo.stepName}</span></p>
+                      )}
                     </div>
                   </details>
                 )}
@@ -789,6 +925,16 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
                 </p>
                 <p className="text-xs text-gray-500">
                   ID: {property.profiles.id}
+                </p>
+              </div>
+            )}
+            {coordinatesInfo && (
+              <div className="mt-2 p-2 bg-green-50 dark:bg-green-800 rounded">
+                <p className="text-sm font-medium text-green-600 dark:text-green-400">
+                  Coordinates: {coordinatesInfo.latitude.toFixed(6)}, {coordinatesInfo.longitude.toFixed(6)}
+                </p>
+                <p className="text-xs text-green-500 dark:text-green-300">
+                  Source: {coordinatesInfo.source === 'table' ? 'Database Table' : 'Embedded in Steps'}
                 </p>
               </div>
             )}

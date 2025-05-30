@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/PropertyFormTypes.ts
-// Version: 3.0.0
-// Last Modified: 04-05-2025 15:15 IST
-// Purpose: Updated to only support v3 data structure
+// Version: 3.1.0
+// Last Modified: 01-06-2025 10:35 IST
+// Purpose: Added coordinates interface to support coordinate display in AllProperties page
 
 import { UseFormReturn } from 'react-hook-form';
 import { PropertyValidationSchema } from './validationSchemas';
@@ -12,6 +12,19 @@ export interface PropertyImage {
   url: string;
   isPrimary: boolean;
   displayOrder: number;
+}
+
+// Coordinates Type Definition
+export interface PropertyCoordinates {
+  id: string;
+  property_id: string;
+  latitude: number;
+  longitude: number;
+  address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 // Core Property Type
@@ -34,6 +47,9 @@ export type PropertyType = {
   
   // Comprehensive image handling
   property_images?: PropertyImage[];
+
+  // Coordinate information from property_coordinates table
+  coordinates?: PropertyCoordinates | null;
 
   // Detailed property information stored as JSON
   property_details?: any;
@@ -217,6 +233,7 @@ export default {
   PropertyType,
   FormData,
   PropertyImage,
+  PropertyCoordinates,
   PropertyFilter,
   PropertyStats,
   PropertyTypeFormData,
