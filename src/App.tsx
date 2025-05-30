@@ -1,7 +1,7 @@
 // src/App.tsx 
-// Version: 9.3.0
-// Last Modified: 25-05-2025 22:30 IST
-// Purpose: Fixed routing to keep property wizard in SeekerLayout with proper parameter handling
+// Version: 9.4.0
+// Last Modified: 01-06-2025 14:30 IST
+// Purpose: Added search page route to SeekerLayout
 
 import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
@@ -15,6 +15,7 @@ import Footer from '@/components/Footer';
 
 // Import components directly
 import HomePage from './pages/HomePage';
+import SearchPage from './pages/SearchPage';
 import PropertyMapHome from './modules/seeker';
 import Dashboard from './modules/owner/pages/Dashboard';
 import Properties from './modules/owner/pages/Properties';
@@ -273,6 +274,16 @@ function App() {
                     element={
                       <PublicOrProtectedRoute>
                         <HomePage />
+                      </PublicOrProtectedRoute>
+                    } 
+                  />
+                  
+                  {/* NEW: Search Page Route */}
+                  <Route 
+                    path="/search" 
+                    element={
+                      <PublicOrProtectedRoute>
+                        <SearchPage />
                       </PublicOrProtectedRoute>
                     } 
                   />
