@@ -31,7 +31,7 @@ const ActiveFilters: React.FC<ActiveFiltersComponentProps> = ({
   const filterTags = [];
 
   // Transaction Type Tag
-  if (filters.transactionType) {
+  if (filters.transactionType && TRANSACTION_TYPES[filters.transactionType as keyof typeof TRANSACTION_TYPES]) {
     filterTags.push({
       id: 'transactionType',
       label: TRANSACTION_TYPES[filters.transactionType as keyof typeof TRANSACTION_TYPES],
@@ -41,7 +41,7 @@ const ActiveFilters: React.FC<ActiveFiltersComponentProps> = ({
   }
 
   // Property Type Tag
-  if (filters.selectedPropertyType) {
+  if (filters.selectedPropertyType && PROPERTY_TYPES[filters.selectedPropertyType as keyof typeof PROPERTY_TYPES]) {
     filterTags.push({
       id: 'propertyType',
       label: PROPERTY_TYPES[filters.selectedPropertyType as keyof typeof PROPERTY_TYPES].label,
@@ -51,7 +51,7 @@ const ActiveFilters: React.FC<ActiveFiltersComponentProps> = ({
   }
 
   // Subtype Tag
-  if (filters.selectedSubType) {
+  if (filters.selectedSubType && getSubTypes()[filters.selectedSubType]) {
     filterTags.push({
       id: 'subType',
       label: getSubTypes()[filters.selectedSubType],
@@ -61,7 +61,7 @@ const ActiveFilters: React.FC<ActiveFiltersComponentProps> = ({
   }
 
   // BHK Tag
-  if (filters.selectedBHK) {
+  if (filters.selectedBHK && BHK_TYPES[filters.selectedBHK as keyof typeof BHK_TYPES]) {
     filterTags.push({
       id: 'bhkType',
       label: BHK_TYPES[filters.selectedBHK as keyof typeof BHK_TYPES],
@@ -71,7 +71,7 @@ const ActiveFilters: React.FC<ActiveFiltersComponentProps> = ({
   }
 
   // Price Range Tag
-  if (filters.selectedPriceRange) {
+  if (filters.selectedPriceRange && PRICE_RANGES[filters.selectedPriceRange as keyof typeof PRICE_RANGES]) {
     filterTags.push({
       id: 'priceRange',
       label: PRICE_RANGES[filters.selectedPriceRange as keyof typeof PRICE_RANGES],

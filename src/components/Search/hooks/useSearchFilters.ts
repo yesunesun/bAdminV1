@@ -36,10 +36,10 @@ export const useSearchFilters = () => {
         newFilters.selectedSubType = '';
         newFilters.selectedBHK = '';
         
-        // If "Any Type" is selected, also reset subtype and BHK to "Any"
-        if (value === 'any') {
-          newFilters.selectedSubType = 'any';
-          newFilters.selectedBHK = 'any';
+        // If "Any Type" is selected, reset subtype and BHK
+        if (value === 'any' || value === '') {
+          newFilters.selectedSubType = '';
+          newFilters.selectedBHK = '';
         }
       }
       
@@ -125,19 +125,21 @@ export const useSearchFilters = () => {
   }, [filters]);
 
   const getFilterDisplayValue = useCallback((filterType: FilterType, value: string) => {
+    if (!value) return '';
+    
     switch (filterType) {
       case 'transactionType':
-        return TRANSACTION_TYPES[value as keyof typeof TRANSACTION_TYPES];
+        return TRANSACTION_TYPES[value as keyof typeof TRANSACTION_TYPES] || value;
       case 'propertyType':
-        return PROPERTY_TYPES[value as keyof typeof PROPERTY_TYPES]?.label;
+        return PROPERTY_TYPES[value as keyof typeof PROPERTY_TYPES]?.label || value;
       case 'subType':
-        return getSubTypes()[value];
+        return getSubTypes()[value] || value;
       case 'bhkType':
-        return BHK_TYPES[value as keyof typeof BHK_TYPES];
+        return BHK_TYPES[value as keyof typeof BHK_TYPES] || value;
       case 'priceRange':
-        return PRICE_RANGES[value as keyof typeof PRICE_RANGES];
+        return PRICE_RANGES[value as keyof typeof PRICE_RANGES] || value;
       case 'location':
-        return value === 'any' ? 'Any Location' : TELANGANA_LOCATIONS[value as keyof typeof TELANGANA_LOCATIONS];
+        return value === 'any' ? 'Any Location' : (TELANGANA_LOCATIONS[value as keyof typeof TELANGANA_LOCATIONS] || value);
       default:
         return value;
     }

@@ -1,6 +1,6 @@
 // src/components/Search/index.ts
-// Version: 1.0.0
-// Last Modified: 01-06-2025 16:00 IST
+// Version: 2.0.0
+// Last Modified: 01-06-2025 16:30 IST
 // Purpose: Main exports for Search components and utilities
 
 // Main component
@@ -11,6 +11,7 @@ export { default as SearchHeader } from './components/SearchHeader';
 export { default as SearchFilters } from './components/SearchFilters';
 export { default as ActiveFilters } from './components/ActiveFilters';
 export { default as SearchResults } from './components/SearchResults';
+export { default as SearchResultsTable } from './components/SearchResultsTable';
 
 // Hooks
 export { useSearch } from './hooks/useSearch';
