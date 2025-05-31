@@ -1,7 +1,7 @@
 // src/components/Search/services/searchService.ts
-// Version: 6.0.0
-// Last Modified: 01-06-2025 20:45 IST
-// Purpose: Enhanced subtype filtering with proper apartment support for residential properties
+// Version: 7.0.0
+// Last Modified: 01-06-2025 21:15 IST
+// Purpose: Fixed apartment subtype filtering to properly filter by property subtype, not just flow type
 
 import { SearchFilters, SearchResult } from '../types/search.types';
 import { supabase } from '@/lib/supabase';
@@ -53,11 +53,10 @@ interface DatabaseSearchResult {
 
 export class SearchService {
   /**
-   * Enhanced mapping of frontend subtypes to database flow types
-   * This handles the new apartment subtype properly
+   * Map frontend subtypes to database flow types
    */
   private mapSubtypeToFlowType(propertyType: string, subtype: string, transactionType: string): string | null {
-    console.log('🔄 Mapping subtype:', { propertyType, subtype, transactionType });
+    console.log('🔄 Mapping subtype to flow type:', { propertyType, subtype, transactionType });
     
     if (propertyType === 'residential') {
       // Handle special residential subtypes that have their own flow types
@@ -76,14 +75,11 @@ export class SearchService {
         case 'farmhouse':
         case 'independent':
           // For regular residential subtypes, use transaction type to determine flow
-          // The specific subtype filtering will be handled by property search query
           return transactionType === 'buy' ? 'residential_sale' : 'residential_rent';
         default:
-          // Default residential flow based on transaction type
           return transactionType === 'buy' ? 'residential_sale' : 'residential_rent';
       }
     } else if (propertyType === 'commercial') {
-      // Handle commercial subtypes
       switch (subtype) {
         case 'coworking':
           return 'commercial_coworking';
@@ -99,7 +95,6 @@ export class SearchService {
           return transactionType === 'buy' ? 'commercial_sale' : 'commercial_rent';
       }
     } else if (propertyType === 'land') {
-      // Land is typically only for sale
       return 'land_sale';
     } else if (propertyType === 'pghostel') {
       return 'residential_pghostel';
@@ -107,45 +102,44 @@ export class SearchService {
       return 'residential_flatmates';
     }
     
-    // Fallback to residential rent
     return 'residential_rent';
   }
 
   /**
-   * NEW: Get property subtype filter for search query
-   * This handles filtering by specific property types like "apartment" vs "villa"
+   * Check if property subtype matches selected filter
+   * This is the key method to filter apartments vs villas vs houses
    */
-  private getPropertySubtypeFilter(filters: SearchFilters): string | null {
-    const propertyType = filters.selectedPropertyType || 'residential';
-    const selectedSubType = filters.selectedSubType;
-
-    // Only apply subtype filter for regular residential properties
-    if (propertyType === 'residential' && selectedSubType && selectedSubType !== 'any') {
-      // Map frontend subtypes to database property types
-      const subtypeMapping: Record<string, string[]> = {
-        'apartment': ['apartment', 'flat', 'Apartment', 'Flat'],
-        'villa': ['villa', 'Villa'],
-        'house': ['house', 'independent house', 'House', 'Independent House'],
-        'studio': ['studio', 'Studio'],
-        'duplex': ['duplex', 'Duplex'],
-        'penthouse': ['penthouse', 'Penthouse'],
-        'farmhouse': ['farmhouse', 'Farmhouse'],
-        'independent': ['independent', 'independent house', 'Independent', 'Independent House']
-      };
-
-      const searchTerms = subtypeMapping[selectedSubType];
-      if (searchTerms && searchTerms.length > 0) {
-        // Return the first search term for property type filtering
-        return searchTerms[0];
-      }
+  private doesPropertyMatchSubtype(property: DatabaseSearchResult, selectedSubtype: string): boolean {
+    if (!selectedSubtype || selectedSubtype === 'any') {
+      return true; // No subtype filter applied
     }
 
-    return null;
+    // For PG/Hostel and Flatmates, the flow type itself is the filter
+    if (selectedSubtype === 'pghostel' || selectedSubtype === 'flatmates') {
+      return property.flow_type.includes(selectedSubtype);
+    }
+
+    // For regular residential properties, we need to check the property details
+    // Since we don't have property_details in the search result, we'll use title-based matching
+    const title = property.title?.toLowerCase() || '';
+    
+    const subtypePatterns: Record<string, string[]> = {
+      'apartment': ['apartment', 'flat', 'aprt', 'apt'],
+      'villa': ['villa', 'independent villa'],
+      'house': ['house', 'independent house', 'individual house'],
+      'studio': ['studio'],
+      'duplex': ['duplex'],
+      'penthouse': ['penthouse'],
+      'farmhouse': ['farmhouse', 'farm house'],
+      'independent': ['independent', 'individual']
+    };
+
+    const patterns = subtypePatterns[selectedSubtype] || [];
+    return patterns.some(pattern => title.includes(pattern));
   }
 
   /**
-   * Get effective subtype for database query
-   * This determines what subtype parameter to send to the database
+   * Enhanced method to get effective subtype considering property-level filtering
    */
   private getEffectiveSubtype(filters: SearchFilters): string | null {
     const propertyType = filters.selectedPropertyType || 'residential';
@@ -154,48 +148,44 @@ export class SearchService {
 
     console.log('🎯 Getting effective subtype:', { propertyType, transactionType, selectedSubType });
 
-    // Priority 1: If specific subtype is selected, use it
-    if (selectedSubType && selectedSubType !== 'any') {
+    // For PG/Hostel and Flatmates, use the specific flow type
+    if (selectedSubType === 'pghostel' || selectedSubType === 'flatmates') {
       const mappedFlowType = this.mapSubtypeToFlowType(propertyType, selectedSubType, transactionType);
-      console.log('✅ Using selected subtype mapping:', selectedSubType, '->', mappedFlowType);
+      console.log('✅ Using special subtype mapping:', selectedSubType, '->', mappedFlowType);
       return mappedFlowType;
     }
 
-    // Priority 2: If only transaction type is selected, use base flow type
+    // For regular residential properties, just use the base flow type
+    // We'll do property-level filtering in post-processing
     if (transactionType && transactionType !== 'any') {
       const mappedFlowType = this.mapSubtypeToFlowType(propertyType, 'default', transactionType);
       console.log('✅ Using transaction type mapping:', transactionType, '->', mappedFlowType);
       return mappedFlowType;
     }
 
-    // Priority 3: Default to null (no subtype filter)
     console.log('ℹ️ No specific subtype filter applied');
     return null;
   }
 
   /**
-   * Main search method using property type specific database functions
+   * Main search method with post-processing subtype filtering
    */
   async search(filters: SearchFilters, options: SearchOptions = {}): Promise<SearchResponse> {
-    // Start performance monitoring
     const searchId = searchPerformanceMonitor.start(filters);
     
     try {
       console.log('🔍 Starting search with filters:', filters);
       console.log('🔧 Search options:', options);
       
-      // Determine which database function to call based on property type
       const propertyType = filters.selectedPropertyType || 'residential';
       
       let searchResults: DatabaseSearchResult[] = [];
       let totalCount = 0;
       
       if (propertyType === 'any' || !propertyType) {
-        // Search all property types
         searchResults = await this.searchAllPropertyTypes(filters, options);
         totalCount = searchResults[0]?.total_count || 0;
       } else {
-        // Search specific property type
         const { data, error } = await this.callPropertySpecificSearch(propertyType, filters, options);
         
         if (error) {
@@ -207,25 +197,33 @@ export class SearchService {
         totalCount = searchResults[0]?.total_count || 0;
       }
 
-      console.log('✅ Database search completed:', {
+      console.log('📊 Raw database results:', {
         resultCount: searchResults.length,
         totalCount: totalCount,
         propertyType: propertyType
       });
 
-      // Transform database results to SearchResult format
-      let transformedResults = this.transformDatabaseResults(searchResults);
-      
-      // Enhance results with fallback data for missing values
+      // CRITICAL: Apply subtype filtering at application level
+      const filteredResults = this.applySubtypeFiltering(searchResults, filters);
+      console.log('🎯 After subtype filtering:', {
+        originalCount: searchResults.length,
+        filteredCount: filteredResults.length,
+        selectedSubtype: filters.selectedSubType
+      });
+
+      // Transform filtered results
+      let transformedResults = this.transformDatabaseResults(filteredResults);
       transformedResults = SearchFallbackService.enhanceSearchResults(transformedResults);
       
-      // Log results and performance
-      const duration = searchPerformanceMonitor.end(transformedResults.length, totalCount);
-      logSearchResults(transformedResults, totalCount, duration);
+      // Adjust total count based on filtering
+      const adjustedTotalCount = filteredResults.length;
+      
+      const duration = searchPerformanceMonitor.end(transformedResults.length, adjustedTotalCount);
+      logSearchResults(transformedResults, adjustedTotalCount, duration);
       
       return {
         results: transformedResults,
-        totalCount,
+        totalCount: adjustedTotalCount,
         page: options.page || 1,
         limit: options.limit || 50
       };
@@ -235,6 +233,34 @@ export class SearchService {
       logSearchError(error, filters, {});
       throw error;
     }
+  }
+
+  /**
+   * NEW: Apply subtype filtering to search results
+   * This is where we filter apartments vs villas vs houses
+   */
+  private applySubtypeFiltering(results: DatabaseSearchResult[], filters: SearchFilters): DatabaseSearchResult[] {
+    const selectedSubtype = filters.selectedSubType;
+    
+    if (!selectedSubtype || selectedSubtype === 'any') {
+      console.log('ℹ️ No subtype filtering applied');
+      return results;
+    }
+
+    console.log('🔍 Applying subtype filter:', selectedSubtype);
+    
+    const filteredResults = results.filter(property => 
+      this.doesPropertyMatchSubtype(property, selectedSubtype)
+    );
+
+    console.log('📋 Subtype filtering results:', {
+      subtype: selectedSubtype,
+      originalCount: results.length,
+      filteredCount: filteredResults.length,
+      removedCount: results.length - filteredResults.length
+    });
+
+    return filteredResults;
   }
 
   /**
@@ -318,10 +344,9 @@ export class SearchService {
    */
   private async searchAllPropertyTypes(filters: SearchFilters, options: SearchOptions): Promise<DatabaseSearchResult[]> {
     const searchParams = this.buildSearchParams(filters, options);
-    const limit = Math.floor((searchParams.p_limit || 50) / 3); // Divide among property types
+    const limit = Math.floor((searchParams.p_limit || 50) / 3);
     
     try {
-      // Search all property types in parallel
       const [residentialResult, commercialResult, landResult] = await Promise.allSettled([
         supabase.rpc('search_residential_properties', {
           p_subtype: searchParams.p_subtype,
@@ -362,7 +387,6 @@ export class SearchService {
         })
       ]);
 
-      // Combine successful results
       let combinedResults: DatabaseSearchResult[] = [];
       let totalCount = 0;
 
@@ -398,11 +422,10 @@ export class SearchService {
   }
 
   /**
-   * Enhanced search parameter building with improved subtype handling
+   * Build search parameters for database functions
    */
   private buildSearchParams(filters: SearchFilters, options: SearchOptions): Record<string, any> {
     const params: Record<string, any> = {
-      // Basic search parameters
       p_search_query: filters.searchQuery || null,
       p_limit: options.limit || 50,
       p_offset: ((options.page || 1) - 1) * (options.limit || 50),
@@ -433,23 +456,11 @@ export class SearchService {
       params.p_state = 'Telangana';
     }
 
-    // ENHANCED: Proper subtype mapping using new method
+    // Get effective subtype for database filtering
     const effectiveSubtype = this.getEffectiveSubtype(filters);
     if (effectiveSubtype) {
       params.p_subtype = effectiveSubtype;
-      console.log('🎯 Final subtype parameter:', effectiveSubtype);
-    }
-
-    // NEW: Add property subtype filter to search query for specific filtering
-    const propertySubtypeFilter = this.getPropertySubtypeFilter(filters);
-    if (propertySubtypeFilter && !params.p_search_query) {
-      // If no search query exists, use the property subtype as search query
-      params.p_search_query = propertySubtypeFilter;
-      console.log('🏠 Property subtype filter applied to search query:', propertySubtypeFilter);
-    } else if (propertySubtypeFilter && params.p_search_query) {
-      // If search query exists, append the property subtype
-      params.p_search_query = `${params.p_search_query} ${propertySubtypeFilter}`;
-      console.log('🏠 Property subtype filter appended to search query:', params.p_search_query);
+      console.log('🎯 Database subtype parameter:', effectiveSubtype);
     }
 
     // BHK filter (bedrooms) - only for residential properties
@@ -476,23 +487,14 @@ export class SearchService {
   }
 
   /**
-   * Transform database results to SearchResult format with enhanced property type handling
+   * Transform database results to SearchResult format
    */
   private transformDatabaseResults(dbResults: DatabaseSearchResult[]): SearchResult[] {
     return dbResults.map(dbResult => {
-      // Determine transaction type from flow_type
       const transactionType = this.extractTransactionType(dbResult.flow_type);
-      
-      // Extract subtype from flow_type for better display
-      const displaySubtype = this.extractDisplaySubtype(dbResult.flow_type, dbResult.subtype);
-      
-      // Format BHK with proper fallback
+      const displaySubtype = this.extractDisplaySubtype(dbResult.flow_type, dbResult.subtype, dbResult.title);
       const bhk = dbResult.bedrooms && dbResult.bedrooms > 0 ? `${dbResult.bedrooms}bhk` : null;
-      
-      // Ensure we have valid prices
       const price = dbResult.price && dbResult.price > 0 ? dbResult.price : 0;
-      
-      // Ensure we have valid area
       const area = dbResult.area && dbResult.area > 0 ? dbResult.area : 0;
       
       return {
@@ -514,26 +516,39 @@ export class SearchService {
   }
 
   /**
-   * Extract display subtype from flow_type for better UI representation
+   * Enhanced display subtype extraction with title-based detection
    */
-  private extractDisplaySubtype(flowType: string, subtype: string | null): string {
+  private extractDisplaySubtype(flowType: string, subtype: string | null, title: string | null): string {
     // If we have a specific subtype, use it
     if (subtype && subtype !== flowType) {
       return subtype;
     }
 
-    // Extract from flow_type
-    if (flowType.includes('residential_rent')) {
-      return 'apartment'; // Default residential rent to apartment
-    } else if (flowType.includes('residential_sale')) {
-      return 'apartment'; // Default residential sale to apartment  
+    // Try to detect subtype from title for better display
+    const titleLower = title?.toLowerCase() || '';
+    
+    if (titleLower.includes('villa')) {
+      return 'villa';
+    } else if (titleLower.includes('independent') || titleLower.includes('house')) {
+      return 'house';
+    } else if (titleLower.includes('duplex')) {
+      return 'duplex';
+    } else if (titleLower.includes('penthouse')) {
+      return 'penthouse';
+    } else if (titleLower.includes('studio')) {
+      return 'studio';
+    } else if (titleLower.includes('farmhouse')) {
+      return 'farmhouse';
+    }
+
+    // Extract from flow_type as fallback
+    if (flowType.includes('residential_rent') || flowType.includes('residential_sale')) {
+      return 'apartment'; // Default residential to apartment
     } else if (flowType.includes('residential_pghostel')) {
       return 'pghostel';
     } else if (flowType.includes('residential_flatmates')) {
       return 'flatmates';
-    } else if (flowType.includes('commercial_rent')) {
-      return 'office_space';
-    } else if (flowType.includes('commercial_sale')) {
+    } else if (flowType.includes('commercial_rent') || flowType.includes('commercial_sale')) {
       return 'office_space';
     } else if (flowType.includes('commercial_coworking')) {
       return 'coworking';
@@ -541,7 +556,7 @@ export class SearchService {
       return 'residential_plot';
     }
 
-    return flowType; // Fallback to flow_type
+    return flowType;
   }
 
   /**
@@ -553,7 +568,7 @@ export class SearchService {
     } else if (flowType.includes('rent') || flowType.includes('rental')) {
       return 'rent';
     }
-    return 'rent'; // default
+    return 'rent';
   }
 
   /**
