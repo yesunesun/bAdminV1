@@ -1,29 +1,42 @@
 // src/components/Search/constants/searchConstants.ts
-// Version: 1.0.0
-// Last Modified: 01-06-2025 16:00 IST
-// Purpose: Constants and static data for search functionality
+// Version: 2.0.0
+// Last Modified: 31-01-2025 16:30 IST
+// Purpose: Updated constants to match new dropdown requirements with Action Type (Buy/Sell), conditional Land for Sell only
 
 import { PropertyType } from '../types/search.types';
 
-// Property types and their subtypes
+// Updated Action Types (Buy/Sell instead of Buy/Rent)
+export const ACTION_TYPES: Record<string, string> = {
+  any: 'Any',
+  buy: 'Buy', 
+  sell: 'Sell'
+};
+
+// Keep TRANSACTION_TYPES for backward compatibility
+export const TRANSACTION_TYPES: Record<string, string> = {
+  buy: 'Buy',
+  rent: 'Rent'
+};
+
+// Updated Property types with conditional logic for Land
 export const PROPERTY_TYPES: Record<string, PropertyType> = {
   residential: {
     label: 'Residential',
     subtypes: {
+      // For Buy/Sell transactions
       apartment: 'Apartment',
+      independent_house: 'Independent House', 
       villa: 'Villa',
-      house: 'House',
-      studio: 'Studio',
-      duplex: 'Duplex',
       penthouse: 'Penthouse',
-      farmhouse: 'Farmhouse'
+      studio_apartment: 'Studio Apartment',
+      service_apartment: 'Service Apartment'
     }
   },
   commercial: {
     label: 'Commercial',
     subtypes: {
+      // For Buy/Sell transactions
       office_space: 'Office Space',
-      coworking: 'Co-Working',
       shop: 'Shop',
       showroom: 'Showroom',
       godown_warehouse: 'Godown/Warehouse',
@@ -56,14 +69,14 @@ export const PROPERTY_TYPES: Record<string, PropertyType> = {
     label: 'Flatmates',
     subtypes: {
       single_sharing: 'Single Sharing',
-      double_sharing: 'Double Sharing',
+      double_sharing: 'Double Sharing', 
       triple_sharing: 'Triple Sharing',
       four_sharing: 'Four Sharing'
     }
   }
 };
 
-// Coworking specific subtypes
+// Coworking specific subtypes for Commercial -> Co-working
 export const COWORKING_SUBTYPES: Record<string, string> = {
   private_office: 'Private Office',
   dedicated_desk: 'Dedicated Desk',
@@ -74,20 +87,13 @@ export const COWORKING_SUBTYPES: Record<string, string> = {
   virtual_office: 'Virtual Office'
 };
 
-// Buy/Rent options
-export const TRANSACTION_TYPES: Record<string, string> = {
-  buy: 'Buy',
-  rent: 'Rent'
-};
-
-// BHK types for residential properties
+// BHK types for residential properties (excluding PG/Hostel and Flatmates)
 export const BHK_TYPES: Record<string, string> = {
   '1bhk': '1 BHK',
   '2bhk': '2 BHK',
   '3bhk': '3 BHK',
   '4bhk': '4 BHK',
-  '5bhk': '5+ BHK',
-  'studio': 'Studio'
+  '4plus': '4+ BHK'
 };
 
 // Major cities and districts in Telangana
@@ -120,4 +126,64 @@ export const PRICE_RANGES: Record<string, string> = {
   '3cr-5cr': '₹3Cr - ₹5Cr',
   '5cr-10cr': '₹5Cr - ₹10Cr',
   'above-10cr': 'Above ₹10Cr'
+};
+
+// Helper function to get available property types based on action type
+export const getAvailablePropertyTypes = (actionType: string): Record<string, PropertyType> => {
+  const availableTypes: Record<string, PropertyType> = {
+    residential: PROPERTY_TYPES.residential,
+    commercial: PROPERTY_TYPES.commercial,
+    pghostel: PROPERTY_TYPES.pghostel,
+    flatmates: PROPERTY_TYPES.flatmates
+  };
+
+  // Land is only available for "Sell" action
+  if (actionType === 'sell') {
+    availableTypes.land = PROPERTY_TYPES.land;
+  }
+
+  return availableTypes;
+};
+
+// Helper function to get subtypes based on property type and action type
+export const getSubtypesForProperty = (
+  propertyType: string, 
+  actionType: string, 
+  isCoworking: boolean = false
+): Record<string, string> => {
+  if (!propertyType || propertyType === 'any') {
+    return {};
+  }
+
+  // Special case for coworking spaces
+  if (propertyType === 'commercial' && isCoworking) {
+    return COWORKING_SUBTYPES;
+  }
+
+  // For PG/Hostel and Flatmates, always return their specific subtypes
+  if (propertyType === 'pghostel' || propertyType === 'flatmates') {
+    return PROPERTY_TYPES[propertyType].subtypes;
+  }
+
+  // For Land, only available with Sell action
+  if (propertyType === 'land') {
+    if (actionType === 'sell') {
+      return PROPERTY_TYPES.land.subtypes;
+    }
+    return {}; // No subtypes if land is not with sell
+  }
+
+  // For Residential and Commercial with Buy/Sell actions
+  if (PROPERTY_TYPES[propertyType as keyof typeof PROPERTY_TYPES]) {
+    return PROPERTY_TYPES[propertyType as keyof typeof PROPERTY_TYPES].subtypes;
+  }
+
+  return {};
+};
+
+// Helper function to check if BHK should be shown
+export const shouldShowBHK = (propertyType: string): boolean => {
+  return propertyType === 'residential' && 
+         propertyType !== 'pghostel' && 
+         propertyType !== 'flatmates';
 };

@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyMapHomeView.tsx
-// Version: 4.4.0
-// Last Modified: 02-06-2025 10:45 IST
-// Purpose: Added 6-character property code detection while retaining original functionality
+// Version: 5.0.0
+// Last Modified: 31-01-2025 17:00 IST
+// Purpose: Updated to handle new actionType filters and conditional dropdown logic
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useGoogleMaps } from '../hooks/useGoogleMaps';
@@ -196,6 +196,17 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
     }
   }, [user, toast]);
 
+  // Helper function to check if all filters are empty/default
+  const areFiltersEmpty = (searchFilters: SearchFilters): boolean => {
+    return !searchFilters.searchQuery && 
+           (!searchFilters.selectedLocation || searchFilters.selectedLocation === 'any') &&
+           (!searchFilters.actionType || searchFilters.actionType === 'any') && // CHANGED: from transactionType
+           (!searchFilters.selectedPropertyType || searchFilters.selectedPropertyType === 'any') && 
+           (!searchFilters.selectedSubType || searchFilters.selectedSubType === 'any') && 
+           (!searchFilters.selectedBHK || searchFilters.selectedBHK === 'any') && 
+           (!searchFilters.selectedPriceRange || searchFilters.selectedPriceRange === 'any');
+  };
+
   // ENHANCED: Handle search from SearchContainer with 6-character property code detection
   const handleSearchFromContainer = useCallback(async (searchFilters: SearchFilters) => {
     console.log('PropertyMapHomeView: Search initiated from SearchContainer with filters:', searchFilters);
@@ -207,17 +218,11 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
       const { searchService } = await import('@/components/Search/services/searchService');
       
       // Check if all filters are empty/default - if so, load latest properties instead of searching
-      const areFiltersEmpty = !searchFilters.searchQuery && 
-                             (!searchFilters.selectedLocation || searchFilters.selectedLocation === 'any') &&
-                             !searchFilters.transactionType && 
-                             !searchFilters.selectedPropertyType && 
-                             !searchFilters.selectedSubType && 
-                             !searchFilters.selectedBHK && 
-                             !searchFilters.selectedPriceRange;
+      const filtersEmpty = areFiltersEmpty(searchFilters);
       
       let response;
       
-      if (areFiltersEmpty) {
+      if (filtersEmpty) {
         console.log('🏠 Empty filters detected - loading default latest properties...');
         // Load default latest properties when filters are empty (including when cleared)
         response = await searchService.getLatestProperties(50);
@@ -229,14 +234,30 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
         if (query && searchService.isPropertyCode(query)) {
           console.log('🎯 Detected 6-character property code, using smart search');
           // Use smart search which tries code search first, then falls back to regular search
-          response = await searchService.smartSearch(searchFilters, {
+          
+          // Transform actionType to transactionType for backend compatibility
+          const backendFilters = {
+            ...searchFilters,
+            transactionType: searchFilters.actionType === 'sell' ? 'buy' : 
+                            searchFilters.actionType === 'buy' ? 'buy' : 'rent'
+          };
+          
+          response = await searchService.smartSearch(backendFilters, {
             page: 1,
             limit: 50
           });
         } else {
           console.log('🔍 Using regular search (not a 6-character property code)');
+          
+          // Transform actionType to transactionType for backend compatibility
+          const backendFilters = {
+            ...searchFilters,
+            transactionType: searchFilters.actionType === 'sell' ? 'buy' : 
+                            searchFilters.actionType === 'buy' ? 'buy' : 'rent'
+          };
+          
           // Perform regular search using searchService
-          response = await searchService.search(searchFilters, {
+          response = await searchService.search(backendFilters, {
             page: 1,
             limit: 50
           });
@@ -254,11 +275,11 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
       if (response.results?.length === 0) {
         toast({
           title: "No properties found",
-          description: areFiltersEmpty ? "No properties available" : "Try adjusting your search filters",
+          description: filtersEmpty ? "No properties available" : "Try adjusting your search filters",
           duration: 3000,
         });
       } else {
-        const resultType = areFiltersEmpty ? 'latest properties' : 'search results';
+        const resultType = filtersEmpty ? 'latest properties' : 'search results';
         console.log(`✅ ${resultType} loaded: ${response.results?.length || 0} properties found`);
       }
       
@@ -270,7 +291,8 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
       toast({
         title: "Search Failed",
         description: "Unable to search properties. Please try again.",
-        variant: 3000,
+        variant: "destructive",
+        duration: 3000,
       });
     } finally {
       setSearchLoading(false);

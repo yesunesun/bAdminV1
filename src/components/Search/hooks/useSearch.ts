@@ -1,7 +1,7 @@
 // src/components/Search/hooks/useSearch.ts
-// Version: 1.3.0
-// Last Modified: 02-06-2025 10:20 IST
-// Purpose: Updated to use 6-character property code detection
+// Version: 2.0.0
+// Last Modified: 31-01-2025 16:50 IST
+// Purpose: Updated to handle actionType instead of transactionType and new filter logic
 
 import { useState, useCallback, useEffect } from 'react';
 import { SearchFilters, SearchResult, SearchState } from '../types/search.types';
@@ -26,11 +26,11 @@ export const useSearch = (onSearchCallback?: (filters: SearchFilters) => void) =
     const { filters } = searchFilters;
     return !filters.searchQuery && 
            (!filters.selectedLocation || filters.selectedLocation === 'any') &&
-           !filters.transactionType && 
-           !filters.selectedPropertyType && 
-           !filters.selectedSubType && 
-           !filters.selectedBHK && 
-           !filters.selectedPriceRange;
+           (!filters.actionType || filters.actionType === 'any') && // CHANGED: from transactionType
+           (!filters.selectedPropertyType || filters.selectedPropertyType === 'any') && 
+           (!filters.selectedSubType || filters.selectedSubType === 'any') && 
+           (!filters.selectedBHK || filters.selectedBHK === 'any') && 
+           (!filters.selectedPriceRange || filters.selectedPriceRange === 'any');
   }, [searchFilters.filters]);
 
   // Auto-trigger search when filters are cleared to load default results
@@ -48,6 +48,32 @@ export const useSearch = (onSearchCallback?: (filters: SearchFilters) => void) =
       }
     }
   }, [wasCleared, areFiltersEmpty, onSearchCallback, searchFilters.filters]);
+
+  /**
+   * Transform ActionType to TransactionType for backend compatibility
+   */
+  const getTransactionTypeFromActionType = (actionType: string): string => {
+    switch (actionType) {
+      case 'buy':
+        return 'buy';
+      case 'sell':
+        return 'buy'; // Sell is also treated as buy transaction in database
+      case 'any':
+      default:
+        return 'rent'; // Default to rent
+    }
+  };
+
+  /**
+   * Transform filters for backend compatibility
+   */
+  const transformFiltersForBackend = (filters: SearchFilters) => {
+    // Create a compatible filter object for the backend
+    return {
+      ...filters,
+      transactionType: getTransactionTypeFromActionType(filters.actionType)
+    };
+  };
 
   /**
    * ENHANCED: Smart search that detects 6-character property codes and uses appropriate search method
@@ -70,18 +96,21 @@ export const useSearch = (onSearchCallback?: (filters: SearchFilters) => void) =
       let response;
       const query = searchFilters.filters.searchQuery?.trim();
       
+      // Transform filters for backend compatibility
+      const backendFilters = transformFiltersForBackend(searchFilters.filters);
+      
       // Check if the search query is exactly a 6-character alphanumeric property code
       if (query && searchService.isPropertyCode(query)) {
         console.log('🎯 Detected 6-character property code in search, using smart search');
         // Use smart search which tries code search first, then falls back to regular search
-        response = await searchService.smartSearch(searchFilters.filters, {
+        response = await searchService.smartSearch(backendFilters, {
           page: 1,
           limit: 50
         });
       } else {
         // Use regular search for non-code queries
         console.log('🔍 Using regular search (not a 6-character property code)');
-        response = await searchService.search(searchFilters.filters, {
+        response = await searchService.search(backendFilters, {
           page: 1,
           limit: 50
         });

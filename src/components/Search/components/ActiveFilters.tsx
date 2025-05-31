@@ -1,15 +1,15 @@
 // src/components/Search/components/ActiveFilters.tsx
-// Version: 1.0.0
-// Last Modified: 01-06-2025 16:00 IST
-// Purpose: Display and manage active filter tags
+// Version: 2.0.0
+// Last Modified: 31-01-2025 16:55 IST
+// Purpose: Updated to handle actionType instead of transactionType and new filter logic
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { X, XCircle } from 'lucide-react';
 import { ActiveFiltersProps, FilterType } from '../types/search.types';
 import { 
-  TRANSACTION_TYPES, 
-  PROPERTY_TYPES, 
+  ACTION_TYPES, // CHANGED: from TRANSACTION_TYPES to ACTION_TYPES
+  getAvailablePropertyTypes, // ADDED: to get available property types based on action
   BHK_TYPES, 
   PRICE_RANGES 
 } from '../constants/searchConstants';
@@ -30,28 +30,31 @@ const ActiveFilters: React.FC<ActiveFiltersComponentProps> = ({
 }) => {
   const filterTags = [];
 
-  // Transaction Type Tag
-  if (filters.transactionType && TRANSACTION_TYPES[filters.transactionType as keyof typeof TRANSACTION_TYPES]) {
+  // Action Type Tag (Buy/Sell/Any)
+  if (filters.actionType && filters.actionType !== 'any' && ACTION_TYPES[filters.actionType as keyof typeof ACTION_TYPES]) {
     filterTags.push({
-      id: 'transactionType',
-      label: TRANSACTION_TYPES[filters.transactionType as keyof typeof TRANSACTION_TYPES],
+      id: 'actionType',
+      label: ACTION_TYPES[filters.actionType as keyof typeof ACTION_TYPES],
       color: 'orange',
-      onClear: () => onClearFilter('transactionType')
+      onClear: () => onClearFilter('actionType')
     });
   }
 
   // Property Type Tag
-  if (filters.selectedPropertyType && PROPERTY_TYPES[filters.selectedPropertyType as keyof typeof PROPERTY_TYPES]) {
-    filterTags.push({
-      id: 'propertyType',
-      label: PROPERTY_TYPES[filters.selectedPropertyType as keyof typeof PROPERTY_TYPES].label,
-      color: 'blue',
-      onClear: () => onClearFilter('propertyType')
-    });
+  if (filters.selectedPropertyType && filters.selectedPropertyType !== 'any') {
+    const availablePropertyTypes = getAvailablePropertyTypes(filters.actionType);
+    if (availablePropertyTypes[filters.selectedPropertyType as keyof typeof availablePropertyTypes]) {
+      filterTags.push({
+        id: 'propertyType',
+        label: availablePropertyTypes[filters.selectedPropertyType as keyof typeof availablePropertyTypes].label,
+        color: 'blue',
+        onClear: () => onClearFilter('propertyType')
+      });
+    }
   }
 
   // Subtype Tag
-  if (filters.selectedSubType && getSubTypes()[filters.selectedSubType]) {
+  if (filters.selectedSubType && filters.selectedSubType !== 'any' && getSubTypes()[filters.selectedSubType]) {
     filterTags.push({
       id: 'subType',
       label: getSubTypes()[filters.selectedSubType],
@@ -60,8 +63,12 @@ const ActiveFilters: React.FC<ActiveFiltersComponentProps> = ({
     });
   }
 
-  // BHK Tag
-  if (filters.selectedBHK && BHK_TYPES[filters.selectedBHK as keyof typeof BHK_TYPES]) {
+  // BHK Tag - Only show if it's applicable (Residential and not PG/Flatmates)
+  if (filters.selectedBHK && filters.selectedBHK !== 'any' && 
+      filters.selectedPropertyType === 'residential' &&
+      filters.selectedPropertyType !== 'pghostel' && 
+      filters.selectedPropertyType !== 'flatmates' &&
+      BHK_TYPES[filters.selectedBHK as keyof typeof BHK_TYPES]) {
     filterTags.push({
       id: 'bhkType',
       label: BHK_TYPES[filters.selectedBHK as keyof typeof BHK_TYPES],
@@ -71,7 +78,8 @@ const ActiveFilters: React.FC<ActiveFiltersComponentProps> = ({
   }
 
   // Price Range Tag
-  if (filters.selectedPriceRange && PRICE_RANGES[filters.selectedPriceRange as keyof typeof PRICE_RANGES]) {
+  if (filters.selectedPriceRange && filters.selectedPriceRange !== 'any' && 
+      PRICE_RANGES[filters.selectedPriceRange as keyof typeof PRICE_RANGES]) {
     filterTags.push({
       id: 'priceRange',
       label: PRICE_RANGES[filters.selectedPriceRange as keyof typeof PRICE_RANGES],

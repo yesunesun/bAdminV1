@@ -1,17 +1,18 @@
 // src/components/Search/components/SearchFilters.tsx
-// Version: 2.0.0
-// Last Modified: 31-05-2025 20:45 IST
-// Purpose: Enhanced filter dropdowns with better visual integration
+// Version: 3.0.0
+// Last Modified: 31-01-2025 16:40 IST
+// Purpose: Implemented new dropdown logic with Action Type, conditional Land for Sell, and BHK for Residential only
 
 import React from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SearchFiltersProps } from '../types/search.types';
 import { 
-  PROPERTY_TYPES, 
-  TRANSACTION_TYPES, 
+  ACTION_TYPES,
+  getAvailablePropertyTypes,
+  getSubtypesForProperty,
   BHK_TYPES, 
   PRICE_RANGES,
-  COWORKING_SUBTYPES
+  shouldShowBHK
 } from '../constants/searchConstants';
 
 interface SearchFiltersComponentProps extends SearchFiltersProps {
@@ -25,23 +26,42 @@ const SearchFilters: React.FC<SearchFiltersComponentProps> = ({
   getSubTypes,
   getSubtypeLabel
 }) => {
+  const handleActionTypeChange = (value: string) => {
+    onFilterChange('actionType', value);
+  };
+
   const handlePropertyTypeChange = (value: string) => {
     onFilterChange('selectedPropertyType', value);
   };
 
+  // Get available property types based on action type
+  const availablePropertyTypes = getAvailablePropertyTypes(filters.actionType);
+
+  // Check if current subtype needs special handling (coworking)
+  const isCoworkingSelected = filters.selectedSubType === 'coworking';
+
+  // Get available subtypes
+  const availableSubtypes = getSubtypesForProperty(
+    filters.selectedPropertyType, 
+    filters.actionType, 
+    isCoworkingSelected
+  );
+
+  // Determine if BHK should be shown
+  const showBHK = shouldShowBHK(filters.selectedPropertyType);
+
   return (
     <div className="flex items-center gap-2 flex-wrap flex-1">
-      {/* Buy/Rent Filter */}
+      {/* Action Type Filter (Buy/Sell/Any) */}
       <Select 
-        value={filters.transactionType} 
-        onValueChange={(value) => onFilterChange('transactionType', value)}
+        value={filters.actionType} 
+        onValueChange={handleActionTypeChange}
       >
         <SelectTrigger className="w-auto min-w-[100px] h-11 border-slate-200 bg-white hover:bg-slate-50 rounded-lg shadow-sm transition-all duration-200 hover:shadow-md focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
-          <SelectValue placeholder="Buy/Rent" />
+          <SelectValue placeholder="Any" />
         </SelectTrigger>
         <SelectContent className="border-slate-200 shadow-lg">
-          <SelectItem value="any" className="hover:bg-slate-50">Any</SelectItem>
-          {Object.entries(TRANSACTION_TYPES).map(([key, label]) => (
+          {Object.entries(ACTION_TYPES).map(([key, label]) => (
             <SelectItem key={key} value={key} className="hover:bg-slate-50">
               {label}
             </SelectItem>
@@ -55,11 +75,11 @@ const SearchFilters: React.FC<SearchFiltersComponentProps> = ({
         onValueChange={handlePropertyTypeChange}
       >
         <SelectTrigger className="w-auto min-w-[130px] h-11 border-slate-200 bg-white hover:bg-slate-50 rounded-lg shadow-sm transition-all duration-200 hover:shadow-md focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
-          <SelectValue placeholder="Property Type" />
+          <SelectValue placeholder="Any" />
         </SelectTrigger>
         <SelectContent className="border-slate-200 shadow-lg">
-          <SelectItem value="any" className="hover:bg-slate-50">Any Type</SelectItem>
-          {Object.entries(PROPERTY_TYPES).map(([key, type]) => (
+          <SelectItem value="any" className="hover:bg-slate-50">Any</SelectItem>
+          {Object.entries(availablePropertyTypes).map(([key, type]) => (
             <SelectItem key={key} value={key} className="hover:bg-slate-50">
               {type.label}
             </SelectItem>
@@ -67,18 +87,20 @@ const SearchFilters: React.FC<SearchFiltersComponentProps> = ({
         </SelectContent>
       </Select>
 
-      {/* Subtype Filter */}
+      {/* Subtype Filter - Conditional based on Property Type and Action Type */}
       <Select 
         value={filters.selectedSubType} 
         onValueChange={(value) => onFilterChange('selectedSubType', value)}
-        disabled={!filters.selectedPropertyType || filters.selectedPropertyType === 'any'}
+        disabled={!filters.selectedPropertyType || 
+                 filters.selectedPropertyType === 'any' ||
+                 Object.keys(availableSubtypes).length === 0}
       >
         <SelectTrigger className="w-auto min-w-[120px] h-11 border-slate-200 bg-white hover:bg-slate-50 rounded-lg shadow-sm transition-all duration-200 hover:shadow-md focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white">
           <SelectValue placeholder={getSubtypeLabel()} />
         </SelectTrigger>
         <SelectContent className="border-slate-200 shadow-lg">
-          <SelectItem value="any" className="hover:bg-slate-50">Any {getSubtypeLabel()}</SelectItem>
-          {Object.entries(getSubTypes()).map(([key, label]) => (
+          <SelectItem value="any" className="hover:bg-slate-50">Any</SelectItem>
+          {Object.entries(availableSubtypes).map(([key, label]) => (
             <SelectItem key={key} value={key} className="hover:bg-slate-50">
               {label}
             </SelectItem>
@@ -87,16 +109,16 @@ const SearchFilters: React.FC<SearchFiltersComponentProps> = ({
       </Select>
 
       {/* BHK Filter - Only for Residential (not PG/Hostel or Flatmates) */}
-      {filters.selectedPropertyType === 'residential' && (
+      {showBHK && (
         <Select 
           value={filters.selectedBHK} 
           onValueChange={(value) => onFilterChange('selectedBHK', value)}
         >
           <SelectTrigger className="w-auto min-w-[100px] h-11 border-slate-200 bg-white hover:bg-slate-50 rounded-lg shadow-sm transition-all duration-200 hover:shadow-md focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
-            <SelectValue placeholder="BHK" />
+            <SelectValue placeholder="Any" />
           </SelectTrigger>
           <SelectContent className="border-slate-200 shadow-lg">
-            <SelectItem value="any" className="hover:bg-slate-50">Any BHK</SelectItem>
+            <SelectItem value="any" className="hover:bg-slate-50">Any</SelectItem>
             {Object.entries(BHK_TYPES).map(([key, label]) => (
               <SelectItem key={key} value={key} className="hover:bg-slate-50">
                 {label}
@@ -106,16 +128,16 @@ const SearchFilters: React.FC<SearchFiltersComponentProps> = ({
         </Select>
       )}
 
-      {/* Price Range Filter */}
+      {/* Price Range Filter - Always available */}
       <Select 
         value={filters.selectedPriceRange} 
         onValueChange={(value) => onFilterChange('selectedPriceRange', value)}
       >
         <SelectTrigger className="w-auto min-w-[130px] h-11 border-slate-200 bg-white hover:bg-slate-50 rounded-lg shadow-sm transition-all duration-200 hover:shadow-md focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
-          <SelectValue placeholder="Price Range" />
+          <SelectValue placeholder="Any" />
         </SelectTrigger>
         <SelectContent className="border-slate-200 shadow-lg">
-          <SelectItem value="any" className="hover:bg-slate-50">Any Price</SelectItem>
+          <SelectItem value="any" className="hover:bg-slate-50">Any</SelectItem>
           {Object.entries(PRICE_RANGES).map(([key, label]) => (
             <SelectItem key={key} value={key} className="hover:bg-slate-50">
               {label}
