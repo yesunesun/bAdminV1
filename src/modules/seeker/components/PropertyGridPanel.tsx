@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyGridPanel.tsx
-// Version: 1.1.0
-// Last Modified: 02-06-2025 00:05 IST
-// Purpose: Removed view mode toggle - grid view only
+// Version: 1.2.0
+// Last Modified: 02-06-2025 00:10 IST
+// Purpose: Increased card width by limiting to 3 cards per row maximum
 
 import React, { useState, useEffect } from 'react';
 import { PropertyType } from '@/modules/owner/components/property/types';
@@ -137,25 +137,25 @@ const PropertyGridPanel: React.FC<PropertyGridPanelProps> = ({
       });
   };
 
-  // Render loading skeleton for grid view
+  // Render loading skeleton for grid view with wider cards
   const renderLoadingSkeleton = () => {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {[...Array(8)].map((_, i) => (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {[...Array(6)].map((_, i) => (
           <Card key={`loading-skeleton-${i}`} className="overflow-hidden animate-pulse">
-            <div className="h-48 bg-muted"></div>
-            <div className="p-4 space-y-3">
+            <div className="h-56 bg-muted"></div>
+            <div className="p-5 space-y-4">
               <div className="h-4 bg-muted rounded w-3/4"></div>
               <div className="h-3 bg-muted rounded w-1/2"></div>
               <div className="h-5 bg-muted rounded w-1/3"></div>
-              <div className="flex gap-2">
-                <div className="h-3 bg-muted rounded w-12"></div>
-                <div className="h-3 bg-muted rounded w-12"></div>
-                <div className="h-3 bg-muted rounded w-16"></div>
+              <div className="flex gap-3">
+                <div className="h-3 bg-muted rounded w-14"></div>
+                <div className="h-3 bg-muted rounded w-14"></div>
+                <div className="h-3 bg-muted rounded w-18"></div>
               </div>
-              <div className="flex gap-2 pt-2">
+              <div className="flex gap-3 pt-2">
+                <div className="h-6 bg-muted rounded w-24"></div>
                 <div className="h-6 bg-muted rounded w-20"></div>
-                <div className="h-6 bg-muted rounded w-16"></div>
               </div>
             </div>
           </Card>
@@ -175,16 +175,16 @@ const PropertyGridPanel: React.FC<PropertyGridPanelProps> = ({
     </div>
   );
 
-  // Render property grid (always in grid view)
+  // Render property grid with wider cards (max 3 per row)
   const renderPropertyGrid = () => {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {properties.map((property) => (
           <Card
             key={property.id}
             className={`overflow-hidden group transition-all duration-300 cursor-pointer
               ${hoveredProperty === property.id ? 'ring-2 ring-primary ring-offset-2' : ''}
-              hover:shadow-md
+              hover:shadow-lg
             `}
             onClick={() => setActiveProperty(property)}
           >
@@ -208,7 +208,7 @@ const PropertyGridPanel: React.FC<PropertyGridPanelProps> = ({
     <div className="w-full h-full flex-shrink-0 p-3">
       <div className="h-full overflow-hidden rounded-xl border border-border bg-card shadow-sm flex flex-col">
         {/* Header with count only */}
-        <div className="sticky top-0 z-10 bg-card p-3 border-b flex justify-between items-center">
+        <div className="sticky top-0 z-10 bg-card p-4 border-b flex justify-between items-center">
           <div className="text-sm font-medium">
             {loading || isLoadingFavorites ? (
               <span className="flex items-center gap-2">
@@ -229,8 +229,8 @@ const PropertyGridPanel: React.FC<PropertyGridPanelProps> = ({
           </div>
         </div>
         
-        {/* Property listing */}
-        <div className="flex-1 overflow-y-auto">
+        {/* Property listing with increased padding */}
+        <div className="flex-1 overflow-y-auto p-4">
           {loading && properties.length === 0 ? (
             renderLoadingSkeleton()
           ) : properties.length === 0 ? (
@@ -242,7 +242,7 @@ const PropertyGridPanel: React.FC<PropertyGridPanelProps> = ({
         
         {/* Load more button */}
         {properties.length > 0 && hasMore && (
-          <div className="p-3 border-t mt-auto bg-card">
+          <div className="p-4 border-t mt-auto bg-card">
             <Button
               variant="outline"
               size="sm"
