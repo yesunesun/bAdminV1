@@ -1,7 +1,7 @@
 // src/App.tsx 
-// Version: 9.4.0
-// Last Modified: 01-06-2025 14:30 IST
-// Purpose: Added search page route to SeekerLayout
+// Version: 9.5.0
+// Last Modified: 01-06-2025 18:00 IST
+// Purpose: Added /find page route to SeekerLayout
 
 import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
@@ -16,6 +16,7 @@ import Footer from '@/components/Footer';
 // Import components directly
 import HomePage from './pages/HomePage';
 import SearchPage from './pages/SearchPage';
+import FindPage from './pages/FindPage';
 import PropertyMapHome from './modules/seeker';
 import Dashboard from './modules/owner/pages/Dashboard';
 import Properties from './modules/owner/pages/Properties';
@@ -278,12 +279,22 @@ function App() {
                     } 
                   />
                   
-                  {/* NEW: Search Page Route */}
+                  {/* Search Page Route */}
                   <Route 
                     path="/search" 
                     element={
                       <PublicOrProtectedRoute>
                         <SearchPage />
+                      </PublicOrProtectedRoute>
+                    } 
+                  />
+                  
+                  {/* NEW: Find Page Route */}
+                  <Route 
+                    path="/find" 
+                    element={
+                      <PublicOrProtectedRoute>
+                        <FindPage />
                       </PublicOrProtectedRoute>
                     } 
                   />

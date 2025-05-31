@@ -1,40 +1,266 @@
--- Updated search_land_properties function - Only uses expectedPrice for land properties
--- Version: 2.0.0
--- Last Modified: 01-06-2025 21:45 IST
--- Purpose: Extract price ONLY from expectedPrice field for land properties
+-- src/database/functions/search_land_properties_refactored.sql
+-- Version: 4.1.0
+-- Last Modified: 01-06-2025 22:45 IST
+-- Purpose: Refactored modular land search with property type filtering
 
-CREATE OR REPLACE FUNCTION public.search_land_properties(
-    p_search_query text DEFAULT NULL,
-    p_min_price numeric DEFAULT NULL,
-    p_max_price numeric DEFAULT NULL,
-    p_city text DEFAULT NULL,
-    p_state text DEFAULT NULL,
-    p_area_min numeric DEFAULT NULL,
-    p_area_max numeric DEFAULT NULL,
-    p_limit integer DEFAULT 50,
-    p_offset integer DEFAULT 0
-) RETURNS TABLE(
-    id uuid,
-    owner_id uuid,
-    created_at timestamp with time zone,
-    updated_at timestamp with time zone,
-    property_type text,
-    flow_type text,
-    subtype text,
-    total_count bigint,
-    title text,
-    price numeric,
-    city text,
-    state text,
-    area numeric,
-    owner_email text,
-    status text,
-    bedrooms integer,
-    bathrooms numeric,
-    area_unit text,
-    land_type text
+-- =============================================================================
+-- HELPER FUNCTION 1: Extract price from land property data
+-- =============================================================================
+CREATE OR REPLACE FUNCTION extract_land_price(property_details JSONB)
+RETURNS NUMERIC
+LANGUAGE plpgsql
+IMMUTABLE
+AS $$
+BEGIN
+    RETURN COALESCE(
+        safe_numeric(property_details->'flow'->>'price'),
+        safe_numeric(property_details->'steps'->'land_sale_basic_details'->>'price'),
+        safe_numeric(property_details->'steps'->'land_sale_basic_details'->>'salePrice'),
+        safe_numeric(property_details->'steps'->'land_sale_basic_details'->>'expectedPrice'),
+        safe_numeric(property_details->'steps'->'land_basic_details'->>'price'),
+        safe_numeric(property_details->'steps'->'land_basic_details'->>'salePrice'),
+        safe_numeric(property_details->'steps'->'land_basic_details'->>'expectedPrice'),
+        safe_numeric(property_details->'steps'->'property_details'->>'price'),
+        safe_numeric(property_details->'steps'->'property_details'->>'salePrice'),
+        safe_numeric(property_details->'steps'->'sale_details'->>'salePrice'),
+        safe_numeric(property_details->'steps'->'sale_details'->>'expectedPrice'),
+        safe_numeric(property_details->'sale'->>'salePrice'),
+        safe_numeric(property_details->'sale'->>'expectedPrice'),
+        safe_numeric(property_details->>'price'),
+        safe_numeric(property_details->>'salePrice'),
+        safe_numeric(property_details->>'expectedPrice')
+    );
+END;
+$$;
+
+-- =============================================================================
+-- HELPER FUNCTION 2: Extract title from land property data
+-- =============================================================================
+CREATE OR REPLACE FUNCTION extract_land_title(property_details JSONB)
+RETURNS TEXT
+LANGUAGE plpgsql
+IMMUTABLE
+AS $$
+BEGIN
+    RETURN COALESCE(
+        property_details->'flow'->>'title',
+        property_details->'steps'->'land_sale_basic_details'->>'title',
+        property_details->'steps'->'land_basic_details'->>'title',
+        property_details->'steps'->'property_details'->>'title',
+        property_details->'basicDetails'->>'title',
+        'Land Property'
+    );
+END;
+$$;
+
+-- =============================================================================
+-- HELPER FUNCTION 3: Extract city from land property data
+-- =============================================================================
+CREATE OR REPLACE FUNCTION extract_land_city(property_details JSONB)
+RETURNS TEXT
+LANGUAGE plpgsql
+IMMUTABLE
+AS $$
+BEGIN
+    RETURN COALESCE(
+        property_details->'steps'->'land_sale_location'->>'city',
+        property_details->'steps'->'land_location'->>'city',
+        property_details->'steps'->'location_details'->>'city',
+        property_details->'location'->>'city',
+        property_details->'flow'->>'city',
+        property_details->>'city'
+    );
+END;
+$$;
+
+-- =============================================================================
+-- HELPER FUNCTION 4: Extract state from land property data
+-- =============================================================================
+CREATE OR REPLACE FUNCTION extract_land_state(property_details JSONB)
+RETURNS TEXT
+LANGUAGE plpgsql
+IMMUTABLE
+AS $$
+BEGIN
+    RETURN COALESCE(
+        property_details->'steps'->'land_sale_location'->>'state',
+        property_details->'steps'->'land_location'->>'state',
+        property_details->'steps'->'location_details'->>'state',
+        property_details->'location'->>'state',
+        property_details->'flow'->>'state',
+        property_details->>'state'
+    );
+END;
+$$;
+
+-- =============================================================================
+-- HELPER FUNCTION 5: Extract area from land property data
+-- =============================================================================
+CREATE OR REPLACE FUNCTION extract_land_area(property_details JSONB)
+RETURNS NUMERIC
+LANGUAGE plpgsql
+IMMUTABLE
+AS $$
+BEGIN
+    RETURN COALESCE(
+        safe_numeric(property_details->'steps'->'land_sale_basic_details'->>'area'),
+        safe_numeric(property_details->'steps'->'land_sale_basic_details'->>'totalArea'),
+        safe_numeric(property_details->'steps'->'land_sale_basic_details'->>'landArea'),
+        safe_numeric(property_details->'steps'->'land_basic_details'->>'area'),
+        safe_numeric(property_details->'steps'->'land_basic_details'->>'totalArea'),
+        safe_numeric(property_details->'steps'->'land_basic_details'->>'landArea'),
+        safe_numeric(property_details->'steps'->'property_details'->>'area'),
+        safe_numeric(property_details->'steps'->'property_details'->>'totalArea'),
+        safe_numeric(property_details->'basicDetails'->>'area'),
+        safe_numeric(property_details->'basicDetails'->>'totalArea'),
+        safe_numeric(property_details->'flow'->>'area'),
+        safe_numeric(property_details->>'area'),
+        safe_numeric(property_details->>'totalArea'),
+        safe_numeric(property_details->>'landArea')
+    );
+END;
+$$;
+
+-- =============================================================================
+-- HELPER FUNCTION 6: Extract area unit from land property data
+-- =============================================================================
+CREATE OR REPLACE FUNCTION extract_land_area_unit(property_details JSONB)
+RETURNS TEXT
+LANGUAGE plpgsql
+IMMUTABLE
+AS $$
+BEGIN
+    RETURN COALESCE(
+        property_details->'steps'->'land_sale_basic_details'->>'areaUnit',
+        property_details->'steps'->'land_basic_details'->>'areaUnit',
+        property_details->'steps'->'property_details'->>'areaUnit',
+        property_details->'basicDetails'->>'areaUnit',
+        property_details->'flow'->>'areaUnit',
+        property_details->>'areaUnit',
+        'sq_ft'
+    );
+END;
+$$;
+
+-- =============================================================================
+-- HELPER FUNCTION 7: Extract land type from land property data
+-- =============================================================================
+CREATE OR REPLACE FUNCTION extract_land_type(property_details JSONB)
+RETURNS TEXT
+LANGUAGE plpgsql
+IMMUTABLE
+AS $$
+BEGIN
+    RETURN COALESCE(
+        property_details->'steps'->'land_sale_basic_details'->>'landType',
+        property_details->'steps'->'land_basic_details'->>'landType',
+        property_details->'steps'->'land_sale_basic_details'->>'propertyType',
+        property_details->'steps'->'land_basic_details'->>'propertyType',
+        property_details->'steps'->'property_details'->>'landType',
+        property_details->'steps'->'property_details'->>'propertyType',
+        property_details->'basicDetails'->>'landType',
+        property_details->'basicDetails'->>'propertyType',
+        property_details->'flow'->>'landType',
+        property_details->'flow'->>'propertyType',
+        property_details->>'landType',
+        property_details->>'propertyType',
+        'agricultural'
+    );
+END;
+$$;
+
+-- =============================================================================
+-- HELPER FUNCTION 8: Extract flow type from land property data
+-- =============================================================================
+CREATE OR REPLACE FUNCTION extract_land_flow_type(property_details JSONB)
+RETURNS TEXT
+LANGUAGE plpgsql
+IMMUTABLE
+AS $$
+BEGIN
+    RETURN COALESCE(
+        property_details->'flow'->>'flowType',
+        property_details->>'flowType',
+        property_details->>'flow_type',
+        property_details->'meta'->>'flow_type',
+        'land_sale'
+    );
+END;
+$$;
+
+-- =============================================================================
+-- HELPER FUNCTION 9: Extract property subtype from land property data
+-- =============================================================================
+CREATE OR REPLACE FUNCTION extract_land_property_subtype(property_details JSONB)
+RETURNS TEXT
+LANGUAGE plpgsql
+IMMUTABLE
+AS $$
+BEGIN
+    RETURN COALESCE(
+        property_details->'steps'->'land_sale_basic_details'->>'propertySubtype',
+        property_details->'steps'->'land_basic_details'->>'propertySubtype',
+        property_details->'steps'->'property_details'->>'propertySubtype',
+        property_details->'basicDetails'->>'propertySubtype'
+    );
+END;
+$$;
+
+-- =============================================================================
+-- HELPER FUNCTION 10: Convert land flow type to subtype
+-- =============================================================================
+CREATE OR REPLACE FUNCTION land_flow_type_to_subtype(flow_type TEXT)
+RETURNS TEXT
+LANGUAGE plpgsql
+IMMUTABLE
+AS $$
+BEGIN
+    RETURN CASE 
+        WHEN flow_type = 'land_sale' THEN 'sale'
+        WHEN flow_type LIKE '%land%' THEN 'sale'
+        ELSE 'sale'
+    END;
+END;
+$$;
+
+-- =============================================================================
+-- MAIN FUNCTION: Search land properties (refactored with property type)
+-- =============================================================================
+DROP FUNCTION IF EXISTS search_land_properties CASCADE;
+
+CREATE OR REPLACE FUNCTION search_land_properties(
+    p_property_subtype TEXT DEFAULT NULL,
+    p_search_query TEXT DEFAULT NULL,
+    p_min_price NUMERIC DEFAULT NULL,
+    p_max_price NUMERIC DEFAULT NULL,
+    p_city TEXT DEFAULT NULL,
+    p_state TEXT DEFAULT NULL,
+    p_area_min NUMERIC DEFAULT NULL,
+    p_area_max NUMERIC DEFAULT NULL,
+    p_limit INTEGER DEFAULT 50,
+    p_offset INTEGER DEFAULT 0
+)
+RETURNS TABLE(
+    id UUID,
+    owner_id UUID,
+    created_at TIMESTAMP WITH TIME ZONE,
+    updated_at TIMESTAMP WITH TIME ZONE,
+    property_type TEXT,
+    flow_type TEXT,
+    subtype TEXT,
+    total_count BIGINT,
+    title TEXT,
+    price NUMERIC,
+    city TEXT,
+    state TEXT,
+    area NUMERIC,
+    owner_email TEXT,
+    status TEXT,
+    area_unit TEXT,
+    land_type TEXT
 )
 LANGUAGE plpgsql
+SECURITY DEFINER
 AS $$
 DECLARE
     v_total_count BIGINT;
@@ -48,184 +274,82 @@ BEGIN
         p_offset := 0;
     END IF;
 
-    -- Get total count first - ONLY using expectedPrice
+    -- Get total count using helper functions
     SELECT COUNT(*) INTO v_total_count
     FROM properties_v2 p
     WHERE p.status IS DISTINCT FROM 'deleted'
       AND (
-          COALESCE(
-              p.property_details->>'flow_type',
-              p.property_details->'flow'->>'flowType',
-              p.property_details->'meta'->>'flow_type'
-          ) = 'land_sale'
-          OR
-          COALESCE(
-              p.property_details->>'flow_type',
-              p.property_details->'flow'->>'flowType',
-              p.property_details->'meta'->>'flow_type'
-          ) LIKE '%land%'
+          extract_land_flow_type(p.property_details) = 'land_sale'
+          OR extract_land_flow_type(p.property_details) LIKE '%land%'
       )
+      AND (p_property_subtype IS NULL OR 
+           extract_land_property_subtype(p.property_details) ILIKE p_property_subtype)
       AND (p_search_query IS NULL OR 
-           COALESCE(
-               p.property_details->'flow'->>'title',
-               p.property_details->'steps'->'land_sale_basic_details'->>'title',
-               p.property_details->'steps'->'land_basic_details'->>'title',
-               'Land Property'
-           ) ILIKE '%' || p_search_query || '%')
+           extract_land_title(p.property_details) ILIKE '%' || p_search_query || '%')
       AND (p_city IS NULL OR 
-           COALESCE(
-               p.property_details->'steps'->'land_sale_location'->>'city',
-               p.property_details->'steps'->'land_location'->>'city',
-               p.property_details->'steps'->'location_details'->>'city'
-           ) ILIKE '%' || p_city || '%')
+           extract_land_city(p.property_details) ILIKE '%' || p_city || '%')
       AND (p_state IS NULL OR 
-           COALESCE(
-               p.property_details->'steps'->'land_sale_location'->>'state',
-               p.property_details->'steps'->'land_location'->>'state',
-               p.property_details->'steps'->'location_details'->>'state'
-           ) ILIKE '%' || p_state || '%')
-      -- CRITICAL: Only use expectedPrice for price filtering
+           extract_land_state(p.property_details) ILIKE '%' || p_state || '%')
       AND (p_min_price IS NULL OR 
-           safe_numeric(p.property_details->'steps'->'land_sale_basic_details'->>'expectedPrice') >= p_min_price)
+           extract_land_price(p.property_details) >= p_min_price)
       AND (p_max_price IS NULL OR 
-           safe_numeric(p.property_details->'steps'->'land_sale_basic_details'->>'expectedPrice') <= p_max_price)
+           extract_land_price(p.property_details) <= p_max_price)
       AND (p_area_min IS NULL OR 
-           COALESCE(
-               safe_numeric(p.property_details->'steps'->'land_sale_basic_details'->>'area'),
-               safe_numeric(p.property_details->'steps'->'land_sale_basic_details'->>'totalArea'),
-               safe_numeric(p.property_details->'steps'->'land_basic_details'->>'area')
-           ) >= p_area_min)
+           extract_land_area(p.property_details) >= p_area_min)
       AND (p_area_max IS NULL OR 
-           COALESCE(
-               safe_numeric(p.property_details->'steps'->'land_sale_basic_details'->>'area'),
-               safe_numeric(p.property_details->'steps'->'land_sale_basic_details'->>'totalArea'),
-               safe_numeric(p.property_details->'steps'->'land_basic_details'->>'area')
-           ) <= p_area_max);
+           extract_land_area(p.property_details) <= p_area_max);
 
-    -- Return the results - ONLY using expectedPrice for price field
+    -- Return results using helper functions
     RETURN QUERY
     SELECT 
+        -- MANDATORY CORE (8 fields)
         p.id,
         p.owner_id,
         p.created_at,
         p.updated_at,
         'land'::TEXT as property_type,
-        COALESCE(
-            p.property_details->>'flow_type',
-            p.property_details->'flow'->>'flowType',
-            p.property_details->'meta'->>'flow_type',
-            'land_sale'
-        )::TEXT as flow_type,
-        'sale'::TEXT as subtype,
+        extract_land_flow_type(p.property_details)::TEXT as flow_type,
+        land_flow_type_to_subtype(extract_land_flow_type(p.property_details))::TEXT as subtype,
         v_total_count as total_count,
-        COALESCE(
-            p.property_details->'flow'->>'title',
-            p.property_details->'steps'->'land_sale_basic_details'->>'title',
-            p.property_details->'steps'->'land_basic_details'->>'title',
-            p.property_details->'steps'->'property_details'->>'title',
-            'Land Property'
-        )::TEXT as title,
-        -- CRITICAL: Price comes ONLY from expectedPrice field
-        safe_numeric(p.property_details->'steps'->'land_sale_basic_details'->>'expectedPrice') as price,
-        COALESCE(
-            p.property_details->'steps'->'land_sale_location'->>'city',
-            p.property_details->'steps'->'land_location'->>'city',
-            p.property_details->'steps'->'location_details'->>'city',
-            p.property_details->'flow'->>'city',
-            p.property_details->>'city'
-        )::TEXT as city,
-        COALESCE(
-            p.property_details->'steps'->'land_sale_location'->>'state',
-            p.property_details->'steps'->'land_location'->>'state',
-            p.property_details->'steps'->'location_details'->>'state',
-            p.property_details->'flow'->>'state',
-            p.property_details->>'state'
-        )::TEXT as state,
-        COALESCE(
-            safe_numeric(p.property_details->'steps'->'land_sale_basic_details'->>'area'),
-            safe_numeric(p.property_details->'steps'->'land_sale_basic_details'->>'totalArea'),
-            safe_numeric(p.property_details->'steps'->'land_basic_details'->>'area'),
-            safe_numeric(p.property_details->'steps'->'land_basic_details'->>'totalArea'),
-            safe_numeric(p.property_details->'steps'->'property_details'->>'area'),
-            safe_numeric(p.property_details->'steps'->'property_details'->>'totalArea'),
-            safe_numeric(p.property_details->'flow'->>'area'),
-            safe_numeric(p.property_details->>'area'),
-            safe_numeric(p.property_details->>'totalArea')
-        ) as area,
+        
+        -- COMMON FIELDS (7 fields) - Using helper functions
+        extract_land_title(p.property_details)::TEXT as title,
+        extract_land_price(p.property_details) as price,
+        extract_land_city(p.property_details)::TEXT as city,
+        extract_land_state(p.property_details)::TEXT as state,
+        extract_land_area(p.property_details) as area,
         prof.email::TEXT as owner_email,
         COALESCE(p.status, 'active')::TEXT as status,
-        NULL::INTEGER as bedrooms,
-        NULL::NUMERIC as bathrooms,
-        COALESCE(
-            p.property_details->'steps'->'land_sale_basic_details'->>'areaUnit',
-            p.property_details->'steps'->'land_basic_details'->>'areaUnit',
-            p.property_details->'steps'->'property_details'->>'areaUnit',
-            p.property_details->'flow'->>'areaUnit',
-            p.property_details->>'areaUnit',
-            'sq_ft'
-        )::TEXT as area_unit,
-        COALESCE(
-            p.property_details->'steps'->'land_sale_basic_details'->>'landType',
-            p.property_details->'steps'->'land_basic_details'->>'landType',
-            p.property_details->'steps'->'land_sale_basic_details'->>'propertyType',
-            p.property_details->'steps'->'property_details'->>'landType',
-            p.property_details->'flow'->>'landType',
-            p.property_details->>'landType',
-            'agricultural'
-        )::TEXT as land_type
+        
+        -- TYPE-SPECIFIC FIELDS (2 fields) - Relevant for land
+        extract_land_area_unit(p.property_details)::TEXT as area_unit,
+        extract_land_type(p.property_details)::TEXT as land_type
+        
     FROM properties_v2 p
     LEFT JOIN profiles prof ON p.owner_id = prof.id
     WHERE p.status IS DISTINCT FROM 'deleted'
       AND (
-          COALESCE(
-              p.property_details->>'flow_type',
-              p.property_details->'flow'->>'flowType',
-              p.property_details->'meta'->>'flow_type'
-          ) = 'land_sale'
-          OR
-          COALESCE(
-              p.property_details->>'flow_type',
-              p.property_details->'flow'->>'flowType',
-              p.property_details->'meta'->>'flow_type'
-          ) LIKE '%land%'
+          extract_land_flow_type(p.property_details) = 'land_sale'
+          OR extract_land_flow_type(p.property_details) LIKE '%land%'
       )
+      AND (p_property_subtype IS NULL OR 
+           extract_land_property_subtype(p.property_details) ILIKE p_property_subtype)
       AND (p_search_query IS NULL OR 
-           COALESCE(
-               p.property_details->'flow'->>'title',
-               p.property_details->'steps'->'land_sale_basic_details'->>'title',
-               p.property_details->'steps'->'land_basic_details'->>'title',
-               'Land Property'
-           ) ILIKE '%' || p_search_query || '%')
+           extract_land_title(p.property_details) ILIKE '%' || p_search_query || '%')
       AND (p_city IS NULL OR 
-           COALESCE(
-               p.property_details->'steps'->'land_sale_location'->>'city',
-               p.property_details->'steps'->'land_location'->>'city',
-               p.property_details->'steps'->'location_details'->>'city'
-           ) ILIKE '%' || p_city || '%')
+           extract_land_city(p.property_details) ILIKE '%' || p_city || '%')
       AND (p_state IS NULL OR 
-           COALESCE(
-               p.property_details->'steps'->'land_sale_location'->>'state',
-               p.property_details->'steps'->'land_location'->>'state',
-               p.property_details->'steps'->'location_details'->>'state'
-           ) ILIKE '%' || p_state || '%')
-      -- CRITICAL: Only use expectedPrice for price filtering in WHERE clause
+           extract_land_state(p.property_details) ILIKE '%' || p_state || '%')
       AND (p_min_price IS NULL OR 
-           safe_numeric(p.property_details->'steps'->'land_sale_basic_details'->>'expectedPrice') >= p_min_price)
+           extract_land_price(p.property_details) >= p_min_price)
       AND (p_max_price IS NULL OR 
-           safe_numeric(p.property_details->'steps'->'land_sale_basic_details'->>'expectedPrice') <= p_max_price)
+           extract_land_price(p.property_details) <= p_max_price)
       AND (p_area_min IS NULL OR 
-           COALESCE(
-               safe_numeric(p.property_details->'steps'->'land_sale_basic_details'->>'area'),
-               safe_numeric(p.property_details->'steps'->'land_sale_basic_details'->>'totalArea'),
-               safe_numeric(p.property_details->'steps'->'land_basic_details'->>'area')
-           ) >= p_area_min)
+           extract_land_area(p.property_details) >= p_area_min)
       AND (p_area_max IS NULL OR 
-           COALESCE(
-               safe_numeric(p.property_details->'steps'->'land_sale_basic_details'->>'area'),
-               safe_numeric(p.property_details->'steps'->'land_sale_basic_details'->>'totalArea'),
-               safe_numeric(p.property_details->'steps'->'land_basic_details'->>'area')
-           ) <= p_area_max)
+           extract_land_area(p.property_details) <= p_area_max)
     ORDER BY p.created_at DESC
     LIMIT p_limit OFFSET p_offset;
+    
 END;
 $$;

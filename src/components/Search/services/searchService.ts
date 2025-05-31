@@ -1,7 +1,7 @@
 // src/components/Search/services/searchService.ts
-// Version: 7.0.0
-// Last Modified: 01-06-2025 21:15 IST
-// Purpose: Fixed apartment subtype filtering to properly filter by property subtype, not just flow type
+// Version: 8.0.0
+// Last Modified: 01-06-2025 23:30 IST
+// Purpose: Updated to match refactored database functions with property subtype filtering
 
 import { SearchFilters, SearchResult } from '../types/search.types';
 import { supabase } from '@/lib/supabase';
@@ -28,8 +28,8 @@ export interface SearchOptions {
   sortOrder?: 'asc' | 'desc';
 }
 
-// Database result interface matching the PostgreSQL function return
-interface DatabaseSearchResult {
+// Updated database result interfaces matching the refactored functions
+interface ResidentialSearchResult {
   id: string;
   owner_id: string;
   created_at: string;
@@ -48,8 +48,52 @@ interface DatabaseSearchResult {
   bedrooms: number | null;
   bathrooms: number | null;
   area_unit: string;
-  land_type: string | null;
+  land_type: string | null; // Always null for residential
 }
+
+interface CommercialSearchResult {
+  id: string;
+  owner_id: string;
+  created_at: string;
+  updated_at: string;
+  property_type: string;
+  flow_type: string;
+  subtype: string;
+  total_count: number;
+  title: string;
+  price: number;
+  city: string;
+  state: string;
+  area: number;
+  owner_email: string;
+  status: string;
+  area_unit: string;
+  // Note: No bedrooms, bathrooms, land_type for commercial
+}
+
+interface LandSearchResult {
+  id: string;
+  owner_id: string;
+  created_at: string;
+  updated_at: string;
+  property_type: string;
+  flow_type: string;
+  subtype: string;
+  total_count: number;
+  title: string;
+  price: number;
+  city: string;
+  state: string;
+  area: number;
+  owner_email: string;
+  status: string;
+  area_unit: string;
+  land_type: string;
+  // Note: No bedrooms, bathrooms for land
+}
+
+// Union type for all database results
+type DatabaseSearchResult = ResidentialSearchResult | CommercialSearchResult | LandSearchResult;
 
 export class SearchService {
   /**
@@ -106,6 +150,43 @@ export class SearchService {
   }
 
   /**
+   * NEW: Get property subtype for database filtering
+   * This maps frontend subtypes to actual property types stored in the database
+   */
+  private getPropertySubtype(subtype: string): string | null {
+    // Map frontend subtypes to database property types
+    const subtypeMapping: Record<string, string> = {
+      // Residential subtypes
+      'apartment': 'apartment',
+      'villa': 'villa',
+      'house': 'independent_house',
+      'studio': 'studio',
+      'duplex': 'duplex',
+      'penthouse': 'penthouse',
+      'farmhouse': 'farmhouse',
+      'independent': 'independent_house',
+      
+      // Commercial subtypes
+      'office_space': 'office_space',
+      'shop': 'shop',
+      'showroom': 'showroom',
+      'godown_warehouse': 'godown_warehouse',
+      'industrial_shed': 'industrial_shed',
+      'industrial_building': 'industrial_building',
+      'other_business': 'other_business',
+      'coworking': 'coworking',
+      
+      // Land subtypes
+      'residential_plot': 'residential_plot',
+      'commercial_plot': 'commercial_plot',
+      'agricultural_land': 'agricultural_land',
+      'industrial_land': 'industrial_land'
+    };
+
+    return subtypeMapping[subtype] || null;
+  }
+
+  /**
    * Check if property subtype matches selected filter
    * This is the key method to filter apartments vs villas vs houses
    */
@@ -119,23 +200,9 @@ export class SearchService {
       return property.flow_type.includes(selectedSubtype);
     }
 
-    // For regular residential properties, we need to check the property details
-    // Since we don't have property_details in the search result, we'll use title-based matching
-    const title = property.title?.toLowerCase() || '';
-    
-    const subtypePatterns: Record<string, string[]> = {
-      'apartment': ['apartment', 'flat', 'aprt', 'apt'],
-      'villa': ['villa', 'independent villa'],
-      'house': ['house', 'independent house', 'individual house'],
-      'studio': ['studio'],
-      'duplex': ['duplex'],
-      'penthouse': ['penthouse'],
-      'farmhouse': ['farmhouse', 'farm house'],
-      'independent': ['independent', 'individual']
-    };
-
-    const patterns = subtypePatterns[selectedSubtype] || [];
-    return patterns.some(pattern => title.includes(pattern));
+    // For regular properties, we now rely on the database-level filtering
+    // since we're passing p_property_subtype to the database functions
+    return true;
   }
 
   /**
@@ -155,8 +222,8 @@ export class SearchService {
       return mappedFlowType;
     }
 
-    // For regular residential properties, just use the base flow type
-    // We'll do property-level filtering in post-processing
+    // For regular properties, just use the base flow type
+    // Property-level filtering will be handled by p_property_subtype parameter
     if (transactionType && transactionType !== 'any') {
       const mappedFlowType = this.mapSubtypeToFlowType(propertyType, 'default', transactionType);
       console.log('✅ Using transaction type mapping:', transactionType, '->', mappedFlowType);
@@ -168,7 +235,7 @@ export class SearchService {
   }
 
   /**
-   * Main search method with post-processing subtype filtering
+   * Main search method with updated database function calls
    */
   async search(filters: SearchFilters, options: SearchOptions = {}): Promise<SearchResponse> {
     const searchId = searchPerformanceMonitor.start(filters);
@@ -203,27 +270,16 @@ export class SearchService {
         propertyType: propertyType
       });
 
-      // CRITICAL: Apply subtype filtering at application level
-      const filteredResults = this.applySubtypeFiltering(searchResults, filters);
-      console.log('🎯 After subtype filtering:', {
-        originalCount: searchResults.length,
-        filteredCount: filteredResults.length,
-        selectedSubtype: filters.selectedSubType
-      });
-
-      // Transform filtered results
-      let transformedResults = this.transformDatabaseResults(filteredResults);
+      // Transform results
+      let transformedResults = this.transformDatabaseResults(searchResults);
       transformedResults = SearchFallbackService.enhanceSearchResults(transformedResults);
       
-      // Adjust total count based on filtering
-      const adjustedTotalCount = filteredResults.length;
-      
-      const duration = searchPerformanceMonitor.end(transformedResults.length, adjustedTotalCount);
-      logSearchResults(transformedResults, adjustedTotalCount, duration);
+      const duration = searchPerformanceMonitor.end(transformedResults.length, totalCount);
+      logSearchResults(transformedResults, totalCount, duration);
       
       return {
         results: transformedResults,
-        totalCount: adjustedTotalCount,
+        totalCount: totalCount,
         page: options.page || 1,
         limit: options.limit || 50
       };
@@ -236,35 +292,7 @@ export class SearchService {
   }
 
   /**
-   * NEW: Apply subtype filtering to search results
-   * This is where we filter apartments vs villas vs houses
-   */
-  private applySubtypeFiltering(results: DatabaseSearchResult[], filters: SearchFilters): DatabaseSearchResult[] {
-    const selectedSubtype = filters.selectedSubType;
-    
-    if (!selectedSubtype || selectedSubtype === 'any') {
-      console.log('ℹ️ No subtype filtering applied');
-      return results;
-    }
-
-    console.log('🔍 Applying subtype filter:', selectedSubtype);
-    
-    const filteredResults = results.filter(property => 
-      this.doesPropertyMatchSubtype(property, selectedSubtype)
-    );
-
-    console.log('📋 Subtype filtering results:', {
-      subtype: selectedSubtype,
-      originalCount: results.length,
-      filteredCount: filteredResults.length,
-      removedCount: results.length - filteredResults.length
-    });
-
-    return filteredResults;
-  }
-
-  /**
-   * Call the appropriate property-specific search function
+   * Call the appropriate property-specific search function with updated parameters
    */
   private async callPropertySpecificSearch(
     propertyType: string, 
@@ -278,6 +306,7 @@ export class SearchService {
         console.log('🏠 Calling search_residential_properties with params:', searchParams);
         return await supabase.rpc('search_residential_properties', {
           p_subtype: searchParams.p_subtype,
+          p_property_subtype: searchParams.p_property_subtype,
           p_search_query: searchParams.p_search_query,
           p_city: searchParams.p_city,
           p_state: searchParams.p_state,
@@ -295,6 +324,7 @@ export class SearchService {
         console.log('🏢 Calling search_commercial_properties with params:', searchParams);
         return await supabase.rpc('search_commercial_properties', {
           p_subtype: searchParams.p_subtype,
+          p_property_subtype: searchParams.p_property_subtype,
           p_search_query: searchParams.p_search_query,
           p_min_price: searchParams.p_min_price,
           p_max_price: searchParams.p_max_price,
@@ -309,6 +339,7 @@ export class SearchService {
       case 'land':
         console.log('🌍 Calling search_land_properties with params:', searchParams);
         return await supabase.rpc('search_land_properties', {
+          p_property_subtype: searchParams.p_property_subtype,
           p_search_query: searchParams.p_search_query,
           p_min_price: searchParams.p_min_price,
           p_max_price: searchParams.p_max_price,
@@ -324,6 +355,7 @@ export class SearchService {
         console.log('🏠 Defaulting to search_residential_properties');
         return await supabase.rpc('search_residential_properties', {
           p_subtype: searchParams.p_subtype,
+          p_property_subtype: searchParams.p_property_subtype,
           p_search_query: searchParams.p_search_query,
           p_city: searchParams.p_city,
           p_state: searchParams.p_state,
@@ -340,7 +372,7 @@ export class SearchService {
   }
 
   /**
-   * Search all property types and combine results
+   * Search all property types and combine results with updated parameters
    */
   private async searchAllPropertyTypes(filters: SearchFilters, options: SearchOptions): Promise<DatabaseSearchResult[]> {
     const searchParams = this.buildSearchParams(filters, options);
@@ -350,6 +382,7 @@ export class SearchService {
       const [residentialResult, commercialResult, landResult] = await Promise.allSettled([
         supabase.rpc('search_residential_properties', {
           p_subtype: searchParams.p_subtype,
+          p_property_subtype: searchParams.p_property_subtype,
           p_search_query: searchParams.p_search_query,
           p_city: searchParams.p_city,
           p_state: searchParams.p_state,
@@ -364,6 +397,7 @@ export class SearchService {
         }),
         supabase.rpc('search_commercial_properties', {
           p_subtype: searchParams.p_subtype,
+          p_property_subtype: searchParams.p_property_subtype,
           p_search_query: searchParams.p_search_query,
           p_min_price: searchParams.p_min_price,
           p_max_price: searchParams.p_max_price,
@@ -375,6 +409,7 @@ export class SearchService {
           p_offset: 0
         }),
         supabase.rpc('search_land_properties', {
+          p_property_subtype: searchParams.p_property_subtype,
           p_search_query: searchParams.p_search_query,
           p_min_price: searchParams.p_min_price,
           p_max_price: searchParams.p_max_price,
@@ -422,7 +457,7 @@ export class SearchService {
   }
 
   /**
-   * Build search parameters for database functions
+   * Build search parameters for database functions with NEW p_property_subtype
    */
   private buildSearchParams(filters: SearchFilters, options: SearchOptions): Record<string, any> {
     const params: Record<string, any> = {
@@ -463,6 +498,15 @@ export class SearchService {
       console.log('🎯 Database subtype parameter:', effectiveSubtype);
     }
 
+    // NEW: Add property subtype parameter for database-level filtering
+    if (filters.selectedSubType && filters.selectedSubType !== 'any') {
+      const propertySubtype = this.getPropertySubtype(filters.selectedSubType);
+      if (propertySubtype) {
+        params.p_property_subtype = propertySubtype;
+        console.log('🔍 Database property subtype parameter:', propertySubtype);
+      }
+    }
+
     // BHK filter (bedrooms) - only for residential properties
     if (filters.selectedBHK && filters.selectedBHK !== 'any' && filters.selectedPropertyType === 'residential') {
       const bhkNumber = this.extractBHKNumber(filters.selectedBHK);
@@ -487,13 +531,18 @@ export class SearchService {
   }
 
   /**
-   * Transform database results to SearchResult format
+   * Transform database results to SearchResult format with type-safe handling
    */
   private transformDatabaseResults(dbResults: DatabaseSearchResult[]): SearchResult[] {
     return dbResults.map(dbResult => {
       const transactionType = this.extractTransactionType(dbResult.flow_type);
       const displaySubtype = this.extractDisplaySubtype(dbResult.flow_type, dbResult.subtype, dbResult.title);
-      const bhk = dbResult.bedrooms && dbResult.bedrooms > 0 ? `${dbResult.bedrooms}bhk` : null;
+      
+      // Type-safe property extraction
+      const bedrooms = 'bedrooms' in dbResult ? dbResult.bedrooms : null;
+      const bathrooms = 'bathrooms' in dbResult ? dbResult.bathrooms : null;
+      const bhk = bedrooms && bedrooms > 0 ? `${bedrooms}bhk` : null;
+      
       const price = dbResult.price && dbResult.price > 0 ? dbResult.price : 0;
       const area = dbResult.area && dbResult.area > 0 ? dbResult.area : 0;
       
