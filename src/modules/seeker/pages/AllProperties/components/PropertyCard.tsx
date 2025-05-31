@@ -1,7 +1,7 @@
 // src/modules/seeker/pages/AllProperties/components/PropertyCard.tsx
-// Version: 7.1.0
-// Last Modified: 25-05-2025 19:20 IST
-// Purpose: Fixed copy icons visibility - ensuring all copy buttons are properly displayed
+// Version: 7.2.0
+// Last Modified: 01-06-2025 20:00 IST
+// Purpose: Fixed BHK and area extraction to handle search results format correctly
 
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
@@ -60,7 +60,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
   const propertyVersion = getPropertyVersion(property.property_details);
 
   // Get display title from new data structure
-  const displayTitle = property.property_details?.flow?.title || 'Untitled Property';
+  const displayTitle = property.property_details?.flow?.title || property.title || 'Untitled Property';
 
   // Get property details for display
   const propertyDetails = property.property_details || {};
@@ -477,52 +477,98 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
     }
   };
 
-  // Extract basic property info from steps for display
+  // ====== FIXED: Extract basic property info with dual-format support ======
   let bedrooms = '';
   let bathrooms = '';
   let area = '';
   let price = property.price || 0;
 
-  // Extract data from steps based on flow type
-  if (propertyDetails.steps) {
-    for (const [stepId, stepData] of Object.entries(propertyDetails.steps)) {
-      if (stepData && typeof stepData === 'object') {
-        const data = stepData as any;
-        
-        // Extract bedroom info
-        if (data.bhkType && !bedrooms) {
-          bedrooms = data.bhkType;
-        }
-        
-        // Extract bathroom info
-        if (data.bathrooms && !bathrooms) {
-          bathrooms = `${data.bathrooms} Bath`;
-        }
-        
-        // Extract area info
-        if (data.builtUpArea && !area) {
-          const unit = data.builtUpAreaUnit === 'sqft' ? 'sq.ft' : 
-                      data.builtUpAreaUnit === 'sqyd' ? 'sq.yd' : 
-                      data.builtUpAreaUnit || 'sq.ft';
-          area = `${data.builtUpArea} ${unit}`;
-        }
-        
-        // Extract price info (rent/sale)
-        if (data.rentAmount && price === 0) {
-          price = data.rentAmount;
-        } else if (data.expectedPrice && price === 0) {
-          price = data.expectedPrice;
+  // 🔧 FIXED: Check if we have direct property fields from search results (NEW FORMAT)
+  if (property.bedrooms && property.bedrooms > 0) {
+    // NEW FORMAT: Direct bedrooms field from search results
+    bedrooms = `${property.bedrooms} BHK`;
+    console.log('🏠 Using NEW FORMAT bedrooms:', bedrooms);
+  }
+
+  if (property.bathrooms && property.bathrooms > 0) {
+    // NEW FORMAT: Direct bathrooms field from search results
+    bathrooms = `${property.bathrooms} Bath`;
+    console.log('🚿 Using NEW FORMAT bathrooms:', bathrooms);
+  }
+
+  if (property.square_feet && property.square_feet > 0) {
+    // NEW FORMAT: Direct area field from search results
+    area = `${property.square_feet} sq.ft`;
+    console.log('📐 Using NEW FORMAT area (square_feet):', area);
+  } else if (property.area && property.area > 0) {
+    // SEARCH RESULTS FORMAT: area field from database function
+    area = `${property.area} sq.ft`;
+    console.log('📐 Using SEARCH FORMAT area:', area);
+  }
+
+  // 🔧 FALLBACK: If no direct fields, extract from steps (OLD FORMAT)
+  if (!bedrooms || !bathrooms || !area) {
+    console.log('🔄 Falling back to OLD FORMAT step parsing...');
+    
+    if (propertyDetails.steps) {
+      for (const [stepId, stepData] of Object.entries(propertyDetails.steps)) {
+        if (stepData && typeof stepData === 'object') {
+          const data = stepData as any;
+          
+          // Extract bedroom info from steps
+          if (data.bhkType && !bedrooms) {
+            bedrooms = data.bhkType;
+            console.log('🏠 Using OLD FORMAT bhkType:', bedrooms);
+          } else if (data.bedrooms && !bedrooms) {
+            bedrooms = `${data.bedrooms} BHK`;
+            console.log('🏠 Using OLD FORMAT bedrooms:', bedrooms);
+          }
+          
+          // Extract bathroom info from steps
+          if (data.bathrooms && !bathrooms) {
+            bathrooms = `${data.bathrooms} Bath`;
+            console.log('🚿 Using OLD FORMAT bathrooms:', bathrooms);
+          }
+          
+          // Extract area info from steps
+          if (data.builtUpArea && !area) {
+            const unit = data.builtUpAreaUnit === 'sqft' ? 'sq.ft' : 
+                        data.builtUpAreaUnit === 'sqyd' ? 'sq.yd' : 
+                        data.builtUpAreaUnit || 'sq.ft';
+            area = `${data.builtUpArea} ${unit}`;
+            console.log('📐 Using OLD FORMAT builtUpArea:', area);
+          } else if (data.squareFootage && !area) {
+            area = `${data.squareFootage} sq.ft`;
+            console.log('📐 Using OLD FORMAT squareFootage:', area);
+          }
+          
+          // Extract price info (rent/sale) from steps
+          if (data.rentAmount && price === 0) {
+            price = data.rentAmount;
+            console.log('💰 Using OLD FORMAT rentAmount:', price);
+          } else if (data.expectedPrice && price === 0) {
+            price = data.expectedPrice;
+            console.log('💰 Using OLD FORMAT expectedPrice:', price);
+          }
         }
       }
     }
   }
 
-  // Get address from location step
+  // 🔧 FINAL FALLBACK: Set default values if still empty
+  if (!bedrooms) bedrooms = 'N/A';
+  if (!bathrooms) bathrooms = 'N/A';
+  if (!area) area = 'N/A';
+
+  console.log('📊 FINAL VALUES:', { bedrooms, bathrooms, area, price });
+
+  // Get address from multiple sources
   let address = property.address || '';
   let city = property.city || '';
   let state = property.state || '';
 
-  if (propertyDetails.steps) {
+  // Fallback to extracting from location steps if direct fields are empty
+  if ((!address || !city || !state) && propertyDetails.steps) {
     for (const [stepId, stepData] of Object.entries(propertyDetails.steps)) {
       if (stepId.includes('location') && stepData && typeof stepData === 'object') {
         const locationData = stepData as any;
@@ -701,19 +747,19 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
                 <span className="font-medium">Price:</span>
                 <div className="text-lg font-bold text-green-600">{formatPrice(price)}</div>
               </div>
-              {bedrooms && (
+              {bedrooms && bedrooms !== 'N/A' && (
                 <div>
                   <span className="font-medium">Type:</span>
                   <div>{bedrooms}</div>
                 </div>
               )}
-              {bathrooms && (
+              {bathrooms && bathrooms !== 'N/A' && (
                 <div>
                   <span className="font-medium">Bathrooms:</span>
                   <div>{bathrooms}</div>
                 </div>
               )}
-              {area && (
+              {area && area !== 'N/A' && (
                 <div className="col-span-2 sm:col-span-1">
                   <span className="font-medium">Area:</span>
                   <div>{area}</div>

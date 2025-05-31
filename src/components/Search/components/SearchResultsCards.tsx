@@ -113,20 +113,22 @@ const SearchResultsCards: React.FC<SearchResultsCardsProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      {/* Cards Grid - Better responsive layout */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
         {adaptedProperties.map((property) => (
-          <Card key={property.id} className="overflow-hidden hover:shadow-lg transition-shadow">
-            <PropertyItem
-              property={property}
-              isLiked={likedProperties.has(property.id)}
-              isHovered={hoveredProperty === property.id}
-              onHover={handleHover}
-              onSelect={handleSelect}
-              onFavoriteToggle={handleFavoriteToggle}
-              onShare={handleShare}
-            />
-          </Card>
+          <div key={property.id} className="w-full">
+            <Card className="overflow-hidden hover:shadow-lg transition-shadow h-full">
+              <PropertyItem
+                property={property}
+                isLiked={likedProperties.has(property.id)}
+                isHovered={hoveredProperty === property.id}
+                onHover={handleHover}
+                onSelect={handleSelect}
+                onFavoriteToggle={handleFavoriteToggle}
+                onShare={handleShare}
+              />
+            </Card>
+          </div>
         ))}
       </div>
 
