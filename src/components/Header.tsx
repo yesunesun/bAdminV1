@@ -1,7 +1,7 @@
 // src/components/Header.tsx
-// Version: 5.0.0
-// Last Modified: 14-04-2025 08:45 IST
-// Purpose: Fix "List My Property" navigation with a hard redirect approach
+// Version: 5.1.0
+// Last Modified: 02-06-2025 10:40 IST
+// Purpose: Reverted Browse Properties link to /browse (which now renders FindPage directly)
 
 import React, { useEffect, useState, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
@@ -267,7 +267,7 @@ export function Header({ onFavoritesClick }: HeaderProps) {
                   </div>
                   
                   <div className="py-2">
-                    {/* Limited menu items as per requirements */}
+                    {/* Browse Properties link - points to /browse which renders FindPage */}
                     <Link 
                       to="/browse" 
                       className="flex w-full items-center px-4 py-2 text-sm text-foreground hover:bg-accent"

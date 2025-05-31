@@ -1,7 +1,7 @@
 // src/App.tsx 
-// Version: 9.5.0
-// Last Modified: 01-06-2025 18:00 IST
-// Purpose: Added /find page route to SeekerLayout
+// Version: 9.6.0
+// Last Modified: 02-06-2025 10:40 IST
+// Purpose: Made /browse and /explore render the same FindPage component instead of redirects
 
 import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
@@ -24,7 +24,6 @@ import PropertyDetails from './modules/owner/pages/PropertyDetails';
 import PropertyPreview from './modules/owner/pages/PropertyPreview';
 import EditProperty from './modules/owner/pages/EditProperty';
 import ListYourProperty from './modules/owner/pages/ListYourProperty';
-import BrowseProperties from './modules/seeker/pages/BrowseProperties';
 import PropertyDetailPage from './modules/seeker/pages/PropertyDetailPage';
 import AllProperties from './modules/seeker/pages/AllProperties/index';
 
@@ -177,7 +176,7 @@ function AppLayout() {
   );
 }
 
-// Standardized Seeker layout - FIXED: Now handles property wizard too
+// Standardized Seeker layout - handles property wizard too
 function SeekerLayout() {
   const [isFavoritesOpen, setIsFavoritesOpen] = useState(false);
   
@@ -259,7 +258,7 @@ function App() {
                   );
                 })}
 
-                {/* FIXED: SeekerLayout with proper property wizard routes */}
+                {/* SeekerLayout with proper property wizard routes */}
                 <Route element={<SeekerLayout />}>
                   <Route 
                     path="/" 
@@ -289,7 +288,7 @@ function App() {
                     } 
                   />
                   
-                  {/* NEW: Find Page Route */}
+                  {/* Find Page Route - Main search interface */}
                   <Route 
                     path="/find" 
                     element={
@@ -299,11 +298,21 @@ function App() {
                     } 
                   />
                   
+                  {/* Browse and Explore routes - same functionality as Find */}
                   <Route 
                     path="/browse" 
                     element={
                       <PublicOrProtectedRoute>
-                        <BrowseProperties />
+                        <FindPage />
+                      </PublicOrProtectedRoute>
+                    } 
+                  />
+                  
+                  <Route 
+                    path="/explore" 
+                    element={
+                      <PublicOrProtectedRoute>
+                        <FindPage />
                       </PublicOrProtectedRoute>
                     } 
                   />
@@ -345,7 +354,7 @@ function App() {
                     />
                   </Route>
                   
-                  {/* FIXED: Property listing wizard routes - now in SeekerLayout with proper parameter handling */}
+                  {/* Property listing wizard routes - now in SeekerLayout with proper parameter handling */}
                   <Route 
                     path="/properties/list" 
                     element={

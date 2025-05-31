@@ -1,7 +1,7 @@
 // src/routes/mainRoutes.tsx
-// Version: 12.0.0
-// Last Modified: 25-05-2025 21:30 IST
-// Purpose: Fixed property listing routes to work with FlowContext
+// Version: 12.1.0
+// Last Modified: 02-06-2025 10:40 IST
+// Purpose: Made /browse and /explore render the same FindPage component instead of redirects
 
 import React from 'react';
 import { Navigate } from 'react-router-dom';
@@ -13,11 +13,11 @@ import PropertyPreview from '../modules/owner/pages/PropertyPreview';
 import EditProperty from '../modules/owner/pages/EditProperty';
 import ListYourProperty from '../modules/owner/pages/ListYourProperty';
 // Import from the seeker module
-import BrowseProperties from '../modules/seeker/pages/BrowseProperties';
 import PropertyDetailPage from '../modules/seeker/pages/PropertyDetailPage';
 import AllProperties from '../modules/seeker/pages/AllProperties/index';
-// Import our HomePage component
+// Import our pages
 import HomePage from '../pages/HomePage';
+import FindPage from '../pages/FindPage';
 
 export const mainRoutes = [
   {
@@ -43,13 +43,16 @@ export const mainRoutes = [
   {
     path: '/seeker',
     children: [
-      { index: true, element: <BrowseProperties /> },
+      { index: true, element: <FindPage /> }, // Seeker index now uses FindPage
       { path: 'property/:id', element: <PropertyDetailPage /> },
       { path: 'allproperties', element: <AllProperties /> }
     ]
   },
-  // Add the new browse route
-  { path: '/browse', element: <BrowseProperties /> },
+  // Main find page for property search
+  { path: '/find', element: <FindPage /> },
+  // Browse and explore routes - same functionality as find
+  { path: '/browse', element: <FindPage /> },
+  { path: '/explore', element: <FindPage /> },
   // Add direct route to AllProperties
   { path: '/allproperties', element: <AllProperties /> },
   // Keep existing HomePage at /home path unchanged
