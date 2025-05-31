@@ -1,7 +1,7 @@
 // src/components/Header.tsx
-// Version: 5.1.0
-// Last Modified: 02-06-2025 10:40 IST
-// Purpose: Reverted Browse Properties link to /browse (which now renders FindPage directly)
+// Version: 5.1.1
+// Last Modified: 02-01-2025 15:30 IST
+// Purpose: Fixed z-index issue for profile dropdown menu appearing behind search components
 
 import React, { useEffect, useState, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
@@ -166,7 +166,7 @@ export function Header({ onFavoritesClick }: HeaderProps) {
               </button>
 
               {isThemeDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-card border border-border overflow-hidden z-50">
+                <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-card border border-border overflow-hidden z-[9999]">
                   <div className="py-1">
                     <div className="px-4 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                       Select Theme
@@ -256,7 +256,7 @@ export function Header({ onFavoritesClick }: HeaderProps) {
               </button>
 
               {isProfileDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-64 rounded-lg shadow-lg bg-card border border-border overflow-hidden z-50">
+                <div className="absolute right-0 mt-2 w-64 rounded-lg shadow-lg bg-card border border-border overflow-hidden z-[9999]">
                   <div className="p-4 border-b border-border">
                     <div className="font-medium truncate">{user.email}</div>
                     <div className="text-xs text-muted-foreground">

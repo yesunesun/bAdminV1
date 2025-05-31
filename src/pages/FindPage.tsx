@@ -1,7 +1,7 @@
 // src/pages/FindPage.tsx
-// Version: 3.6.0
-// Last Modified: 02-06-2025 00:20 IST
-// Purpose: Added default loading of latest properties on page load and filter reset
+// Version: 3.6.1
+// Last Modified: 02-01-2025 15:45 IST
+// Purpose: Fixed z-index conflict with header dropdown menu
 
 import React, { useState, useCallback, useEffect } from 'react';
 import { SearchContainer, SearchFilters, searchService } from '@/components/Search';
@@ -261,8 +261,8 @@ const FindPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Sticky Search Container */}
-      <div className="sticky top-0 z-50 bg-background shadow-sm">
+      {/* Sticky Search Container with lower z-index to prevent overlap with header */}
+      <div className="sticky top-0 z-40 bg-background shadow-sm">
         <SearchContainer 
           onSearch={handleSearch}
           showResults={false}
