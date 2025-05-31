@@ -1,12 +1,11 @@
 // src/modules/seeker/components/PropertyMapHomeView.tsx
-// Version: 3.14.0
-// Last Modified: 19-05-2025 21:40 IST
-// Purpose: Fixed property marker highlighting when hovering over properties in the list
+// Version: 4.3.0
+// Last Modified: 01-06-2025 15:05 IST
+// Purpose: Added logic to revert to default results when all filters are cleared
 
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { usePropertyMapData } from '../hooks/usePropertyMapData';
-import { useGoogleMaps } from '../hooks/useGoogleMaps'; // Import centralized Google Maps hook
-import CompactSearchBar from './CompactSearchBar';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useGoogleMaps } from '../hooks/useGoogleMaps';
+import { SearchContainer, SearchFilters, SearchResult } from '@/components/Search';
 import PropertyListingPanel from './PropertyListingPanel';
 import MapPanel from './MapPanel';
 import { AlertCircle } from 'lucide-react';
@@ -19,41 +18,88 @@ interface PropertyMapHomeViewProps {
   onFavoriteAction?: (propertyId: string) => boolean;
 }
 
+// Union type for handling both legacy and search results
+type PropertyData = SearchResult;
+
 const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAction }) => {
-  // Reference for search input
-  const searchInputRef = useRef<HTMLInputElement>(null);
-  
   // Favorites state management
   const [favoriteProperties, setFavoriteProperties] = useState<Set<string>>(new Set());
   const [isLoadingFavorites, setIsLoadingFavorites] = useState<boolean>(false);
   const { user } = useAuth();
   const { toast } = useToast();
   
-  // Property data and state management - keeping hook calls in consistent order
-  const {
-    properties,
-    loading,
-    loadingMore,
-    hasMore,
-    totalCount,
-    loadMoreProperties,
-    filters,
-    setFilters,
-    searchQuery,
-    setSearchQuery,
-    selectedPropertyType,
-    hoveredProperty,
-    activeProperty,
-    setActiveProperty,
-    handleResetFilters,
-    handlePropertyTypeChange,
-    handlePropertyHover,
-    recentSearches,
-    searchLocations
-  } = usePropertyMapData();
-  
+  // Search-specific state (replacing usePropertyMapData for search results)
+  const [searchProperties, setSearchProperties] = useState<SearchResult[]>([]);
+  const [searchLoading, setSearchLoading] = useState<boolean>(true); // Start with loading true
+  const [searchTotalCount, setSearchTotalCount] = useState<number>(0);
+  const [activeProperty, setActiveProperty] = useState<PropertyData | null>(null);
+  const [hoveredProperty, setHoveredProperty] = useState<string | null>(null);
+
   // Use the centralized Google Maps loading hook
-  const { isLoaded, loadError } = useGoogleMaps(properties);
+  const { isLoaded: mapsLoaded, loadError } = useGoogleMaps(searchProperties);
+
+  // Load latest properties on component mount (DEFAULT BEHAVIOR)
+  useEffect(() => {
+    const loadLatestProperties = async () => {
+      console.log('🏠 Loading latest properties on homepage mount...');
+      setSearchLoading(true);
+      
+      try {
+        // Import searchService dynamically to avoid circular imports
+        console.log('📦 Importing searchService...');
+        const { searchService } = await import('@/components/Search/services/searchService');
+        console.log('✅ SearchService imported successfully');
+        
+        // Get latest properties using the SQL function
+        console.log('🔍 Calling getLatestProperties...');
+        const response = await searchService.getLatestProperties(50);
+        
+        console.log('🏠 Latest properties loaded:', response);
+        
+        // Update search state with latest properties
+        setSearchProperties(response.results || []);
+        setSearchTotalCount(response.totalCount || 0);
+        setActiveProperty(null);
+        setHoveredProperty(null);
+        
+        console.log(`✅ Homepage initialized with ${response.results?.length || 0} latest properties`);
+        
+      } catch (error) {
+        console.error('❌ Failed to load latest properties:', error);
+        console.error('❌ Error details:', {
+          message: error.message,
+          stack: error.stack,
+          name: error.name
+        });
+        
+        // Set empty state on error but don't show error toast immediately
+        setSearchProperties([]);
+        setSearchTotalCount(0);
+        
+        // Only show error toast if it's not a network/loading issue
+        if (!error.message?.includes('fetch')) {
+          toast({
+            title: "Loading Error",
+            description: "Unable to load latest properties. Please refresh the page.",
+            variant: "destructive",
+            duration: 5000,
+          });
+        }
+      } finally {
+        setSearchLoading(false);
+      }
+    };
+    
+    // Add a small delay to ensure component is fully mounted
+    const timeoutId = setTimeout(loadLatestProperties, 100);
+    
+    return () => clearTimeout(timeoutId);
+  }, []); // Empty dependency array - only run on mount
+  
+  // Handle property hover
+  const handlePropertyHover = useCallback((propertyId: string, isHovering: boolean) => {
+    setHoveredProperty(isHovering ? propertyId : null);
+  }, []);
   
   // Load user favorites when component mounts or user changes
   useEffect(() => {
@@ -149,6 +195,75 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
       return false;
     }
   }, [user, toast]);
+
+  // Handle search from SearchContainer (OVERRIDE default latest properties OR revert to defaults)
+  const handleSearchFromContainer = useCallback(async (searchFilters: SearchFilters) => {
+    console.log('PropertyMapHomeView: Search initiated from SearchContainer with filters:', searchFilters);
+    
+    setSearchLoading(true);
+    
+    try {
+      // Import searchService dynamically to avoid circular imports
+      const { searchService } = await import('@/components/Search/services/searchService');
+      
+      // Check if all filters are empty/default - if so, load latest properties instead of searching
+      const areFiltersEmpty = !searchFilters.searchQuery && 
+                             (!searchFilters.selectedLocation || searchFilters.selectedLocation === 'any') &&
+                             !searchFilters.transactionType && 
+                             !searchFilters.selectedPropertyType && 
+                             !searchFilters.selectedSubType && 
+                             !searchFilters.selectedBHK && 
+                             !searchFilters.selectedPriceRange;
+      
+      let response;
+      
+      if (areFiltersEmpty) {
+        console.log('🏠 Empty filters detected - loading default latest properties...');
+        // Load default latest properties when filters are empty (including when cleared)
+        response = await searchService.getLatestProperties(50);
+      } else {
+        console.log('🔍 Performing filtered search...');
+        // Perform the search using searchService
+        response = await searchService.search(searchFilters, {
+          page: 1,
+          limit: 50
+        });
+      }
+      
+      console.log('PropertyMapHomeView: Search response:', response);
+      
+      // Update search state
+      setSearchProperties(response.results || []);
+      setSearchTotalCount(response.totalCount || 0);
+      setActiveProperty(null);
+      setHoveredProperty(null);
+      
+      if (response.results?.length === 0) {
+        toast({
+          title: "No properties found",
+          description: areFiltersEmpty ? "No properties available" : "Try adjusting your search filters",
+          duration: 3000,
+        });
+      } else {
+        const resultType = areFiltersEmpty ? 'latest properties' : 'search results';
+        console.log(`✅ ${resultType} loaded: ${response.results?.length || 0} properties found`);
+      }
+      
+    } catch (error) {
+      console.error('PropertyMapHomeView: Search failed:', error);
+      setSearchProperties([]);
+      setSearchTotalCount(0);
+      
+      toast({
+        title: "Search Failed",
+        description: "Unable to search properties. Please try again.",
+        variant: "destructive",
+        duration: 3000,
+      });
+    } finally {
+      setSearchLoading(false);
+    }
+  }, [toast]);
   
   // Preload fallback image with visual performance indicator
   useEffect(() => {
@@ -184,18 +299,12 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
 
   return (
     <div className="flex flex-col bg-background text-foreground" style={{ height: 'calc(100vh - 200px)' }}>
-      {/* Optimized search section with proper spacing */}
-      <div className="px-2 sm:px-3 pt-3 pb-2">
-        <CompactSearchBar
-          ref={searchInputRef}
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          searchLocations={searchLocations}
-          selectedPropertyType={selectedPropertyType}
-          handlePropertyTypeChange={handlePropertyTypeChange}
-          filters={filters}
-          setFilters={setFilters}
-          handleResetFilters={handleResetFilters}
+      {/* SearchContainer - Replacing CompactSearchBar */}
+      <div className="bg-background border-b border-border">
+        <SearchContainer 
+          onSearch={handleSearchFromContainer}
+          showResults={false}
+          className="min-h-0 shadow-none" // Override default styling
         />
       </div>
       
@@ -204,12 +313,12 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
         {/* Property Listings Panel - Full width on mobile, 1/3 width on desktop */}
         <div className="w-full md:w-1/3 h-full">
           <PropertyListingPanel
-            properties={properties}
-            loading={loading}
-            loadingMore={loadingMore}
-            hasMore={hasMore}
-            totalCount={totalCount}
-            onLoadMore={loadMoreProperties}
+            properties={searchProperties}
+            loading={searchLoading}
+            loadingMore={false} // No load more for search results yet
+            hasMore={false} // No load more for search results yet
+            totalCount={searchTotalCount}
+            onLoadMore={() => {}} // No load more for search results yet
             onFavoriteAction={handleFavoriteToggle}
             handlePropertyHover={handlePropertyHover}
             hoveredProperty={hoveredProperty}
@@ -221,14 +330,14 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
         
         {/* Map Panel - Hidden on mobile, 2/3 width on desktop */}
         <div className="hidden md:block md:w-2/3 h-full">
-          {isLoaded ? (
+          {mapsLoaded ? (
             <MapPanel
-              properties={properties}
-              isLoaded={isLoaded}
+              properties={searchProperties}
+              isLoaded={mapsLoaded}
               loadError={loadError}
               activeProperty={activeProperty}
               setActiveProperty={setActiveProperty}
-              hoveredPropertyId={hoveredProperty} // Changed from hoveredProperty to hoveredPropertyId
+              hoveredPropertyId={hoveredProperty}
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-muted">

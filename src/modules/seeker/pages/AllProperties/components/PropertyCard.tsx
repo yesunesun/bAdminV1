@@ -83,7 +83,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
   const propertyVersion = getPropertyVersion(property.property_details);
 
   // Get display title from new data structure
-  const displayTitle = property.property_details?.flow?.title || 'Untitled Property';
+  const displayTitle = property.property_details?.flow?.title || property.title || 'Untitled Property';
 
   // Get property details for display
   const propertyDetails = property.property_details || {};
@@ -485,7 +485,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
     }
   };
 
-  // Extract basic property info from steps for display
+  // ====== FIXED: Extract basic property info with dual-format support ======
   let bedrooms = '';
   let bathrooms = '';
   let area = '';
@@ -525,7 +525,8 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
   let city = property.city || '';
   let state = property.state || '';
 
-  if (propertyDetails.steps) {
+  // Fallback to extracting from location steps if direct fields are empty
+  if ((!address || !city || !state) && propertyDetails.steps) {
     for (const [stepId, stepData] of Object.entries(propertyDetails.steps)) {
       if (stepId.includes('location') && stepData && typeof stepData === 'object') {
         const locationData = stepData as any;
@@ -837,19 +838,19 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
                 <span className="font-medium">Price:</span>
                 <div className="text-lg font-bold text-green-600">{formatPrice(price)}</div>
               </div>
-              {bedrooms && (
+              {bedrooms && bedrooms !== 'N/A' && (
                 <div>
                   <span className="font-medium">Type:</span>
                   <div>{bedrooms}</div>
                 </div>
               )}
-              {bathrooms && (
+              {bathrooms && bathrooms !== 'N/A' && (
                 <div>
                   <span className="font-medium">Bathrooms:</span>
                   <div>{bathrooms}</div>
                 </div>
               )}
-              {area && (
+              {area && area !== 'N/A' && (
                 <div className="col-span-2 sm:col-span-1">
                   <span className="font-medium">Area:</span>
                   <div>{area}</div>
