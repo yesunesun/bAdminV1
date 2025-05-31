@@ -1,11 +1,12 @@
 // src/modules/seeker/components/PropertyItem.tsx
-// Version: 5.1.0
-// Last Modified: 31-05-2025 18:30 IST
-// Purpose: Fixed image display using primary_image field and fastImageService
+// Version: 6.0.0
+// Last Modified: 01-06-2025 23:00 IST
+// Purpose: Updated to handle both PropertyType and SearchResult formats
 
 import React, { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { PropertyType } from '@/modules/owner/components/property/types';
+import { SearchResult } from '@/components/Search/types/search.types';
 import { 
   ChevronRight, MapPin, Bed, Bath, Square, Users, 
   Coffee, Building, Home, Calendar, Utensils, Briefcase, FileText, Map
@@ -19,16 +20,24 @@ import {
 } from '../utils/propertyTitleUtils';
 import { fastImageService } from './PropertyItem/services/fastImageService';
 
+// Union type to handle both formats
+type PropertyItemData = PropertyType | SearchResult;
+
 interface PropertyItemProps {
-  property: PropertyType;
+  property: PropertyItemData;
   isLiked: boolean;
   isHovered: boolean;
   propertyImage?: string; // Legacy prop - ignored now
   onHover: (propertyId: string, isHovering: boolean) => void;
-  onSelect: (property: PropertyType) => void;
+  onSelect: (property: PropertyItemData) => void;
   onFavoriteToggle: (propertyId: string, isLiked: boolean) => Promise<boolean>;
-  onShare: (e: React.MouseEvent, property: PropertyType) => void;
+  onShare: (e: React.MouseEvent, property: PropertyItemData) => void;
 }
+
+// Type guard to check if property is SearchResult
+const isSearchResult = (property: PropertyItemData): property is SearchResult => {
+  return 'transactionType' in property && !('property_details' in property);
+};
 
 const PropertyItem: React.FC<PropertyItemProps> = ({
   property,
@@ -43,94 +52,143 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
   // State for favorite button loading
   const [isFavoriteLoading, setIsFavoriteLoading] = useState(false);
 
-  // Extract details from property
-  const details = property.property_details || {};
-  
-  // Use utility functions to determine flow type
-  const flowType = detectPropertyFlowType(property);
-  
-  // Use title directly from flow.title only
-  const title = details.flow?.title || 'Property Listing';
-  const detailedLocation = formatDetailedLocation(property);
-  
-  // Get display data specific to the flow type
-  const displayData = getFlowSpecificDisplayData(property, flowType, details);
-  
-  // FIXED: Simple image URL logic using primary_image from search results with detailed debugging
+  // Extract data based on property type
+  const propertyData = useMemo(() => {
+    if (isSearchResult(property)) {
+      // Handle SearchResult format
+      return {
+        id: property.id,
+        title: property.title,
+        location: property.location,
+        price: property.price,
+        propertyType: property.propertyType,
+        transactionType: property.transactionType,
+        subType: (property as any).subType || '',
+        bhk: (property as any).bhk || '',
+        area: (property as any).area || 0,
+        ownerName: (property as any).ownerName || 'Property Owner',
+        primary_image: (property as any).primary_image || null,
+        createdAt: (property as any).createdAt || '',
+        status: (property as any).status || 'active'
+      };
+    } else {
+      // Handle PropertyType format (legacy)
+      const details = property.property_details || {};
+      const flowType = detectPropertyFlowType(property);
+      
+      return {
+        id: property.id,
+        title: details.flow?.title || 'Property Listing',
+        location: formatDetailedLocation(property),
+        price: property.price || 0,
+        propertyType: property.property_type || 'residential',
+        transactionType: flowType.includes('sale') ? 'buy' : 'rent',
+        subType: details.basicDetails?.propertyType || '',
+        bhk: details.basicDetails?.bhkType || '',
+        area: details.basicDetails?.builtUpArea || property.square_feet || 0,
+        ownerName: 'Property Owner',
+        primary_image: property.primary_image || null,
+        createdAt: property.created_at || '',
+        status: property.status || 'active'
+      };
+    }
+  }, [property]);
+
+  // Generate image URL
   const imageUrl = useMemo(() => {
     try {
-      console.log(`[PropertyItem] =======DEBUG START for Property ${property.id}=======`);
-      console.log(`[PropertyItem] Full property object keys:`, Object.keys(property));
-      console.log(`[PropertyItem] property.primary_image:`, property.primary_image);
-      console.log(`[PropertyItem] property.property_images:`, property.property_images);
-      console.log(`[PropertyItem] property.property_details:`, property.property_details);
+      console.log(`[PropertyItem] Processing image for property ${propertyData.id}`);
       
-      // Method 1: Use primary_image field from search results (NEW - from SQL function)
-      if (property.primary_image && property.primary_image.trim()) {
-        const constructedUrl = fastImageService.getPublicImageUrl(property.id, property.primary_image);
-        console.log(`[PropertyItem] ✓ Using primary_image '${property.primary_image}'`);
-        console.log(`[PropertyItem] ✓ Constructed URL:`, constructedUrl);
-        console.log(`[PropertyItem] =======DEBUG END=======`);
+      // Method 1: Use primary_image field if available
+      if (propertyData.primary_image && propertyData.primary_image.trim()) {
+        const constructedUrl = fastImageService.getPublicImageUrl(propertyData.id, propertyData.primary_image);
+        console.log(`[PropertyItem] ✓ Using primary_image '${propertyData.primary_image}' -> ${constructedUrl}`);
         return constructedUrl;
       }
       
-      // Method 2: Use property_images array (set by propertyService - for compatibility)
-      if (property.property_images && Array.isArray(property.property_images) && property.property_images.length > 0) {
+      // Method 2: Check if it's PropertyType and has property_images
+      if (!isSearchResult(property) && property.property_images && Array.isArray(property.property_images) && property.property_images.length > 0) {
         console.log(`[PropertyItem] ✓ Found property_images array with ${property.property_images.length} images`);
         const primaryImage = property.property_images.find(img => img.is_primary);
         const imageToUse = primaryImage || property.property_images[0];
-        console.log(`[PropertyItem] ✓ Using image:`, imageToUse);
         
         if (imageToUse.url && imageToUse.url.startsWith('http')) {
           console.log(`[PropertyItem] ✓ Using full URL:`, imageToUse.url);
-          console.log(`[PropertyItem] =======DEBUG END=======`);
           return imageToUse.url;
         }
         
         if (imageToUse.fileName) {
-          const constructedUrl = fastImageService.getPublicImageUrl(property.id, imageToUse.fileName);
+          const constructedUrl = fastImageService.getPublicImageUrl(propertyData.id, imageToUse.fileName);
           console.log(`[PropertyItem] ✓ Constructed URL from fileName '${imageToUse.fileName}':`, constructedUrl);
-          console.log(`[PropertyItem] =======DEBUG END=======`);
           return constructedUrl;
         }
       }
       
-      // Method 3: Use primaryImage from property_details (legacy support)
-      if (details.primaryImage) {
-        console.log(`[PropertyItem] ✓ Found details.primaryImage:`, details.primaryImage);
-        if (details.primaryImage.startsWith('http') || details.primaryImage.startsWith('/')) {
-          console.log(`[PropertyItem] ✓ Using details.primaryImage as URL:`, details.primaryImage);
-          console.log(`[PropertyItem] =======DEBUG END=======`);
-          return details.primaryImage;
+      // Method 3: Legacy property_details support
+      if (!isSearchResult(property)) {
+        const details = property.property_details || {};
+        if (details.primaryImage) {
+          console.log(`[PropertyItem] ✓ Found details.primaryImage:`, details.primaryImage);
+          if (details.primaryImage.startsWith('http') || details.primaryImage.startsWith('/')) {
+            return details.primaryImage;
+          }
+          return fastImageService.getPublicImageUrl(propertyData.id, details.primaryImage);
         }
-        const constructedUrl = fastImageService.getPublicImageUrl(property.id, details.primaryImage);
-        console.log(`[PropertyItem] ✓ Constructed URL from details.primaryImage:`, constructedUrl);
-        console.log(`[PropertyItem] =======DEBUG END=======`);
-        return constructedUrl;
       }
       
-      // Debug: Check if we're missing any image fields
-      console.log(`[PropertyItem] ❌ NO IMAGES FOUND!`);
-      console.log(`[PropertyItem] ❌ property.primary_image: ${property.primary_image}`);
-      console.log(`[PropertyItem] ❌ property.property_images: ${property.property_images}`);
-      console.log(`[PropertyItem] ❌ details.primaryImage: ${details.primaryImage}`);
-      console.log(`[PropertyItem] =======DEBUG END=======`);
-      
-      // Fallback to no image
+      console.log(`[PropertyItem] ❌ No image found, using fallback`);
       return '/noimage.png';
     } catch (error) {
-      console.error(`[PropertyItem] Error getting image for property ${property.id}:`, error);
-      console.log(`[PropertyItem] =======DEBUG END=======`);
+      console.error(`[PropertyItem] Error getting image for property ${propertyData.id}:`, error);
       return '/noimage.png';
     }
-  }, [property.id, property.primary_image, property.property_images, details]);
+  }, [propertyData.id, propertyData.primary_image, property]);
+
+  // Generate display data for SearchResult
+  const displayData = useMemo(() => {
+    if (isSearchResult(property)) {
+      // For SearchResult, create simplified display data
+      const formattedPrice = propertyData.transactionType === 'rent' 
+        ? `${formatPrice(propertyData.price)} per month`
+        : formatPrice(propertyData.price);
+
+      const icons = [];
+      
+      // Add BHK info if available
+      if (propertyData.bhk) {
+        const bhkNumber = propertyData.bhk.replace(/\D/g, '');
+        if (bhkNumber) {
+          icons.push({ icon: <Bed className="h-3 w-3 mr-1" />, text: `${bhkNumber} BHK` });
+        }
+      }
+      
+      // Add area info if available
+      if (propertyData.area && propertyData.area > 0) {
+        icons.push({ icon: <Square className="h-3 w-3 mr-1" />, text: `${propertyData.area} sq.ft` });
+      }
+      
+      // Add property type icon
+      const propertyTypeIcon = propertyData.propertyType === 'commercial' ? Building : Home;
+      icons.push({ icon: React.createElement(propertyTypeIcon, { className: "h-3 w-3 mr-1" }), text: propertyData.subType || propertyData.propertyType });
+
+      return {
+        price: formattedPrice,
+        icons,
+        propertyType: propertyData.subType || propertyData.propertyType || 'Property',
+        listingDisplay: propertyData.transactionType === 'buy' ? 'For Sale' : 'For Rent'
+      };
+    } else {
+      // Use existing logic for PropertyType
+      return getFlowSpecificDisplayData(property, detectPropertyFlowType(property), property.property_details || {});
+    }
+  }, [property, propertyData]);
   
   // Handle favorite toggle with loading state
   const handleFavoriteToggle = async (isLiked: boolean) => {
     setIsFavoriteLoading(true);
     
     try {
-      const success = await onFavoriteToggle(property.id, isLiked);
+      const success = await onFavoriteToggle(propertyData.id, isLiked);
       return success;
     } catch (error) {
       console.error('Error toggling favorite:', error);
@@ -142,7 +200,7 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
   
   return (
     <div 
-      key={`property-${property.id}`}
+      key={`property-${propertyData.id}`}
       className={`relative transition hover:bg-muted/40 ${isHovered ? 'bg-muted/40' : ''}`}
     >
       {/* Favorite Button - Top Right Corner of Card */}
@@ -156,29 +214,29 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
       </div>
 
       <div className="p-3"
-        onMouseEnter={() => onHover(property.id, true)}
-        onMouseLeave={() => onHover(property.id, false)}
+        onMouseEnter={() => onHover(propertyData.id, true)}
+        onMouseLeave={() => onHover(propertyData.id, false)}
         onClick={() => onSelect(property)}
       >
         {/* Property Name at the top with blue text */}
         <div className="mb-2">
           <Link
-            to={`/seeker/property/${property.id}`}
+            to={`/seeker/property/${propertyData.id}`}
             className="text-sm font-medium text-blue-500 hover:underline truncate block"
           >
-            {title}
+            {propertyData.title}
           </Link>
         </div>
         
         <Link 
-          to={`/seeker/property/${property.id}`} 
+          to={`/seeker/property/${propertyData.id}`} 
           className="flex gap-2"
         >
-          {/* Property image - using fastImageService with proper URL construction */}
+          {/* Property image */}
           <div className="relative h-20 w-24 flex-shrink-0 overflow-hidden rounded-lg">
             <img
               src={imageUrl}
-              alt={title || 'Property'}
+              alt={propertyData.title || 'Property'}
               className="h-full w-full object-cover"
               loading="lazy"
               onError={(e) => {
@@ -195,7 +253,7 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
             <div className="flex items-center text-xs text-gray-500 mb-1">
               <MapPin className="h-3 w-3 mr-1 flex-shrink-0" />
               <span className="truncate">
-                {detailedLocation}
+                {propertyData.location}
               </span>
             </div>
             
@@ -204,7 +262,7 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
               {displayData.price}
             </p>
             
-            {/* Property specs - flow-specific icons */}
+            {/* Property specs */}
             <div className="flex items-center gap-2 text-xs text-gray-500">
               {displayData.icons.map((icon, index) => (
                 <span key={index} className="flex items-center">
@@ -241,7 +299,7 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
   );
 };
 
-// Keep the existing helper function (same as before)
+// Keep the existing helper function for PropertyType format
 function getFlowSpecificDisplayData(property: PropertyType, flowType: string, details: any) {
   const basicDetails = details.basicDetails || {};
   const saleInfo = details.saleInfo || {};
