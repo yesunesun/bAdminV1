@@ -1,7 +1,7 @@
 // src/components/Search/components/SearchFilters.tsx
-// Version: 1.0.0
-// Last Modified: 01-06-2025 16:00 IST
-// Purpose: Filter dropdowns component for property search
+// Version: 2.0.0
+// Last Modified: 31-05-2025 20:45 IST
+// Purpose: Enhanced filter dropdowns with better visual integration
 
 import React from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -30,19 +30,19 @@ const SearchFilters: React.FC<SearchFiltersComponentProps> = ({
   };
 
   return (
-    <div className="flex items-center gap-3 flex-wrap flex-1">
+    <div className="flex items-center gap-2 flex-wrap flex-1">
       {/* Buy/Rent Filter */}
       <Select 
         value={filters.transactionType} 
         onValueChange={(value) => onFilterChange('transactionType', value)}
       >
-        <SelectTrigger className="w-auto min-w-[100px] h-10 border-slate-300 rounded-lg">
+        <SelectTrigger className="w-auto min-w-[100px] h-11 border-slate-200 bg-white hover:bg-slate-50 rounded-lg shadow-sm transition-all duration-200 hover:shadow-md focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
           <SelectValue placeholder="Buy/Rent" />
         </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="any">Any</SelectItem>
+        <SelectContent className="border-slate-200 shadow-lg">
+          <SelectItem value="any" className="hover:bg-slate-50">Any</SelectItem>
           {Object.entries(TRANSACTION_TYPES).map(([key, label]) => (
-            <SelectItem key={key} value={key}>
+            <SelectItem key={key} value={key} className="hover:bg-slate-50">
               {label}
             </SelectItem>
           ))}
@@ -54,13 +54,13 @@ const SearchFilters: React.FC<SearchFiltersComponentProps> = ({
         value={filters.selectedPropertyType} 
         onValueChange={handlePropertyTypeChange}
       >
-        <SelectTrigger className="w-auto min-w-[120px] h-10 border-slate-300 rounded-lg">
+        <SelectTrigger className="w-auto min-w-[130px] h-11 border-slate-200 bg-white hover:bg-slate-50 rounded-lg shadow-sm transition-all duration-200 hover:shadow-md focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
           <SelectValue placeholder="Property Type" />
         </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="any">Any Type</SelectItem>
+        <SelectContent className="border-slate-200 shadow-lg">
+          <SelectItem value="any" className="hover:bg-slate-50">Any Type</SelectItem>
           {Object.entries(PROPERTY_TYPES).map(([key, type]) => (
-            <SelectItem key={key} value={key}>
+            <SelectItem key={key} value={key} className="hover:bg-slate-50">
               {type.label}
             </SelectItem>
           ))}
@@ -73,13 +73,13 @@ const SearchFilters: React.FC<SearchFiltersComponentProps> = ({
         onValueChange={(value) => onFilterChange('selectedSubType', value)}
         disabled={!filters.selectedPropertyType || filters.selectedPropertyType === 'any'}
       >
-        <SelectTrigger className="w-auto min-w-[120px] h-10 border-slate-300 rounded-lg">
+        <SelectTrigger className="w-auto min-w-[120px] h-11 border-slate-200 bg-white hover:bg-slate-50 rounded-lg shadow-sm transition-all duration-200 hover:shadow-md focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white">
           <SelectValue placeholder={getSubtypeLabel()} />
         </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="any">Any {getSubtypeLabel()}</SelectItem>
+        <SelectContent className="border-slate-200 shadow-lg">
+          <SelectItem value="any" className="hover:bg-slate-50">Any {getSubtypeLabel()}</SelectItem>
           {Object.entries(getSubTypes()).map(([key, label]) => (
-            <SelectItem key={key} value={key}>
+            <SelectItem key={key} value={key} className="hover:bg-slate-50">
               {label}
             </SelectItem>
           ))}
@@ -92,13 +92,13 @@ const SearchFilters: React.FC<SearchFiltersComponentProps> = ({
           value={filters.selectedBHK} 
           onValueChange={(value) => onFilterChange('selectedBHK', value)}
         >
-          <SelectTrigger className="w-auto min-w-[100px] h-10 border-slate-300 rounded-lg">
+          <SelectTrigger className="w-auto min-w-[100px] h-11 border-slate-200 bg-white hover:bg-slate-50 rounded-lg shadow-sm transition-all duration-200 hover:shadow-md focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
             <SelectValue placeholder="BHK" />
           </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="any">Any BHK</SelectItem>
+          <SelectContent className="border-slate-200 shadow-lg">
+            <SelectItem value="any" className="hover:bg-slate-50">Any BHK</SelectItem>
             {Object.entries(BHK_TYPES).map(([key, label]) => (
-              <SelectItem key={key} value={key}>
+              <SelectItem key={key} value={key} className="hover:bg-slate-50">
                 {label}
               </SelectItem>
             ))}
@@ -111,13 +111,13 @@ const SearchFilters: React.FC<SearchFiltersComponentProps> = ({
         value={filters.selectedPriceRange} 
         onValueChange={(value) => onFilterChange('selectedPriceRange', value)}
       >
-        <SelectTrigger className="w-auto min-w-[120px] h-10 border-slate-300 rounded-lg">
+        <SelectTrigger className="w-auto min-w-[130px] h-11 border-slate-200 bg-white hover:bg-slate-50 rounded-lg shadow-sm transition-all duration-200 hover:shadow-md focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
           <SelectValue placeholder="Price Range" />
         </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="any">Any Price</SelectItem>
+        <SelectContent className="border-slate-200 shadow-lg">
+          <SelectItem value="any" className="hover:bg-slate-50">Any Price</SelectItem>
           {Object.entries(PRICE_RANGES).map(([key, label]) => (
-            <SelectItem key={key} value={key}>
+            <SelectItem key={key} value={key} className="hover:bg-slate-50">
               {label}
             </SelectItem>
           ))}

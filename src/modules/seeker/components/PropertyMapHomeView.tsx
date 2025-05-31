@@ -1,10 +1,9 @@
 // src/modules/seeker/components/PropertyMapHomeView.tsx
-// Version: 4.0.0
-// Last Modified: 01-06-2025 22:30 IST
-// Purpose: Replaced CompactSearchBar with SearchContainer from /find page
+// Version: 4.2.0
+// Last Modified: 01-06-2025 14:45 IST
+// Purpose: Fixed duplicate code blocks and TypeScript parsing errors
 
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { usePropertyMapData } from '../hooks/usePropertyMapData';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useGoogleMaps } from '../hooks/useGoogleMaps';
 import { SearchContainer, SearchFilters, SearchResult } from '@/components/Search';
 import PropertyListingPanel from './PropertyListingPanel';
@@ -31,22 +30,71 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
   
   // Search-specific state (replacing usePropertyMapData for search results)
   const [searchProperties, setSearchProperties] = useState<SearchResult[]>([]);
-  const [searchLoading, setSearchLoading] = useState<boolean>(false);
+  const [searchLoading, setSearchLoading] = useState<boolean>(true); // Start with loading true
   const [searchTotalCount, setSearchTotalCount] = useState<number>(0);
   const [activeProperty, setActiveProperty] = useState<PropertyData | null>(null);
   const [hoveredProperty, setHoveredProperty] = useState<string | null>(null);
-  const [isUsingSearch, setIsUsingSearch] = useState<boolean>(false);
-  
-  // Fallback to usePropertyMapData for legacy support (when no search is active)
-  const legacyPropertyData = usePropertyMapData();
-  
-  // Determine which data source to use
-  const currentProperties = isUsingSearch ? searchProperties : legacyPropertyData.properties;
-  const currentLoading = isUsingSearch ? searchLoading : legacyPropertyData.loading;
-  const currentTotalCount = isUsingSearch ? searchTotalCount : legacyPropertyData.totalCount;
-  
+
   // Use the centralized Google Maps loading hook
-  const { isLoaded, loadError } = useGoogleMaps(currentProperties);
+  const { isLoaded: mapsLoaded, loadError } = useGoogleMaps(searchProperties);
+
+  // Load latest properties on component mount (DEFAULT BEHAVIOR)
+  useEffect(() => {
+    const loadLatestProperties = async () => {
+      console.log('🏠 Loading latest properties on homepage mount...');
+      setSearchLoading(true);
+      
+      try {
+        // Import searchService dynamically to avoid circular imports
+        console.log('📦 Importing searchService...');
+        const { searchService } = await import('@/components/Search/services/searchService');
+        console.log('✅ SearchService imported successfully');
+        
+        // Get latest properties using the SQL function
+        console.log('🔍 Calling getLatestProperties...');
+        const response = await searchService.getLatestProperties(50);
+        
+        console.log('🏠 Latest properties loaded:', response);
+        
+        // Update search state with latest properties
+        setSearchProperties(response.results || []);
+        setSearchTotalCount(response.totalCount || 0);
+        setActiveProperty(null);
+        setHoveredProperty(null);
+        
+        console.log(`✅ Homepage initialized with ${response.results?.length || 0} latest properties`);
+        
+      } catch (error) {
+        console.error('❌ Failed to load latest properties:', error);
+        console.error('❌ Error details:', {
+          message: error.message,
+          stack: error.stack,
+          name: error.name
+        });
+        
+        // Set empty state on error but don't show error toast immediately
+        setSearchProperties([]);
+        setSearchTotalCount(0);
+        
+        // Only show error toast if it's not a network/loading issue
+        if (!error.message?.includes('fetch')) {
+          toast({
+            title: "Loading Error",
+            description: "Unable to load latest properties. Please refresh the page.",
+            variant: "destructive",
+            duration: 5000,
+          });
+        }
+      } finally {
+        setSearchLoading(false);
+      }
+    };
+    
+    // Add a small delay to ensure component is fully mounted
+    const timeoutId = setTimeout(loadLatestProperties, 100);
+    
+    return () => clearTimeout(timeoutId);
+  }, []); // Empty dependency array - only run on mount
   
   // Handle property hover
   const handlePropertyHover = useCallback((propertyId: string, isHovering: boolean) => {
@@ -148,48 +196,11 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
     }
   }, [user, toast]);
 
-  // Bridge function to convert SearchContainer filters to PropertyMapData filters
-  const convertSearchFiltersToPropertyFilters = useCallback((searchFilters: SearchFilters) => {
-    console.log('Converting SearchContainer filters:', searchFilters);
-    
-    // Update search query in legacy system if not using search
-    if (!isUsingSearch) {
-      legacyPropertyData.setSearchQuery(searchFilters.searchQuery || '');
-      
-      // Update property type
-      const propertyType = searchFilters.selectedPropertyType || 'all';
-      legacyPropertyData.handlePropertyTypeChange(propertyType);
-      
-      // Convert and update other filters
-      const convertedFilters = {
-        ...legacyPropertyData.filters,
-        // Map location
-        location: searchFilters.selectedLocation || '',
-        // Map transaction type (rent/buy)
-        transactionType: searchFilters.transactionType || '',
-        // Map property type 
-        propertyType: propertyType === 'any' ? undefined : propertyType,
-        // Map BHK to bedrooms
-        bedrooms: searchFilters.selectedBHK && searchFilters.selectedBHK !== 'any' 
-          ? parseInt(searchFilters.selectedBHK.replace(/\D/g, '')) || undefined
-          : undefined,
-        // Map price range
-        priceRange: searchFilters.selectedPriceRange || '',
-        // Map subtype
-        subType: searchFilters.selectedSubType || ''
-      };
-      
-      console.log('Converted filters:', convertedFilters);
-      legacyPropertyData.setFilters(convertedFilters);
-    }
-  }, [isUsingSearch, legacyPropertyData]);
-
-  // Handle search from SearchContainer
+  // Handle search from SearchContainer (OVERRIDE default latest properties)
   const handleSearchFromContainer = useCallback(async (searchFilters: SearchFilters) => {
     console.log('PropertyMapHomeView: Search initiated from SearchContainer with filters:', searchFilters);
     
     setSearchLoading(true);
-    setIsUsingSearch(true);
     
     try {
       // Import searchService dynamically to avoid circular imports
@@ -215,6 +226,8 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
           description: "Try adjusting your search filters",
           duration: 3000,
         });
+      } else {
+        console.log(`✅ Search completed: ${response.results?.length || 0} properties found`);
       }
       
     } catch (error) {
@@ -281,11 +294,11 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
         {/* Property Listings Panel - Full width on mobile, 1/3 width on desktop */}
         <div className="w-full md:w-1/3 h-full">
           <PropertyListingPanel
-            properties={currentProperties}
-            loading={currentLoading}
+            properties={searchProperties}
+            loading={searchLoading}
             loadingMore={false} // No load more for search results yet
             hasMore={false} // No load more for search results yet
-            totalCount={currentTotalCount}
+            totalCount={searchTotalCount}
             onLoadMore={() => {}} // No load more for search results yet
             onFavoriteAction={handleFavoriteToggle}
             handlePropertyHover={handlePropertyHover}
@@ -298,10 +311,10 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
         
         {/* Map Panel - Hidden on mobile, 2/3 width on desktop */}
         <div className="hidden md:block md:w-2/3 h-full">
-          {isLoaded ? (
+          {mapsLoaded ? (
             <MapPanel
-              properties={currentProperties}
-              isLoaded={isLoaded}
+              properties={searchProperties}
+              isLoaded={mapsLoaded}
               loadError={loadError}
               activeProperty={activeProperty}
               setActiveProperty={setActiveProperty}

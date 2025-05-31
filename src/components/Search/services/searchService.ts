@@ -1,7 +1,7 @@
 // src/components/Search/services/searchService.ts
-// Version: 8.1.0
-// Last Modified: 31-05-2025 19:00 IST
-// Purpose: FIXED - Added primary_image field to database result interfaces
+// Version: 9.0.0
+// Last Modified: 01-06-2025 23:30 IST
+// Purpose: Added get_latest_properties method for default homepage results
 
 import { SearchFilters, SearchResult } from '../types/search.types';
 import { supabase } from '@/lib/supabase';
@@ -99,6 +99,64 @@ interface LandSearchResult {
 type DatabaseSearchResult = ResidentialSearchResult | CommercialSearchResult | LandSearchResult;
 
 export class SearchService {
+  /**
+   * NEW: Get latest properties using get_latest_properties SQL function
+   * This is the default method to call when homepage loads
+   */
+  async getLatestProperties(limit: number = 50): Promise<SearchResponse> {
+    const searchId = searchPerformanceMonitor.start({} as SearchFilters);
+    
+    try {
+      console.log('🏠 Getting latest properties with limit:', limit);
+      
+      const { data, error } = await supabase.rpc('get_latest_properties', {
+        p_limit: limit
+      });
+      
+      if (error) {
+        console.error('❌ get_latest_properties error:', error);
+        throw new Error(`Failed to get latest properties: ${error.message}`);
+      }
+      
+      const searchResults = data || [];
+      const totalCount = searchResults[0]?.total_count || searchResults.length;
+      
+      console.log('📊 Latest properties results:', {
+        resultCount: searchResults.length,
+        totalCount: totalCount,
+        firstResultHasPrimaryImage: searchResults[0]?.primary_image ? 'YES' : 'NO'
+      });
+
+      // ADDED: Debug logging for primary_image
+      if (searchResults.length > 0) {
+        console.log('🖼️ Latest properties - Primary image sample:', {
+          propertyId: searchResults[0].id,
+          primaryImage: searchResults[0].primary_image,
+          title: searchResults[0].title
+        });
+      }
+
+      // Transform results using the same transformation logic
+      let transformedResults = this.transformDatabaseResults(searchResults);
+      transformedResults = SearchFallbackService.enhanceSearchResults(transformedResults);
+      
+      const duration = searchPerformanceMonitor.end(transformedResults.length, totalCount);
+      logSearchResults(transformedResults, totalCount, duration);
+      
+      return {
+        results: transformedResults,
+        totalCount: totalCount,
+        page: 1,
+        limit: limit
+      };
+      
+    } catch (error) {
+      searchPerformanceMonitor.error(error);
+      logSearchError(error, {} as SearchFilters, {});
+      throw error;
+    }
+  }
+
   /**
    * Map frontend subtypes to database flow types
    */
