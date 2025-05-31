@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyItem.tsx
-// Version: 5.0.0
-// Last Modified: 26-05-2025 15:30 IST
-// Purpose: Ultra-fast PropertyItem with direct public image URLs
+// Version: 5.1.0
+// Last Modified: 31-05-2025 18:30 IST
+// Purpose: Fixed image display using primary_image field and fastImageService
 
 import React, { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
@@ -56,45 +56,74 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
   // Get display data specific to the flow type
   const displayData = getFlowSpecificDisplayData(property, flowType, details);
   
-  // Get fast image URL using memoization
+  // FIXED: Simple image URL logic using primary_image from search results with detailed debugging
   const imageUrl = useMemo(() => {
     try {
-      // Try to find image in property_details
-      const imageFiles = details.imageFiles;
-      if (Array.isArray(imageFiles) && imageFiles.length > 0) {
-        // Find primary image or use first
-        const primaryImage = imageFiles.find((img: any) => img.isPrimary || img.is_primary);
-        const imageToUse = primaryImage || imageFiles[0];
+      console.log(`[PropertyItem] =======DEBUG START for Property ${property.id}=======`);
+      console.log(`[PropertyItem] Full property object keys:`, Object.keys(property));
+      console.log(`[PropertyItem] property.primary_image:`, property.primary_image);
+      console.log(`[PropertyItem] property.property_images:`, property.property_images);
+      console.log(`[PropertyItem] property.property_details:`, property.property_details);
+      
+      // Method 1: Use primary_image field from search results (NEW - from SQL function)
+      if (property.primary_image && property.primary_image.trim()) {
+        const constructedUrl = fastImageService.getPublicImageUrl(property.id, property.primary_image);
+        console.log(`[PropertyItem] ✓ Using primary_image '${property.primary_image}'`);
+        console.log(`[PropertyItem] ✓ Constructed URL:`, constructedUrl);
+        console.log(`[PropertyItem] =======DEBUG END=======`);
+        return constructedUrl;
+      }
+      
+      // Method 2: Use property_images array (set by propertyService - for compatibility)
+      if (property.property_images && Array.isArray(property.property_images) && property.property_images.length > 0) {
+        console.log(`[PropertyItem] ✓ Found property_images array with ${property.property_images.length} images`);
+        const primaryImage = property.property_images.find(img => img.is_primary);
+        const imageToUse = primaryImage || property.property_images[0];
+        console.log(`[PropertyItem] ✓ Using image:`, imageToUse);
         
-        if (imageToUse?.fileName) {
-          return fastImageService.getPublicImageUrl(property.id, imageToUse.fileName);
+        if (imageToUse.url && imageToUse.url.startsWith('http')) {
+          console.log(`[PropertyItem] ✓ Using full URL:`, imageToUse.url);
+          console.log(`[PropertyItem] =======DEBUG END=======`);
+          return imageToUse.url;
+        }
+        
+        if (imageToUse.fileName) {
+          const constructedUrl = fastImageService.getPublicImageUrl(property.id, imageToUse.fileName);
+          console.log(`[PropertyItem] ✓ Constructed URL from fileName '${imageToUse.fileName}':`, constructedUrl);
+          console.log(`[PropertyItem] =======DEBUG END=======`);
+          return constructedUrl;
         }
       }
       
-      // Try other image paths
-      const imagePaths = [
-        details.images,
-        details.photos?.images,
-        details.media?.images
-      ];
-      
-      for (const path of imagePaths) {
-        if (Array.isArray(path) && path.length > 0) {
-          const primaryImage = path.find((img: any) => img.isPrimary || img.is_primary);
-          const imageToUse = primaryImage || path[0];
-          
-          if (imageToUse?.fileName) {
-            return fastImageService.getPublicImageUrl(property.id, imageToUse.fileName);
-          }
+      // Method 3: Use primaryImage from property_details (legacy support)
+      if (details.primaryImage) {
+        console.log(`[PropertyItem] ✓ Found details.primaryImage:`, details.primaryImage);
+        if (details.primaryImage.startsWith('http') || details.primaryImage.startsWith('/')) {
+          console.log(`[PropertyItem] ✓ Using details.primaryImage as URL:`, details.primaryImage);
+          console.log(`[PropertyItem] =======DEBUG END=======`);
+          return details.primaryImage;
         }
+        const constructedUrl = fastImageService.getPublicImageUrl(property.id, details.primaryImage);
+        console.log(`[PropertyItem] ✓ Constructed URL from details.primaryImage:`, constructedUrl);
+        console.log(`[PropertyItem] =======DEBUG END=======`);
+        return constructedUrl;
       }
       
+      // Debug: Check if we're missing any image fields
+      console.log(`[PropertyItem] ❌ NO IMAGES FOUND!`);
+      console.log(`[PropertyItem] ❌ property.primary_image: ${property.primary_image}`);
+      console.log(`[PropertyItem] ❌ property.property_images: ${property.property_images}`);
+      console.log(`[PropertyItem] ❌ details.primaryImage: ${details.primaryImage}`);
+      console.log(`[PropertyItem] =======DEBUG END=======`);
+      
+      // Fallback to no image
       return '/noimage.png';
     } catch (error) {
-      console.error(`Error getting image for property ${property.id}:`, error);
+      console.error(`[PropertyItem] Error getting image for property ${property.id}:`, error);
+      console.log(`[PropertyItem] =======DEBUG END=======`);
       return '/noimage.png';
     }
-  }, [property.id, details]);
+  }, [property.id, property.primary_image, property.property_images, details]);
   
   // Handle favorite toggle with loading state
   const handleFavoriteToggle = async (isLiked: boolean) => {
@@ -145,13 +174,13 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
           to={`/seeker/property/${property.id}`} 
           className="flex gap-2"
         >
-          {/* Property image - now using direct public URLs */}
+          {/* Property image - using fastImageService with proper URL construction */}
           <div className="relative h-20 w-24 flex-shrink-0 overflow-hidden rounded-lg">
             <img
               src={imageUrl}
               alt={title || 'Property'}
               className="h-full w-full object-cover"
-              loading="lazy" // Native lazy loading
+              loading="lazy"
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
                 target.onerror = null; // Prevent infinite loop
@@ -224,7 +253,7 @@ function getFlowSpecificDisplayData(property: PropertyType, flowType: string, de
   let propertyType = basicDetails.propertyType || property.property_type || 'Apartment';
   let listingDisplay = flowType.includes('sale') ? 'For Sale' : 'For Rent';
   
-  // Same flow-specific logic as before...
+  // Flow-specific logic
   switch (flowType) {
     case FLOW_TYPES.RESIDENTIAL_RENT:
       price = `${formatPrice(rentalInfo.rentAmount || property.price || 0)} per month`;
@@ -239,8 +268,89 @@ function getFlowSpecificDisplayData(property: PropertyType, flowType: string, de
       listingDisplay = "For Rent";
       break;
       
-    // ... (include all other cases from the original function)
-    // For brevity, I'm showing just one case, but include all cases from the original PropertyItem
+    case FLOW_TYPES.RESIDENTIAL_SALE:
+      price = formatPrice(saleInfo.expectedPrice || property.price || 0);
+      icons = [
+        { icon: <Bed className="h-3 w-3 mr-1" />, text: basicDetails.bhkType?.charAt(0) || property.bedrooms || 0 },
+        { icon: <Bath className="h-3 w-3 mr-1" />, text: basicDetails.bathrooms || property.bathrooms || 0 },
+        { icon: <Square className="h-3 w-3 mr-1" />, text: `${basicDetails.builtUpArea || property.square_feet || 0} ${basicDetails.builtUpAreaUnit || 'sq.ft'}` }
+      ];
+      listingDisplay = "For Sale";
+      break;
+      
+    case FLOW_TYPES.RESIDENTIAL_FLATMATES:
+      const flatmateInfo = details.flatmateInfo || {};
+      price = `${formatPrice(flatmateInfo.rent || property.price || 0)} per month`;
+      icons = [
+        { icon: <Users className="h-3 w-3 mr-1" />, text: `${flatmateInfo.totalFlatmates || 2} flatmates` },
+        { icon: <Bed className="h-3 w-3 mr-1" />, text: flatmateInfo.roomType || 'Shared' },
+        { icon: <Utensils className="h-3 w-3 mr-1" />, text: flatmateInfo.foodPreference || 'Any' }
+      ];
+      listingDisplay = "Flatmates";
+      break;
+      
+    case FLOW_TYPES.RESIDENTIAL_PGHOSTEL:
+      const pgInfo = details.pgInfo || {};
+      price = `${formatPrice(pgInfo.rent || property.price || 0)} per month`;
+      icons = [
+        { icon: <Users className="h-3 w-3 mr-1" />, text: pgInfo.genderPreference || 'Any' },
+        { icon: <Bed className="h-3 w-3 mr-1" />, text: pgInfo.roomType || 'Shared' },
+        { icon: <Utensils className="h-3 w-3 mr-1" />, text: pgInfo.foodIncluded ? 'Food Included' : 'No Food' }
+      ];
+      listingDisplay = "PG/Hostel";
+      break;
+      
+    case FLOW_TYPES.COMMERCIAL_RENT:
+      const commercialRentalInfo = details.commercialRentalInfo || {};
+      price = `${formatPrice(commercialRentalInfo.rentAmount || property.price || 0)} per month`;
+      icons = [
+        { icon: <Building className="h-3 w-3 mr-1" />, text: basicDetails.commercialType || 'Office' },
+        { icon: <Square className="h-3 w-3 mr-1" />, text: `${basicDetails.area || property.square_feet || 0} sq.ft` },
+        { icon: <Briefcase className="h-3 w-3 mr-1" />, text: commercialRentalInfo.suitableFor || 'Business' }
+      ];
+      listingDisplay = "For Rent";
+      break;
+      
+    case FLOW_TYPES.COMMERCIAL_SALE:
+      const commercialSaleInfo = details.commercialSaleInfo || {};
+      price = formatPrice(commercialSaleInfo.salePrice || property.price || 0);
+      icons = [
+        { icon: <Building className="h-3 w-3 mr-1" />, text: basicDetails.commercialType || 'Office' },
+        { icon: <Square className="h-3 w-3 mr-1" />, text: `${basicDetails.area || property.square_feet || 0} sq.ft` },
+        { icon: <FileText className="h-3 w-3 mr-1" />, text: commercialSaleInfo.ownershipType || 'Freehold' }
+      ];
+      listingDisplay = "For Sale";
+      break;
+      
+    case FLOW_TYPES.COMMERCIAL_COWORKING:
+      const coworkingInfo = details.coworkingInfo || {};
+      price = `${formatPrice(coworkingInfo.seatPrice || property.price || 0)} per seat/month`;
+      icons = [
+        { icon: <Coffee className="h-3 w-3 mr-1" />, text: `${coworkingInfo.totalSeats || 0} seats` },
+        { icon: <Square className="h-3 w-3 mr-1" />, text: `${basicDetails.area || property.square_feet || 0} sq.ft` },
+        { icon: <Building className="h-3 w-3 mr-1" />, text: coworkingInfo.workspaceType || 'Open Desk' }
+      ];
+      listingDisplay = "Coworking";
+      break;
+      
+    case FLOW_TYPES.LAND_SALE:
+      const landInfo = details.landInfo || {};
+      price = formatPrice(landInfo.price || property.price || 0);
+      icons = [
+        { icon: <Map className="h-3 w-3 mr-1" />, text: `${landInfo.area || property.square_feet || 0} ${landInfo.areaUnit || 'sq.ft'}` },
+        { icon: <FileText className="h-3 w-3 mr-1" />, text: landInfo.landType || 'Residential' },
+        { icon: <Building className="h-3 w-3 mr-1" />, text: landInfo.ownershipType || 'Freehold' }
+      ];
+      listingDisplay = "Land for Sale";
+      break;
+      
+    default:
+      // Fallback for unknown flow types
+      icons = [
+        { icon: <Building className="h-3 w-3 mr-1" />, text: propertyType },
+        { icon: <Square className="h-3 w-3 mr-1" />, text: `${property.square_feet || 0} sq.ft` }
+      ];
+      break;
   }
   
   // Handle price edge cases

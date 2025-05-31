@@ -1,7 +1,7 @@
 // src/components/Search/services/searchService.ts
-// Version: 8.0.0
-// Last Modified: 01-06-2025 23:30 IST
-// Purpose: Updated to match refactored database functions with property subtype filtering
+// Version: 8.1.0
+// Last Modified: 31-05-2025 19:00 IST
+// Purpose: FIXED - Added primary_image field to database result interfaces
 
 import { SearchFilters, SearchResult } from '../types/search.types';
 import { supabase } from '@/lib/supabase';
@@ -28,7 +28,7 @@ export interface SearchOptions {
   sortOrder?: 'asc' | 'desc';
 }
 
-// Updated database result interfaces matching the refactored functions
+// FIXED: Updated database result interfaces with primary_image field
 interface ResidentialSearchResult {
   id: string;
   owner_id: string;
@@ -49,6 +49,7 @@ interface ResidentialSearchResult {
   bathrooms: number | null;
   area_unit: string;
   land_type: string | null; // Always null for residential
+  primary_image: string | null; // ADDED: Primary image filename from SQL function
 }
 
 interface CommercialSearchResult {
@@ -68,6 +69,7 @@ interface CommercialSearchResult {
   owner_email: string;
   status: string;
   area_unit: string;
+  primary_image: string | null; // ADDED: Will need this for commercial too
   // Note: No bedrooms, bathrooms, land_type for commercial
 }
 
@@ -89,6 +91,7 @@ interface LandSearchResult {
   status: string;
   area_unit: string;
   land_type: string;
+  primary_image: string | null; // ADDED: Will need this for land too
   // Note: No bedrooms, bathrooms for land
 }
 
@@ -267,8 +270,18 @@ export class SearchService {
       console.log('📊 Raw database results:', {
         resultCount: searchResults.length,
         totalCount: totalCount,
-        propertyType: propertyType
+        propertyType: propertyType,
+        firstResultHasPrimaryImage: searchResults[0]?.primary_image ? 'YES' : 'NO'
       });
+
+      // ADDED: Debug logging for primary_image
+      if (searchResults.length > 0) {
+        console.log('🖼️ Primary image sample:', {
+          propertyId: searchResults[0].id,
+          primaryImage: searchResults[0].primary_image,
+          title: searchResults[0].title
+        });
+      }
 
       // Transform results
       let transformedResults = this.transformDatabaseResults(searchResults);
@@ -531,7 +544,7 @@ export class SearchService {
   }
 
   /**
-   * Transform database results to SearchResult format with type-safe handling
+   * FIXED: Transform database results to SearchResult format with primary_image
    */
   private transformDatabaseResults(dbResults: DatabaseSearchResult[]): SearchResult[] {
     return dbResults.map(dbResult => {
@@ -546,6 +559,11 @@ export class SearchService {
       const price = dbResult.price && dbResult.price > 0 ? dbResult.price : 0;
       const area = dbResult.area && dbResult.area > 0 ? dbResult.area : 0;
       
+      // ADDED: Extract primary_image from database result
+      const primaryImage = dbResult.primary_image || null;
+      
+      console.log(`🖼️ Transforming property ${dbResult.id}: primary_image = ${primaryImage}`);
+      
       return {
         id: dbResult.id,
         title: dbResult.title || 'Property Listing',
@@ -559,7 +577,8 @@ export class SearchService {
         ownerName: this.extractOwnerName(dbResult.owner_email),
         ownerPhone: '+91 98765 43210',
         createdAt: dbResult.created_at,
-        status: dbResult.status || 'active'
+        status: dbResult.status || 'active',
+        primary_image: primaryImage // ADDED: Include primary_image in SearchResult
       } as SearchResult;
     });
   }
