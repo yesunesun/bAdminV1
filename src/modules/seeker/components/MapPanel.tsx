@@ -238,13 +238,13 @@ const MapPanel: React.FC<MapPanelProps> = ({
       </GoogleMap>
       
       {/* Debug information - remove in production */}
-      {process.env.NODE_ENV === 'development' && (
+      {/* {process.env.NODE_ENV === 'development' && (
         <div className="absolute bottom-2 left-2 bg-white/80 text-xs p-2 rounded border shadow max-w-xs">
           <div>Properties: {properties.length}</div>
           <div>Displayed markers: {displayedMarkers.length}</div>
           <div>Hover ID: {hoveredPropertyId || 'none'}</div>
         </div>
-      )}
+      )} */}
     </div>
   );
 };
