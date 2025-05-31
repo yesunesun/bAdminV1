@@ -1,7 +1,7 @@
 -- src/database/functions/search_land_properties_refactored.sql
--- Version: 4.1.0
--- Last Modified: 01-06-2025 22:45 IST
--- Purpose: Refactored modular land search with property type filtering
+-- Version: 4.2.0
+-- Last Modified: 01-06-2025 22:50 IST
+-- Purpose: Refactored modular land search with property type filtering and primary image
 
 -- =============================================================================
 -- HELPER FUNCTION 1: Extract price from land property data
@@ -207,7 +207,51 @@ END;
 $$;
 
 -- =============================================================================
--- HELPER FUNCTION 10: Convert land flow type to subtype
+-- HELPER FUNCTION 10: Extract primary image from land property data (NEW)
+-- =============================================================================
+CREATE OR REPLACE FUNCTION extract_land_primary_image(property_details JSONB)
+RETURNS TEXT
+LANGUAGE plpgsql
+IMMUTABLE
+AS $$
+DECLARE
+    image_file JSONB;
+    primary_filename TEXT;
+BEGIN
+    -- Check if imageFiles array exists and has elements
+    IF property_details ? 'imageFiles' AND jsonb_array_length(property_details->'imageFiles') > 0 THEN
+        -- Iterate through imageFiles array to find the primary image
+        FOR image_file IN SELECT jsonb_array_elements(property_details->'imageFiles')
+        LOOP
+            -- Check if this image is marked as primary
+            IF (image_file->>'isPrimary')::boolean = true THEN
+                primary_filename := image_file->>'fileName';
+                EXIT; -- Found primary image, exit loop
+            END IF;
+        END LOOP;
+        
+        -- If no primary image found, return the first image filename
+        IF primary_filename IS NULL THEN
+            primary_filename := (property_details->'imageFiles'->0)->>'fileName';
+        END IF;
+    END IF;
+    
+    -- Check alternative image storage locations
+    IF primary_filename IS NULL THEN
+        primary_filename := COALESCE(
+            property_details->'steps'->'image_upload'->>'primaryImage',
+            property_details->'steps'->'images'->>'primaryImage',
+            property_details->'media'->'photos'->>'primaryImage',
+            property_details->'images'->>'primary'
+        );
+    END IF;
+    
+    RETURN primary_filename;
+END;
+$$;
+
+-- =============================================================================
+-- HELPER FUNCTION 11: Convert land flow type to subtype
 -- =============================================================================
 CREATE OR REPLACE FUNCTION land_flow_type_to_subtype(flow_type TEXT)
 RETURNS TEXT
@@ -224,9 +268,25 @@ END;
 $$;
 
 -- =============================================================================
--- MAIN FUNCTION: Search land properties (refactored with property type)
+-- MAIN FUNCTION: Search land properties (enhanced with primary image)
 -- =============================================================================
-DROP FUNCTION IF EXISTS search_land_properties CASCADE;
+
+-- First, check if the function exists and drop it safely
+DO $$
+BEGIN
+    -- Check if function exists and drop it
+    IF EXISTS (
+        SELECT 1 
+        FROM pg_proc p 
+        JOIN pg_namespace n ON p.pronamespace = n.oid 
+        WHERE n.nspname = 'public' 
+        AND p.proname = 'search_land_properties'
+    ) THEN
+        DROP FUNCTION public.search_land_properties CASCADE;
+        RAISE NOTICE 'Existing search_land_properties function dropped';
+    END IF;
+END
+$$;
 
 CREATE OR REPLACE FUNCTION search_land_properties(
     p_property_subtype TEXT DEFAULT NULL,
@@ -256,8 +316,11 @@ RETURNS TABLE(
     area NUMERIC,
     owner_email TEXT,
     status TEXT,
+    bedrooms INTEGER,
+    bathrooms NUMERIC,
     area_unit TEXT,
-    land_type TEXT
+    land_type TEXT,
+    primary_image TEXT
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -321,9 +384,14 @@ BEGIN
         prof.email::TEXT as owner_email,
         COALESCE(p.status, 'active')::TEXT as status,
         
-        -- TYPE-SPECIFIC FIELDS (2 fields) - Relevant for land
+        -- TYPE-SPECIFIC FIELDS (4 fields) - Using NULL for land properties
+        NULL::INTEGER as bedrooms,
+        NULL::NUMERIC as bathrooms,
         extract_land_area_unit(p.property_details)::TEXT as area_unit,
-        extract_land_type(p.property_details)::TEXT as land_type
+        extract_land_type(p.property_details)::TEXT as land_type,
+        
+        -- NEW FIELD: Primary image filename
+        extract_land_primary_image(p.property_details)::TEXT as primary_image
         
     FROM properties_v2 p
     LEFT JOIN profiles prof ON p.owner_id = prof.id
