@@ -1,7 +1,7 @@
 // src/components/Search/SearchContainer.tsx
-// Version: 3.0.0
-// Last Modified: 31-05-2025 20:45 IST
-// Purpose: Enhanced search container with improved visual integration
+// Version: 3.2.0
+// Last Modified: 01-06-2025 14:55 IST
+// Purpose: Removed active filters counter as requested
 
 import React from 'react';
 import { SearchContainerProps } from './types/search.types';
@@ -46,21 +46,6 @@ const SearchContainer: React.FC<SearchContainerProps> = ({
       {/* Enhanced Filters Section */}
       <div className="bg-white border-b border-slate-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 py-4">
-          {/* Filter Section Header */}
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-4">
-            <div className="flex items-center gap-2">
-              <h3 className="text-sm font-medium text-slate-700">Refine your search:</h3>
-              <span className="text-xs text-slate-500">Use filters to find your perfect property</span>
-            </div>
-            {search.hasActiveFilters && (
-              <div className="text-sm text-slate-600">
-                <span className="inline-flex items-center px-2 py-1 rounded-full bg-blue-100 text-blue-800 text-xs font-medium">
-                  {Object.values(search.filters).filter(v => v && v !== 'any').length} filters active
-                </span>
-              </div>
-            )}
-          </div>
-
           {/* Filters Container */}
           <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
             <div className="flex flex-col lg:flex-row gap-4">

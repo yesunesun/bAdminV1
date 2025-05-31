@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyMapHomeView.tsx
-// Version: 4.2.0
-// Last Modified: 01-06-2025 14:45 IST
-// Purpose: Fixed duplicate code blocks and TypeScript parsing errors
+// Version: 4.3.0
+// Last Modified: 01-06-2025 15:05 IST
+// Purpose: Added logic to revert to default results when all filters are cleared
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useGoogleMaps } from '../hooks/useGoogleMaps';
@@ -196,7 +196,7 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
     }
   }, [user, toast]);
 
-  // Handle search from SearchContainer (OVERRIDE default latest properties)
+  // Handle search from SearchContainer (OVERRIDE default latest properties OR revert to defaults)
   const handleSearchFromContainer = useCallback(async (searchFilters: SearchFilters) => {
     console.log('PropertyMapHomeView: Search initiated from SearchContainer with filters:', searchFilters);
     
@@ -206,11 +206,29 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
       // Import searchService dynamically to avoid circular imports
       const { searchService } = await import('@/components/Search/services/searchService');
       
-      // Perform the search using searchService
-      const response = await searchService.search(searchFilters, {
-        page: 1,
-        limit: 50
-      });
+      // Check if all filters are empty/default - if so, load latest properties instead of searching
+      const areFiltersEmpty = !searchFilters.searchQuery && 
+                             (!searchFilters.selectedLocation || searchFilters.selectedLocation === 'any') &&
+                             !searchFilters.transactionType && 
+                             !searchFilters.selectedPropertyType && 
+                             !searchFilters.selectedSubType && 
+                             !searchFilters.selectedBHK && 
+                             !searchFilters.selectedPriceRange;
+      
+      let response;
+      
+      if (areFiltersEmpty) {
+        console.log('🏠 Empty filters detected - loading default latest properties...');
+        // Load default latest properties when filters are empty (including when cleared)
+        response = await searchService.getLatestProperties(50);
+      } else {
+        console.log('🔍 Performing filtered search...');
+        // Perform the search using searchService
+        response = await searchService.search(searchFilters, {
+          page: 1,
+          limit: 50
+        });
+      }
       
       console.log('PropertyMapHomeView: Search response:', response);
       
@@ -223,11 +241,12 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
       if (response.results?.length === 0) {
         toast({
           title: "No properties found",
-          description: "Try adjusting your search filters",
+          description: areFiltersEmpty ? "No properties available" : "Try adjusting your search filters",
           duration: 3000,
         });
       } else {
-        console.log(`✅ Search completed: ${response.results?.length || 0} properties found`);
+        const resultType = areFiltersEmpty ? 'latest properties' : 'search results';
+        console.log(`✅ ${resultType} loaded: ${response.results?.length || 0} properties found`);
       }
       
     } catch (error) {
