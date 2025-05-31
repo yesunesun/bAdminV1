@@ -1,7 +1,7 @@
 // src/components/Search/types/search.types.ts
-// Version: 2.0.0
-// Last Modified: 01-06-2025 23:00 IST
-// Purpose: Enhanced SearchResult interface to match searchService output
+// Version: 2.1.0
+// Last Modified: 01-06-2025 23:50 IST
+// Purpose: Added property code field to SearchResult interface
 
 export interface SearchFilters {
   searchQuery: string;
@@ -33,6 +33,7 @@ export interface SearchResult {
   createdAt: string;
   status: string;
   primary_image: string | null; // Image filename from database
+  code?: string | null; // ADDED: Property code from meta.code
 }
 
 export interface SearchState {

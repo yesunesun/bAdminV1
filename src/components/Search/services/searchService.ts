@@ -1,7 +1,7 @@
 // src/components/Search/services/searchService.ts
-// Version: 9.0.0
-// Last Modified: 01-06-2025 23:30 IST
-// Purpose: Added get_latest_properties method for default homepage results
+// Version: 10.1.0
+// Last Modified: 02-06-2025 10:15 IST
+// Purpose: Updated property code detection to only trigger for 6-character alphanumeric codes
 
 import { SearchFilters, SearchResult } from '../types/search.types';
 import { supabase } from '@/lib/supabase';
@@ -28,7 +28,7 @@ export interface SearchOptions {
   sortOrder?: 'asc' | 'desc';
 }
 
-// FIXED: Updated database result interfaces with primary_image field
+// UPDATED: Database result interfaces with primary_image and code fields
 interface ResidentialSearchResult {
   id: string;
   owner_id: string;
@@ -48,8 +48,9 @@ interface ResidentialSearchResult {
   bedrooms: number | null;
   bathrooms: number | null;
   area_unit: string;
-  land_type: string | null; // Always null for residential
-  primary_image: string | null; // ADDED: Primary image filename from SQL function
+  land_type: string | null;
+  primary_image: string | null;
+  code?: string | null; // ADDED: Property code from meta.code
 }
 
 interface CommercialSearchResult {
@@ -69,8 +70,8 @@ interface CommercialSearchResult {
   owner_email: string;
   status: string;
   area_unit: string;
-  primary_image: string | null; // ADDED: Will need this for commercial too
-  // Note: No bedrooms, bathrooms, land_type for commercial
+  primary_image: string | null;
+  code?: string | null; // ADDED: Property code from meta.code
 }
 
 interface LandSearchResult {
@@ -91,8 +92,8 @@ interface LandSearchResult {
   status: string;
   area_unit: string;
   land_type: string;
-  primary_image: string | null; // ADDED: Will need this for land too
-  // Note: No bedrooms, bathrooms for land
+  primary_image: string | null;
+  code?: string | null; // ADDED: Property code from meta.code
 }
 
 // Union type for all database results
@@ -100,8 +101,126 @@ type DatabaseSearchResult = ResidentialSearchResult | CommercialSearchResult | L
 
 export class SearchService {
   /**
-   * NEW: Get latest properties using get_latest_properties SQL function
-   * This is the default method to call when homepage loads
+   * Search property by code using search_property_by_code SQL function
+   */
+  async searchByCode(code: string, useInsensitiveSearch: boolean = true): Promise<SearchResponse> {
+    const searchId = searchPerformanceMonitor.start({} as SearchFilters);
+    
+    try {
+      console.log('🔍 Searching property by code:', code, 'insensitive:', useInsensitiveSearch);
+      
+      // Validate input
+      if (!code || code.trim() === '') {
+        throw new Error('Property code cannot be empty');
+      }
+
+      const trimmedCode = code.trim();
+      
+      // Choose the appropriate function based on case sensitivity
+      const functionName = useInsensitiveSearch 
+        ? 'search_property_by_code_insensitive' 
+        : 'search_property_by_code';
+      
+      const { data, error } = await supabase.rpc(functionName, {
+        p_code: trimmedCode
+      });
+      
+      if (error) {
+        console.error('❌ search_property_by_code error:', error);
+        throw new Error(`Failed to search property by code: ${error.message}`);
+      }
+      
+      const searchResults = data || [];
+      const totalCount = searchResults[0]?.total_count || searchResults.length;
+      
+      console.log('📊 Property code search results:', {
+        code: trimmedCode,
+        resultCount: searchResults.length,
+        totalCount: totalCount,
+        foundProperty: searchResults.length > 0 ? searchResults[0].title : 'None'
+      });
+
+      // Transform results using the same transformation logic
+      let transformedResults = this.transformDatabaseResults(searchResults);
+      transformedResults = SearchFallbackService.enhanceSearchResults(transformedResults);
+      
+      const duration = searchPerformanceMonitor.end(transformedResults.length, totalCount);
+      logSearchResults(transformedResults, totalCount, duration);
+      
+      return {
+        results: transformedResults,
+        totalCount: totalCount,
+        page: 1,
+        limit: 50
+      };
+      
+    } catch (error) {
+      searchPerformanceMonitor.error(error);
+      logSearchError(error, {} as SearchFilters, {});
+      throw error;
+    }
+  }
+
+  /**
+   * UPDATED: Check if a search query is exactly a 6-character alphanumeric property code
+   * Property codes must be exactly 6 characters: alphanumeric only (e.g., RX0AD8, AB1234, 123ABC)
+   */
+  isPropertyCode(query: string): boolean {
+    if (!query) {
+      return false;
+    }
+    
+    const trimmedQuery = query.trim();
+    
+    // Must be exactly 6 characters
+    if (trimmedQuery.length !== 6) {
+      console.log(`🔍 Query "${trimmedQuery}" is ${trimmedQuery.length} chars, not 6 - not a property code`);
+      return false;
+    }
+    
+    // Must be alphanumeric only (letters and numbers, no special characters)
+    const alphanumericPattern = /^[A-Za-z0-9]{6}$/;
+    const isValidCode = alphanumericPattern.test(trimmedQuery);
+    
+    console.log(`🔍 Query "${trimmedQuery}" alphanumeric check: ${isValidCode ? 'PASS' : 'FAIL'} - ${isValidCode ? 'IS' : 'NOT'} a property code`);
+    
+    return isValidCode;
+  }
+
+  /**
+   * ENHANCED: Smart search that detects if query is exactly a 6-character property code
+   * If it matches the criteria, search by code first, then fall back to regular search
+   */
+  async smartSearch(filters: SearchFilters, options: SearchOptions = {}): Promise<SearchResponse> {
+    const query = filters.searchQuery?.trim();
+    
+    // If query is exactly a 6-character alphanumeric code, try code search first
+    if (query && this.isPropertyCode(query)) {
+      console.log('🎯 Detected 6-character property code, trying code search first:', query);
+      
+      try {
+        const codeResults = await this.searchByCode(query, true);
+        
+        // If we found results, return them
+        if (codeResults.results.length > 0) {
+          console.log('✅ Found property by code, returning results');
+          return codeResults;
+        }
+        
+        console.log('ℹ️ No results by code, falling back to regular search');
+      } catch (error) {
+        console.log('⚠️ Code search failed, falling back to regular search:', error);
+      }
+    } else if (query) {
+      console.log(`🔍 Query "${query}" does not match 6-character property code pattern, using regular search`);
+    }
+    
+    // Fall back to regular search
+    return this.search(filters, options);
+  }
+
+  /**
+   * Get latest properties using get_latest_properties SQL function
    */
   async getLatestProperties(limit: number = 50): Promise<SearchResponse> {
     const searchId = searchPerformanceMonitor.start({} as SearchFilters);
@@ -126,15 +245,6 @@ export class SearchService {
         totalCount: totalCount,
         firstResultHasPrimaryImage: searchResults[0]?.primary_image ? 'YES' : 'NO'
       });
-
-      // ADDED: Debug logging for primary_image
-      if (searchResults.length > 0) {
-        console.log('🖼️ Latest properties - Primary image sample:', {
-          propertyId: searchResults[0].id,
-          primaryImage: searchResults[0].primary_image,
-          title: searchResults[0].title
-        });
-      }
 
       // Transform results using the same transformation logic
       let transformedResults = this.transformDatabaseResults(searchResults);
@@ -211,8 +321,7 @@ export class SearchService {
   }
 
   /**
-   * NEW: Get property subtype for database filtering
-   * This maps frontend subtypes to actual property types stored in the database
+   * Get property subtype for database filtering
    */
   private getPropertySubtype(subtype: string): string | null {
     // Map frontend subtypes to database property types
@@ -249,7 +358,6 @@ export class SearchService {
 
   /**
    * Check if property subtype matches selected filter
-   * This is the key method to filter apartments vs villas vs houses
    */
   private doesPropertyMatchSubtype(property: DatabaseSearchResult, selectedSubtype: string): boolean {
     if (!selectedSubtype || selectedSubtype === 'any') {
@@ -262,7 +370,6 @@ export class SearchService {
     }
 
     // For regular properties, we now rely on the database-level filtering
-    // since we're passing p_property_subtype to the database functions
     return true;
   }
 
@@ -284,7 +391,6 @@ export class SearchService {
     }
 
     // For regular properties, just use the base flow type
-    // Property-level filtering will be handled by p_property_subtype parameter
     if (transactionType && transactionType !== 'any') {
       const mappedFlowType = this.mapSubtypeToFlowType(propertyType, 'default', transactionType);
       console.log('✅ Using transaction type mapping:', transactionType, '->', mappedFlowType);
@@ -331,15 +437,6 @@ export class SearchService {
         propertyType: propertyType,
         firstResultHasPrimaryImage: searchResults[0]?.primary_image ? 'YES' : 'NO'
       });
-
-      // ADDED: Debug logging for primary_image
-      if (searchResults.length > 0) {
-        console.log('🖼️ Primary image sample:', {
-          propertyId: searchResults[0].id,
-          primaryImage: searchResults[0].primary_image,
-          title: searchResults[0].title
-        });
-      }
 
       // Transform results
       let transformedResults = this.transformDatabaseResults(searchResults);
@@ -528,7 +625,7 @@ export class SearchService {
   }
 
   /**
-   * Build search parameters for database functions with NEW p_property_subtype
+   * Build search parameters for database functions with p_property_subtype
    */
   private buildSearchParams(filters: SearchFilters, options: SearchOptions): Record<string, any> {
     const params: Record<string, any> = {
@@ -569,7 +666,7 @@ export class SearchService {
       console.log('🎯 Database subtype parameter:', effectiveSubtype);
     }
 
-    // NEW: Add property subtype parameter for database-level filtering
+    // Add property subtype parameter for database-level filtering
     if (filters.selectedSubType && filters.selectedSubType !== 'any') {
       const propertySubtype = this.getPropertySubtype(filters.selectedSubType);
       if (propertySubtype) {
@@ -602,7 +699,7 @@ export class SearchService {
   }
 
   /**
-   * FIXED: Transform database results to SearchResult format with primary_image
+   * Transform database results to SearchResult format with primary_image and code
    */
   private transformDatabaseResults(dbResults: DatabaseSearchResult[]): SearchResult[] {
     return dbResults.map(dbResult => {
@@ -617,10 +714,13 @@ export class SearchService {
       const price = dbResult.price && dbResult.price > 0 ? dbResult.price : 0;
       const area = dbResult.area && dbResult.area > 0 ? dbResult.area : 0;
       
-      // ADDED: Extract primary_image from database result
+      // Extract primary_image from database result
       const primaryImage = dbResult.primary_image || null;
       
-      console.log(`🖼️ Transforming property ${dbResult.id}: primary_image = ${primaryImage}`);
+      // Extract property code from database result
+      const propertyCode = dbResult.code || null;
+      
+      console.log(`🖼️ Transforming property ${dbResult.id}: primary_image = ${primaryImage}, code = ${propertyCode}`);
       
       return {
         id: dbResult.id,
@@ -636,7 +736,8 @@ export class SearchService {
         ownerPhone: '+91 98765 43210',
         createdAt: dbResult.created_at,
         status: dbResult.status || 'active',
-        primary_image: primaryImage // ADDED: Include primary_image in SearchResult
+        primary_image: primaryImage,
+        code: propertyCode
       } as SearchResult;
     });
   }
@@ -669,7 +770,7 @@ export class SearchService {
 
     // Extract from flow_type as fallback
     if (flowType.includes('residential_rent') || flowType.includes('residential_sale')) {
-      return 'apartment'; // Default residential to apartment
+      return 'apartment';
     } else if (flowType.includes('residential_pghostel')) {
       return 'pghostel';
     } else if (flowType.includes('residential_flatmates')) {
@@ -754,27 +855,36 @@ export class SearchService {
   }
 
   /**
-   * Get search suggestions (autocomplete)
+   * UPDATED: Get search suggestions with 6-character property code support
    */
   async getSearchSuggestions(query: string): Promise<string[]> {
     if (query.length < 2) return [];
     
     try {
+      const suggestions: string[] = [];
+      
+      // If query looks like a 6-character property code, suggest code-based search
+      if (this.isPropertyCode(query)) {
+        suggestions.push(`Search by code: ${query.toUpperCase()}`);
+      }
+      
+      // Get title-based suggestions
       const { data, error } = await supabase
         .from('properties_v2')
         .select('property_details')
         .ilike('property_details->flow->>title', `%${query}%`)
         .limit(5);
 
-      if (error) {
-        console.error('Error getting suggestions:', error);
-        return [];
+      if (!error && data) {
+        const titleSuggestions = data
+          .map(item => item.property_details?.flow?.title)
+          .filter(Boolean)
+          .slice(0, 4); // Leave space for code suggestion
+        
+        suggestions.push(...titleSuggestions);
       }
 
-      return data
-        .map(item => item.property_details?.flow?.title)
-        .filter(Boolean)
-        .slice(0, 5);
+      return suggestions.slice(0, 5);
         
     } catch (error) {
       console.error('Error in getSearchSuggestions:', error);

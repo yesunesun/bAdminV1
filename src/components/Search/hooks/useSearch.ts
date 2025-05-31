@@ -1,7 +1,7 @@
 // src/components/Search/hooks/useSearch.ts
-// Version: 1.1.0
-// Last Modified: 01-06-2025 15:00 IST
-// Purpose: Added auto-search on clear all filters to revert to default results
+// Version: 1.3.0
+// Last Modified: 02-06-2025 10:20 IST
+// Purpose: Updated to use 6-character property code detection
 
 import { useState, useCallback, useEffect } from 'react';
 import { SearchFilters, SearchResult, SearchState } from '../types/search.types';
@@ -49,6 +49,9 @@ export const useSearch = (onSearchCallback?: (filters: SearchFilters) => void) =
     }
   }, [wasCleared, areFiltersEmpty, onSearchCallback, searchFilters.filters]);
 
+  /**
+   * ENHANCED: Smart search that detects 6-character property codes and uses appropriate search method
+   */
   const handleSearch = useCallback(async () => {
     console.log('Search initiated with:', searchFilters.filters);
     
@@ -64,11 +67,25 @@ export const useSearch = (onSearchCallback?: (filters: SearchFilters) => void) =
         error: null
       }));
 
-      // Call the search service
-      const response = await searchService.search(searchFilters.filters, {
-        page: 1,
-        limit: 50
-      });
+      let response;
+      const query = searchFilters.filters.searchQuery?.trim();
+      
+      // Check if the search query is exactly a 6-character alphanumeric property code
+      if (query && searchService.isPropertyCode(query)) {
+        console.log('🎯 Detected 6-character property code in search, using smart search');
+        // Use smart search which tries code search first, then falls back to regular search
+        response = await searchService.smartSearch(searchFilters.filters, {
+          page: 1,
+          limit: 50
+        });
+      } else {
+        // Use regular search for non-code queries
+        console.log('🔍 Using regular search (not a 6-character property code)');
+        response = await searchService.search(searchFilters.filters, {
+          page: 1,
+          limit: 50
+        });
+      }
       
       setSearchState(prev => ({
         ...prev,
@@ -88,6 +105,55 @@ export const useSearch = (onSearchCallback?: (filters: SearchFilters) => void) =
       }));
     }
   }, [searchFilters.filters, onSearchCallback]);
+
+  /**
+   * Direct property code search method (for exactly 6-character codes)
+   */
+  const searchByCode = useCallback(async (code: string) => {
+    console.log('🔍 Direct property code search:', code);
+    
+    // Validate that it's exactly 6 characters alphanumeric
+    if (!searchService.isPropertyCode(code)) {
+      console.warn('⚠️ Invalid property code format. Must be exactly 6 alphanumeric characters.');
+      setSearchState(prev => ({
+        ...prev,
+        error: 'Property code must be exactly 6 alphanumeric characters',
+        results: [],
+        totalCount: 0
+      }));
+      return [];
+    }
+    
+    try {
+      setSearchState(prev => ({
+        ...prev,
+        loading: true,
+        error: null
+      }));
+
+      const response = await searchService.searchByCode(code, true);
+      
+      setSearchState(prev => ({
+        ...prev,
+        loading: false,
+        results: response.results,
+        totalCount: response.totalCount
+      }));
+
+      return response.results;
+      
+    } catch (error) {
+      console.error('Code search error:', error);
+      setSearchState(prev => ({
+        ...prev,
+        loading: false,
+        error: error instanceof Error ? error.message : 'Code search failed',
+        results: [],
+        totalCount: 0
+      }));
+      return [];
+    }
+  }, []);
 
   const updateSearchQuery = useCallback((query: string) => {
     searchFilters.updateFilter('searchQuery', query);
@@ -113,6 +179,25 @@ export const useSearch = (onSearchCallback?: (filters: SearchFilters) => void) =
     }));
   }, []);
 
+  /**
+   * UPDATED: Get search suggestions with 6-character property code support
+   */
+  const getSearchSuggestions = useCallback(async (query: string): Promise<string[]> => {
+    try {
+      return await searchService.getSearchSuggestions(query);
+    } catch (error) {
+      console.error('Error getting search suggestions:', error);
+      return [];
+    }
+  }, []);
+
+  /**
+   * Check if a query is a valid 6-character property code
+   */
+  const isValidPropertyCode = useCallback((query: string): boolean => {
+    return searchService.isPropertyCode(query);
+  }, []);
+
   return {
     // Search filters (override clearAllFilters with enhanced version)
     ...searchFilters,
@@ -123,9 +208,12 @@ export const useSearch = (onSearchCallback?: (filters: SearchFilters) => void) =
     
     // Search actions
     handleSearch,
+    searchByCode, // Direct code search for 6-character codes
     updateSearchQuery,
     updateLocation,
     clearResults,
+    getSearchSuggestions, // Enhanced suggestions with code support
+    isValidPropertyCode, // NEW: Utility to check if query is valid property code
     
     // Combined state for convenience
     searchState: {

@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyMapHomeView.tsx
-// Version: 4.3.0
-// Last Modified: 01-06-2025 15:05 IST
-// Purpose: Added logic to revert to default results when all filters are cleared
+// Version: 4.4.0
+// Last Modified: 02-06-2025 10:45 IST
+// Purpose: Added 6-character property code detection while retaining original functionality
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useGoogleMaps } from '../hooks/useGoogleMaps';
@@ -196,7 +196,7 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
     }
   }, [user, toast]);
 
-  // Handle search from SearchContainer (OVERRIDE default latest properties OR revert to defaults)
+  // ENHANCED: Handle search from SearchContainer with 6-character property code detection
   const handleSearchFromContainer = useCallback(async (searchFilters: SearchFilters) => {
     console.log('PropertyMapHomeView: Search initiated from SearchContainer with filters:', searchFilters);
     
@@ -223,11 +223,24 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
         response = await searchService.getLatestProperties(50);
       } else {
         console.log('🔍 Performing filtered search...');
-        // Perform the search using searchService
-        response = await searchService.search(searchFilters, {
-          page: 1,
-          limit: 50
-        });
+        
+        // ADDED: Check if search query looks like a 6-character property code
+        const query = searchFilters.searchQuery?.trim();
+        if (query && searchService.isPropertyCode(query)) {
+          console.log('🎯 Detected 6-character property code, using smart search');
+          // Use smart search which tries code search first, then falls back to regular search
+          response = await searchService.smartSearch(searchFilters, {
+            page: 1,
+            limit: 50
+          });
+        } else {
+          console.log('🔍 Using regular search (not a 6-character property code)');
+          // Perform regular search using searchService
+          response = await searchService.search(searchFilters, {
+            page: 1,
+            limit: 50
+          });
+        }
       }
       
       console.log('PropertyMapHomeView: Search response:', response);
@@ -257,8 +270,7 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
       toast({
         title: "Search Failed",
         description: "Unable to search properties. Please try again.",
-        variant: "destructive",
-        duration: 3000,
+        variant: 3000,
       });
     } finally {
       setSearchLoading(false);
