@@ -9,7 +9,7 @@ import { useSearch } from './hooks/useSearch';
 import SearchHeader from './components/SearchHeader';
 import SearchFilters from './components/SearchFilters';
 import ActiveFilters from './components/ActiveFilters';
-import SearchResults from './components/SearchResults';
+import SearchResultsView from './components/SearchResultsView';
 
 const SearchContainer: React.FC<SearchContainerProps> = ({
   onSearch,
@@ -68,7 +68,7 @@ const SearchContainer: React.FC<SearchContainerProps> = ({
 
       {/* Search Results */}
       {showResults && (
-        <SearchResults
+        <SearchResultsView
           filters={search.filters}
           results={search.results}
           getSubTypes={search.getSubTypes}

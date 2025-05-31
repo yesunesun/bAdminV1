@@ -12,6 +12,9 @@ export { default as SearchFilters } from './components/SearchFilters';
 export { default as ActiveFilters } from './components/ActiveFilters';
 export { default as SearchResults } from './components/SearchResults';
 export { default as SearchResultsTable } from './components/SearchResultsTable';
+export { default as SearchResultsCards } from './components/SearchResultsCards';
+export { default as SearchResultsView } from './components/SearchResultsView';
+export { default as SearchResultsTabs } from './components/SearchResultsTabs';
 
 // Hooks
 export { useSearch } from './hooks/useSearch';
