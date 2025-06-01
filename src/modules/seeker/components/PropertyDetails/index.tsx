@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyDetails/index.tsx  
-// Version: 18.2.0
-// Last Modified: 29-05-2025 14:30 IST
-// Purpose: Updated to use generatePropertyCode utility with meta.code persistence
+// Version: 19.0.0
+// Last Modified: 02-06-2025 14:15 IST
+// Purpose: Updated to use real similar properties with fetchSimilarProperties service
 
 import React, { useState, useEffect } from 'react';
 import { useToast } from '@/components/ui/use-toast';
@@ -20,6 +20,10 @@ import {
 // Import extracted hooks
 import { usePropertyData } from './hooks/usePropertyData';
 import { usePropertyMedia } from './hooks/usePropertyMedia';
+
+// Import similar properties service
+import { fetchSimilarProperties } from '@/modules/seeker/services/similarPropertiesService';
+import { SearchResult } from '@/components/Search/types/search.types';
 
 // Import extracted components
 import BasicDetailsSection from './BasicDetailsSection';
@@ -57,46 +61,6 @@ interface EnhancedPropertyDetailsProps extends PropertyDetailsProps {
   currentUser?: { id: string } | null;
 }
 
-// Define static data for similar properties
-const SIMILAR_PROPERTIES_DATA = [
-  {
-    id: 'similar-1',
-    title: 'Luxury Apartment in City Center',
-    address: '',
-    city: 'Madhapur',
-    state: 'Hyderabad',
-    price: 8500000,
-    bedrooms: 3,
-    bathrooms: 2,
-    square_feet: 1600,
-    property_details: { propertyType: 'Apartment' }
-  },
-  {
-    id: 'similar-2',
-    title: 'Modern Villa with Garden',
-    address: '',
-    city: 'Gachibowli',
-    state: 'Hyderabad',
-    price: 12000000,
-    bedrooms: 4,
-    bathrooms: 3,
-    square_feet: 2200,
-    property_details: { propertyType: 'Villa' }
-  },
-  {
-    id: 'similar-3',
-    title: 'Affordable 2BHK Near Metro',
-    address: '',
-    city: 'Miyapur',
-    state: 'Hyderabad',
-    price: 4500000,
-    bedrooms: 2,
-    bathrooms: 2,
-    square_feet: 1100,
-    property_details: { propertyType: 'Apartment' }
-  }
-];
-
 const PropertyDetails: React.FC<EnhancedPropertyDetailsProps> = ({
   property,
   isLiked,
@@ -128,6 +92,11 @@ const PropertyDetails: React.FC<EnhancedPropertyDetailsProps> = ({
   // State for success message visibility
   const [showSuccessMessage, setShowSuccessMessage] = useState<boolean>(false);
 
+  // State for similar properties
+  const [similarProperties, setSimilarProperties] = useState<SearchResult[]>([]);
+  const [similarPropertiesLoading, setSimilarPropertiesLoading] = useState<boolean>(false);
+  const [similarPropertiesError, setSimilarPropertiesError] = useState<string | null>(null);
+
   // Generate or retrieve property code when component mounts
   useEffect(() => {
     if (propertyData?.propertyId) {
@@ -148,6 +117,81 @@ const PropertyDetails: React.FC<EnhancedPropertyDetailsProps> = ({
         });
     }
   }, [propertyData?.propertyId, property]);
+
+  // Fetch similar properties when property data is available
+  useEffect(() => {
+    const loadSimilarProperties = async () => {
+      if (!propertyData?.propertyId) {
+        console.log('[PropertyDetails] No property ID available for similar properties');
+        return;
+      }
+
+      console.log(`[PropertyDetails] Loading similar properties for ${propertyData.propertyId}`);
+      setSimilarPropertiesLoading(true);
+      setSimilarPropertiesError(null);
+
+      try {
+        const results = await fetchSimilarProperties(
+          propertyData.propertyId,
+          10,    // limit: 10 properties
+          0.7    // similarity threshold: 0.7
+        );
+
+        console.log(`[PropertyDetails] Found ${results.length} similar properties`);
+        setSimilarProperties(results);
+        
+        if (results.length === 0) {
+          console.log('[PropertyDetails] No similar properties found');
+        }
+      } catch (error) {
+        console.error('[PropertyDetails] Error loading similar properties:', error);
+        setSimilarPropertiesError(
+          error instanceof Error ? error.message : 'Failed to load similar properties'
+        );
+      } finally {
+        setSimilarPropertiesLoading(false);
+      }
+    };
+
+    loadSimilarProperties();
+  }, [propertyData?.propertyId]);
+
+  // Function to refresh similar properties
+  const refreshSimilarProperties = async () => {
+    if (!propertyData?.propertyId) return;
+
+    console.log('[PropertyDetails] Refreshing similar properties');
+    setSimilarPropertiesLoading(true);
+    setSimilarPropertiesError(null);
+
+    try {
+      const results = await fetchSimilarProperties(
+        propertyData.propertyId,
+        10,
+        0.7
+      );
+      setSimilarProperties(results);
+      
+      toast({
+        title: "Similar Properties Refreshed",
+        description: `Found ${results.length} similar properties`,
+        variant: "default"
+      });
+    } catch (error) {
+      console.error('[PropertyDetails] Error refreshing similar properties:', error);
+      setSimilarPropertiesError(
+        error instanceof Error ? error.message : 'Failed to refresh similar properties'
+      );
+      
+      toast({
+        title: "Refresh Failed",
+        description: "Unable to refresh similar properties. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setSimilarPropertiesLoading(false);
+    }
+  };
 
   // Page load animation effect
   useEffect(() => {
@@ -905,16 +949,10 @@ const PropertyDetails: React.FC<EnhancedPropertyDetailsProps> = ({
           )}
 
           <SimilarProperties
-            properties={SIMILAR_PROPERTIES_DATA.map(prop => ({
-              id: prop.id,
-              title: prop.title,
-              city: prop.city,
-              state: prop.state,
-              price: prop.price,
-              bedrooms: prop.bedrooms,
-              bathrooms: prop.bathrooms,
-              square_feet: prop.square_feet
-            }))}
+            properties={similarProperties}
+            isLoading={similarPropertiesLoading}
+            error={similarPropertiesError}
+            onRefresh={refreshSimilarProperties}
           />
 
           <NearbyAmenities
