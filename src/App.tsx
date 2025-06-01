@@ -1,7 +1,7 @@
 // src/App.tsx 
-// Version: 9.6.0
-// Last Modified: 02-06-2025 10:40 IST
-// Purpose: Made /browse and /explore render the same FindPage component instead of redirects
+// Version: 9.7.0
+// Last Modified: 02-06-2025 15:40 IST
+// Purpose: Updated /explore route to use new ExploreProperties page
 
 import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
@@ -17,6 +17,7 @@ import Footer from '@/components/Footer';
 import HomePage from './pages/HomePage';
 import SearchPage from './pages/SearchPage';
 import FindPage from './pages/FindPage';
+import ExploreProperties from './pages/ExploreProperties';
 import PropertyMapHome from './modules/seeker';
 import Dashboard from './modules/owner/pages/Dashboard';
 import Properties from './modules/owner/pages/Properties';
@@ -298,7 +299,7 @@ function App() {
                     } 
                   />
                   
-                  {/* Browse and Explore routes - same functionality as Find */}
+                  {/* Browse route - same functionality as Find */}
                   <Route 
                     path="/browse" 
                     element={
@@ -308,11 +309,12 @@ function App() {
                     } 
                   />
                   
+                  {/* Explore route - NEW ExploreProperties page */}
                   <Route 
                     path="/explore" 
                     element={
                       <PublicOrProtectedRoute>
-                        <FindPage />
+                        <ExploreProperties />
                       </PublicOrProtectedRoute>
                     } 
                   />
