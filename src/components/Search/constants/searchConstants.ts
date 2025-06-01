@@ -1,15 +1,15 @@
 // src/components/Search/constants/searchConstants.ts
-// Version: 2.0.0
-// Last Modified: 31-01-2025 16:30 IST
-// Purpose: Updated constants to match new dropdown requirements with Action Type (Buy/Sell), conditional Land for Sell only
+// Version: 3.0.0
+// Last Modified: 01-06-2025 17:15 IST
+// Purpose: Updated property types and subtypes to match exact dropdown requirements with COWORKING_SUBTYPES kept for compatibility
 
 import { PropertyType } from '../types/search.types';
 
-// Updated Action Types (Buy/Sell instead of Buy/Rent)
+// Action Types - Buy/Rent
 export const ACTION_TYPES: Record<string, string> = {
   any: 'Any',
   buy: 'Buy', 
-  sell: 'Sell'
+  rent: 'Rent'
 };
 
 // Keep TRANSACTION_TYPES for backward compatibility
@@ -18,12 +18,11 @@ export const TRANSACTION_TYPES: Record<string, string> = {
   rent: 'Rent'
 };
 
-// Updated Property types with conditional logic for Land
+// Updated Property types with exact subtypes as per requirements
 export const PROPERTY_TYPES: Record<string, PropertyType> = {
   residential: {
     label: 'Residential',
     subtypes: {
-      // For Buy/Sell transactions
       apartment: 'Apartment',
       independent_house: 'Independent House', 
       villa: 'Villa',
@@ -35,14 +34,13 @@ export const PROPERTY_TYPES: Record<string, PropertyType> = {
   commercial: {
     label: 'Commercial',
     subtypes: {
-      // For Buy/Sell transactions
       office_space: 'Office Space',
       shop: 'Shop',
       showroom: 'Showroom',
       godown_warehouse: 'Godown/Warehouse',
       industrial_shed: 'Industrial Shed',
       industrial_building: 'Industrial Building',
-      other_business: 'Other Business'
+      other_building: 'Other Building'
     }
   },
   land: {
@@ -71,12 +69,13 @@ export const PROPERTY_TYPES: Record<string, PropertyType> = {
       single_sharing: 'Single Sharing',
       double_sharing: 'Double Sharing', 
       triple_sharing: 'Triple Sharing',
-      four_sharing: 'Four Sharing'
+      four_sharing: 'Four Sharing',
+      dormitory: 'Dormitory'
     }
   }
 };
 
-// Coworking specific subtypes for Commercial -> Co-working
+// Keep COWORKING_SUBTYPES for backward compatibility (even though not used in new structure)
 export const COWORKING_SUBTYPES: Record<string, string> = {
   private_office: 'Private Office',
   dedicated_desk: 'Dedicated Desk',
@@ -87,7 +86,7 @@ export const COWORKING_SUBTYPES: Record<string, string> = {
   virtual_office: 'Virtual Office'
 };
 
-// BHK types for residential properties (excluding PG/Hostel and Flatmates)
+// BHK types for residential properties only
 export const BHK_TYPES: Record<string, string> = {
   '1bhk': '1 BHK',
   '2bhk': '2 BHK',
@@ -130,16 +129,22 @@ export const PRICE_RANGES: Record<string, string> = {
 
 // Helper function to get available property types based on action type
 export const getAvailablePropertyTypes = (actionType: string): Record<string, PropertyType> => {
-  const availableTypes: Record<string, PropertyType> = {
-    residential: PROPERTY_TYPES.residential,
-    commercial: PROPERTY_TYPES.commercial,
-    pghostel: PROPERTY_TYPES.pghostel,
-    flatmates: PROPERTY_TYPES.flatmates
-  };
+  const availableTypes: Record<string, PropertyType> = {};
 
-  // Land is only available for "Sell" action
-  if (actionType === 'sell') {
+  if (actionType === 'buy') {
+    // For Buy: Residential, Commercial, Land
+    availableTypes.residential = PROPERTY_TYPES.residential;
+    availableTypes.commercial = PROPERTY_TYPES.commercial;
     availableTypes.land = PROPERTY_TYPES.land;
+  } else if (actionType === 'rent') {
+    // For Rent: Residential, Commercial, PG/Hostel, Flatmates
+    availableTypes.residential = PROPERTY_TYPES.residential;
+    availableTypes.commercial = PROPERTY_TYPES.commercial;
+    availableTypes.pghostel = PROPERTY_TYPES.pghostel;
+    availableTypes.flatmates = PROPERTY_TYPES.flatmates;
+  } else {
+    // For Any: All property types available
+    return PROPERTY_TYPES;
   }
 
   return availableTypes;
@@ -148,32 +153,26 @@ export const getAvailablePropertyTypes = (actionType: string): Record<string, Pr
 // Helper function to get subtypes based on property type and action type
 export const getSubtypesForProperty = (
   propertyType: string, 
-  actionType: string, 
-  isCoworking: boolean = false
+  actionType: string,
+  isCoworking: boolean = false // Keep for backward compatibility
 ): Record<string, string> => {
   if (!propertyType || propertyType === 'any') {
     return {};
   }
 
-  // Special case for coworking spaces
+  // Legacy coworking support (keep for backward compatibility)
   if (propertyType === 'commercial' && isCoworking) {
     return COWORKING_SUBTYPES;
   }
 
-  // For PG/Hostel and Flatmates, always return their specific subtypes
-  if (propertyType === 'pghostel' || propertyType === 'flatmates') {
-    return PROPERTY_TYPES[propertyType].subtypes;
+  // Check if property type is available for the selected action type
+  const availableTypes = getAvailablePropertyTypes(actionType);
+  
+  if (!availableTypes[propertyType as keyof typeof availableTypes]) {
+    return {}; // Property type not available for this action
   }
 
-  // For Land, only available with Sell action
-  if (propertyType === 'land') {
-    if (actionType === 'sell') {
-      return PROPERTY_TYPES.land.subtypes;
-    }
-    return {}; // No subtypes if land is not with sell
-  }
-
-  // For Residential and Commercial with Buy/Sell actions
+  // Return subtypes for the property type
   if (PROPERTY_TYPES[propertyType as keyof typeof PROPERTY_TYPES]) {
     return PROPERTY_TYPES[propertyType as keyof typeof PROPERTY_TYPES].subtypes;
   }
@@ -183,7 +182,6 @@ export const getSubtypesForProperty = (
 
 // Helper function to check if BHK should be shown
 export const shouldShowBHK = (propertyType: string): boolean => {
-  return propertyType === 'residential' && 
-         propertyType !== 'pghostel' && 
-         propertyType !== 'flatmates';
+  // BHK is only shown for Residential properties (not PG/Hostel or Flatmates)
+  return propertyType === 'residential';
 };
