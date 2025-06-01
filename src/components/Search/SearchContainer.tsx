@@ -1,9 +1,9 @@
 // src/components/Search/SearchContainer.tsx
-// Version: 4.0.0
-// Last Modified: 01-06-2025 18:30 IST
-// Purpose: Unified, visually appealing search component with gradient header and integrated filters
+// Version: 4.1.0
+// Last Modified: 02-06-2025 18:45 IST
+// Purpose: Fixed hook ordering issue and React rules violations
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
@@ -20,11 +20,86 @@ const SearchContainer: React.FC<SearchContainerProps> = ({
   showResults = true,
   className = ''
 }) => {
-  const search = useSearch(onSearch);
+  // ✅ ALL useState hooks FIRST - maintain consistent order
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isPropertyCode, setIsPropertyCode] = useState(false);
 
+  // ✅ Custom hooks AFTER useState hooks
+  const search = useSearch(onSearch);
+
+  // ✅ ALL useCallback hooks AFTER useState and custom hooks
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    search.updateSearchQuery(e.target.value);
+  }, [search]);
+
+  const handleSuggestionClick = useCallback((suggestion: string) => {
+    // If it's a code suggestion, extract the code
+    if (suggestion.startsWith('Search by code:')) {
+      const code = suggestion.replace('Search by code:', '').trim();
+      search.updateSearchQuery(code);
+    } else {
+      search.updateSearchQuery(suggestion);
+    }
+    setShowSuggestions(false);
+    search.handleSearch();
+  }, [search]);
+
+  const handleKeyPress = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      setShowSuggestions(false);
+      search.handleSearch();
+    } else if (e.key === 'Escape') {
+      setShowSuggestions(false);
+    }
+  }, [search]);
+
+  const getPlaceholderText = useCallback(() => {
+    if (isPropertyCode) {
+      return `Property code: ${search.filters.searchQuery.toUpperCase()}`;
+    }
+    return 'Search by property name, location, or code…';
+  }, [isPropertyCode, search.filters.searchQuery]);
+
+  const handleViewDetails = useCallback((propertyId: string) => {
+    console.log('Viewing property details for:', propertyId);
+  }, []);
+
+  const handleContactOwner = useCallback((propertyId: string) => {
+    console.log('Contacting owner for property:', propertyId);
+  }, []);
+
+  const handleActionTypeChange = useCallback((value: string) => {
+    search.updateFilter('actionType', value);
+  }, [search]);
+
+  const handlePropertyTypeChange = useCallback((value: string) => {
+    search.updateFilter('selectedPropertyType', value);
+  }, [search]);
+
+  const handleSubTypeChange = useCallback((value: string) => {
+    search.updateFilter('selectedSubType', value);
+  }, [search]);
+
+  const handleBHKChange = useCallback((value: string) => {
+    search.updateFilter('selectedBHK', value);
+  }, [search]);
+
+  const handlePriceRangeChange = useCallback((value: string) => {
+    search.updateFilter('selectedPriceRange', value);
+  }, [search]);
+
+  const handleSuggestionFocus = useCallback(() => {
+    if (suggestions.length > 0) {
+      setShowSuggestions(true);
+    }
+  }, [suggestions.length]);
+
+  const handleSuggestionBlur = useCallback(() => {
+    setTimeout(() => setShowSuggestions(false), 200);
+  }, []);
+
+  // ✅ ALL useEffect hooks AFTER all other hooks
   // Check if query looks like a property code
   useEffect(() => {
     const isCode = searchService.isPropertyCode(search.filters.searchQuery);
@@ -57,38 +132,7 @@ const SearchContainer: React.FC<SearchContainerProps> = ({
     return () => clearTimeout(timeoutId);
   }, [search.filters.searchQuery]);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    search.updateSearchQuery(e.target.value);
-  };
-
-  const handleSuggestionClick = (suggestion: string) => {
-    // If it's a code suggestion, extract the code
-    if (suggestion.startsWith('Search by code:')) {
-      const code = suggestion.replace('Search by code:', '').trim();
-      search.updateSearchQuery(code);
-    } else {
-      search.updateSearchQuery(suggestion);
-    }
-    setShowSuggestions(false);
-    search.handleSearch();
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      setShowSuggestions(false);
-      search.handleSearch();
-    } else if (e.key === 'Escape') {
-      setShowSuggestions(false);
-    }
-  };
-
-  const getPlaceholderText = () => {
-    if (isPropertyCode) {
-      return `Property code: ${search.filters.searchQuery.toUpperCase()}`;
-    }
-    return 'Search by property name, location, or code…';
-  };
-
+  // ✅ Compute derived values after all hooks
   // Get available property types based on action type
   const availablePropertyTypes = getAvailablePropertyTypes(search.filters.actionType);
 
@@ -105,14 +149,7 @@ const SearchContainer: React.FC<SearchContainerProps> = ({
   // Determine if BHK should be shown
   const showBHK = shouldShowBHK(search.filters.selectedPropertyType);
 
-  const handleViewDetails = (propertyId: string) => {
-    console.log('Viewing property details for:', propertyId);
-  };
-
-  const handleContactOwner = (propertyId: string) => {
-    console.log('Contacting owner for property:', propertyId);
-  };
-
+  // ✅ JSX render
   return (
     <div className={`bg-background ${className}`}>
       {/* Unified Search Card */}
@@ -151,8 +188,8 @@ const SearchContainer: React.FC<SearchContainerProps> = ({
                     value={search.filters.searchQuery}
                     onChange={handleInputChange}
                     onKeyPress={handleKeyPress}
-                    onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
-                    onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                    onFocus={handleSuggestionFocus}
+                    onBlur={handleSuggestionBlur}
                     className={`
                       h-12 pl-4 pr-4 text-slate-900 bg-white border-0 rounded-lg focus:ring-2 focus:ring-white/50 shadow-sm
                       ${isPropertyCode ? 'border-2 border-orange-300 bg-orange-50' : ''}
@@ -229,8 +266,8 @@ const SearchContainer: React.FC<SearchContainerProps> = ({
                   value={search.filters.searchQuery}
                   onChange={handleInputChange}
                   onKeyPress={handleKeyPress}
-                  onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
-                  onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                  onFocus={handleSuggestionFocus}
+                  onBlur={handleSuggestionBlur}
                   className={`
                     w-full h-12 pl-4 pr-12 text-slate-900 bg-white border-0 rounded-lg focus:ring-2 focus:ring-white/50 shadow-sm
                     ${isPropertyCode ? 'border-2 border-orange-300 bg-orange-50' : ''}
@@ -288,7 +325,7 @@ const SearchContainer: React.FC<SearchContainerProps> = ({
                 {/* Action Type Filter (Buy/Sell/Any) */}
                 <Select 
                   value={search.filters.actionType} 
-                  onValueChange={(value) => search.updateFilter('actionType', value)}
+                  onValueChange={handleActionTypeChange}
                 >
                   <SelectTrigger className="w-auto min-w-[100px] h-11 border-gray-200 bg-gray-50 hover:bg-gray-100 rounded-lg shadow-sm transition-all duration-200 hover:shadow-md focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
                     <SelectValue placeholder="Any" />
@@ -305,7 +342,7 @@ const SearchContainer: React.FC<SearchContainerProps> = ({
                 {/* Property Type Filter */}
                 <Select 
                   value={search.filters.selectedPropertyType} 
-                  onValueChange={(value) => search.updateFilter('selectedPropertyType', value)}
+                  onValueChange={handlePropertyTypeChange}
                 >
                   <SelectTrigger className="w-auto min-w-[130px] h-11 border-gray-200 bg-gray-50 hover:bg-gray-100 rounded-lg shadow-sm transition-all duration-200 hover:shadow-md focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
                     <SelectValue placeholder="Any" />
@@ -323,7 +360,7 @@ const SearchContainer: React.FC<SearchContainerProps> = ({
                 {/* Subtype Filter */}
                 <Select 
                   value={search.filters.selectedSubType} 
-                  onValueChange={(value) => search.updateFilter('selectedSubType', value)}
+                  onValueChange={handleSubTypeChange}
                   disabled={!search.filters.selectedPropertyType || 
                            search.filters.selectedPropertyType === 'any' ||
                            Object.keys(availableSubtypes).length === 0}
@@ -345,7 +382,7 @@ const SearchContainer: React.FC<SearchContainerProps> = ({
                 {showBHK && (
                   <Select 
                     value={search.filters.selectedBHK} 
-                    onValueChange={(value) => search.updateFilter('selectedBHK', value)}
+                    onValueChange={handleBHKChange}
                   >
                     <SelectTrigger className="w-auto min-w-[100px] h-11 border-gray-200 bg-gray-50 hover:bg-gray-100 rounded-lg shadow-sm transition-all duration-200 hover:shadow-md focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
                       <SelectValue placeholder="Any" />
@@ -364,7 +401,7 @@ const SearchContainer: React.FC<SearchContainerProps> = ({
                 {/* Price Range Filter */}
                 <Select 
                   value={search.filters.selectedPriceRange} 
-                  onValueChange={(value) => search.updateFilter('selectedPriceRange', value)}
+                  onValueChange={handlePriceRangeChange}
                 >
                   <SelectTrigger className="w-auto min-w-[130px] h-11 border-gray-200 bg-gray-50 hover:bg-gray-100 rounded-lg shadow-sm transition-all duration-200 hover:shadow-md focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
                     <SelectValue placeholder="Any" />

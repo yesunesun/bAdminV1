@@ -1,7 +1,7 @@
 // src/components/Search/hooks/useSearch.ts
-// Version: 2.0.0
-// Last Modified: 31-01-2025 16:50 IST
-// Purpose: Updated to handle actionType instead of transactionType and new filter logic
+// Version: 3.0.0
+// Last Modified: 02-06-2025 18:40 IST
+// Purpose: Updated to use fixed search service with proper parameter mapping
 
 import { useState, useCallback, useEffect } from 'react';
 import { SearchFilters, SearchResult, SearchState } from '../types/search.types';
@@ -26,7 +26,7 @@ export const useSearch = (onSearchCallback?: (filters: SearchFilters) => void) =
     const { filters } = searchFilters;
     return !filters.searchQuery && 
            (!filters.selectedLocation || filters.selectedLocation === 'any') &&
-           (!filters.actionType || filters.actionType === 'any') && // CHANGED: from transactionType
+           (!filters.actionType || filters.actionType === 'any') &&
            (!filters.selectedPropertyType || filters.selectedPropertyType === 'any') && 
            (!filters.selectedSubType || filters.selectedSubType === 'any') && 
            (!filters.selectedBHK || filters.selectedBHK === 'any') && 
@@ -41,45 +41,54 @@ export const useSearch = (onSearchCallback?: (filters: SearchFilters) => void) =
       // Reset the wasCleared flag
       setWasCleared(false);
       
-      // Trigger the callback to load default results
+      // Load default latest properties
+      loadLatestProperties();
+    }
+  }, [wasCleared, areFiltersEmpty]);
+
+  /**
+   * Load latest properties as default content
+   */
+  const loadLatestProperties = useCallback(async () => {
+    try {
+      setSearchState(prev => ({
+        ...prev,
+        loading: true,
+        error: null
+      }));
+
+      console.log('🏠 Loading latest properties as default content');
+      const response = await searchService.getLatestProperties(50);
+      
+      setSearchState(prev => ({
+        ...prev,
+        loading: false,
+        results: response.results,
+        totalCount: response.totalCount
+      }));
+
+      // Call external callback if provided
       if (onSearchCallback) {
-        // Call with empty filters to signal loading default results
         onSearchCallback(searchFilters.filters);
       }
+      
+    } catch (error) {
+      console.error('Error loading latest properties:', error);
+      setSearchState(prev => ({
+        ...prev,
+        loading: false,
+        error: error instanceof Error ? error.message : 'Failed to load properties',
+        results: [],
+        totalCount: 0
+      }));
     }
-  }, [wasCleared, areFiltersEmpty, onSearchCallback, searchFilters.filters]);
+  }, [onSearchCallback, searchFilters.filters]);
 
   /**
-   * Transform ActionType to TransactionType for backend compatibility
-   */
-  const getTransactionTypeFromActionType = (actionType: string): string => {
-    switch (actionType) {
-      case 'buy':
-        return 'buy';
-      case 'sell':
-        return 'buy'; // Sell is also treated as buy transaction in database
-      case 'any':
-      default:
-        return 'rent'; // Default to rent
-    }
-  };
-
-  /**
-   * Transform filters for backend compatibility
-   */
-  const transformFiltersForBackend = (filters: SearchFilters) => {
-    // Create a compatible filter object for the backend
-    return {
-      ...filters,
-      transactionType: getTransactionTypeFromActionType(filters.actionType)
-    };
-  };
-
-  /**
-   * ENHANCED: Smart search that detects 6-character property codes and uses appropriate search method
+   * Enhanced smart search using the fixed search service
    */
   const handleSearch = useCallback(async () => {
-    console.log('Search initiated with:', searchFilters.filters);
+    console.log('🔍 Search initiated with filters:', searchFilters.filters);
     
     // Call external callback if provided
     if (onSearchCallback) {
@@ -96,21 +105,22 @@ export const useSearch = (onSearchCallback?: (filters: SearchFilters) => void) =
       let response;
       const query = searchFilters.filters.searchQuery?.trim();
       
-      // Transform filters for backend compatibility
-      const backendFilters = transformFiltersForBackend(searchFilters.filters);
-      
+      // Check if all filters are empty - load latest properties
+      if (areFiltersEmpty()) {
+        console.log('🏠 No filters applied - loading latest properties');
+        response = await searchService.getLatestProperties(50);
+      }
       // Check if the search query is exactly a 6-character alphanumeric property code
-      if (query && searchService.isPropertyCode(query)) {
-        console.log('🎯 Detected 6-character property code in search, using smart search');
-        // Use smart search which tries code search first, then falls back to regular search
-        response = await searchService.smartSearch(backendFilters, {
+      else if (query && searchService.isPropertyCode(query)) {
+        console.log('🎯 Detected 6-character property code, using smart search');
+        response = await searchService.smartSearch(searchFilters.filters, {
           page: 1,
           limit: 50
         });
       } else {
-        // Use regular search for non-code queries
-        console.log('🔍 Using regular search (not a 6-character property code)');
-        response = await searchService.search(backendFilters, {
+        // Use regular search with proper parameter mapping
+        console.log('🔍 Using regular search with proper parameter mapping');
+        response = await searchService.search(searchFilters.filters, {
           page: 1,
           limit: 50
         });
@@ -133,7 +143,7 @@ export const useSearch = (onSearchCallback?: (filters: SearchFilters) => void) =
         totalCount: 0
       }));
     }
-  }, [searchFilters.filters, onSearchCallback]);
+  }, [searchFilters.filters, onSearchCallback, areFiltersEmpty]);
 
   /**
    * Direct property code search method (for exactly 6-character codes)
@@ -184,6 +194,56 @@ export const useSearch = (onSearchCallback?: (filters: SearchFilters) => void) =
     }
   }, []);
 
+  /**
+   * Search specific property type with proper parameter mapping
+   */
+  const searchPropertyType = useCallback(async (propertyType: 'residential' | 'commercial' | 'land') => {
+    try {
+      setSearchState(prev => ({
+        ...prev,
+        loading: true,
+        error: null
+      }));
+
+      let response;
+      const options = { page: 1, limit: 50 };
+
+      switch (propertyType) {
+        case 'residential':
+          response = await searchService.searchResidentialProperties(searchFilters.filters, options);
+          break;
+        case 'commercial':
+          response = await searchService.searchCommercialProperties(searchFilters.filters, options);
+          break;
+        case 'land':
+          response = await searchService.searchLandProperties(searchFilters.filters, options);
+          break;
+        default:
+          throw new Error(`Unsupported property type: ${propertyType}`);
+      }
+      
+      setSearchState(prev => ({
+        ...prev,
+        loading: false,
+        results: response.results,
+        totalCount: response.totalCount
+      }));
+
+      return response.results;
+      
+    } catch (error) {
+      console.error(`${propertyType} search error:`, error);
+      setSearchState(prev => ({
+        ...prev,
+        loading: false,
+        error: error instanceof Error ? error.message : `${propertyType} search failed`,
+        results: [],
+        totalCount: 0
+      }));
+      return [];
+    }
+  }, [searchFilters.filters]);
+
   const updateSearchQuery = useCallback((query: string) => {
     searchFilters.updateFilter('searchQuery', query);
   }, [searchFilters]);
@@ -209,7 +269,7 @@ export const useSearch = (onSearchCallback?: (filters: SearchFilters) => void) =
   }, []);
 
   /**
-   * UPDATED: Get search suggestions with 6-character property code support
+   * Get search suggestions with 6-character property code support
    */
   const getSearchSuggestions = useCallback(async (query: string): Promise<string[]> => {
     try {
@@ -227,6 +287,18 @@ export const useSearch = (onSearchCallback?: (filters: SearchFilters) => void) =
     return searchService.isPropertyCode(query);
   }, []);
 
+  /**
+   * Get popular searches
+   */
+  const getPopularSearches = useCallback(async (): Promise<string[]> => {
+    try {
+      return await searchService.getPopularSearches();
+    } catch (error) {
+      console.error('Error getting popular searches:', error);
+      return [];
+    }
+  }, []);
+
   return {
     // Search filters (override clearAllFilters with enhanced version)
     ...searchFilters,
@@ -238,11 +310,14 @@ export const useSearch = (onSearchCallback?: (filters: SearchFilters) => void) =
     // Search actions
     handleSearch,
     searchByCode, // Direct code search for 6-character codes
+    searchPropertyType, // Search specific property type
+    loadLatestProperties, // Load default latest properties
     updateSearchQuery,
     updateLocation,
     clearResults,
     getSearchSuggestions, // Enhanced suggestions with code support
-    isValidPropertyCode, // NEW: Utility to check if query is valid property code
+    isValidPropertyCode, // Utility to check if query is valid property code
+    getPopularSearches, // Get popular search terms
     
     // Combined state for convenience
     searchState: {
