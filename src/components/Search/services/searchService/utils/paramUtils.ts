@@ -193,6 +193,7 @@ export const buildCommercialSearchParams = (filters: SearchFilters, options: Sea
 
 /**
  * Build search parameters for land properties according to search_land_properties function
+ * NOTE: Land properties do NOT use p_subtype - they are always for sale by default
  */
 export const buildLandSearchParams = (filters: SearchFilters, options: SearchOptions): SearchParams => {
   const params: SearchParams = {
@@ -224,21 +225,28 @@ export const buildLandSearchParams = (filters: SearchFilters, options: SearchOpt
     params.p_state = 'Telangana';
   }
 
-  // Land is typically only for sale
-  params.p_subtype = 'sale';
+  // IMPORTANT: NO p_subtype parameter for land - land is always for sale by default
+  // The search_land_properties function does not use p_subtype parameter
 
-  // Property subtype for land - uses p_property_subtype parameter
+  // Property subtype for land (agricultural, residential, commercial, industrial)
   if (filters.selectedSubType && filters.selectedSubType !== 'any') {
     const landSubtypeMapping: Record<string, string> = {
-      'residential_plot': 'residential_plot',
-      'commercial_plot': 'commercial_plot',
-      'agricultural_land': 'agricultural_land',
-      'industrial_land': 'industrial_land',
-      'mixed_use_land': 'mixed_use_land'
+      // Map UI selections to database land types as per documentation
+      'agricultural_land': 'agricultural',
+      'agricultural': 'agricultural',
+      'residential_plot': 'residential',
+      'residential': 'residential', 
+      'commercial_plot': 'commercial',
+      'commercial': 'commercial',
+      'industrial_land': 'industrial',
+      'industrial': 'industrial',
+      'mixed_use_land': 'mixed_use',
+      'mixed_use': 'mixed_use'
     };
     
     if (landSubtypeMapping[filters.selectedSubType]) {
       params.p_property_subtype = landSubtypeMapping[filters.selectedSubType];
+      console.log('🌍 Land property subtype applied:', landSubtypeMapping[filters.selectedSubType]);
     }
   }
 
@@ -251,6 +259,20 @@ export const buildLandSearchParams = (filters: SearchFilters, options: SearchOpt
       console.log('💰 Land price range filter applied:', priceRange);
     }
   }
+
+  // Area range filters (commonly used for land)
+  // TODO: Add area filter support to SearchFilters interface for land properties
+  // Land documentation shows p_area_min and p_area_max are important parameters
+  /*
+  if (filters.selectedAreaRange && filters.selectedAreaRange !== 'any') {
+    const areaRange = parseAreaRange(filters.selectedAreaRange);
+    if (areaRange) {
+      params.p_area_min = areaRange.min;
+      params.p_area_max = areaRange.max;
+      console.log('📐 Land area range filter applied:', areaRange);
+    }
+  }
+  */
 
   console.log('🔧 Final land search parameters:', params);
   return params;

@@ -120,6 +120,173 @@ export class ResidentialSearchDb extends BasePropertySearchDb {
       this.handleDatabaseError(error, 'search residential properties with custom limit');
     }
   }
+
+  /**
+   * SPECIALIZED SEARCH METHODS FOR FLATMATES AND PG/HOSTEL
+   */
+
+  /**
+   * Search flatmates properties with specialized filters
+   */
+  async searchFlatmates(options: {
+    city?: string;
+    genderPreference?: 'boys' | 'girls' | 'family';
+    minPrice?: number;
+    maxPrice?: number;
+    bedrooms?: number;
+    keywords?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<DatabaseSearchResult[]> {
+    console.log('🏠 Residential Database: Searching flatmates with options:', options);
+
+    try {
+      const { data, error } = await supabase.rpc('search_residential_properties', {
+        p_subtype: 'flatmates', // Fixed subtype for flatmates
+        p_property_subtype: options.genderPreference || null,
+        p_search_query: options.keywords || null,
+        p_city: options.city || null,
+        p_state: options.city ? 'Telangana' : null,
+        p_min_price: options.minPrice || null,
+        p_max_price: options.maxPrice || null,
+        p_bedrooms: options.bedrooms || null,
+        p_bathrooms: null,
+        p_area_min: null,
+        p_area_max: null,
+        p_limit: options.limit || 20,
+        p_offset: options.offset || 0
+      });
+
+      if (error) {
+        this.handleDatabaseError(error, 'search flatmates properties');
+      }
+
+      const results = this.validateResults(data);
+      console.log(`✅ Flatmates search: Found ${results.length} properties`);
+      return results;
+    } catch (error) {
+      this.handleDatabaseError(error, 'search flatmates properties');
+    }
+  }
+
+  /**
+   * Search PG/Hostel properties with specialized filters
+   */
+  async searchPGHostel(options: {
+    city?: string;
+    genderPreference?: 'boys' | 'girls' | 'family' | 'student' | 'executive';
+    minPrice?: number;
+    maxPrice?: number;
+    amenities?: string[]; // ['food', 'wifi', 'AC', 'laundry', 'security', 'parking']
+    accommodationType?: 'single' | 'double' | 'triple' | 'dormitory';
+    limit?: number;
+    offset?: number;
+  }): Promise<DatabaseSearchResult[]> {
+    console.log('🏨 Residential Database: Searching PG/Hostel with options:', options);
+
+    try {
+      // Build search query from amenities and accommodation type
+      let searchQuery = '';
+      if (options.amenities && options.amenities.length > 0) {
+        searchQuery += options.amenities.join(' ');
+      }
+      if (options.accommodationType) {
+        searchQuery += ` ${options.accommodationType} sharing`;
+      }
+
+      const { data, error } = await supabase.rpc('search_residential_properties', {
+        p_subtype: 'pghostel', // Fixed subtype for PG/Hostel
+        p_property_subtype: options.genderPreference || null,
+        p_search_query: searchQuery.trim() || null,
+        p_city: options.city || null,
+        p_state: options.city ? 'Telangana' : null,
+        p_min_price: options.minPrice || null,
+        p_max_price: options.maxPrice || null,
+        p_bedrooms: null, // PG rooms don't typically use bedroom count
+        p_bathrooms: null,
+        p_area_min: null,
+        p_area_max: null,
+        p_limit: options.limit || 20,
+        p_offset: options.offset || 0
+      });
+
+      if (error) {
+        this.handleDatabaseError(error, 'search PG/Hostel properties');
+      }
+
+      const results = this.validateResults(data);
+      console.log(`✅ PG/Hostel search: Found ${results.length} properties`);
+      return results;
+    } catch (error) {
+      this.handleDatabaseError(error, 'search PG/Hostel properties');
+    }
+  }
+
+  /**
+   * Search budget-friendly student accommodation (PG/Hostel under ₹10,000)
+   */
+  async searchStudentAccommodation(options: {
+    city?: string;
+    gender?: 'boys' | 'girls';
+    maxBudget?: number;
+    nearCollege?: boolean;
+    limit?: number;
+  }): Promise<DatabaseSearchResult[]> {
+    console.log('🎓 Residential Database: Searching student accommodation with options:', options);
+
+    const searchKeywords = [];
+    if (options.nearCollege) {
+      searchKeywords.push('college', 'university', 'student');
+    }
+
+    return await this.searchPGHostel({
+      city: options.city,
+      genderPreference: options.gender || 'student',
+      maxPrice: options.maxBudget || 10000,
+      amenities: ['wifi'], // Students typically need internet
+      limit: options.limit || 15
+    });
+  }
+
+  /**
+   * Search professional accommodation (working professionals)
+   */
+  async searchProfessionalAccommodation(options: {
+    city?: string;
+    type: 'flatmates' | 'pghostel';
+    gender?: 'boys' | 'girls' | 'family';
+    minPrice?: number;
+    maxPrice?: number;
+    furnished?: boolean;
+    limit?: number;
+  }): Promise<DatabaseSearchResult[]> {
+    console.log('💼 Residential Database: Searching professional accommodation with options:', options);
+
+    const searchKeywords = ['working professional'];
+    if (options.furnished) {
+      searchKeywords.push('furnished');
+    }
+
+    if (options.type === 'flatmates') {
+      return await this.searchFlatmates({
+        city: options.city,
+        genderPreference: options.gender,
+        minPrice: options.minPrice || 12000,
+        maxPrice: options.maxPrice || 30000,
+        keywords: searchKeywords.join(' '),
+        limit: options.limit || 20
+      });
+    } else {
+      return await this.searchPGHostel({
+        city: options.city,
+        genderPreference: options.gender || 'executive',
+        minPrice: options.minPrice || 15000,
+        maxPrice: options.maxPrice || 35000,
+        amenities: ['wifi', 'food'],
+        limit: options.limit || 20
+      });
+    }
+  }
 }
 
 /**

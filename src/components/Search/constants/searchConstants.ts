@@ -1,7 +1,7 @@
 // src/components/Search/constants/searchConstants.ts
-// Version: 3.0.0
-// Last Modified: 01-06-2025 17:15 IST
-// Purpose: Updated property types and subtypes to match exact dropdown requirements with COWORKING_SUBTYPES kept for compatibility
+// Version: 3.1.0
+// Last Modified: 02-06-2025 19:00 IST
+// Purpose: Updated with proper land types according to search_land_properties documentation
 
 import { PropertyType } from '../types/search.types';
 
@@ -46,11 +46,12 @@ export const PROPERTY_TYPES: Record<string, PropertyType> = {
   land: {
     label: 'Land',
     subtypes: {
-      residential_plot: 'Residential Plot',
-      commercial_plot: 'Commercial Plot',
-      agricultural_land: 'Agricultural Land',
-      industrial_land: 'Industrial Land',
-      mixed_use_land: 'Mixed-use Land'
+      // Updated land subtypes according to search_land_properties documentation
+      agricultural: 'Agricultural Land',
+      residential: 'Residential Plot',
+      commercial: 'Commercial Plot', 
+      industrial: 'Industrial Land',
+      mixed_use: 'Mixed-use Land'
     }
   },
   pghostel: {
@@ -113,7 +114,7 @@ export const TELANGANA_LOCATIONS: Record<string, string> = {
   vikarabad: 'Vikarabad'
 };
 
-// Price ranges
+// Price ranges - updated with broader ranges for land properties
 export const PRICE_RANGES: Record<string, string> = {
   'under-10l': 'Under ₹10L',
   '10l-25l': '₹10L - ₹25L', 
@@ -125,6 +126,29 @@ export const PRICE_RANGES: Record<string, string> = {
   '3cr-5cr': '₹3Cr - ₹5Cr',
   '5cr-10cr': '₹5Cr - ₹10Cr',
   'above-10cr': 'Above ₹10Cr'
+};
+
+// Area ranges for land properties (in sq ft)
+// These could be added to filters in the future
+export const LAND_AREA_RANGES: Record<string, string> = {
+  'under-1000': 'Under 1,000 sq ft',
+  '1000-2500': '1,000 - 2,500 sq ft',
+  '2500-5000': '2,500 - 5,000 sq ft', 
+  '5000-10000': '5,000 - 10,000 sq ft',
+  '10000-43560': '10,000 sq ft - 1 Acre',
+  '43560-87120': '1 - 2 Acres',
+  '87120-217800': '2 - 5 Acres',
+  '217800-435600': '5 - 10 Acres',
+  'above-435600': 'Above 10 Acres'
+};
+
+// Area units commonly used in Indian land transactions
+export const AREA_UNITS: Record<string, string> = {
+  'sq_ft': 'Square Feet',
+  'acres': 'Acres',
+  'guntas': 'Guntas',
+  'cents': 'Cents',
+  'hectares': 'Hectares'
 };
 
 // Helper function to get available property types based on action type
@@ -184,4 +208,41 @@ export const getSubtypesForProperty = (
 export const shouldShowBHK = (propertyType: string): boolean => {
   // BHK is only shown for Residential properties (not PG/Hostel or Flatmates)
   return propertyType === 'residential';
+};
+
+// Helper function to check if area filters should be shown (for land properties)
+export const shouldShowAreaFilter = (propertyType: string): boolean => {
+  return propertyType === 'land';
+};
+
+// Helper function to get appropriate label for subtype dropdown
+export const getSubtypeLabel = (propertyType: string): string => {
+  switch (propertyType) {
+    case 'land':
+      return 'Land Type';
+    case 'pghostel':
+    case 'flatmates':
+      return 'Room Type';
+    case 'commercial':
+      return 'Space Type';
+    default:
+      return 'Property Type';
+  }
+};
+
+// Parse area range for land properties (future enhancement)
+export const parseAreaRange = (areaRange: string): { min: number; max: number } | null => {
+  const ranges: Record<string, { min: number; max: number }> = {
+    'under-1000': { min: 0, max: 1000 },
+    '1000-2500': { min: 1000, max: 2500 },
+    '2500-5000': { min: 2500, max: 5000 },
+    '5000-10000': { min: 5000, max: 10000 },
+    '10000-43560': { min: 10000, max: 43560 }, // Up to 1 acre
+    '43560-87120': { min: 43560, max: 87120 }, // 1-2 acres
+    '87120-217800': { min: 87120, max: 217800 }, // 2-5 acres
+    '217800-435600': { min: 217800, max: 435600 }, // 5-10 acres
+    'above-435600': { min: 435600, max: 99999999 } // Above 10 acres
+  };
+
+  return ranges[areaRange] || null;
 };
