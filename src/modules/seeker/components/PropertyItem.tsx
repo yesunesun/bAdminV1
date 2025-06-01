@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyItem.tsx
-// Version: 6.0.0
-// Last Modified: 01-06-2025 23:00 IST
-// Purpose: Updated to handle both PropertyType and SearchResult formats
+// Version: 6.1.0
+// Last Modified: 02-06-2025 13:30 IST
+// Purpose: Enhanced UI with improved hover effects, spacing, and visual hierarchy
 
 import React, { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
@@ -201,28 +201,32 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
   return (
     <div 
       key={`property-${propertyData.id}`}
-      className={`relative transition hover:bg-muted/40 ${isHovered ? 'bg-muted/40' : ''}`}
+      className={`
+        relative transition-all duration-300 
+        ${isHovered ? 'bg-gradient-to-r from-blue-50/50 to-purple-50/50 shadow-md' : 'hover:bg-muted/30'}
+        hover:shadow-lg rounded-xl mx-2 my-1
+      `}
     >
-      {/* Favorite Button - Top Right Corner of Card */}
-      <div className="absolute top-2 right-2 z-10">
+      {/* Enhanced Favorite Button - Top Right Corner */}
+      <div className="absolute top-3 right-3 z-10">
         <FavoriteButton
           initialIsLiked={isLiked}
           onToggle={handleFavoriteToggle}
           isLoading={isFavoriteLoading}
-          className="w-8 h-8"
+          className="w-8 h-8 bg-white/90 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-200"
         />
       </div>
 
-      <div className="p-3"
+      <div className="p-4"
         onMouseEnter={() => onHover(propertyData.id, true)}
         onMouseLeave={() => onHover(propertyData.id, false)}
         onClick={() => onSelect(property)}
       >
-        {/* Property Name at the top with blue text */}
-        <div className="mb-2">
+        {/* Enhanced Property Name with better typography */}
+        <div className="mb-3">
           <Link
             to={`/seeker/property/${propertyData.id}`}
-            className="text-sm font-medium text-blue-500 hover:underline truncate block"
+            className="text-sm font-semibold text-blue-600 hover:text-blue-700 hover:underline truncate block transition-colors duration-200"
           >
             {propertyData.title}
           </Link>
@@ -230,14 +234,14 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
         
         <Link 
           to={`/seeker/property/${propertyData.id}`} 
-          className="flex gap-2"
+          className="flex gap-3 group"
         >
-          {/* Property image */}
-          <div className="relative h-20 w-24 flex-shrink-0 overflow-hidden rounded-lg">
+          {/* Enhanced Property image with better styling */}
+          <div className="relative h-20 w-24 flex-shrink-0 overflow-hidden rounded-xl shadow-sm group-hover:shadow-md transition-shadow duration-200">
             <img
               src={imageUrl}
               alt={propertyData.title || 'Property'}
-              className="h-full w-full object-cover"
+              className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
               loading="lazy"
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
@@ -245,53 +249,58 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
                 target.src = '/noimage.png';
               }}
             />
+            {/* Enhanced image overlay on hover */}
+            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-200 rounded-xl"></div>
           </div>
           
-          {/* Property details */}
-          <div className="flex-1 min-w-0">
-            {/* Location with icon */}
-            <div className="flex items-center text-xs text-gray-500 mb-1">
-              <MapPin className="h-3 w-3 mr-1 flex-shrink-0" />
-              <span className="truncate">
+          {/* Enhanced Property details with improved spacing */}
+          <div className="flex-1 min-w-0 space-y-2">
+            {/* Enhanced Location with better styling */}
+            <div className="flex items-center text-xs text-muted-foreground">
+              <MapPin className="h-3 w-3 mr-1.5 flex-shrink-0 text-blue-500" />
+              <span className="truncate font-medium">
                 {propertyData.location}
               </span>
             </div>
             
-            {/* Price */}
-            <p className="text-sm font-semibold mb-2">
+            {/* Enhanced Price with better typography */}
+            <p className="text-sm font-bold text-foreground">
               {displayData.price}
             </p>
             
-            {/* Property specs */}
-            <div className="flex items-center gap-2 text-xs text-gray-500">
+            {/* Enhanced Property specs with better spacing */}
+            <div className="flex items-center gap-3 text-xs text-muted-foreground">
               {displayData.icons.map((icon, index) => (
-                <span key={index} className="flex items-center">
-                  {icon.icon}
-                  <span className="whitespace-nowrap">{icon.text}</span>
+                <span key={index} className="flex items-center hover:text-foreground transition-colors duration-200">
+                  <span className="text-blue-500">{icon.icon}</span>
+                  <span className="whitespace-nowrap font-medium">{icon.text}</span>
                 </span>
               ))}
             </div>
             
-            {/* Property Type and Listing Type Badges */}
-            <div className="mt-2 flex flex-wrap gap-2">
-              {/* Property Type Badge */}
-              <div className="inline-block text-xs text-white px-2 py-0.5 rounded bg-gray-500">
+            {/* Enhanced Property Type and Listing Type Badges */}
+            <div className="mt-3 flex flex-wrap gap-2">
+              {/* Enhanced Property Type Badge */}
+              <div className="inline-flex items-center text-xs text-white px-2.5 py-1 rounded-full bg-gradient-to-r from-gray-500 to-gray-600 font-medium shadow-sm">
                 {displayData.propertyType}
               </div>
               
-              {/* Listing Type Badge */}
-              <div className={`inline-block text-xs text-white px-2 py-0.5 rounded ${
-                displayData.listingDisplay.toLowerCase().includes('rent') 
-                  ? 'bg-blue-500' : 'bg-green-500'
-              }`}>
+              {/* Enhanced Listing Type Badge */}
+              <div className={`
+                inline-flex items-center text-xs text-white px-2.5 py-1 rounded-full font-medium shadow-sm
+                ${displayData.listingDisplay.toLowerCase().includes('rent') 
+                  ? 'bg-gradient-to-r from-blue-500 to-blue-600' 
+                  : 'bg-gradient-to-r from-green-500 to-green-600'
+                }
+              `}>
                 {displayData.listingDisplay}
               </div>
             </div>
           </div>
           
-          {/* Chevron icon */}
+          {/* Enhanced Chevron icon with hover animation */}
           <div className="self-center flex-shrink-0">
-            <ChevronRight className="h-4 w-4 text-gray-400" />
+            <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-blue-500 group-hover:translate-x-0.5 transition-all duration-200" />
           </div>
         </Link>
       </div>
@@ -299,7 +308,7 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
   );
 };
 
-// Keep the existing helper function for PropertyType format
+// Enhanced helper function for PropertyType format with better styling
 function getFlowSpecificDisplayData(property: PropertyType, flowType: string, details: any) {
   const basicDetails = details.basicDetails || {};
   const saleInfo = details.saleInfo || {};

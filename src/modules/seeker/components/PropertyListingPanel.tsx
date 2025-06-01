@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyListingPanel.tsx
-// Version: 5.1.0
-// Last Modified: 26-05-2025 15:30 IST
-// Purpose: Ultra-fast PropertyListingPanel with zero image API calls
+// Version: 5.3.0
+// Last Modified: 02-06-2025 15:30 IST
+// Purpose: Fixed bottom content visibility and scroll behavior for proper display of all properties and load more button
 
 import React, { useState, useEffect } from 'react';
 import { PropertyType } from '@/modules/owner/components/property/types';
@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Loader2, Info } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
-import PropertyItem from './PropertyItem'; // Use the original PropertyItem location
+import PropertyItem from './PropertyItem';
 
 interface PropertyListingPanelProps {
   properties: PropertyType[];
@@ -139,37 +139,40 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
   // Render content
   const renderContent = () => {
     if (loading && properties.length === 0) {
-      // Loading placeholders
+      // Enhanced loading placeholders with better visual hierarchy
       return (
-        <div className="divide-y">
+        <div className="divide-y divide-border/50">
           {[1, 2, 3, 4, 5].map((i) => (
-            <div key={`loading-skeleton-${i}`} className="p-3 border-b animate-pulse">
-              <div className="flex items-center justify-between mb-2">
-                <div className="h-4 bg-muted rounded w-1/2"></div>
+            <div key={`loading-skeleton-${i}`} className="p-4 animate-pulse">
+              <div className="flex items-center justify-between mb-3">
+                <div className="h-4 bg-muted rounded-lg w-1/2"></div>
                 <div className="flex items-center space-x-2">
                   <div className="h-4 w-4 bg-muted rounded-full"></div>
                   <div className="h-4 w-4 bg-muted rounded-full"></div>
                 </div>
               </div>
               
-              <div className="flex gap-2">
-                <div className="h-20 w-24 flex-shrink-0 bg-muted rounded-lg"></div>
+              <div className="flex gap-3">
+                <div className="h-20 w-24 flex-shrink-0 bg-muted rounded-xl"></div>
                 
-                <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-0 space-y-3">
                   <div className="flex items-center mb-1">
-                    <div className="h-3 w-3 bg-muted rounded-full mr-1"></div>
-                    <div className="h-3 bg-muted rounded w-3/4"></div>
+                    <div className="h-3 w-3 bg-muted rounded-full mr-2"></div>
+                    <div className="h-3 bg-muted rounded-lg w-3/4"></div>
                   </div>
                   
-                  <div className="h-4 bg-muted rounded w-1/3 mb-2"></div>
+                  <div className="h-4 bg-muted rounded-lg w-1/3"></div>
                   
-                  <div className="flex gap-2 mb-2">
-                    <div className="h-3 bg-muted rounded w-8"></div>
-                    <div className="h-3 bg-muted rounded w-8"></div>
-                    <div className="h-3 bg-muted rounded w-14"></div>
+                  <div className="flex gap-2">
+                    <div className="h-3 bg-muted rounded-lg w-12"></div>
+                    <div className="h-3 bg-muted rounded-lg w-12"></div>
+                    <div className="h-3 bg-muted rounded-lg w-16"></div>
                   </div>
                   
-                  <div className="h-5 w-16 bg-muted rounded"></div>
+                  <div className="flex gap-2">
+                    <div className="h-5 w-16 bg-muted rounded-lg"></div>
+                    <div className="h-5 w-16 bg-muted rounded-lg"></div>
+                  </div>
                 </div>
                 
                 <div className="self-center flex-shrink-0">
@@ -181,32 +184,44 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
         </div>
       );
     } else if (properties.length === 0) {
-      // No properties found state
+      // Enhanced empty state with better visual appeal
       return (
         <div className="flex flex-col items-center justify-center p-12 text-center">
-          <Info className="h-12 w-12 text-muted-foreground/40 mb-4" />
-          <h3 className="text-lg font-medium mb-1">No properties found</h3>
-          <p className="text-muted-foreground max-w-xs mb-4">
-            Try adjusting your filters or search for a different location
+          <div className="w-20 h-20 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center mb-6">
+            <Info className="h-10 w-10 text-muted-foreground/60" />
+          </div>
+          <h3 className="text-xl font-semibold mb-2 text-foreground">No properties found</h3>
+          <p className="text-muted-foreground max-w-xs mb-6 leading-relaxed">
+            Try adjusting your filters or search for a different location to discover more properties
           </p>
+          <div className="w-32 h-1 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full opacity-30"></div>
         </div>
       );
     } else {
-      // Property cards - NO batch image loading anymore
+      // Enhanced property cards with improved spacing
       return (
-        <div className="divide-y">
-          {properties.map((property) => (
-            <PropertyItem
+        <div className="divide-y divide-border/30">
+          {properties.map((property, index) => (
+            <div 
               key={property.id}
-              property={property}
-              isLiked={propertyLikeState[property.id] || false}
-              isHovered={hoveredProperty === property.id}
-              propertyImage="" // Empty - let PropertyItem handle its own images
-              onHover={handlePropertyHover}
-              onSelect={setActiveProperty}
-              onFavoriteToggle={handleFavoriteToggle}
-              onShare={handleShare}
-            />
+              className={`
+                transition-all duration-200 
+                ${hoveredProperty === property.id ? 'bg-muted/40 scale-[1.02]' : 'hover:bg-muted/20'}
+                ${index === 0 ? 'rounded-t-xl' : ''}
+                ${index === properties.length - 1 ? 'rounded-b-xl' : ''}
+              `}
+            >
+              <PropertyItem
+                property={property}
+                isLiked={propertyLikeState[property.id] || false}
+                isHovered={hoveredProperty === property.id}
+                propertyImage=""
+                onHover={handlePropertyHover}
+                onSelect={setActiveProperty}
+                onFavoriteToggle={handleFavoriteToggle}
+                onShare={handleShare}
+              />
+            </div>
           ))}
         </div>
       );
@@ -214,58 +229,79 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
   };
 
   return (
-    <div className="w-full h-full flex-shrink-0 p-3">
-      <div className="h-full overflow-hidden rounded-xl border border-border bg-card shadow-sm flex flex-col">
-        {/* Header with count */}
-        <div className="sticky top-0 z-10 bg-card p-3 border-b flex justify-between items-center">
-          <div className="text-sm font-medium">
+    <div className="w-full h-full flex flex-col">
+      <div className="h-full overflow-hidden rounded-2xl border border-border/50 bg-card shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col">
+        {/* Enhanced Header with better typography and spacing */}
+        <div className="flex-shrink-0 bg-card/95 backdrop-blur-sm p-4 border-b border-border/50 flex justify-between items-center">
+          <div className="text-sm font-semibold text-foreground">
             {loading || isLoadingFavorites ? (
-              <span className="flex items-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                {isLoadingFavorites ? 'Loading favorites...' : 'Loading properties...'}
+              <span className="flex items-center gap-3">
+                <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                <span className="text-muted-foreground">
+                  {isLoadingFavorites ? 'Loading favorites...' : 'Loading properties...'}
+                </span>
               </span>
             ) : (
-              <span>
-                {properties.length === 0 ? 'No properties found' : `${properties.length} of ${totalCount} properties`}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-foreground">
+                  {properties.length === 0 ? 'No properties found' : `${properties.length} of ${totalCount} properties`}
+                </span>
+                {properties.length > 0 && totalCount > properties.length && (
+                  <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">
+                    +{totalCount - properties.length} more
+                  </span>
+                )}
+              </div>
             )}
           </div>
           
-          <div className="text-sm text-muted-foreground hidden sm:block">
+          <div className="text-xs text-muted-foreground hidden sm:block">
             {!loading && properties.length > 0 && (
-              <>Click on a property to view details</>
+              <span className="bg-muted/50 px-3 py-1 rounded-full">
+                Click to view details
+              </span>
             )}
           </div>
         </div>
         
-        {/* Property listing */}
+        {/* Property listing with proper scrolling and bottom spacing */}
         <div className="flex-1 overflow-y-auto">
-          {renderContent()}
-        </div>
-        
-        {/* Load more button */}
-        {properties.length > 0 && hasMore && (
-          <div className="p-3 border-t mt-auto bg-card">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onLoadMore}
-              disabled={loadingMore || !hasMore}
-              className="w-full"
-            >
-              {loadingMore ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Loading more...
-                </>
-              ) : hasMore ? (
-                <>Load more properties</>
-              ) : (
-                <>All properties loaded</>
-              )}
-            </Button>
+          <div className="min-h-0">
+            {renderContent()}
           </div>
-        )}
+          
+          {/* Load more button section - moved inside scrollable area with proper spacing */}
+          {properties.length > 0 && hasMore && (
+            <div className="p-4 bg-card/95 backdrop-blur-sm">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onLoadMore}
+                disabled={loadingMore || !hasMore}
+                className="w-full h-11 rounded-xl border-primary/20 hover:border-primary/40 hover:bg-primary/5 transition-all duration-200"
+              >
+                {loadingMore ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    <span>Loading more properties...</span>
+                  </>
+                ) : hasMore ? (
+                  <>
+                    <span>Load more properties</span>
+                    <span className="ml-2 text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">
+                      {totalCount - properties.length} remaining
+                    </span>
+                  </>
+                ) : (
+                  <span>All properties loaded</span>
+                )}
+              </Button>
+            </div>
+          )}
+          
+          {/* Bottom spacing to ensure last item is fully visible */}
+          <div className="h-4"></div>
+        </div>
       </div>
     </div>
   );

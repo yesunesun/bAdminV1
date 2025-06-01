@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyMapHomeView.tsx
-// Version: 5.0.0
-// Last Modified: 31-01-2025 17:00 IST
-// Purpose: Updated to handle new actionType filters and conditional dropdown logic
+// Version: 5.4.0
+// Last Modified: 02-06-2025 16:00 IST
+// Purpose: Implemented functional Load More button with proper pagination logic
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useGoogleMaps } from '../hooks/useGoogleMaps';
@@ -28,10 +28,13 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
   const { user } = useAuth();
   const { toast } = useToast();
   
-  // Search-specific state (replacing usePropertyMapData for search results)
+  // Search-specific state with pagination support
   const [searchProperties, setSearchProperties] = useState<SearchResult[]>([]);
-  const [searchLoading, setSearchLoading] = useState<boolean>(true); // Start with loading true
+  const [searchLoading, setSearchLoading] = useState<boolean>(true);
+  const [loadingMore, setLoadingMore] = useState<boolean>(false);
   const [searchTotalCount, setSearchTotalCount] = useState<number>(0);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [currentFilters, setCurrentFilters] = useState<SearchFilters | null>(null);
   const [activeProperty, setActiveProperty] = useState<PropertyData | null>(null);
   const [hoveredProperty, setHoveredProperty] = useState<string | null>(null);
 
@@ -52,7 +55,7 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
         
         // Get latest properties using the SQL function
         console.log('🔍 Calling getLatestProperties...');
-        const response = await searchService.getLatestProperties(50);
+        const response = await searchService.getLatestProperties(20); // Start with 20 items
         
         console.log('🏠 Latest properties loaded:', response);
         
@@ -61,6 +64,8 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
         setSearchTotalCount(response.totalCount || 0);
         setActiveProperty(null);
         setHoveredProperty(null);
+        setCurrentPage(1);
+        setCurrentFilters(null); // No filters for latest properties
         
         console.log(`✅ Homepage initialized with ${response.results?.length || 0} latest properties`);
         
@@ -200,7 +205,7 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
   const areFiltersEmpty = (searchFilters: SearchFilters): boolean => {
     return !searchFilters.searchQuery && 
            (!searchFilters.selectedLocation || searchFilters.selectedLocation === 'any') &&
-           (!searchFilters.actionType || searchFilters.actionType === 'any') && // CHANGED: from transactionType
+           (!searchFilters.actionType || searchFilters.actionType === 'any') && 
            (!searchFilters.selectedPropertyType || searchFilters.selectedPropertyType === 'any') && 
            (!searchFilters.selectedSubType || searchFilters.selectedSubType === 'any') && 
            (!searchFilters.selectedBHK || searchFilters.selectedBHK === 'any') && 
@@ -212,6 +217,7 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
     console.log('PropertyMapHomeView: Search initiated from SearchContainer with filters:', searchFilters);
     
     setSearchLoading(true);
+    setCurrentPage(1); // Reset to first page for new search
     
     try {
       // Import searchService dynamically to avoid circular imports
@@ -225,9 +231,13 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
       if (filtersEmpty) {
         console.log('🏠 Empty filters detected - loading default latest properties...');
         // Load default latest properties when filters are empty (including when cleared)
-        response = await searchService.getLatestProperties(50);
+        response = await searchService.getLatestProperties(20);
+        setCurrentFilters(null); // No filters for latest properties
       } else {
         console.log('🔍 Performing filtered search...');
+        
+        // Store current filters for pagination
+        setCurrentFilters(searchFilters);
         
         // ADDED: Check if search query looks like a 6-character property code
         const query = searchFilters.searchQuery?.trim();
@@ -244,7 +254,7 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
           
           response = await searchService.smartSearch(backendFilters, {
             page: 1,
-            limit: 50
+            limit: 20
           });
         } else {
           console.log('🔍 Using regular search (not a 6-character property code)');
@@ -259,7 +269,7 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
           // Perform regular search using searchService
           response = await searchService.search(backendFilters, {
             page: 1,
-            limit: 50
+            limit: 20
           });
         }
       }
@@ -298,6 +308,92 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
       setSearchLoading(false);
     }
   }, [toast]);
+
+  // NEW: Handle Load More functionality
+  const handleLoadMore = useCallback(async () => {
+    if (loadingMore || searchProperties.length >= searchTotalCount) {
+      return; // Already loading or no more items
+    }
+
+    console.log('🔄 Loading more properties...');
+    setLoadingMore(true);
+    
+    try {
+      const { searchService } = await import('@/components/Search/services/searchService');
+      const nextPage = currentPage + 1;
+      
+      let response;
+      
+      if (!currentFilters) {
+        // Loading more latest properties
+        console.log('🏠 Loading more latest properties...');
+        response = await searchService.getLatestProperties(20, (nextPage - 1) * 20); // offset calculation
+      } else {
+        console.log('🔍 Loading more search results...');
+        
+        // Check if search query looks like a 6-character property code
+        const query = currentFilters.searchQuery?.trim();
+        if (query && searchService.isPropertyCode(query)) {
+          // Transform actionType to transactionType for backend compatibility
+          const backendFilters = {
+            ...currentFilters,
+            transactionType: currentFilters.actionType === 'sell' ? 'buy' : 
+                            currentFilters.actionType === 'buy' ? 'buy' : 'rent'
+          };
+          
+          response = await searchService.smartSearch(backendFilters, {
+            page: nextPage,
+            limit: 20
+          });
+        } else {
+          // Transform actionType to transactionType for backend compatibility
+          const backendFilters = {
+            ...currentFilters,
+            transactionType: currentFilters.actionType === 'sell' ? 'buy' : 
+                            currentFilters.actionType === 'buy' ? 'buy' : 'rent'
+          };
+          
+          response = await searchService.search(backendFilters, {
+            page: nextPage,
+            limit: 20
+          });
+        }
+      }
+      
+      console.log('🏠 Load more response:', response);
+      
+      if (response.results && response.results.length > 0) {
+        // Append new properties to existing list
+        setSearchProperties(prev => [...prev, ...response.results]);
+        setCurrentPage(nextPage);
+        
+        toast({
+          title: "Loaded more properties",
+          description: `${response.results.length} more properties loaded`,
+          duration: 2000,
+        });
+        
+        console.log(`✅ Loaded ${response.results.length} more properties. Total: ${searchProperties.length + response.results.length}`);
+      } else {
+        toast({
+          title: "No more properties",
+          description: "All available properties have been loaded",
+          duration: 2000,
+        });
+      }
+      
+    } catch (error) {
+      console.error('❌ Failed to load more properties:', error);
+      toast({
+        title: "Load More Failed",
+        description: "Unable to load more properties. Please try again.",
+        variant: "destructive",
+        duration: 3000,
+      });
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loadingMore, searchProperties.length, searchTotalCount, currentPage, currentFilters, toast, searchProperties]);
   
   // Preload fallback image with visual performance indicator
   useEffect(() => {
@@ -308,7 +404,7 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
   // Comprehensive error handling with user feedback
   if (loadError) {
     return (
-      <div className="flex items-center justify-center bg-background p-6" style={{ height: 'calc(100vh - 200px)' }}>
+      <div className="flex items-center justify-center bg-background p-6 h-[calc(100vh-160px)]">
         <div className="text-center max-w-md bg-card p-8 rounded-lg shadow-lg border border-border">
           <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
           <h2 className="text-2xl font-bold mb-3 text-foreground">Map Loading Failed</h2>
@@ -332,55 +428,62 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
   }
 
   return (
-    <div className="flex flex-col bg-background text-foreground" style={{ height: 'calc(100vh - 200px)' }}>
-      {/* SearchContainer - Replacing CompactSearchBar */}
-      <div className="bg-background border-b border-border">
+    <div className="flex flex-col bg-background text-foreground h-screen overflow-hidden">
+      {/* SearchContainer - Fixed height section */}
+      <div className="flex-shrink-0 w-full">
         <SearchContainer 
           onSearch={handleSearchFromContainer}
           showResults={false}
-          className="min-h-0 shadow-none" // Override default styling
+          className="w-full"
         />
       </div>
       
-      {/* Main Content - Responsive layout (full width on mobile, split on desktop) */}
-      <div className="flex-grow flex w-full overflow-hidden">
-        {/* Property Listings Panel - Full width on mobile, 1/3 width on desktop */}
-        <div className="w-full md:w-1/3 h-full">
-          <PropertyListingPanel
-            properties={searchProperties}
-            loading={searchLoading}
-            loadingMore={false} // No load more for search results yet
-            hasMore={false} // No load more for search results yet
-            totalCount={searchTotalCount}
-            onLoadMore={() => {}} // No load more for search results yet
-            onFavoriteAction={handleFavoriteToggle}
-            handlePropertyHover={handlePropertyHover}
-            hoveredProperty={hoveredProperty}
-            setActiveProperty={setActiveProperty}
-            favoriteProperties={favoriteProperties}
-            isLoadingFavorites={isLoadingFavorites}
-          />
-        </div>
-        
-        {/* Map Panel - Hidden on mobile, 2/3 width on desktop */}
-        <div className="hidden md:block md:w-2/3 h-full">
-          {mapsLoaded ? (
-            <MapPanel
-              properties={searchProperties}
-              isLoaded={mapsLoaded}
-              loadError={loadError}
-              activeProperty={activeProperty}
-              setActiveProperty={setActiveProperty}
-              hoveredPropertyId={hoveredProperty}
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center bg-muted">
-              <div className="text-center p-6">
-                <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-primary border-r-transparent"></div>
-                <p className="mt-4 text-muted-foreground">Loading maps...</p>
+      {/* Main Content Container - Takes remaining height with proper constraints */}
+      <div className="flex-1 w-full overflow-hidden">
+        <div className="max-w-7xl mx-auto px-4 py-4 h-full">
+          {/* Main Content - Fixed height layout with more precise constraints */}
+          <div className="flex flex-col md:flex-row gap-4 h-full">
+            {/* Property Listings Panel - Fixed height with careful calculation */}
+            <div className="w-full md:w-1/3 h-[600px] md:h-full">
+              <PropertyListingPanel
+                properties={searchProperties}
+                loading={searchLoading}
+                loadingMore={loadingMore}
+                hasMore={searchProperties.length < searchTotalCount}
+                totalCount={searchTotalCount}
+                onLoadMore={handleLoadMore}
+                onFavoriteAction={handleFavoriteToggle}
+                handlePropertyHover={handlePropertyHover}
+                hoveredProperty={hoveredProperty}
+                setActiveProperty={setActiveProperty}
+                favoriteProperties={favoriteProperties}
+                isLoadingFavorites={isLoadingFavorites}
+              />
+            </div>
+            
+            {/* Map Panel - Fixed height with proper constraints */}
+            <div className="hidden md:block md:w-2/3 h-full">
+              <div className="h-full rounded-2xl overflow-hidden shadow-lg border border-border/50 bg-card">
+                {mapsLoaded ? (
+                  <MapPanel
+                    properties={searchProperties}
+                    isLoaded={mapsLoaded}
+                    loadError={loadError}
+                    activeProperty={activeProperty}
+                    setActiveProperty={setActiveProperty}
+                    hoveredPropertyId={hoveredProperty}
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-muted/30">
+                    <div className="text-center p-6">
+                      <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-primary border-r-transparent mb-4"></div>
+                      <p className="text-muted-foreground">Loading maps...</p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
-          )}
+          </div>
         </div>
       </div>
     </div>
