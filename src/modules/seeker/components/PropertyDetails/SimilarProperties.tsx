@@ -255,7 +255,7 @@ const SimilarProperties: React.FC<SimilarPropertiesProps> = ({
         
         {/* View More Button */}
         <div className="text-center mt-6 pt-4 border-t border-border/50">
-          <Link to="/properties">
+          <Link to="/browse">
             <Button 
               variant="outline" 
               size="sm"
