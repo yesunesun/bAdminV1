@@ -671,9 +671,18 @@ export class SearchService {
       params.p_state = 'Telangana';
     }
 
-    // FIXED: Set p_subtype based on transactionType (from documentation examples)
+    // FIXED: Set p_subtype based on transactionType and special property types
     const transactionType = (filters as any).transactionType;
-    if (transactionType) {
+    
+    // Handle special property types first (they override transaction type)
+    if (filters.selectedPropertyType === 'pghostel' || filters.selectedSubType === 'pghostel') {
+      params.p_subtype = 'pghostel';
+      console.log('✅ PG/Hostel property → p_subtype = "pghostel"');
+    } else if (filters.selectedPropertyType === 'flatmates' || filters.selectedSubType === 'flatmates') {
+      params.p_subtype = 'flatmates';
+      console.log('✅ Flatmates property → p_subtype = "flatmates"');
+    } else if (transactionType) {
+      // Handle regular Buy/Rent for other property types
       if (transactionType === 'buy') {
         params.p_subtype = 'sale';  // Buy = Sale properties
         console.log('✅ Buy filter → p_subtype = "sale"');
@@ -684,7 +693,7 @@ export class SearchService {
       // If transactionType is null (Any), don't set p_subtype to search all
     }
 
-    // Handle special subtypes that override transaction type
+    // Handle special subtypes that override transaction type (legacy support)
     if (filters.selectedSubType && filters.selectedSubType !== 'any') {
       if (filters.selectedSubType === 'pghostel') {
         params.p_subtype = 'pghostel';
