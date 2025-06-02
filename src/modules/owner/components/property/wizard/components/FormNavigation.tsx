@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/components/FormNavigation.tsx
-// Version: 7.0.0
-// Last Modified: 30-05-2025 16:15 IST
-// Purpose: Added proper validation checks to prevent navigation on incomplete steps
+// Version: 7.1.0
+// Last Modified: 02-06-2025 17:45 IST
+// Purpose: Fixed step validation status passing to prevent navigation issues with Flatmates Room Details
 
 import React, { useMemo } from 'react';
 import { cn } from '@/lib/utils';
@@ -22,8 +22,8 @@ interface Step {
   icon?: React.ElementType;
   description?: string;
   hidden?: boolean;
-  isValid?: boolean; // NEW: Add validation status
-  completionPercentage?: number; // NEW: Add completion percentage
+  isValid?: boolean; // Step validation status
+  completionPercentage?: number; // Step completion percentage
 }
 
 interface FormNavigationProps {
@@ -33,7 +33,7 @@ interface FormNavigationProps {
   category?: string;
   adType?: string;
   steps: Step[];
-  // NEW: Add validation props
+  // ✅ FIXED: Enhanced validation props to properly track step completion
   stepValidationStatus?: Record<number, { isValid: boolean; completionPercentage: number }>;
 }
 
@@ -266,7 +266,7 @@ const NavigationComponent = (props: FormNavigationProps) => {
     category = '',
     adType = '',
     steps = [],
-    stepValidationStatus = {} // NEW: Validation status for steps
+    stepValidationStatus = {} // Validation status for steps
   } = props;
   
   const navigate = useNavigate();
@@ -328,7 +328,7 @@ const NavigationComponent = (props: FormNavigationProps) => {
     return flowSteps;
   }, [steps, flowSteps]);
 
-  // NEW: Enhanced step click handler with validation check
+  // ✅ ENHANCED: Step click handler with better validation logic for Flatmates flow
   const handleStepClick = (index: number, stepId: string) => {
     const targetStepNumber = index + 1;
     
@@ -337,7 +337,10 @@ const NavigationComponent = (props: FormNavigationProps) => {
       stepId,
       currentStep,
       targetStep: targetStepNumber,
-      stepValidationStatus
+      stepValidationStatus,
+      flowType,
+      category,
+      adType
     });
 
     // Allow navigation to current step (refresh)
@@ -356,13 +359,26 @@ const NavigationComponent = (props: FormNavigationProps) => {
       // Navigation to next step - check if current step is valid
       const currentStepValidation = stepValidationStatus[currentStep];
       
+      // ✅ ENHANCED: Better validation checking for Flatmates Room Details
       if (currentStepValidation && currentStepValidation.isValid) {
         console.log('[FormNavigation] Current step is valid, allowing navigation to next step');
         navigateToStep(index, stepId, targetStepNumber);
       } else {
-        console.log('[FormNavigation] Current step is invalid, blocking navigation to next step', currentStepValidation);
-        // Show user feedback that current step needs to be completed
-        alert('Please complete all required fields in the current step before proceeding.');
+        console.log('[FormNavigation] Current step is invalid, blocking navigation to next step', {
+          currentStepValidation,
+          currentStep,
+          stepId: stepsToRender[currentStep - 1]?.id,
+          flowType
+        });
+        
+        // ✅ IMPROVED: More specific error message for different flows
+        let errorMessage = 'Please complete all required fields in the current step before proceeding.';
+        
+        if (flowType === FLOW_TYPES.RESIDENTIAL_FLATMATES && currentStep === 1) {
+          errorMessage = 'Please fill in all required Room Details fields (Room Type, Capacity, Rent, Deposit, Bathroom Type, Room Size, and Meal Option) before proceeding.';
+        }
+        
+        alert(errorMessage);
         return;
       }
     } else {
@@ -479,13 +495,13 @@ const NavigationComponent = (props: FormNavigationProps) => {
             const isPassed = currentStep > stepNumber;
             const stepValidation = stepValidationStatus[stepNumber];
             
-            // NEW: Enhanced clickable logic with validation
+            // ✅ ENHANCED: Improved clickable logic with proper validation checking
             const isClickable = 
               stepNumber < currentStep || // Previous steps are always clickable
               stepNumber === currentStep || // Current step is clickable (refresh)
               (stepNumber === currentStep + 1 && stepValidationStatus[currentStep]?.isValid); // Next step only if current is valid
             
-            // NEW: Visual indicators for validation status
+            // ✅ ENHANCED: Better visual indicators for validation status
             const hasValidationInfo = stepValidation !== undefined;
             const isValid = stepValidation?.isValid ?? true;
             const completionPercentage = stepValidation?.completionPercentage ?? 100;
@@ -538,7 +554,7 @@ const NavigationComponent = (props: FormNavigationProps) => {
                 <IconComponent className="w-4 h-4 mr-1.5" style={{ marginRight: '0.375rem' }} />
                 <span>{step.title}</span>
                 
-                {/* NEW: Validation indicator */}
+                {/* ✅ ENHANCED: Better validation indicator */}
                 {hasValidationInfo && isActive && (
                   <div 
                     className="absolute -bottom-1 left-0 h-1 bg-current rounded-b-lg transition-all duration-300"
@@ -546,7 +562,7 @@ const NavigationComponent = (props: FormNavigationProps) => {
                   />
                 )}
                 
-                {/* NEW: Status icon */}
+                {/* ✅ ENHANCED: Status icon */}
                 {hasValidationInfo && isActive && (
                   <span className="ml-1 text-xs">
                     {isValid ? '✓' : '⚠️'}

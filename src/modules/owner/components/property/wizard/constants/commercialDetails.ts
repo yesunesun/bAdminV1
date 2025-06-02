@@ -1,11 +1,10 @@
 // src/modules/owner/components/property/wizard/constants/commercialDetails.ts
-// Version: 1.2.0
-// Last Modified: 03-05-2025 17:15 IST
-// Purpose: Added building types with property type mapping
+// Version: 1.3.0
+// Last Modified: 02-06-2025 16:45 IST
+// Purpose: Removed Co-working from property types for commercial rent flow
 
 export const COMMERCIAL_PROPERTY_TYPES = [
   'Office Space',
-  'Co-Working',
   'Shop',
   'Showroom',
   'Godown/Warehouse',
@@ -25,7 +24,6 @@ export const COMMERCIAL_BUILDING_TYPES = [
 // Mapping of property types to available building types
 export const PROPERTY_TO_BUILDING_TYPES: Record<string, string[]> = {
   'Office Space': ['Independent House', 'Business Park', 'Mall', 'Standalone building', 'Independent shop'],
-  'Co-Working': ['Independent House', 'Business Park', 'Mall', 'Standalone building', 'Independent shop'],
   'Shop': ['Independent House', 'Business Park', 'Mall', 'Standalone building', 'Independent shop'],
   'Showroom': ['Independent House', 'Business Park', 'Mall', 'Standalone building', 'Independent shop'],
   'Godown/Warehouse': ['Standalone building'],

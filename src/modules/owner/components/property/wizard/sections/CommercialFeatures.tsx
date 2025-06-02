@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/CommercialFeatures.tsx
-// Version: 3.0.0
-// Last Modified: 30-05-2025 17:00 IST
-// Purpose: Added step completion validation system integration
+// Version: 3.1.0
+// Last Modified: 02-06-2025 17:00 IST
+// Purpose: Added mandatory field validation for Essential Facilities, Property Status, Furnishing and checkbox groups
 
 import React, { useCallback, useEffect } from 'react';
 import { FormSectionProps } from '../types';
@@ -168,6 +168,12 @@ const CommercialFeatures: React.FC<FormSectionProps> = ({
     return currentValues.includes(value);
   };
 
+  // ✅ NEW: Helper function to check if at least one option is selected in checkbox groups
+  const hasAtLeastOneSelected = (fieldName: string) => {
+    const currentValues = getField(fieldName, []);
+    return currentValues.length > 0;
+  };
+
   return (
     <div className="space-y-8">
       {/* ✅ ADDED: Progress indicator */}
@@ -190,12 +196,12 @@ const CommercialFeatures: React.FC<FormSectionProps> = ({
         </div>
       )}
 
-      {/* Essential Commercial Facilities - Required Fields */}
+      {/* Essential Commercial Facilities - ALL FIELDS MANDATORY */}
       <FormSection title="Essential Facilities" description="Specify key facilities available in your commercial property">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Power Backup - Required */}
+          {/* Power Backup - MANDATORY */}
           <div>
-            <RequiredLabel htmlFor="powerBackup">Power Backup</RequiredLabel>
+            <RequiredLabel htmlFor="powerBackup" required>Power Backup</RequiredLabel>
             <select
               id="powerBackup"
               className="w-full px-4 py-3 rounded-xl border border-border bg-background"
@@ -217,9 +223,9 @@ const CommercialFeatures: React.FC<FormSectionProps> = ({
             )}
           </div>
 
-          {/* Lift - Required */}
+          {/* Lift - MANDATORY */}
           <div>
-            <RequiredLabel htmlFor="lift">Lift/Elevator</RequiredLabel>
+            <RequiredLabel htmlFor="lift" required>Lift/Elevator</RequiredLabel>
             <select
               id="lift"
               className="w-full px-4 py-3 rounded-xl border border-border bg-background"
@@ -241,9 +247,9 @@ const CommercialFeatures: React.FC<FormSectionProps> = ({
             )}
           </div>
 
-          {/* Parking - Required */}
+          {/* Parking - MANDATORY */}
           <div>
-            <RequiredLabel htmlFor="parkingType">Parking</RequiredLabel>
+            <RequiredLabel htmlFor="parkingType" required>Parking</RequiredLabel>
             <select
               id="parkingType"
               className="w-full px-4 py-3 rounded-xl border border-border bg-background"
@@ -265,9 +271,9 @@ const CommercialFeatures: React.FC<FormSectionProps> = ({
             )}
           </div>
 
-          {/* Washroom(s) - Required */}
+          {/* Washroom(s) - MANDATORY */}
           <div>
-            <RequiredLabel htmlFor="washroomType">Washroom(s)</RequiredLabel>
+            <RequiredLabel htmlFor="washroomType" required>Washroom(s)</RequiredLabel>
             <select
               id="washroomType"
               className="w-full px-4 py-3 rounded-xl border border-border bg-background"
@@ -289,11 +295,9 @@ const CommercialFeatures: React.FC<FormSectionProps> = ({
             )}
           </div>
 
-          {/* Water Storage Facility */}
+          {/* Water Storage Facility - MANDATORY */}
           <div>
-            <label htmlFor="waterStorage" className="block text-sm font-medium mb-1">
-              Water Storage Facility
-            </label>
+            <RequiredLabel htmlFor="waterStorage" required>Water Storage Facility</RequiredLabel>
             <select
               id="waterStorage"
               className="w-full px-4 py-3 rounded-xl border border-border bg-background"
@@ -307,13 +311,17 @@ const CommercialFeatures: React.FC<FormSectionProps> = ({
                 </option>
               ))}
             </select>
+            {/* ✅ ADDED: Error message display */}
+            {shouldShowFieldError('waterStorage') && (
+              <p className="text-sm text-red-600 mt-0.5">
+                {getFieldValidation('waterStorage').error}
+              </p>
+            )}
           </div>
 
-          {/* Security */}
+          {/* Security - MANDATORY */}
           <div>
-            <label htmlFor="security" className="block text-sm font-medium mb-1">
-              Security
-            </label>
+            <RequiredLabel htmlFor="security" required>Security</RequiredLabel>
             <select
               id="security"
               className="w-full px-4 py-3 rounded-xl border border-border bg-background"
@@ -327,6 +335,12 @@ const CommercialFeatures: React.FC<FormSectionProps> = ({
                 </option>
               ))}
             </select>
+            {/* ✅ ADDED: Error message display */}
+            {shouldShowFieldError('security') && (
+              <p className="text-sm text-red-600 mt-0.5">
+                {getFieldValidation('security').error}
+              </p>
+            )}
           </div>
         </div>
       </FormSection>
@@ -335,7 +349,7 @@ const CommercialFeatures: React.FC<FormSectionProps> = ({
       <FormSection title="Property Status" description="Provide information about the current status of your property">
         <div className="space-y-6">
           <div>
-            <RequiredLabel htmlFor="propertyCondition">Current Property Condition</RequiredLabel>
+            <RequiredLabel htmlFor="propertyCondition" required>Current Property Condition</RequiredLabel>
             <select
               id="propertyCondition"
               className="w-full px-4 py-3 rounded-xl border border-border bg-background"
@@ -400,9 +414,10 @@ const CommercialFeatures: React.FC<FormSectionProps> = ({
         </div>
       </FormSection>
 
-      {/* Furnishing Type */}
+      {/* Furnishing Type - MANDATORY */}
       <FormSection title="Furnishing" description="Select the furnishing status of your commercial property">
         <div className="space-y-4">
+          <RequiredLabel required>Furnishing</RequiredLabel>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {FURNISHING_OPTIONS.map((option) => (
               <div key={option} className="relative">
@@ -428,6 +443,12 @@ const CommercialFeatures: React.FC<FormSectionProps> = ({
               </div>
             ))}
           </div>
+          {/* ✅ NEW: Show validation error if no furnishing selected */}
+          {!furnishingType && (
+            <p className="text-sm text-red-600 mt-1">
+              Please select a furnishing option
+            </p>
+          )}
           
           {furnishingType && (furnishingType === 'Fully Furnished' || furnishingType === 'Semi Furnished') && (
             <div className="pt-4">
@@ -444,9 +465,10 @@ const CommercialFeatures: React.FC<FormSectionProps> = ({
         </div>
       </FormSection>
 
-      {/* Commercial Amenities */}
+      {/* Commercial Amenities - AT LEAST ONE MANDATORY */}
       <FormSection title="Commercial Amenities" description="Select all amenities available at your commercial property">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-3">
+        <RequiredLabel required>Commercial Amenities (at least 1)</RequiredLabel>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-3 mt-3">
           {COMMERCIAL_AMENITIES.map((amenity) => (
             <div key={amenity} className="flex items-center">
               <input
@@ -462,11 +484,18 @@ const CommercialFeatures: React.FC<FormSectionProps> = ({
             </div>
           ))}
         </div>
+        {/* ✅ NEW: Show validation error if no amenities selected */}
+        {!hasAtLeastOneSelected('amenities') && (
+          <p className="text-sm text-red-600 mt-2">
+            Please select at least one commercial amenity
+          </p>
+        )}
       </FormSection>
 
-      {/* Commercial Facilities */}
+      {/* Commercial Facilities - AT LEAST ONE MANDATORY */}
       <FormSection title="Commercial Facilities" description="Select all facilities available at your commercial property">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-3">
+        <RequiredLabel required>Commercial Facilities (at least 1)</RequiredLabel>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-3 mt-3">
           {COMMERCIAL_FACILITIES.map((facility) => (
             <div key={facility} className="flex items-center">
               <input
@@ -482,11 +511,18 @@ const CommercialFeatures: React.FC<FormSectionProps> = ({
             </div>
           ))}
         </div>
+        {/* ✅ NEW: Show validation error if no facilities selected */}
+        {!hasAtLeastOneSelected('facilities') && (
+          <p className="text-sm text-red-600 mt-2">
+            Please select at least one commercial facility
+          </p>
+        )}
       </FormSection>
 
-      {/* Infrastructure Features */}
+      {/* Infrastructure Features - AT LEAST ONE MANDATORY */}
       <FormSection title="Infrastructure Features" description="Select all infrastructure features of your commercial property">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-3">
+        <RequiredLabel required>Infrastructure Features (at least 1)</RequiredLabel>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-3 mt-3">
           {INFRASTRUCTURE_FEATURES.map((feature) => (
             <div key={feature} className="flex items-center">
               <input
@@ -502,6 +538,12 @@ const CommercialFeatures: React.FC<FormSectionProps> = ({
             </div>
           ))}
         </div>
+        {/* ✅ NEW: Show validation error if no infrastructure features selected */}
+        {!hasAtLeastOneSelected('infrastructureFeatures') && (
+          <p className="text-sm text-red-600 mt-2">
+            Please select at least one infrastructure feature
+          </p>
+        )}
       </FormSection>
 
       {/* Directions Tip */}

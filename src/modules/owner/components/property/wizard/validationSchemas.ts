@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/validationSchemas.ts
-// Version: 4.1.0
-// Last Modified: 02-06-2025 15:30 IST
-// Purpose: Removed Monthly Rent and Security Deposit validation for PG/Hostel flow
+// Version: 4.2.0
+// Last Modified: 02-06-2025 17:15 IST
+// Purpose: Added commercial rent flow validation schemas for mandatory fields
 
 import { z } from 'zod';
 // Updated import to use the migrated constants file
@@ -57,6 +57,36 @@ export const propertyValidationSchema = z.object({
   maintenance: z.string().min(1, 'Maintenance option is required'),
   preferredTenants: z.array(z.string()).min(1, 'Select at least one preferred tenant'),
   
+  // ✅ NEW: Commercial Rental Details validation
+  advanceRent: z.string()
+    .min(1, 'Advance rent is required')
+    .refine((val) => {
+      const num = parseInt(val);
+      return !isNaN(num) && num >= 0 && num <= 12;
+    }, 'Advance rent must be between 0 and 12 months'),
+  camCharges: z.string().min(1, 'CAM charges are required'),
+  availableFrom: z.string().min(1, 'Available from date is required'),
+  parking: z.string().min(1, 'Parking option is required'),
+  operatingHours: z.string().min(1, 'Operating hours are required'),
+  businessPreferences: z.array(z.string()).min(1, 'Select at least one preferred business type'),
+  
+  // ✅ NEW: Commercial Features validation - Essential Facilities
+  powerBackup: z.string().min(1, 'Power backup option is required'),
+  lift: z.string().min(1, 'Lift/elevator option is required'),
+  parkingType: z.string().min(1, 'Parking type is required'),
+  washroomType: z.string().min(1, 'Washroom type is required'),
+  waterStorage: z.string().min(1, 'Water storage option is required'),
+  security: z.string().min(1, 'Security option is required'),
+  
+  // ✅ NEW: Commercial Features validation - Property Status & Furnishing
+  propertyCondition: z.string().min(1, 'Property condition is required'),
+  furnishingType: z.string().min(1, 'Furnishing type is required'),
+  
+  // ✅ NEW: Commercial Features validation - Checkbox groups (at least 1)
+  amenities: z.array(z.string()).min(1, 'Select at least one commercial amenity'),
+  facilities: z.array(z.string()).min(1, 'Select at least one commercial facility'),
+  infrastructureFeatures: z.array(z.string()).min(1, 'Select at least one infrastructure feature'),
+  
   // Sale Details
   expectedPrice: z.string().min(1, 'Expected price is required'),
   maintenanceCost: z.string().min(1, 'Maintenance cost is required'),
@@ -87,9 +117,7 @@ export const propertyValidationSchema = z.object({
   pgAmenities: z.array(z.string()).optional(),
   
   // Common fields
-  availableFrom: z.string().min(1, 'Available date is required'),
   furnishing: z.string().min(1, 'Furnishing status is required'),
-  parking: z.string().min(1, 'Parking option is required'),
   description: z.string().optional(),
 
   // Amenities
@@ -99,17 +127,63 @@ export const propertyValidationSchema = z.object({
   nonVegAllowed: z.boolean().default(false),
   gatedSecurity: z.boolean().default(false),
   propertyShowOption: z.string().min(1, 'Property show option is required'),
-  propertyCondition: z.string().min(1, 'Property condition is required'),
   secondaryNumber: z.string()
     .regex(/^\d{10}$/, 'Phone number must be 10 digits')
     .optional()
     .or(z.literal('')),
   hasSimilarUnits: z.boolean().default(false),
   direction: z.string().optional(),
-  amenities: z.array(z.string()).min(1, 'Select at least one amenity'),
 });
 
 export type PropertyValidationSchema = z.infer<typeof propertyValidationSchema>;
+
+// ✅ NEW: Commercial Rent Flow Step Validation Schemas
+const commercialRentBasicDetailsSchema = z.object({
+  propertyType: z.string().min(1, 'Property type is required'),
+  buildingType: z.string().min(1, 'Building type is required'),
+  ageOfProperty: z.string().min(1, 'Age of property is required'),
+  builtUpArea: z.string().min(1, 'Built-up area is required'),
+  builtUpAreaUnit: z.string().min(1, 'Area unit is required'),
+  floor: z.string().min(1, 'Floor is required'),
+  totalFloors: z.string().min(1, 'Total floors is required'),
+});
+
+const commercialRentRentalDetailsSchema = z.object({
+  rentalType: z.string().min(1, 'Rental type is required'),
+  rentAmount: z.string().min(1, 'Rent amount is required'),
+  securityDeposit: z.string().min(1, 'Security deposit is required'),
+  advanceRent: z.string()
+    .min(1, 'Advance rent is required')
+    .refine((val) => {
+      const num = parseInt(val);
+      return !isNaN(num) && num >= 0 && num <= 12;
+    }, 'Advance rent must be between 0 and 12 months'),
+  maintenance: z.string().min(1, 'Maintenance is required'),
+  camCharges: z.string().min(1, 'CAM charges are required'),
+  availableFrom: z.string().min(1, 'Available from date is required'),
+  parking: z.string().min(1, 'Parking is required'),
+  operatingHours: z.string().min(1, 'Operating hours are required'),
+  businessPreferences: z.array(z.string()).min(1, 'Select at least one preferred business type'),
+});
+
+const commercialRentFeaturesSchema = z.object({
+  // Essential Facilities - All mandatory
+  powerBackup: z.string().min(1, 'Power backup is required'),
+  lift: z.string().min(1, 'Lift/elevator is required'),
+  parkingType: z.string().min(1, 'Parking type is required'),
+  washroomType: z.string().min(1, 'Washroom type is required'),
+  waterStorage: z.string().min(1, 'Water storage is required'),
+  security: z.string().min(1, 'Security is required'),
+  
+  // Property Status & Furnishing
+  propertyCondition: z.string().min(1, 'Property condition is required'),
+  furnishingType: z.string().min(1, 'Furnishing type is required'),
+  
+  // Checkbox groups - At least 1 required
+  amenities: z.array(z.string()).min(1, 'Select at least one commercial amenity'),
+  facilities: z.array(z.string()).min(1, 'Select at least one commercial facility'),
+  infrastructureFeatures: z.array(z.string()).min(1, 'Select at least one infrastructure feature'),
+});
 
 export const stepValidationSchemas = {
   0: propertyValidationSchema.pick({
@@ -152,6 +226,8 @@ export const stepValidationSchemas = {
       availableFrom: true,
       preferredTenants: true,
     }),
+    // ✅ NEW: Commercial Rental Details Validation
+    commercialRentRentalDetailsSchema,
     // Sale Details Validation
     propertyValidationSchema.pick({
       expectedPrice: true,
@@ -183,6 +259,8 @@ export const stepValidationSchemas = {
       propertyCondition: true,
       amenities: true,
     }),
+    // ✅ NEW: Commercial Features Validation
+    commercialRentFeaturesSchema,
     // ✅ UPDATED: PG/Hostel Facility Validation (removed monthlyRent and securityDeposit)
     propertyValidationSchema.pick({
       mealOption: true,
@@ -193,4 +271,21 @@ export const stepValidationSchemas = {
       pgAmenities: true,
     })
   ]),
+};
+
+// ✅ NEW: Export flow-specific validation schemas
+export const commercialRentValidationSchemas = {
+  com_rent_basic_details: commercialRentBasicDetailsSchema,
+  com_rent_rental: commercialRentRentalDetailsSchema,
+  com_rent_features: commercialRentFeaturesSchema,
+};
+
+// ✅ NEW: Helper function to get validation schema by flow type and step
+export const getValidationSchemaForStep = (flowType: string, stepId: string) => {
+  switch (flowType) {
+    case 'commercial_rent':
+      return commercialRentValidationSchemas[stepId as keyof typeof commercialRentValidationSchemas];
+    default:
+      return null;
+  }
 };

@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/RoomDetails.tsx
-// Version: 4.0.0
-// Last Modified: 31-05-2025 12:15 IST
-// Purpose: Added mandatory field asterisk indicators for all required fields
+// Version: 4.1.0
+// Last Modified: 02-06-2025 17:50 IST
+// Purpose: Fixed step ID detection to properly handle both PG and Flatmates flows
 
 import React, { useEffect, useCallback } from 'react';
 import { FormData, FormSectionProps } from '../types';
@@ -36,17 +36,51 @@ const RoomDetails: React.FC<FormSectionProps> = ({
   // Get form methods
   const { register, formState: { errors }, setValue, getValues, watch } = form;
   
-  // Determine the correct step ID based on the flow type
+  // ✅ FIXED: Properly determine step ID based on flow type and URL
   const flowType = getValues('flow.flowType');
-  const isPGFlow = flowType === FLOW_TYPES.RESIDENTIAL_PGHOSTEL;
+  const urlPath = window.location.pathname.toLowerCase();
   
-  // Default to pg step id if we detect PG flow, otherwise use provided stepId or fallback
-  const actualStepId = isPGFlow ? 'res_pg_basic_details' : (stepId || 'res_rent_basic_details');
+  // ✅ ENHANCED: Better step ID detection for both PG and Flatmates flows
+  const actualStepId = (() => {
+    // Check for explicit stepId prop first
+    if (stepId) {
+      console.log(`[RoomDetails] Using provided stepId: ${stepId}`);
+      return stepId;
+    }
+    
+    // Detect from URL if flatmates
+    if (urlPath.includes('flatmate')) {
+      console.log('[RoomDetails] Detected Flatmates flow from URL');
+      return 'res_flat_basic_details';
+    }
+    
+    // Detect from flow type
+    if (flowType === FLOW_TYPES.RESIDENTIAL_FLATMATES) {
+      console.log('[RoomDetails] Detected Flatmates flow from form data');
+      return 'res_flat_basic_details';
+    }
+    
+    if (flowType === FLOW_TYPES.RESIDENTIAL_PGHOSTEL) {
+      console.log('[RoomDetails] Detected PG/Hostel flow from form data');
+      return 'res_pg_basic_details';
+    }
+    
+    // Check URL for PG indicators
+    if (urlPath.includes('pghostel') || urlPath.includes('/pg/')) {
+      console.log('[RoomDetails] Detected PG/Hostel flow from URL');
+      return 'res_pg_basic_details';
+    }
+    
+    // Default to PG step for backward compatibility
+    console.log('[RoomDetails] Defaulting to PG/Hostel step ID');
+    return 'res_pg_basic_details';
+  })();
+  
   const effectiveStepId = actualStepId;
   
-  console.log(`Room Details using step ID: ${actualStepId} for flow type: ${flowType}`);
+  console.log(`[RoomDetails] Using step ID: ${actualStepId} for flow type: ${flowType}, URL: ${urlPath}`);
   
-  // ✅ ADDED: Initialize validation system
+  // ✅ FIXED: Initialize validation system with correct step ID and flow type
   const {
     validateField,
     getFieldValidation,
@@ -57,8 +91,8 @@ const RoomDetails: React.FC<FormSectionProps> = ({
     requiredFields
   } = useStepValidation({
     form,
-    flowType: flowType || 'residential_pghostel',
-    currentStepId: effectiveStepId || 'res_pg_basic_details'
+    flowType: flowType || (actualStepId.includes('flat') ? 'residential_flatmates' : 'residential_pghostel'),
+    currentStepId: effectiveStepId
   });
   
   // Create path helper to ensure we register fields in the correct step
@@ -161,10 +195,25 @@ const RoomDetails: React.FC<FormSectionProps> = ({
     roomSize: watchedRoomSize
   });
 
+  // ✅ ENHANCED: Dynamic title based on flow type
+  const getTitle = () => {
+    if (actualStepId.includes('flat')) {
+      return "Room Details";
+    }
+    return "Room Details";
+  };
+
+  const getDescription = () => {
+    if (actualStepId.includes('flat')) {
+      return "Provide details about the room you're offering for flatmates";
+    }
+    return "Provide details about your PG/Hostel rooms";
+  };
+
   return (
     <FormSection
-      title="Room Details"
-      description="Provide details about your PG/Hostel rooms"
+      title={getTitle()}
+      description={getDescription()}
     >
       {/* ✅ ADDED: Progress indicator (like LocationDetails and SaleDetails) */}
       {requiredFields.length > 0 && (
@@ -183,6 +232,8 @@ const RoomDetails: React.FC<FormSectionProps> = ({
               style={{ width: `${completionPercentage}%` }}
             />
           </div>
+          
+
         </div>
       )}
       

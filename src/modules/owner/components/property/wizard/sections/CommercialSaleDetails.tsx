@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/CommercialSaleDetails.tsx
-// Version: 3.0.0
-// Last Modified: 30-05-2025 17:30 IST
-// Purpose: Added step completion validation system integration
+// Version: 4.0.0
+// Last Modified: 02-06-2025 18:45 IST
+// Purpose: Fixed mandatory field marking and validation for Commercial Sale Details step
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { FormSection } from '@/components/FormSection';
@@ -31,9 +31,9 @@ const PREDEFINED_IDEAL_TAGS = [
 
 const CommercialSaleDetails: React.FC<FormSectionProps> = ({ 
   form,
-  stepId = 'com_sale_sale_details' // Default stepId for commercial sale details
+  stepId = 'com_sale_sale_details' // ✅ FIXED: Correct stepId for commercial sale details
 }) => {
-  // ✅ ADDED: Initialize validation system
+  // ✅ FIXED: Initialize validation system with correct flow type
   const {
     validateField,
     getFieldValidation,
@@ -44,7 +44,7 @@ const CommercialSaleDetails: React.FC<FormSectionProps> = ({
     requiredFields
   } = useStepValidation({
     form,
-    flowType: 'commercial_sale',
+    flowType: 'commercial_sale', // ✅ FIXED: Correct flow type
     currentStepId: stepId
   });
 
@@ -54,7 +54,7 @@ const CommercialSaleDetails: React.FC<FormSectionProps> = ({
     console.log(`Saving field ${fieldName} at path ${path}:`, value);
     form.setValue(path, value, { shouldValidate: true });
     
-    // ✅ ADDED: Mark field as touched and validate
+    // ✅ Mark field as touched and validate
     markFieldAsTouched(fieldName);
     validateField(fieldName);
   }, [form, stepId, markFieldAsTouched, validateField]);
@@ -130,7 +130,7 @@ const CommercialSaleDetails: React.FC<FormSectionProps> = ({
       title="Commercial Sale Details"
       description="Provide details about your commercial property for sale"
     >
-      {/* ✅ ADDED: Progress indicator */}
+      {/* ✅ Progress indicator */}
       {requiredFields.length > 0 && (
         <div className="mb-6 p-3 bg-blue-50 rounded-lg border border-blue-200">
           <div className="flex items-center justify-between mb-2">
@@ -152,9 +152,9 @@ const CommercialSaleDetails: React.FC<FormSectionProps> = ({
 
       <div className="space-y-6">
         <div className="grid md:grid-cols-2 gap-6">
-          {/* Expected Price */}
+          {/* ✅ FIXED: Expected Price - Now properly marked as required */}
           <div className="space-y-2">
-            <RequiredLabel htmlFor="expectedPrice">
+            <RequiredLabel htmlFor="expectedPrice" required={true}>
               Expected Price
             </RequiredLabel>
             <div className="relative">
@@ -188,7 +188,7 @@ const CommercialSaleDetails: React.FC<FormSectionProps> = ({
                 Price Negotiable
               </label>
             </div>
-            {/* ✅ ADDED: Error message display */}
+            {/* ✅ Error message display */}
             {shouldShowFieldError('expectedPrice') && (
               <p className="text-sm text-red-600 mt-0.5">
                 {getFieldValidation('expectedPrice').error}
@@ -196,9 +196,9 @@ const CommercialSaleDetails: React.FC<FormSectionProps> = ({
             )}
           </div>
           
-          {/* Ownership Type - implemented as radio buttons */}
+          {/* ✅ FIXED: Ownership Type - Now properly marked as required */}
           <div className="space-y-2">
-            <RequiredLabel htmlFor="ownershipType">
+            <RequiredLabel htmlFor="ownershipType" required={true}>
               Ownership Type
             </RequiredLabel>
             <div className="space-y-2">
@@ -221,7 +221,7 @@ const CommercialSaleDetails: React.FC<FormSectionProps> = ({
                 </div>
               ))}
             </div>
-            {/* ✅ ADDED: Error message display */}
+            {/* ✅ Error message display */}
             {shouldShowFieldError('ownershipType') && (
               <p className="text-sm text-red-600 mt-0.5">
                 {getFieldValidation('ownershipType').error}
@@ -230,9 +230,9 @@ const CommercialSaleDetails: React.FC<FormSectionProps> = ({
           </div>
         </div>
         
-        {/* Available From - removed right icon */}
+        {/* ✅ FIXED: Available From - Now properly marked as required */}
         <div className="space-y-2">
-          <RequiredLabel htmlFor="availableFrom">
+          <RequiredLabel htmlFor="availableFrom" required={true}>
             Available From
           </RequiredLabel>
           <div className="relative">
@@ -245,7 +245,7 @@ const CommercialSaleDetails: React.FC<FormSectionProps> = ({
               className="w-full md:w-1/2"
             />
           </div>
-          {/* ✅ ADDED: Error message display */}
+          {/* ✅ Error message display */}
           {shouldShowFieldError('availableFrom') && (
             <p className="text-sm text-red-600 mt-0.5">
               {getFieldValidation('availableFrom').error}
@@ -253,18 +253,11 @@ const CommercialSaleDetails: React.FC<FormSectionProps> = ({
           )}
         </div>
         
-        {/* Ideal For */}
+        {/* ✅ FIXED: Ideal For - Now properly marked as required */}
         <div className="space-y-2">
-          <div className="flex items-center">
-            <span className="text-sm font-medium">Ideal For</span>
-            <span className="ml-1 text-gray-400">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10"></circle>
-                <line x1="12" y1="16" x2="12" y2="12"></line>
-                <line x1="12" y1="8" x2="12" y2="8"></line>
-              </svg>
-            </span>
-          </div>
+          <RequiredLabel htmlFor="idealFor" required={true}>
+            Ideal For
+          </RequiredLabel>
           
           {/* Tag selection area */}
           <div className="flex flex-wrap gap-2">
@@ -299,7 +292,7 @@ const CommercialSaleDetails: React.FC<FormSectionProps> = ({
               ))}
           </div>
           
-          {/* Improved custom tag input and button layout */}
+          {/* Custom tag input and button layout */}
           <div className="flex mt-2">
             <Input
               placeholder="Add other tags"
@@ -315,6 +308,13 @@ const CommercialSaleDetails: React.FC<FormSectionProps> = ({
               Create
             </button>
           </div>
+          
+          {/* ✅ Error message display */}
+          {shouldShowFieldError('idealFor') && (
+            <p className="text-sm text-red-600 mt-0.5">
+              {getFieldValidation('idealFor').error}
+            </p>
+          )}
         </div>
       </div>
     </FormSection>

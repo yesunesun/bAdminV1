@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/CommercialRentalDetails.tsx
-// Version: 2.0.0
-// Last Modified: 30-05-2025 17:15 IST
-// Purpose: Added step completion validation system integration
+// Version: 2.1.0
+// Last Modified: 02-06-2025 16:50 IST
+// Purpose: Added mandatory field markers and advance rent validation (max 12 months)
 
 import React, { useEffect } from 'react';
 import { FormData, FormSectionProps } from '../types';
@@ -90,6 +90,15 @@ export const CommercialRentalDetails: React.FC<FormSectionProps> = ({
   const rentNegotiable = watchField('rentNegotiable');
   const hasLockInPeriod = watchField('hasLockInPeriod');
   const includesUtilities = watchField('includesUtilities');
+  const advanceRent = watchField('advanceRent');
+
+  // ✅ NEW: Advance rent validation
+  const handleAdvanceRentChange = (value: string) => {
+    const numValue = parseInt(value);
+    if (value === '' || (numValue >= 0 && numValue <= 12)) {
+      updateFormAndState('advanceRent', value);
+    }
+  };
 
   // Function to convert number to Indian currency format
   const formatToIndianCurrency = (value: number): string => {
@@ -135,9 +144,9 @@ export const CommercialRentalDetails: React.FC<FormSectionProps> = ({
         
         {/* First Row - Rental Type and Rent Amount */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Rental Type */}
+          {/* Rental Type - MANDATORY */}
           <div className="space-y-2">
-            <RequiredLabel htmlFor={getFieldId('rentalType')}>Rental Type</RequiredLabel>
+            <RequiredLabel htmlFor={getFieldId('rentalType')} required>Rental Type</RequiredLabel>
             <Select
               value={getFieldValue('rentalType') || 'rent'}
               onValueChange={(value) => updateFormAndState('rentalType', value as 'rent' | 'lease')}
@@ -171,9 +180,9 @@ export const CommercialRentalDetails: React.FC<FormSectionProps> = ({
             )}
           </div>
 
-          {/* Rent Amount */}
+          {/* Rent Amount - MANDATORY */}
           <div className="space-y-2">
-            <RequiredLabel htmlFor={getFieldId('rentAmount')}>
+            <RequiredLabel htmlFor={getFieldId('rentAmount')} required>
               {rentalType === 'lease' ? 'Lease Amount (₹)' : 'Rent Amount (₹) per month'}
             </RequiredLabel>
             <div className="relative">
@@ -220,9 +229,9 @@ export const CommercialRentalDetails: React.FC<FormSectionProps> = ({
 
         {/* Second Row - Security Deposit and Advance Rent */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Security Deposit */}
+          {/* Security Deposit - MANDATORY */}
           <div className="space-y-2">
-            <RequiredLabel htmlFor={getFieldId('securityDeposit')}>Security Deposit (₹)</RequiredLabel>
+            <RequiredLabel htmlFor={getFieldId('securityDeposit')} required>Security Deposit (₹)</RequiredLabel>
             <Input
               id={getFieldId('securityDeposit')}
               type="text"
@@ -244,9 +253,9 @@ export const CommercialRentalDetails: React.FC<FormSectionProps> = ({
             )}
           </div>
 
-          {/* Advance Rent */}
+          {/* Advance Rent - MANDATORY with 12 month limit */}
           <div className="space-y-2">
-            <RequiredLabel htmlFor={getFieldId('advanceRent')}>Advance Rent (months)</RequiredLabel>
+            <RequiredLabel htmlFor={getFieldId('advanceRent')} required>Advance Rent (months)</RequiredLabel>
             <Input
               id={getFieldId('advanceRent')}
               type="number"
@@ -257,8 +266,16 @@ export const CommercialRentalDetails: React.FC<FormSectionProps> = ({
               className={cn(
                 getFieldError('advanceRent') && "border-destructive focus-visible:ring-destructive"
               )}
-              onChange={(e) => updateFormAndState('advanceRent', e.target.value)}
+              value={advanceRent || ''}
+              onChange={(e) => handleAdvanceRentChange(e.target.value)}
             />
+            <p className="text-xs text-gray-500">Maximum 12 months allowed</p>
+            {/* ✅ NEW: Show validation error for advance rent limit */}
+            {advanceRent && parseInt(advanceRent) > 12 && (
+              <p className="text-sm text-red-600 mt-0.5">
+                Advance rent cannot exceed 12 months
+              </p>
+            )}
             {/* ✅ ADDED: Error message display */}
             {shouldShowFieldError('advanceRent') && (
               <p className="text-sm text-red-600 mt-0.5">
@@ -273,9 +290,9 @@ export const CommercialRentalDetails: React.FC<FormSectionProps> = ({
 
         {/* Third Row - Maintenance and CAM Charges */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Maintenance */}
+          {/* Maintenance - MANDATORY */}
           <div className="space-y-2">
-            <RequiredLabel htmlFor={getFieldId('maintenance')}>Maintenance</RequiredLabel>
+            <RequiredLabel htmlFor={getFieldId('maintenance')} required>Maintenance</RequiredLabel>
             <Select
               value={getFieldValue('maintenance') || ''}
               onValueChange={(value) => updateFormAndState('maintenance', value)}
@@ -308,9 +325,9 @@ export const CommercialRentalDetails: React.FC<FormSectionProps> = ({
             )}
           </div>
 
-          {/* CAM Charges */}
+          {/* CAM Charges - MANDATORY */}
           <div className="space-y-2">
-            <RequiredLabel htmlFor={getFieldId('camCharges')}>CAM Charges (₹/sq ft/month)</RequiredLabel>
+            <RequiredLabel htmlFor={getFieldId('camCharges')} required>CAM Charges (₹/sq ft/month)</RequiredLabel>
             <Input
               id={getFieldId('camCharges')}
               type="text"
@@ -336,9 +353,9 @@ export const CommercialRentalDetails: React.FC<FormSectionProps> = ({
 
         {/* Fourth Row - Available From and Parking (removed furnishing) */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Available From */}
+          {/* Available From - MANDATORY */}
           <div className="space-y-2">
-            <RequiredLabel htmlFor={getFieldId('availableFrom')}>Available From</RequiredLabel>
+            <RequiredLabel htmlFor={getFieldId('availableFrom')} required>Available From</RequiredLabel>
             <Input
               id={getFieldId('availableFrom')}
               type="date"
@@ -359,9 +376,9 @@ export const CommercialRentalDetails: React.FC<FormSectionProps> = ({
             )}
           </div>
 
-          {/* Parking */}
+          {/* Parking - MANDATORY */}
           <div className="space-y-2">
-            <RequiredLabel htmlFor={getFieldId('parking')}>Parking</RequiredLabel>
+            <RequiredLabel htmlFor={getFieldId('parking')} required>Parking</RequiredLabel>
             <Select
               value={getFieldValue('parking') || ''}
               onValueChange={(value) => updateFormAndState('parking', value)}
@@ -397,9 +414,9 @@ export const CommercialRentalDetails: React.FC<FormSectionProps> = ({
 
         {/* Fifth Row - Operating Hours (single column since furnishing was removed) */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Operating Hours */}
+          {/* Operating Hours - MANDATORY */}
           <div className="space-y-2">
-            <RequiredLabel htmlFor={getFieldId('operatingHours')}>Operating Hours</RequiredLabel>
+            <RequiredLabel htmlFor={getFieldId('operatingHours')} required>Operating Hours</RequiredLabel>
             <Select
               value={getFieldValue('operatingHours') || ''}
               onValueChange={(value) => updateFormAndState('operatingHours', value)}
@@ -438,9 +455,9 @@ export const CommercialRentalDetails: React.FC<FormSectionProps> = ({
           </div>
         </div>
 
-        {/* Business Preferences */}
+        {/* Business Preferences - MANDATORY (at least 1) */}
         <div className="mt-8">
-          <RequiredLabel>Preferred Business Types</RequiredLabel>
+          <RequiredLabel required>Preferred Business Types (at least 1)</RequiredLabel>
           <p className="text-sm text-gray-600 mb-3">Select the types of businesses you prefer as tenants</p>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-2">
             {COMMERCIAL_BUSINESS_PREFERENCES.map((business) => (
@@ -469,6 +486,12 @@ export const CommercialRentalDetails: React.FC<FormSectionProps> = ({
               </div>
             ))}
           </div>
+          {/* ✅ NEW: Show validation error if no business preferences selected */}
+          {(!getFieldValue('businessPreferences') || getFieldValue('businessPreferences').length === 0) && (
+            <p className="text-sm text-red-600 mt-2">
+              Please select at least one preferred business type
+            </p>
+          )}
           {/* ✅ ADDED: Error message display */}
           {shouldShowFieldError('businessPreferences') && (
             <p className="text-sm text-red-600 mt-0.5">
@@ -480,7 +503,7 @@ export const CommercialRentalDetails: React.FC<FormSectionProps> = ({
           )}
         </div>
 
-        {/* Commercial Terms */}
+        {/* Commercial Terms - OPTIONAL */}
         <div className="mt-8">
           <h3 className="text-base font-medium mb-3">Commercial Terms</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -545,6 +568,7 @@ export const CommercialRentalDetails: React.FC<FormSectionProps> = ({
               </div>
             </div>
           </div>
+          {/* ✅ REMOVED: Validation error for commercial terms since it's not mandatory */}
         </div>
       </div>
     </FormSection>
