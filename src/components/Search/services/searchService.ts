@@ -1,7 +1,7 @@
 // src/components/Search/services/searchService.ts
-// Version: 10.1.0
-// Last Modified: 02-06-2025 10:15 IST
-// Purpose: Updated property code detection to only trigger for 6-character alphanumeric codes
+// Version: 10.2.0
+// Last Modified: 02-06-2025 15:45 IST
+// Purpose: Fixed Buy/Rent filtering by properly mapping transactionType to database flow types
 
 import { SearchFilters, SearchResult } from '../types/search.types';
 import { supabase } from '@/lib/supabase';
@@ -50,7 +50,7 @@ interface ResidentialSearchResult {
   area_unit: string;
   land_type: string | null;
   primary_image: string | null;
-  code?: string | null; // ADDED: Property code from meta.code
+  code?: string | null;
 }
 
 interface CommercialSearchResult {
@@ -71,7 +71,7 @@ interface CommercialSearchResult {
   status: string;
   area_unit: string;
   primary_image: string | null;
-  code?: string | null; // ADDED: Property code from meta.code
+  code?: string | null;
 }
 
 interface LandSearchResult {
@@ -93,7 +93,7 @@ interface LandSearchResult {
   area_unit: string;
   land_type: string;
   primary_image: string | null;
-  code?: string | null; // ADDED: Property code from meta.code
+  code?: string | null;
 }
 
 // Union type for all database results
@@ -268,56 +268,72 @@ export class SearchService {
   }
 
   /**
-   * Map frontend subtypes to database flow types
+   * FIXED: Map transaction type and property type to specific database flow types
+   * This ensures Buy shows only Sale properties and Rent shows only Rental properties
    */
-  private mapSubtypeToFlowType(propertyType: string, subtype: string, transactionType: string): string | null {
-    console.log('🔄 Mapping subtype to flow type:', { propertyType, subtype, transactionType });
+  private getFlowTypeFromTransactionAndProperty(transactionType: string | null, propertyType: string, subType?: string): string | null {
+    console.log('🔄 Mapping transaction and property to flow type:', { transactionType, propertyType, subType });
     
-    if (propertyType === 'residential') {
-      // Handle special residential subtypes that have their own flow types
-      switch (subtype) {
-        case 'pghostel':
-        case 'pg':
-          return 'residential_pghostel';
-        case 'flatmates':
-          return 'residential_flatmates';
-        case 'apartment':
-        case 'villa':
-        case 'house':
-        case 'studio':
-        case 'duplex':
-        case 'penthouse':
-        case 'farmhouse':
-        case 'independent':
-          // For regular residential subtypes, use transaction type to determine flow
-          return transactionType === 'buy' ? 'residential_sale' : 'residential_rent';
-        default:
-          return transactionType === 'buy' ? 'residential_sale' : 'residential_rent';
-      }
-    } else if (propertyType === 'commercial') {
-      switch (subtype) {
-        case 'coworking':
-          return 'commercial_coworking';
-        case 'office_space':
-        case 'shop':
-        case 'showroom':
-        case 'godown_warehouse':
-        case 'industrial_shed':
-        case 'industrial_building':
-        case 'other_business':
-          return transactionType === 'buy' ? 'commercial_sale' : 'commercial_rent';
-        default:
-          return transactionType === 'buy' ? 'commercial_sale' : 'commercial_rent';
-      }
-    } else if (propertyType === 'land') {
-      return 'land_sale';
-    } else if (propertyType === 'pghostel') {
+    // Handle special subtypes first
+    if (subType === 'pghostel' || subType === 'pg') {
+      console.log('✅ PG/Hostel subtype → residential_pghostel');
       return 'residential_pghostel';
-    } else if (propertyType === 'flatmates') {
+    }
+    
+    if (subType === 'flatmates') {
+      console.log('✅ Flatmates subtype → residential_flatmates');
       return 'residential_flatmates';
     }
     
-    return 'residential_rent';
+    if (subType === 'coworking') {
+      console.log('✅ Coworking subtype → commercial_coworking');
+      return 'commercial_coworking';
+    }
+    
+    // If no transaction type specified, return null to search all
+    if (!transactionType) {
+      console.log('ℹ️ No transaction type specified → search all flow types');
+      return null;
+    }
+    
+    // Map transaction type + property type to specific flow types
+    if (propertyType === 'residential' || !propertyType || propertyType === 'any') {
+      if (transactionType === 'buy') {
+        console.log('✅ Buy + Residential → residential_sale');
+        return 'residential_sale';
+      } else if (transactionType === 'rent') {
+        console.log('✅ Rent + Residential → residential_rent');
+        return 'residential_rent';
+      }
+    }
+    
+    if (propertyType === 'commercial') {
+      if (transactionType === 'buy') {
+        console.log('✅ Buy + Commercial → commercial_sale');
+        return 'commercial_sale';
+      } else if (transactionType === 'rent') {
+        console.log('✅ Rent + Commercial → commercial_rent');
+        return 'commercial_rent';
+      }
+    }
+    
+    if (propertyType === 'land') {
+      // Land is always for sale (buy)
+      console.log('✅ Land property → land_sale');
+      return 'land_sale';
+    }
+    
+    // Default fallback
+    console.log('⚠️ No specific mapping found, using default');
+    return transactionType === 'buy' ? 'residential_sale' : 'residential_rent';
+  }
+
+  /**
+   * DEPRECATED: Old mapping function - replaced by getFlowTypeFromTransactionAndProperty
+   */
+  private mapSubtypeToFlowType(propertyType: string, subtype: string, transactionType: string): string | null {
+    console.log('⚠️ Using deprecated mapSubtypeToFlowType - should use getFlowTypeFromTransactionAndProperty');
+    return this.getFlowTypeFromTransactionAndProperty(transactionType, propertyType, subtype);
   }
 
   /**
@@ -374,35 +390,22 @@ export class SearchService {
   }
 
   /**
-   * Enhanced method to get effective subtype considering property-level filtering
+   * SIMPLIFIED: Get effective subtype - just pass through the special cases
    */
   private getEffectiveSubtype(filters: SearchFilters): string | null {
-    const propertyType = filters.selectedPropertyType || 'residential';
-    const transactionType = filters.transactionType || 'rent';
-    const selectedSubType = filters.selectedSubType;
-
-    console.log('🎯 Getting effective subtype:', { propertyType, transactionType, selectedSubType });
-
-    // For PG/Hostel and Flatmates, use the specific flow type
-    if (selectedSubType === 'pghostel' || selectedSubType === 'flatmates') {
-      const mappedFlowType = this.mapSubtypeToFlowType(propertyType, selectedSubType, transactionType);
-      console.log('✅ Using special subtype mapping:', selectedSubType, '->', mappedFlowType);
-      return mappedFlowType;
+    // Only handle special subtypes, let the database handle transaction type filtering
+    if (filters.selectedSubType === 'pghostel') {
+      return 'pghostel';
+    } else if (filters.selectedSubType === 'flatmates') {
+      return 'flatmates';
     }
-
-    // For regular properties, just use the base flow type
-    if (transactionType && transactionType !== 'any') {
-      const mappedFlowType = this.mapSubtypeToFlowType(propertyType, 'default', transactionType);
-      console.log('✅ Using transaction type mapping:', transactionType, '->', mappedFlowType);
-      return mappedFlowType;
-    }
-
-    console.log('ℹ️ No specific subtype filter applied');
+    
+    // For everything else, return null and let buildSearchParams handle the transaction type
     return null;
   }
 
   /**
-   * Main search method with updated database function calls
+   * Main search method with FIXED transaction type filtering
    */
   async search(filters: SearchFilters, options: SearchOptions = {}): Promise<SearchResponse> {
     const searchId = searchPerformanceMonitor.start(filters);
@@ -412,6 +415,9 @@ export class SearchService {
       console.log('🔧 Search options:', options);
       
       const propertyType = filters.selectedPropertyType || 'residential';
+      const transactionType = (filters as any).transactionType; // Get the mapped transaction type
+      
+      console.log('💡 Transaction type for filtering:', transactionType);
       
       let searchResults: DatabaseSearchResult[] = [];
       let totalCount = 0;
@@ -435,6 +441,8 @@ export class SearchService {
         resultCount: searchResults.length,
         totalCount: totalCount,
         propertyType: propertyType,
+        transactionType: transactionType,
+        firstResultFlowType: searchResults[0]?.flow_type,
         firstResultHasPrimaryImage: searchResults[0]?.primary_image ? 'YES' : 'NO'
       });
 
@@ -460,7 +468,7 @@ export class SearchService {
   }
 
   /**
-   * Call the appropriate property-specific search function with updated parameters
+   * FIXED: Call the appropriate property-specific search function with transaction type filtering
    */
   private async callPropertySpecificSearch(
     propertyType: string, 
@@ -468,6 +476,8 @@ export class SearchService {
     options: SearchOptions
   ) {
     const searchParams = this.buildSearchParams(filters, options);
+    
+    console.log('📡 Calling database search with params:', searchParams);
     
     switch (propertyType) {
       case 'residential':
@@ -540,11 +550,13 @@ export class SearchService {
   }
 
   /**
-   * Search all property types and combine results with updated parameters
+   * SIMPLIFIED: Search all property types with correct p_subtype parameter
    */
   private async searchAllPropertyTypes(filters: SearchFilters, options: SearchOptions): Promise<DatabaseSearchResult[]> {
     const searchParams = this.buildSearchParams(filters, options);
     const limit = Math.floor((searchParams.p_limit || 50) / 3);
+    
+    console.log('🌐 Searching all property types with params:', { p_subtype: searchParams.p_subtype });
     
     try {
       const [residentialResult, commercialResult, landResult] = await Promise.allSettled([
@@ -625,7 +637,7 @@ export class SearchService {
   }
 
   /**
-   * Build search parameters for database functions with p_property_subtype
+   * FIXED: Build search parameters with correct p_subtype mapping for database functions
    */
   private buildSearchParams(filters: SearchFilters, options: SearchOptions): Record<string, any> {
     const params: Record<string, any> = {
@@ -659,19 +671,36 @@ export class SearchService {
       params.p_state = 'Telangana';
     }
 
-    // Get effective subtype for database filtering
-    const effectiveSubtype = this.getEffectiveSubtype(filters);
-    if (effectiveSubtype) {
-      params.p_subtype = effectiveSubtype;
-      console.log('🎯 Database subtype parameter:', effectiveSubtype);
+    // FIXED: Set p_subtype based on transactionType (from documentation examples)
+    const transactionType = (filters as any).transactionType;
+    if (transactionType) {
+      if (transactionType === 'buy') {
+        params.p_subtype = 'sale';  // Buy = Sale properties
+        console.log('✅ Buy filter → p_subtype = "sale"');
+      } else if (transactionType === 'rent') {
+        params.p_subtype = 'rent';  // Rent = Rental properties
+        console.log('✅ Rent filter → p_subtype = "rent"');
+      }
+      // If transactionType is null (Any), don't set p_subtype to search all
     }
 
-    // Add property subtype parameter for database-level filtering
+    // Handle special subtypes that override transaction type
+    if (filters.selectedSubType && filters.selectedSubType !== 'any') {
+      if (filters.selectedSubType === 'pghostel') {
+        params.p_subtype = 'pghostel';
+        console.log('✅ PG/Hostel subtype → p_subtype = "pghostel"');
+      } else if (filters.selectedSubType === 'flatmates') {
+        params.p_subtype = 'flatmates';
+        console.log('✅ Flatmates subtype → p_subtype = "flatmates"');
+      }
+    }
+
+    // Add property subtype parameter for more specific filtering
     if (filters.selectedSubType && filters.selectedSubType !== 'any') {
       const propertySubtype = this.getPropertySubtype(filters.selectedSubType);
       if (propertySubtype) {
         params.p_property_subtype = propertySubtype;
-        console.log('🔍 Database property subtype parameter:', propertySubtype);
+        console.log('🔍 Property subtype parameter:', propertySubtype);
       }
     }
 
@@ -720,7 +749,7 @@ export class SearchService {
       // Extract property code from database result
       const propertyCode = dbResult.code || null;
       
-      console.log(`🖼️ Transforming property ${dbResult.id}: primary_image = ${primaryImage}, code = ${propertyCode}`);
+      console.log(`🖼️ Transforming property ${dbResult.id}: flow_type = ${dbResult.flow_type}, transaction = ${transactionType}, primary_image = ${primaryImage}, code = ${propertyCode}`);
       
       return {
         id: dbResult.id,
