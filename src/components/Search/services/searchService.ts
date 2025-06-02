@@ -5,6 +5,14 @@
 
 import { SearchFilters, SearchResult } from '../types/search.types';
 import { supabase } from '@/lib/supabase';
+import SearchFallbackService from './searchFallbackService';
+import { 
+  logSearchParams, 
+  logSearchResults, 
+  logSearchError, 
+  validateSearchParams,
+  searchPerformanceMonitor 
+} from '../utils/searchDebugUtils';
 
 export interface SearchResponse {
   results: SearchResult[];
@@ -20,8 +28,8 @@ export interface SearchOptions {
   sortOrder?: 'asc' | 'desc';
 }
 
-// Database result interface matching the PostgreSQL function return
-interface DatabaseSearchResult {
+// UPDATED: Database result interfaces with primary_image and code fields
+interface ResidentialSearchResult {
   id: string;
   owner_id: string;
   created_at: string;
@@ -96,28 +104,48 @@ export class SearchService {
    * Search property by code using search_property_by_code SQL function
    */
   async searchByCode(code: string, useInsensitiveSearch: boolean = true): Promise<SearchResponse> {
+    const searchId = searchPerformanceMonitor.start({} as SearchFilters);
+    
     try {
       console.log('🔍 Searching property by code:', code, 'insensitive:', useInsensitiveSearch);
       
-      const functionName = useInsensitiveSearch ? 'search_property_by_code_insensitive' : 'search_property_by_code';
-      const { data, error } = await supabase.rpc(functionName, { p_code: code.trim() });
-      
-      if (error) {
-        console.error('❌ Property code search error:', error);
-        throw new Error(`Code search failed: ${error.message}`);
+      // Validate input
+      if (!code || code.trim() === '') {
+        throw new Error('Property code cannot be empty');
       }
 
+      const trimmedCode = code.trim();
+      
+      // Choose the appropriate function based on case sensitivity
+      const functionName = useInsensitiveSearch 
+        ? 'search_property_by_code_insensitive' 
+        : 'search_property_by_code';
+      
+      const { data, error } = await supabase.rpc(functionName, {
+        p_code: trimmedCode
+      });
+      
+      if (error) {
+        console.error('❌ search_property_by_code error:', error);
+        throw new Error(`Failed to search property by code: ${error.message}`);
+      }
+      
       const searchResults = data || [];
       const totalCount = searchResults[0]?.total_count || searchResults.length;
       
       console.log('📊 Property code search results:', {
-        code: code.trim(),
+        code: trimmedCode,
         resultCount: searchResults.length,
         totalCount: totalCount,
         foundProperty: searchResults.length > 0 ? searchResults[0].title : 'None'
       });
 
-      const transformedResults = this.transformDatabaseResults(searchResults);
+      // Transform results using the same transformation logic
+      let transformedResults = this.transformDatabaseResults(searchResults);
+      transformedResults = SearchFallbackService.enhanceSearchResults(transformedResults);
+      
+      const duration = searchPerformanceMonitor.end(transformedResults.length, totalCount);
+      logSearchResults(transformedResults, totalCount, duration);
       
       return {
         results: transformedResults,
@@ -127,62 +155,114 @@ export class SearchService {
       };
       
     } catch (error) {
-      console.error('💥 Property code search error:', error);
+      searchPerformanceMonitor.error(error);
+      logSearchError(error, {} as SearchFilters, {});
       throw error;
     }
   }
 
   /**
-   * Check if a search query is exactly a 6-character alphanumeric property code
+   * UPDATED: Check if a search query is exactly a 6-character alphanumeric property code
+   * Property codes must be exactly 6 characters: alphanumeric only (e.g., RX0AD8, AB1234, 123ABC)
    */
   isPropertyCode(query: string): boolean {
-    if (!query) return false;
+    if (!query) {
+      return false;
+    }
     
     const trimmedQuery = query.trim();
-    if (trimmedQuery.length !== 6) return false;
     
+    // Must be exactly 6 characters
+    if (trimmedQuery.length !== 6) {
+      console.log(`🔍 Query "${trimmedQuery}" is ${trimmedQuery.length} chars, not 6 - not a property code`);
+      return false;
+    }
+    
+    // Must be alphanumeric only (letters and numbers, no special characters)
     const alphanumericPattern = /^[A-Za-z0-9]{6}$/;
-    return alphanumericPattern.test(trimmedQuery);
+    const isValidCode = alphanumericPattern.test(trimmedQuery);
+    
+    console.log(`🔍 Query "${trimmedQuery}" alphanumeric check: ${isValidCode ? 'PASS' : 'FAIL'} - ${isValidCode ? 'IS' : 'NOT'} a property code`);
+    
+    return isValidCode;
   }
 
   /**
-   * Search residential properties using proper parameter mapping
+   * ENHANCED: Smart search that detects if query is exactly a 6-character property code
+   * If it matches the criteria, search by code first, then fall back to regular search
    */
-  async searchResidentialProperties(filters: SearchFilters, options: SearchOptions = {}): Promise<SearchResponse> {
+  async smartSearch(filters: SearchFilters, options: SearchOptions = {}): Promise<SearchResponse> {
+    const query = filters.searchQuery?.trim();
+    
+    // If query is exactly a 6-character alphanumeric code, try code search first
+    if (query && this.isPropertyCode(query)) {
+      console.log('🎯 Detected 6-character property code, trying code search first:', query);
+      
+      try {
+        const codeResults = await this.searchByCode(query, true);
+        
+        // If we found results, return them
+        if (codeResults.results.length > 0) {
+          console.log('✅ Found property by code, returning results');
+          return codeResults;
+        }
+        
+        console.log('ℹ️ No results by code, falling back to regular search');
+      } catch (error) {
+        console.log('⚠️ Code search failed, falling back to regular search:', error);
+      }
+    } else if (query) {
+      console.log(`🔍 Query "${query}" does not match 6-character property code pattern, using regular search`);
+    }
+    
+    // Fall back to regular search
+    return this.search(filters, options);
+  }
+
+  /**
+   * Get latest properties using get_latest_properties SQL function
+   */
+  async getLatestProperties(limit: number = 50): Promise<SearchResponse> {
+    const searchId = searchPerformanceMonitor.start({} as SearchFilters);
+    
     try {
-      console.log('🏠 Searching residential properties with filters:', filters);
+      console.log('🏠 Getting latest properties with limit:', limit);
       
-      // Build parameters according to search_residential_properties function signature
-      const params = this.buildResidentialSearchParams(filters, options);
-      console.log('🔧 Residential search parameters:', params);
-      
-      const { data, error } = await supabase.rpc('search_residential_properties', params);
+      const { data, error } = await supabase.rpc('get_latest_properties', {
+        p_limit: limit
+      });
       
       if (error) {
-        console.error('❌ Residential search error:', error);
-        throw new Error(`Residential search failed: ${error.message}`);
+        console.error('❌ get_latest_properties error:', error);
+        throw new Error(`Failed to get latest properties: ${error.message}`);
       }
-
-      const searchResults = data || [];
-      const totalCount = searchResults[0]?.total_count || 0;
       
-      console.log('📊 Residential search results:', {
+      const searchResults = data || [];
+      const totalCount = searchResults[0]?.total_count || searchResults.length;
+      
+      console.log('📊 Latest properties results:', {
         resultCount: searchResults.length,
         totalCount: totalCount,
-        params: params
+        firstResultHasPrimaryImage: searchResults[0]?.primary_image ? 'YES' : 'NO'
       });
 
-      const transformedResults = this.transformDatabaseResults(searchResults);
+      // Transform results using the same transformation logic
+      let transformedResults = this.transformDatabaseResults(searchResults);
+      transformedResults = SearchFallbackService.enhanceSearchResults(transformedResults);
+      
+      const duration = searchPerformanceMonitor.end(transformedResults.length, totalCount);
+      logSearchResults(transformedResults, totalCount, duration);
       
       return {
         results: transformedResults,
         totalCount: totalCount,
-        page: options.page || 1,
-        limit: options.limit || 50
+        page: 1,
+        limit: limit
       };
       
     } catch (error) {
-      console.error('💥 Residential search error:', error);
+      searchPerformanceMonitor.error(error);
+      logSearchError(error, {} as SearchFilters, {});
       throw error;
     }
   }
@@ -327,7 +407,9 @@ export class SearchService {
   /**
    * Main search method with FIXED transaction type filtering
    */
-  async searchLandProperties(filters: SearchFilters, options: SearchOptions = {}): Promise<SearchResponse> {
+  async search(filters: SearchFilters, options: SearchOptions = {}): Promise<SearchResponse> {
+    const searchId = searchPerformanceMonitor.start(filters);
+    
     try {
       console.log('🔍 Starting search with filters:', filters);
       console.log('🔧 Search options:', options);
@@ -379,7 +461,8 @@ export class SearchService {
       };
       
     } catch (error) {
-      console.error('💥 Land search error:', error);
+      searchPerformanceMonitor.error(error);
+      logSearchError(error, filters, {});
       throw error;
     }
   }
@@ -536,33 +619,34 @@ export class SearchService {
         combinedResults.push(...landResult.value.data);
         totalCount += landResult.value.data[0]?.total_count || 0;
       }
-    }
 
-    // Price range filter
-    if (filters.selectedPriceRange && filters.selectedPriceRange !== 'any') {
-      const priceRange = this.parsePriceRange(filters.selectedPriceRange);
-      if (priceRange) {
-        params.p_min_price = priceRange.min;
-        params.p_max_price = priceRange.max;
+      // Sort by created_at desc
+      combinedResults.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+      // Set total count on first result for consistency
+      if (combinedResults.length > 0) {
+        combinedResults[0].total_count = totalCount;
       }
-    }
 
-    return params;
+      return combinedResults;
+      
+    } catch (error) {
+      console.error('Error in searchAllPropertyTypes:', error);
+      throw error;
+    }
   }
 
   /**
    * FIXED: Build search parameters with correct p_subtype mapping for database functions
    */
-  private buildLandSearchParams(filters: SearchFilters, options: SearchOptions): Record<string, any> {
+  private buildSearchParams(filters: SearchFilters, options: SearchOptions): Record<string, any> {
     const params: Record<string, any> = {
+      p_search_query: filters.searchQuery || null,
       p_limit: options.limit || 50,
-      p_offset: ((options.page || 1) - 1) * (options.limit || 50)
+      p_offset: ((options.page || 1) - 1) * (options.limit || 50),
+      p_sort_by: options.sortBy || 'created_at',
+      p_sort_order: (options.sortOrder || 'desc').toUpperCase(),
     };
-
-    // Search query
-    if (filters.searchQuery?.trim()) {
-      params.p_search_query = filters.searchQuery.trim();
-    }
 
     // Location filters
     if (filters.selectedLocation && filters.selectedLocation !== 'any') {
@@ -644,25 +728,11 @@ export class SearchService {
       if (priceRange) {
         params.p_min_price = priceRange.min;
         params.p_max_price = priceRange.max;
-        console.log('💰 Land price range filter applied:', priceRange);
+        console.log('💰 Price range filter applied:', priceRange);
       }
     }
 
-    // Area range filter (if we add area filter support in the future)
-    // Land properties commonly use area filters
-    // TODO: Add area filter support to SearchFilters interface
-    /*
-    if (filters.selectedAreaRange && filters.selectedAreaRange !== 'any') {
-      const areaRange = this.parseAreaRange(filters.selectedAreaRange);
-      if (areaRange) {
-        params.p_area_min = areaRange.min;
-        params.p_area_max = areaRange.max;
-        console.log('📐 Land area range filter applied:', areaRange);
-      }
-    }
-    */
-
-    console.log('🔧 Final land search parameters:', params);
+    console.log('🔧 Final search parameters:', params);
     return params;
   }
 
@@ -694,43 +764,76 @@ export class SearchService {
         id: dbResult.id,
         title: dbResult.title || 'Property Listing',
         location: this.formatLocation(dbResult.city, dbResult.state),
-        price: dbResult.price || 0,
+        price: price,
         propertyType: dbResult.property_type,
         transactionType: transactionType,
-        subType: dbResult.subtype || dbResult.property_type,
+        subType: displaySubtype,
         bhk: bhk,
-        area: dbResult.area || 0,
+        area: area,
         ownerName: this.extractOwnerName(dbResult.owner_email),
         ownerPhone: '+91 98765 43210',
         createdAt: dbResult.created_at,
         status: dbResult.status || 'active',
-        primary_image: dbResult.primary_image,
-        code: dbResult.code
+        primary_image: primaryImage,
+        code: propertyCode
       } as SearchResult;
     });
   }
 
   /**
-   * Extract transaction type from flow_type and subtype
+   * Enhanced display subtype extraction with title-based detection
    */
-  private extractTransactionType(flowType: string, subtype: string): string {
-    // Check subtype first (more reliable)
-    if (subtype === 'sale' || subtype === 'buy') {
-      return 'buy';
-    } else if (subtype === 'rent' || subtype === 'rental') {
-      return 'rent';
-    } else if (subtype === 'pghostel' || subtype === 'flatmates') {
-      return 'rent'; // PG and flatmates are rental-based
+  private extractDisplaySubtype(flowType: string, subtype: string | null, title: string | null): string {
+    // If we have a specific subtype, use it
+    if (subtype && subtype !== flowType) {
+      return subtype;
     }
+
+    // Try to detect subtype from title for better display
+    const titleLower = title?.toLowerCase() || '';
     
-    // Fallback to flow_type
+    if (titleLower.includes('villa')) {
+      return 'villa';
+    } else if (titleLower.includes('independent') || titleLower.includes('house')) {
+      return 'house';
+    } else if (titleLower.includes('duplex')) {
+      return 'duplex';
+    } else if (titleLower.includes('penthouse')) {
+      return 'penthouse';
+    } else if (titleLower.includes('studio')) {
+      return 'studio';
+    } else if (titleLower.includes('farmhouse')) {
+      return 'farmhouse';
+    }
+
+    // Extract from flow_type as fallback
+    if (flowType.includes('residential_rent') || flowType.includes('residential_sale')) {
+      return 'apartment';
+    } else if (flowType.includes('residential_pghostel')) {
+      return 'pghostel';
+    } else if (flowType.includes('residential_flatmates')) {
+      return 'flatmates';
+    } else if (flowType.includes('commercial_rent') || flowType.includes('commercial_sale')) {
+      return 'office_space';
+    } else if (flowType.includes('commercial_coworking')) {
+      return 'coworking';
+    } else if (flowType.includes('land_sale')) {
+      return 'residential_plot';
+    }
+
+    return flowType;
+  }
+
+  /**
+   * Extract transaction type from flow_type
+   */
+  private extractTransactionType(flowType: string): string {
     if (flowType.includes('sale') || flowType.includes('buy')) {
       return 'buy';
     } else if (flowType.includes('rent') || flowType.includes('rental')) {
       return 'rent';
     }
-    
-    return 'rent'; // default
+    return 'rent';
   }
 
   /**
@@ -790,7 +893,7 @@ export class SearchService {
   }
 
   /**
-   * Get search suggestions with property code support
+   * UPDATED: Get search suggestions with 6-character property code support
    */
   async getSearchSuggestions(query: string): Promise<string[]> {
     if (query.length < 2) return [];
@@ -798,7 +901,7 @@ export class SearchService {
     try {
       const suggestions: string[] = [];
       
-      // If query looks like a property code, suggest code-based search
+      // If query looks like a 6-character property code, suggest code-based search
       if (this.isPropertyCode(query)) {
         suggestions.push(`Search by code: ${query.toUpperCase()}`);
       }
@@ -810,18 +913,15 @@ export class SearchService {
         .ilike('property_details->flow->>title', `%${query}%`)
         .limit(5);
 
-      if (error) {
-        console.error('Error getting suggestions:', error);
-        return suggestions;
+      if (!error && data) {
+        const titleSuggestions = data
+          .map(item => item.property_details?.flow?.title)
+          .filter(Boolean)
+          .slice(0, 4); // Leave space for code suggestion
+        
+        suggestions.push(...titleSuggestions);
       }
 
-      const titleSuggestions = data
-        .map(item => item.property_details?.flow?.title)
-        .filter(Boolean)
-        .slice(0, 5);
-        
-      suggestions.push(...titleSuggestions);
-      
       return suggestions.slice(0, 5);
         
     } catch (error) {
@@ -836,15 +936,22 @@ export class SearchService {
   async getPopularSearches(): Promise<string[]> {
     return [
       'Apartments in Hitech City',
-      'Villas in Jubilee Hills',
+      'Villas in Jubilee Hills', 
       'Commercial spaces in Gachibowli',
       'PG in Kukatpally',
       'Land in Shamshabad'
     ];
   }
+
+  /**
+   * Save search for user history (future implementation)
+   */
+  async saveSearch(filters: SearchFilters): Promise<void> {
+    console.log('📝 Search saved for future implementation:', filters);
+  }
 }
 
 // Create and export singleton instance
-const searchService = new SearchService();
-export { searchService };
-export default searchService;
+const searchServiceInstance = new SearchService();
+export { searchServiceInstance as searchService };
+export default searchServiceInstance;

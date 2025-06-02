@@ -41,34 +41,9 @@ export const useSearch = (onSearchCallback?: (filters: SearchFilters) => void) =
       // Reset the wasCleared flag
       setWasCleared(false);
       
-      // Load default latest properties
-      loadLatestProperties();
-    }
-  }, [wasCleared, areFiltersEmpty]);
-
-  /**
-   * Load latest properties as default content
-   */
-  const loadLatestProperties = useCallback(async () => {
-    try {
-      setSearchState(prev => ({
-        ...prev,
-        loading: true,
-        error: null
-      }));
-
-      console.log('🏠 Loading latest properties as default content');
-      const response = await searchService.getLatestProperties(50);
-      
-      setSearchState(prev => ({
-        ...prev,
-        loading: false,
-        results: response.results,
-        totalCount: response.totalCount
-      }));
-
-      // Call external callback if provided
+      // Trigger the callback to load default results
       if (onSearchCallback) {
+        // Call with empty filters to signal loading default results
         onSearchCallback(searchFilters.filters);
       }
     }
@@ -149,9 +124,10 @@ export const useSearch = (onSearchCallback?: (filters: SearchFilters) => void) =
       console.log('🎯 Backend filters after transformation:', backendFilters);
       
       // Check if the search query is exactly a 6-character alphanumeric property code
-      else if (query && searchService.isPropertyCode(query)) {
-        console.log('🎯 Detected 6-character property code, using smart search');
-        response = await searchService.smartSearch(searchFilters.filters, {
+      if (query && searchService.isPropertyCode(query)) {
+        console.log('🎯 Detected 6-character property code in search, using smart search');
+        // Use smart search which tries code search first, then falls back to regular search
+        response = await searchService.smartSearch(backendFilters, {
           page: 1,
           limit: 50
         });
@@ -192,7 +168,7 @@ export const useSearch = (onSearchCallback?: (filters: SearchFilters) => void) =
         totalCount: 0
       }));
     }
-  }, [searchFilters.filters, onSearchCallback, areFiltersEmpty]);
+  }, [searchFilters.filters, onSearchCallback]);
 
   /**
    * Direct property code search method (for exactly 6-character codes)
@@ -243,56 +219,6 @@ export const useSearch = (onSearchCallback?: (filters: SearchFilters) => void) =
     }
   }, []);
 
-  /**
-   * Search specific property type with proper parameter mapping
-   */
-  const searchPropertyType = useCallback(async (propertyType: 'residential' | 'commercial' | 'land') => {
-    try {
-      setSearchState(prev => ({
-        ...prev,
-        loading: true,
-        error: null
-      }));
-
-      let response;
-      const options = { page: 1, limit: 50 };
-
-      switch (propertyType) {
-        case 'residential':
-          response = await searchService.searchResidentialProperties(searchFilters.filters, options);
-          break;
-        case 'commercial':
-          response = await searchService.searchCommercialProperties(searchFilters.filters, options);
-          break;
-        case 'land':
-          response = await searchService.searchLandProperties(searchFilters.filters, options);
-          break;
-        default:
-          throw new Error(`Unsupported property type: ${propertyType}`);
-      }
-      
-      setSearchState(prev => ({
-        ...prev,
-        loading: false,
-        results: response.results,
-        totalCount: response.totalCount
-      }));
-
-      return response.results;
-      
-    } catch (error) {
-      console.error(`${propertyType} search error:`, error);
-      setSearchState(prev => ({
-        ...prev,
-        loading: false,
-        error: error instanceof Error ? error.message : `${propertyType} search failed`,
-        results: [],
-        totalCount: 0
-      }));
-      return [];
-    }
-  }, [searchFilters.filters]);
-
   const updateSearchQuery = useCallback((query: string) => {
     searchFilters.updateFilter('searchQuery', query);
   }, [searchFilters]);
@@ -318,7 +244,7 @@ export const useSearch = (onSearchCallback?: (filters: SearchFilters) => void) =
   }, []);
 
   /**
-   * Get search suggestions with 6-character property code support
+   * UPDATED: Get search suggestions with 6-character property code support
    */
   const getSearchSuggestions = useCallback(async (query: string): Promise<string[]> => {
     try {
@@ -336,18 +262,6 @@ export const useSearch = (onSearchCallback?: (filters: SearchFilters) => void) =
     return searchService.isPropertyCode(query);
   }, []);
 
-  /**
-   * Get popular searches
-   */
-  const getPopularSearches = useCallback(async (): Promise<string[]> => {
-    try {
-      return await searchService.getPopularSearches();
-    } catch (error) {
-      console.error('Error getting popular searches:', error);
-      return [];
-    }
-  }, []);
-
   return {
     // Search filters (override clearAllFilters with enhanced version)
     ...searchFilters,
@@ -359,14 +273,11 @@ export const useSearch = (onSearchCallback?: (filters: SearchFilters) => void) =
     // Search actions
     handleSearch,
     searchByCode, // Direct code search for 6-character codes
-    searchPropertyType, // Search specific property type
-    loadLatestProperties, // Load default latest properties
     updateSearchQuery,
     updateLocation,
     clearResults,
     getSearchSuggestions, // Enhanced suggestions with code support
-    isValidPropertyCode, // Utility to check if query is valid property code
-    getPopularSearches, // Get popular search terms
+    isValidPropertyCode, // NEW: Utility to check if query is valid property code
     
     // Combined state for convenience
     searchState: {
