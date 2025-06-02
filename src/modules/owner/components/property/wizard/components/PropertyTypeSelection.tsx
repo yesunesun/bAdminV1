@@ -230,7 +230,7 @@ export default function PropertyTypeSelection({
       <div className="space-y-12">
         <div>
           <h1 className="text-3xl font-bold text-slate-800 mb-2">
-            List Your Property in Hyderabad
+            List Your Property in Telangana
           </h1>
           <p className="text-slate-600 mb-4">
             Choose your property type below to get started quickly
