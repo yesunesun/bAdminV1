@@ -238,7 +238,7 @@ export default function PropertyTypeSelection({
           <div className="flex justify-end">
             <div className="flex items-center">
               <span className="text-slate-600 mr-2">Looking for a property?</span>
-              <a href="/properties" className="text-teal-600 hover:text-teal-700 font-medium">
+              <a href="/browse" className="text-teal-600 hover:text-teal-700 font-medium">
                 Browse Properties
               </a>
             </div>
