@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/validation/fieldValidationConfig.ts
-// Version: 2.2.0
-// Last Modified: 30-05-2025 20:55 IST
-// Purpose: Updated Property Details step validation to include availableFrom as required
+// Version: 2.3.0
+// Last Modified: 02-06-2025 16:00 IST
+// Purpose: Removed Monthly Rent and Security Deposit from PG Details validation
 
 // Validation types
 export type ValidationRule = {
@@ -147,6 +147,10 @@ export const BASIC_FIELD_VALIDATIONS: Record<string, ValidationRule> = {
   mealOption: COMMON_VALIDATIONS.REQUIRED,
   roomFeatures: { required: false }, // Room features are optional
   
+  // PG Details specific fields
+  genderPreference: COMMON_VALIDATIONS.REQUIRED,
+  occupantType: COMMON_VALIDATIONS.REQUIRED,
+  
   // Amenities fields
   propertyShowOption: COMMON_VALIDATIONS.REQUIRED,
   amenities: { required: true },
@@ -270,6 +274,10 @@ const getFieldLabel = (fieldName: string): string => {
     mealOption: 'Meal Option',
     roomFeatures: 'Room Features',
     
+    // PG Details specific field labels
+    genderPreference: 'Gender Preference',
+    occupantType: 'Preferred Guests',
+    
     // Amenities field labels
     propertyShowOption: 'Who Shows Property',
     amenities: 'Amenities'
@@ -302,7 +310,7 @@ export const validateStep = (stepId: string, formData: any): { isValid: boolean;
   };
 };
 
-// Get required fields for step - ✅ UPDATED: Added availableFrom to property details steps
+// Get required fields for step - ✅ UPDATED: Removed monthlyRent and securityDeposit from PG details
 const getRequiredFieldsForStep = (stepId: string): string[] => {
   const stepFieldMap: Record<string, string[]> = {
     // Residential rent - ✅ UPDATED: Added availableFrom to basic details
@@ -316,10 +324,10 @@ const getRequiredFieldsForStep = (stepId: string): string[] => {
     'res_sale_sale_details': ['expectedPrice', 'maintenanceCost', 'kitchenType', 'availableFrom', 'furnishing', 'parking'],
     'res_sale_features': ['bathrooms', 'propertyShowOption', 'propertyCondition', 'amenities'],
     
-    // ✅ ADDED: PG/Hostel steps
+    // ✅ UPDATED: PG/Hostel steps - Removed monthlyRent and securityDeposit from res_pg_pg_details
     'res_pg_basic_details': ['roomType', 'roomCapacity', 'expectedRent', 'expectedDeposit', 'bathroomType', 'roomSize', 'mealOption'],
     'res_pg_location': ['address', 'city', 'state', 'pinCode', 'locality'],
-    'res_pg_pg_details': ['monthlyRent', 'securityDeposit', 'mealOption'],
+    'res_pg_pg_details': ['genderPreference', 'occupantType', 'mealOption', 'availableFrom'], // ✅ FIXED: Removed monthlyRent and securityDeposit
     'res_pg_features': ['propertyShowOption', 'propertyCondition', 'amenities'],
     
     // Commercial rent
@@ -418,6 +426,8 @@ const getFieldType = (fieldName: string): FieldConfig['type'] => {
     roomSize: 'number',
     mealOption: 'select',
     roomFeatures: 'checkbox',
+    genderPreference: 'radio',
+    occupantType: 'select',
     
     propertyShowOption: 'select',
     amenities: 'checkbox'

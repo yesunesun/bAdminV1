@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/hooks/useStepValidation.ts
-// Version: 5.0.0
-// Last Modified: 30-05-2025 23:15 IST
-// Purpose: Added cross-field validation and fixed commercial rent step validation
+// Version: 5.2.0
+// Last Modified: 02-06-2025 16:00 IST
+// Purpose: Removed Monthly Rent and Security Deposit from PG Details validation requirements
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { UseFormReturn } from 'react-hook-form';
@@ -43,7 +43,7 @@ export function useStepValidation({
     lastCheckedStep: ''
   });
   
-  // ✅ UPDATED: Get required fields for current step - fixed commercial rent fields
+  // ✅ UPDATED: Get required fields for current step - REMOVED monthlyRent and securityDeposit from PG details
   const getRequiredFieldsForStep = useCallback((stepId: string): string[] => {
     const stepFieldMap: Record<string, string[]> = {
       // Basic details steps - ✅ UPDATED: Added availableFrom to all property details steps
@@ -86,8 +86,8 @@ export function useStepValidation({
       // ✅ FIXED: Commercial rental step - exactly matching UI requirements
       'com_rent_rental': ['rentAmount', 'securityDeposit', 'advanceRent', 'maintenance', 'camCharges', 'availableFrom', 'parking', 'operatingHours', 'businessPreferences'],
       
-      // Rental steps - includes ALL required fields as shown in UI
-      'res_rent_rental': ['rentAmount', 'securityDeposit', 'availableFrom', 'furnishingStatus', 'preferredTenants'],
+      // ✅ UPDATED: Residential rental step - ADDED maintenanceCharges as mandatory
+      'res_rent_rental': ['rentAmount', 'securityDeposit', 'maintenanceCharges', 'availableFrom', 'furnishingStatus', 'preferredTenants'],
       
       // Sale details steps - added ALL required fields as shown in UI
       'res_sale_sale_details': ['expectedPrice', 'maintenanceCost', 'kitchenType', 'availableFrom', 'furnishing', 'parking'],
@@ -106,8 +106,8 @@ export function useStepValidation({
       // Flatmate details
       'res_flat_flatmate_details': ['preferredGender', 'rentAmount'],
       
-      // PG details  
-      'res_pg_pg_details': ['monthlyRent', 'securityDeposit', 'mealOption'],
+      // ✅ FIXED: PG details - REMOVED monthlyRent and securityDeposit
+      'res_pg_pg_details': ['genderPreference', 'occupantType', 'mealOption', 'availableFrom'],
       
       // Coworking details
       'com_cow_coworking_details': ['spaceType', 'capacity', 'rentAmount'],
@@ -159,545 +159,548 @@ export function useStepValidation({
           validate: (values) => {
             const floor = parseInt(values.floor);
             const totalFloors = parseInt(values.totalFloors);
-            
             if (isNaN(floor) || isNaN(totalFloors)) {
-              return { isValid: true };
-            }
-            
-            if (totalFloors < floor) {
-              return { 
-                isValid: false, 
-                error: 'Total Floors should be equal to or greater than Floor' 
-              };
-            }
-            
-            return { isValid: true };
-          }
-        }
-      ],
-      'res_rent_basic_details': [
-        {
-          fields: ['floor', 'totalFloors'],
-          validate: (values) => {
-            const floor = parseInt(values.floor);
-            const totalFloors = parseInt(values.totalFloors);
-            
-            if (isNaN(floor) || isNaN(totalFloors)) {
-              return { isValid: true };
-            }
-            
-            if (totalFloors < floor) {
-              return { 
-                isValid: false, 
-                error: 'Total Floors should be equal to or greater than Floor' 
-              };
-            }
-            
-            return { isValid: true };
-          }
-        }
-      ],
-      'res_sale_basic_details': [
-        {
-          fields: ['floor', 'totalFloors'],
-          validate: (values) => {
-            const floor = parseInt(values.floor);
-            const totalFloors = parseInt(values.totalFloors);
-            
-            if (isNaN(floor) || isNaN(totalFloors)) {
-              return { isValid: true };
-            }
-            
-            if (totalFloors < floor) {
-              return { 
-                isValid: false, 
-                error: 'Total Floors should be equal to or greater than Floor' 
-              };
-            }
-            
-            return { isValid: true };
-          }
-        }
-      ]
-    };
-    
-    return rules[stepId] || [];
-  }, []);
+             return { isValid: true };
+           }
+           
+           if (totalFloors < floor) {
+             return { 
+               isValid: false, 
+               error: 'Total Floors should be equal to or greater than Floor' 
+             };
+           }
+           
+           return { isValid: true };
+         }
+       }
+     ],
+     'res_rent_basic_details': [
+       {
+         fields: ['floor', 'totalFloors'],
+         validate: (values) => {
+           const floor = parseInt(values.floor);
+           const totalFloors = parseInt(values.totalFloors);
+           
+           if (isNaN(floor) || isNaN(totalFloors)) {
+             return { isValid: true };
+           }
+           
+           if (totalFloors < floor) {
+             return { 
+               isValid: false, 
+               error: 'Total Floors should be equal to or greater than Floor' 
+             };
+           }
+           
+           return { isValid: true };
+         }
+       }
+     ],
+     'res_sale_basic_details': [
+       {
+         fields: ['floor', 'totalFloors'],
+         validate: (values) => {
+           const floor = parseInt(values.floor);
+           const totalFloors = parseInt(values.totalFloors);
+           
+           if (isNaN(floor) || isNaN(totalFloors)) {
+             return { isValid: true };
+           }
+           
+           if (totalFloors < floor) {
+             return { 
+               isValid: false, 
+               error: 'Total Floors should be equal to or greater than Floor' 
+             };
+           }
+           
+           return { isValid: true };
+         }
+       }
+     ]
+   };
+   
+   return rules[stepId] || [];
+ }, []);
 
-  // Enhanced field checker that properly validates different field types
-  const hasFieldValue = useCallback((fieldName: string): boolean => {
-    if (!form || !currentStepId || !fieldName) {
-      return false;
-    }
+ // Enhanced field checker that properly validates different field types
+ const hasFieldValue = useCallback((fieldName: string): boolean => {
+   if (!form || !currentStepId || !fieldName) {
+     return false;
+   }
 
-    try {
-      console.log(`[hasFieldValue] Checking ${fieldName} in step ${currentStepId}`);
-      
-      // Method 1: Check step-specific data first
-      try {
-        const stepData = form.getValues(`steps.${currentStepId}`);
-        if (stepData && stepData[fieldName] !== undefined) {
-          const value = stepData[fieldName];
-          console.log(`[hasFieldValue] Step value for ${fieldName}:`, value);
-          
-          // Enhanced validation for different field types
-          if (Array.isArray(value)) {
-            // For arrays (like preferredTenants, roomFeatures), check if it has at least one item
-            return value.length > 0;
-          } else if (typeof value === 'boolean') {
-            // For booleans, consider them valid regardless of true/false
-            return true;
-          } else if (typeof value === 'string') {
-            // For strings, check if not empty after trimming
-            return value.trim() !== '';
-          } else if (typeof value === 'number') {
-            // For numbers, check if not NaN and greater than 0 (except certain fields which can be 0)
-            if (fieldName === 'bathrooms' || fieldName === 'balconies' || fieldName === 'maintenanceCost' || fieldName === 'expectedDeposit' || fieldName === 'floor') {
-              return !isNaN(value) && value >= 0;
-            }
-            return !isNaN(value) && value > 0;
-          } else if (value !== null && value !== undefined) {
-            // For other types, check if not null/undefined
-            return true;
-          }
-        }
-      } catch (e) {
-        console.error(`[hasFieldValue] Error checking step data for ${fieldName}:`, e);
-      }
+   try {
+     console.log(`[hasFieldValue] Checking ${fieldName} in step ${currentStepId}`);
+     
+     // Method 1: Check step-specific data first
+     try {
+       const stepData = form.getValues(`steps.${currentStepId}`);
+       if (stepData && stepData[fieldName] !== undefined) {
+         const value = stepData[fieldName];
+         console.log(`[hasFieldValue] Step value for ${fieldName}:`, value);
+         
+         // Enhanced validation for different field types
+         if (Array.isArray(value)) {
+           // For arrays (like preferredTenants, roomFeatures), check if it has at least one item
+           return value.length > 0;
+         } else if (typeof value === 'boolean') {
+           // For booleans, consider them valid regardless of true/false
+           return true;
+         } else if (typeof value === 'string') {
+           // For strings, check if not empty after trimming
+           return value.trim() !== '';
+         } else if (typeof value === 'number') {
+           // ✅ UPDATED: For numbers, check if not NaN and greater than 0 (except certain fields which can be 0)
+           // Added maintenanceCharges to fields that can be 0 but cannot be empty
+           if (fieldName === 'bathrooms' || fieldName === 'balconies' || fieldName === 'maintenanceCharges' || fieldName === 'maintenanceCost' || fieldName === 'expectedDeposit' || fieldName === 'floor') {
+             return !isNaN(value) && value >= 0;
+           }
+           return !isNaN(value) && value > 0;
+         } else if (value !== null && value !== undefined) {
+           // For other types, check if not null/undefined
+           return true;
+         }
+       }
+     } catch (e) {
+       console.error(`[hasFieldValue] Error checking step data for ${fieldName}:`, e);
+     }
 
-      // Method 2: Check root level data as fallback
-      try {
-        const rootValue = form.getValues(fieldName);
-        if (rootValue !== undefined && rootValue !== null) {
-          console.log(`[hasFieldValue] Root value for ${fieldName}:`, rootValue);
-          
-          // Same enhanced validation for root values
-          if (Array.isArray(rootValue)) {
-            return rootValue.length > 0;
-          } else if (typeof rootValue === 'boolean') {
-            return true;
-          } else if (typeof rootValue === 'string') {
-            return rootValue.trim() !== '';
-          } else if (typeof rootValue === 'number') {
-            if (fieldName === 'bathrooms' || fieldName === 'balconies' || fieldName === 'maintenanceCost' || fieldName === 'expectedDeposit' || fieldName === 'floor') {
-              return !isNaN(rootValue) && rootValue >= 0;
-            }
-            return !isNaN(rootValue) && rootValue > 0;
-          } else {
-            return true;
-          }
-        }
-      } catch (e) {
-        console.error(`[hasFieldValue] Error checking root data for ${fieldName}:`, e);
-      }
+     // Method 2: Check root level data as fallback
+     try {
+       const rootValue = form.getValues(fieldName);
+       if (rootValue !== undefined && rootValue !== null) {
+         console.log(`[hasFieldValue] Root value for ${fieldName}:`, rootValue);
+         
+         // Same enhanced validation for root values
+         if (Array.isArray(rootValue)) {
+           return rootValue.length > 0;
+         } else if (typeof rootValue === 'boolean') {
+           return true;
+         } else if (typeof rootValue === 'string') {
+           return rootValue.trim() !== '';
+         } else if (typeof rootValue === 'number') {
+           // ✅ UPDATED: Added maintenanceCharges to fields that can be 0
+           if (fieldName === 'bathrooms' || fieldName === 'balconies' || fieldName === 'maintenanceCharges' || fieldName === 'maintenanceCost' || fieldName === 'expectedDeposit' || fieldName === 'floor') {
+             return !isNaN(rootValue) && rootValue >= 0;
+           }
+           return !isNaN(rootValue) && rootValue > 0;
+         } else {
+           return true;
+         }
+       }
+     } catch (e) {
+       console.error(`[hasFieldValue] Error checking root data for ${fieldName}:`, e);
+     }
 
-      console.log(`[hasFieldValue] No valid value found for ${fieldName}`);
-      return false;
-    } catch (error) {
-      console.error('[useStepValidation] Error checking field value:', fieldName, error);
-      return false;
-    }
-  }, [form, currentStepId]);
+     console.log(`[hasFieldValue] No valid value found for ${fieldName}`);
+     return false;
+   } catch (error) {
+     console.error('[useStepValidation] Error checking field value:', fieldName, error);
+     return false;
+   }
+ }, [form, currentStepId]);
 
-  // ✅ NEW: Cross-field validation checker
-  const validateCrossFields = useCallback((): Array<{ name: string; label: string; error: string }> => {
-    const rules = getCrossFieldValidationRules(currentStepId);
-    const crossFieldErrors: Array<{ name: string; label: string; error: string }> = [];
-    
-    for (const rule of rules) {
-      try {
-        // Get values for all fields in the rule
-        const values: Record<string, any> = {};
-        for (const fieldName of rule.fields) {
-          // Check step data first, then root level
-          const stepData = form.getValues(`steps.${currentStepId}`);
-          if (stepData && stepData[fieldName] !== undefined) {
-            values[fieldName] = stepData[fieldName];
-          } else {
-            values[fieldName] = form.getValues(fieldName);
-          }
-        }
-        
-        // Run the validation
-        const result = rule.validate(values);
-        if (!result.isValid && result.error) {
-          // ✅ UPDATED: Add error for totalFloors field (the second field in the rule)
-          crossFieldErrors.push({
-            name: 'totalFloors', // Always show error on totalFloors field
-            label: getFieldLabel('totalFloors'),
-            error: result.error
-          });
-        }
-      } catch (error) {
-        console.error('[validateCrossFields] Error validating cross-field rule:', error);
-      }
-    }
-    
-    return crossFieldErrors;
-  }, [currentStepId, form, getCrossFieldValidationRules]);
+ // ✅ NEW: Cross-field validation checker
+ const validateCrossFields = useCallback((): Array<{ name: string; label: string; error: string }> => {
+   const rules = getCrossFieldValidationRules(currentStepId);
+   const crossFieldErrors: Array<{ name: string; label: string; error: string }> = [];
+   
+   for (const rule of rules) {
+     try {
+       // Get values for all fields in the rule
+       const values: Record<string, any> = {};
+       for (const fieldName of rule.fields) {
+         // Check step data first, then root level
+         const stepData = form.getValues(`steps.${currentStepId}`);
+         if (stepData && stepData[fieldName] !== undefined) {
+           values[fieldName] = stepData[fieldName];
+         } else {
+           values[fieldName] = form.getValues(fieldName);
+         }
+       }
+       
+       // Run the validation
+       const result = rule.validate(values);
+       if (!result.isValid && result.error) {
+         // ✅ UPDATED: Add error for totalFloors field (the second field in the rule)
+         crossFieldErrors.push({
+           name: 'totalFloors', // Always show error on totalFloors field
+           label: getFieldLabel('totalFloors'),
+           error: result.error
+         });
+       }
+     } catch (error) {
+       console.error('[validateCrossFields] Error validating cross-field rule:', error);
+     }
+   }
+   
+   return crossFieldErrors;
+ }, [currentStepId, form, getCrossFieldValidationRules]);
 
-  // Enhanced validation summary
-  const getValidationSummary = useCallback((): ValidationSummary => {
-    if (!currentStepId) {
-      return {
-        isValid: true,
-        completionPercentage: 100,
-        totalRequiredFields: 0,
-        completedFields: 0,
-        invalidFields: []
-      };
-    }
+ // Enhanced validation summary
+ const getValidationSummary = useCallback((): ValidationSummary => {
+   if (!currentStepId) {
+     return {
+       isValid: true,
+       completionPercentage: 100,
+       totalRequiredFields: 0,
+       completedFields: 0,
+       invalidFields: []
+     };
+   }
 
-    try {
-      const requiredFields = getRequiredFieldsForStep(currentStepId);
-      console.log(`[getValidationSummary] Required fields for ${currentStepId}:`, requiredFields);
-      
-      const invalidFields: ValidationSummary['invalidFields'] = [];
-      let completedFields = 0;
+   try {
+     const requiredFields = getRequiredFieldsForStep(currentStepId);
+     console.log(`[getValidationSummary] Required fields for ${currentStepId}:`, requiredFields);
+     
+     const invalidFields: ValidationSummary['invalidFields'] = [];
+     let completedFields = 0;
 
-      // Check each required field
-      for (const fieldName of requiredFields) {
-        try {
-          const hasValue = hasFieldValue(fieldName);
-          console.log(`[getValidationSummary] Field ${fieldName} has value:`, hasValue);
-          
-          if (hasValue) {
-            completedFields++;
-          } else {
-            // ✅ UPDATED: Track incomplete fields for step validation (but don't show error messages)
-            invalidFields.push({
-              name: fieldName,
-              label: getFieldLabel(fieldName),
-              error: `${getFieldLabel(fieldName)} is required` // Keep for internal tracking
-            });
-          }
-        } catch (error) {
-          console.error(`[getValidationSummary] Error validating field ${fieldName}:`, error);
-          // On error, assume field is invalid for required fields
-          invalidFields.push({
-            name: fieldName,
-            label: getFieldLabel(fieldName),
-            error: `${getFieldLabel(fieldName)} validation error`
-          });
-        }
-      }
+     // Check each required field
+     for (const fieldName of requiredFields) {
+       try {
+         const hasValue = hasFieldValue(fieldName);
+         console.log(`[getValidationSummary] Field ${fieldName} has value:`, hasValue);
+         
+         if (hasValue) {
+           completedFields++;
+         } else {
+           // ✅ UPDATED: Track incomplete fields for step validation (but don't show error messages)
+           invalidFields.push({
+             name: fieldName,
+             label: getFieldLabel(fieldName),
+             error: `${getFieldLabel(fieldName)} is required` // Keep for internal tracking
+           });
+         }
+       } catch (error) {
+         console.error(`[getValidationSummary] Error validating field ${fieldName}:`, error);
+         // On error, assume field is invalid for required fields
+         invalidFields.push({
+           name: fieldName,
+           label: getFieldLabel(fieldName),
+           error: `${getFieldLabel(fieldName)} validation error`
+         });
+       }
+     }
 
-      // ✅ NEW: Add cross-field validation errors
-      const crossFieldErrors = validateCrossFields();
-      invalidFields.push(...crossFieldErrors);
+     // ✅ NEW: Add cross-field validation errors
+     const crossFieldErrors = validateCrossFields();
+     invalidFields.push(...crossFieldErrors);
 
-      const totalRequiredFields = requiredFields.length;
-      const completionPercentage = totalRequiredFields > 0 
-        ? Math.round((completedFields / totalRequiredFields) * 100)
-        : 100;
+     const totalRequiredFields = requiredFields.length;
+     const completionPercentage = totalRequiredFields > 0 
+       ? Math.round((completedFields / totalRequiredFields) * 100)
+       : 100;
 
-      console.log(`[getValidationSummary] Step ${currentStepId} completion: ${completedFields}/${totalRequiredFields} (${completionPercentage}%)`);
-      console.log(`[getValidationSummary] Invalid fields:`, invalidFields.map(f => f.name));
+     console.log(`[getValidationSummary] Step ${currentStepId} completion: ${completedFields}/${totalRequiredFields} (${completionPercentage}%)`);
+     console.log(`[getValidationSummary] Invalid fields:`, invalidFields.map(f => f.name));
 
-      return {
-        isValid: invalidFields.length === 0,
-        completionPercentage,
-        totalRequiredFields,
-        completedFields,
-        invalidFields
-      };
-    } catch (error) {
-      console.warn('[useStepValidation] Error getting validation summary:', error);
-      return {
-        isValid: false,
-        completionPercentage: 0,
-        totalRequiredFields: 0,
-        completedFields: 0,
-        invalidFields: []
-      };
-    }
-  }, [currentStepId, getRequiredFieldsForStep, hasFieldValue, validateCrossFields]);
+     return {
+       isValid: invalidFields.length === 0,
+       completionPercentage,
+       totalRequiredFields,
+       completedFields,
+       invalidFields
+     };
+   } catch (error) {
+     console.warn('[useStepValidation] Error getting validation summary:', error);
+     return {
+       isValid: false,
+       completionPercentage: 0,
+       totalRequiredFields: 0,
+       completedFields: 0,
+       invalidFields: []
+     };
+   }
+ }, [currentStepId, getRequiredFieldsForStep, hasFieldValue, validateCrossFields]);
 
-  // Simple step validation
-  const validateCurrentStep = useCallback(() => {
-    try {
-      const summary = getValidationSummary();
-      return {
-        isValid: summary.isValid,
-        errors: summary.invalidFields.reduce((acc, field) => {
-          acc[field.name] = field.error;
-          return acc;
-        }, {} as Record<string, string>)
-      };
-    } catch (error) {
-      console.warn('[useStepValidation] Error validating step:', error);
-      return { isValid: false, errors: {} };
-    }
-  }, [getValidationSummary]);
+ // Simple step validation
+ const validateCurrentStep = useCallback(() => {
+   try {
+     const summary = getValidationSummary();
+     return {
+       isValid: summary.isValid,
+       errors: summary.invalidFields.reduce((acc, field) => {
+         acc[field.name] = field.error;
+         return acc;
+       }, {} as Record<string, string>)
+     };
+   } catch (error) {
+     console.warn('[useStepValidation] Error validating step:', error);
+     return { isValid: false, errors: {} };
+   }
+ }, [getValidationSummary]);
 
-  // Check if can proceed to next step
-  const canProceedToNextStep = useCallback(() => {
-    try {
-      const validation = validateCurrentStep();
-      return validation.isValid;
-    } catch (error) {
-      console.warn('[useStepValidation] Error checking if can proceed:', error);
-      return false; // Be strict about navigation
-    }
-  }, [validateCurrentStep]);
+ // Check if can proceed to next step
+ const canProceedToNextStep = useCallback(() => {
+   try {
+     const validation = validateCurrentStep();
+     return validation.isValid;
+   } catch (error) {
+     console.warn('[useStepValidation] Error checking if can proceed:', error);
+     return false; // Be strict about navigation
+   }
+ }, [validateCurrentStep]);
 
-  // Enhanced field validation for individual fields
-  const validateField = useCallback((fieldName: string) => {
-    try {
-      const hasValue = hasFieldValue(fieldName);
-      
-      // ✅ NEW: Check for cross-field validation errors specific to this field
-      const crossFieldErrors = validateCrossFields();
-      const crossFieldError = crossFieldErrors.find(error => error.name === fieldName);
-      
-      if (crossFieldError) {
-        return {
-          isValid: false,
-          error: crossFieldError.error,
-          isTouched: true
-        };
-      }
-      
-      // ✅ UPDATED: Don't show "required" messages since asterisks already indicate this
-      return {
-        isValid: hasValue,
-        error: null, // No error message for required fields
-        isTouched: true
-      };
-    } catch (error) {
-      return { isValid: false, error: 'Validation error', isTouched: false };
-    }
-  }, [hasFieldValue, validateCrossFields]);
+ // Enhanced field validation for individual fields
+ const validateField = useCallback((fieldName: string) => {
+   try {
+     const hasValue = hasFieldValue(fieldName);
+     
+     // ✅ NEW: Check for cross-field validation errors specific to this field
+     const crossFieldErrors = validateCrossFields();
+     const crossFieldError = crossFieldErrors.find(error => error.name === fieldName);
+     
+     if (crossFieldError) {
+       return {
+         isValid: false,
+         error: crossFieldError.error,
+         isTouched: true
+       };
+     }
+     
+     // ✅ UPDATED: Don't show "required" messages since asterisks already indicate this
+     return {
+       isValid: hasValue,
+       error: null, // No error message for required fields
+       isTouched: true
+     };
+   } catch (error) {
+     return { isValid: false, error: 'Validation error', isTouched: false };
+   }
+ }, [hasFieldValue, validateCrossFields]);
 
-  const getFieldValidation = useCallback((fieldName: string) => {
-    try {
-      const hasValue = hasFieldValue(fieldName);
-      
-      // ✅ NEW: Check for cross-field validation errors specific to this field
-      const crossFieldErrors = validateCrossFields();
-      const crossFieldError = crossFieldErrors.find(error => error.name === fieldName);
-      
-      if (crossFieldError) {
-        return {
-          isValid: false,
-          error: crossFieldError.error,
-          isTouched: false
-        };
-      }
-      
-      // ✅ UPDATED: Don't show "required" messages since asterisks already indicate this
-      return {
-        isValid: hasValue,
-        error: null, // No error message for required fields
-        isTouched: false
-      };
-    } catch (error) {
-      return { isValid: false, error: null, isTouched: false };
-    }
-  }, [hasFieldValue, validateCrossFields]);
+ const getFieldValidation = useCallback((fieldName: string) => {
+   try {
+     const hasValue = hasFieldValue(fieldName);
+     
+     // ✅ NEW: Check for cross-field validation errors specific to this field
+     const crossFieldErrors = validateCrossFields();
+     const crossFieldError = crossFieldErrors.find(error => error.name === fieldName);
+     
+     if (crossFieldError) {
+       return {
+         isValid: false,
+         error: crossFieldError.error,
+         isTouched: false
+       };
+     }
+     
+     // ✅ UPDATED: Don't show "required" messages since asterisks already indicate this
+     return {
+       isValid: hasValue,
+       error: null, // No error message for required fields
+       isTouched: false
+     };
+   } catch (error) {
+     return { isValid: false, error: null, isTouched: false };
+   }
+ }, [hasFieldValue, validateCrossFields]);
 
-  const shouldShowFieldError = useCallback((fieldName: string) => {
-    // ✅ UPDATED: Only show cross-field validation errors for totalFloors field
-    // But still track all validation for step completion
-    if (fieldName !== 'totalFloors') {
-      return false; // No validation messages for any other fields
-    }
-    
-    const crossFieldErrors = validateCrossFields();
-    const hasCrossFieldError = crossFieldErrors.some(error => error.name === fieldName);
-    
-    return hasCrossFieldError;
-  }, [validateCrossFields]);
-  
-  // ✅ NEW: Additional function to check if field has validation error (for internal use)
-  const hasValidationError = useCallback((fieldName: string) => {
-    const requiredFields = getRequiredFieldsForStep(currentStepId);
-    if (requiredFields.includes(fieldName) && !hasFieldValue(fieldName)) {
-      return true; // Field is required but empty
-    }
-    
-    // Check cross-field validation errors
-    const crossFieldErrors = validateCrossFields();
-    const hasCrossFieldError = crossFieldErrors.some(error => error.name === fieldName);
-    
-    return hasCrossFieldError;
-  }, [currentStepId, getRequiredFieldsForStep, hasFieldValue, validateCrossFields]);
+ const shouldShowFieldError = useCallback((fieldName: string) => {
+   // ✅ UPDATED: Only show cross-field validation errors for totalFloors field
+   // But still track all validation for step completion
+   if (fieldName !== 'totalFloors') {
+     return false; // No validation messages for any other fields
+   }
+   
+   const crossFieldErrors = validateCrossFields();
+   const hasCrossFieldError = crossFieldErrors.some(error => error.name === fieldName);
+   
+   return hasCrossFieldError;
+ }, [validateCrossFields]);
+ 
+ // ✅ NEW: Additional function to check if field has validation error (for internal use)
+ const hasValidationError = useCallback((fieldName: string) => {
+   const requiredFields = getRequiredFieldsForStep(currentStepId);
+   if (requiredFields.includes(fieldName) && !hasFieldValue(fieldName)) {
+     return true; // Field is required but empty
+   }
+   
+   // Check cross-field validation errors
+   const crossFieldErrors = validateCrossFields();
+   const hasCrossFieldError = crossFieldErrors.some(error => error.name === fieldName);
+   
+   return hasCrossFieldError;
+ }, [currentStepId, getRequiredFieldsForStep, hasFieldValue, validateCrossFields]);
 
-  const getFieldConfig = useCallback((fieldName: string) => {
-    const requiredFields = getRequiredFieldsForStep(currentStepId);
-    return { 
-      required: requiredFields.includes(fieldName)
-    };
-  }, [currentStepId, getRequiredFieldsForStep]);
+ const getFieldConfig = useCallback((fieldName: string) => {
+   const requiredFields = getRequiredFieldsForStep(currentStepId);
+   return { 
+     required: requiredFields.includes(fieldName)
+   };
+ }, [currentStepId, getRequiredFieldsForStep]);
 
-  const markFieldAsTouched = useCallback(() => {
-    // No-op for now
-  }, []);
+ const markFieldAsTouched = useCallback(() => {
+   // No-op for now
+ }, []);
 
-  const blockNavigation = useCallback(() => {
-    return !canProceedToNextStep();
-  }, [canProceedToNextStep]);
+ const blockNavigation = useCallback(() => {
+   return !canProceedToNextStep();
+ }, [canProceedToNextStep]);
 
-  // Memoized values using reactive state
-  const isValid = useMemo(() => {
-    return validationResults.isValid;
-  }, [validationResults.isValid]);
+ // Memoized values using reactive state
+ const isValid = useMemo(() => {
+   return validationResults.isValid;
+ }, [validationResults.isValid]);
 
-  const completionPercentage = useMemo(() => {
-    return validationResults.completionPercentage;
-  }, [validationResults.completionPercentage]);
+ const completionPercentage = useMemo(() => {
+   return validationResults.completionPercentage;
+ }, [validationResults.completionPercentage]);
 
-  const requiredFields = useMemo(() => {
-    try {
-      return getRequiredFieldsForStep(currentStepId);
-    } catch (error) {
-      return [];
-    }
-  }, [getRequiredFieldsForStep, currentStepId]);
+ const requiredFields = useMemo(() => {
+   try {
+     return getRequiredFieldsForStep(currentStepId);
+   } catch (error) {
+     return [];
+   }
+ }, [getRequiredFieldsForStep, currentStepId]);
 
-  // Watch form changes and update validation
-  useEffect(() => {
-    if (!form || !currentStepId) return;
+ // Watch form changes and update validation
+ useEffect(() => {
+   if (!form || !currentStepId) return;
 
-    const subscription = form.watch(() => {
-      // Debounce validation updates
-      const timeoutId = setTimeout(() => {
-        try {
-          const summary = getValidationSummary();
-          setValidationResults({
-            isValid: summary.isValid,
-            completionPercentage: summary.completionPercentage,
-            lastCheckedStep: currentStepId
-          });
-          console.log(`[useStepValidation] Updated validation for ${currentStepId}:`, summary);
-        } catch (error) {
-          console.error('[useStepValidation] Error updating validation:', error);
-        }
-      }, 100);
+   const subscription = form.watch(() => {
+     // Debounce validation updates
+     const timeoutId = setTimeout(() => {
+       try {
+         const summary = getValidationSummary();
+         setValidationResults({
+           isValid: summary.isValid,
+           completionPercentage: summary.completionPercentage,
+           lastCheckedStep: currentStepId
+         });
+         console.log(`[useStepValidation] Updated validation for ${currentStepId}:`, summary);
+       } catch (error) {
+         console.error('[useStepValidation] Error updating validation:', error);
+       }
+     }, 100);
 
-      return () => clearTimeout(timeoutId);
-    });
+     return () => clearTimeout(timeoutId);
+   });
 
-    // Initial validation
-    try {
-      const summary = getValidationSummary();
-      setValidationResults({
-        isValid: summary.isValid,
-        completionPercentage: summary.completionPercentage,
-        lastCheckedStep: currentStepId
-      });
-    } catch (error) {
-      console.error('[useStepValidation] Error in initial validation:', error);
-    }
+   // Initial validation
+   try {
+     const summary = getValidationSummary();
+     setValidationResults({
+       isValid: summary.isValid,
+       completionPercentage: summary.completionPercentage,
+       lastCheckedStep: currentStepId
+     });
+   } catch (error) {
+     console.error('[useStepValidation] Error in initial validation:', error);
+   }
 
-    return () => subscription.unsubscribe();
-  }, [form, currentStepId, getValidationSummary]);
+   return () => subscription.unsubscribe();
+ }, [form, currentStepId, getValidationSummary]);
 
-  return {
-    isValid,
-    canProceedToNextStep,
-    completionPercentage,
-    getValidationSummary,
-    blockNavigation,
-    validateCurrentStep,
-    requiredFields,
-    
-    // Field-level validation functions
-    validateField,
-    getFieldValidation,
-    getFieldConfig,
-    shouldShowFieldError,
-    markFieldAsTouched,
-    hasValidationError // ✅ NEW: Added for internal validation checking
-  };
+ return {
+   isValid,
+   canProceedToNextStep,
+   completionPercentage,
+   getValidationSummary,
+   blockNavigation,
+   validateCurrentStep,
+   requiredFields,
+   
+   // Field-level validation functions
+   validateField,
+   getFieldValidation,
+   getFieldConfig,
+   shouldShowFieldError,
+   markFieldAsTouched,
+   hasValidationError // ✅ NEW: Added for internal validation checking
+ };
 }
 
-// Helper function to get user-friendly field labels - ✅ UPDATED: Added all land-specific field labels
+// Helper function to get user-friendly field labels - ✅ UPDATED: Added PG-specific field labels
 function getFieldLabel(fieldName: string): string {
-  const labels: Record<string, string> = {
-    // Property Details fields
-    propertyType: 'Property Type',
-    buildingType: 'Building Type',
-    ageOfProperty: 'Age of Property',
-    bhkType: 'BHK Configuration',
-    floor: 'Floor',
-    totalFloors: 'Total Floors',
-    propertyAge: 'Property Age',
-    facing: 'Facing Direction',
-    builtUpArea: 'Built-up Area',
-    bathrooms: 'Bathrooms',
-    availableFrom: 'Available From',
-    
-    // Location fields
-    address: 'Complete Address',
-    city: 'City',
-    state: 'State',
-    pinCode: 'PIN Code',
-    locality: 'Locality',
-    
-    // Rental/Sale fields
-    rentAmount: 'Monthly Rent Amount',
-    securityDeposit: 'Security Deposit',
-    advanceRent: 'Advance Rent',
-    maintenance: 'Maintenance',
-    camCharges: 'CAM Charges',
-    parking: 'Parking',
-    operatingHours: 'Operating Hours',
-    businessPreferences: 'Business Preferences',
-    furnishingStatus: 'Furnishing Status',
-    preferredTenants: 'Preferred Tenants',
-    
-    // Sale details field labels
-    expectedPrice: 'Expected Price',
-    maintenanceCost: 'Maintenance Cost',
-    kitchenType: 'Kitchen Type',
-    furnishing: 'Furnishing',
-    
-    // ✅ PG/Hostel room details field labels
-    roomType: 'Room Type',
-    roomCapacity: 'Room Capacity',
-    expectedRent: 'Expected Rent',
-    expectedDeposit: 'Expected Deposit',
-    bathroomType: 'Bathroom Type',
-    roomSize: 'Room Size',
-    mealOption: 'Meal Option',
-    roomFeatures: 'Room Features',
-    
-    // Features fields
-    propertyShowOption: 'Who Shows Property',
-    propertyCondition: 'Property Condition',
-    amenities: 'Amenities',
-    
-    // Commercial fields
-    spaceType: 'Space Type',
-    capacity: 'Capacity',
-    
-    // PG fields
-    monthlyRent: 'Monthly Rent',
-    
-    // Flatmate fields
-    preferredGender: 'Preferred Gender',
-    
-    // ✅ ADDED: Land-specific field labels
-    plotFacing: 'Plot Facing',
-    developmentStatus: 'Development Status',
-    approvalStatus: 'Approval Status',
-    soilType: 'Soil Type',
-    boundaryType: 'Boundary Type',
-    waterAvailability: 'Water Availability',
-    electricityStatus: 'Electricity Status',
-    roadConnectivity: 'Road Connectivity',
-    additionalDetails: 'Additional Details',
-    
-    // ✅ ADDED: Land features field labels
-    distanceFromCity: 'Distance from City Center',
-    distanceFromHighway: 'Distance from Highway',
-    nearbyLandmarks: 'Nearby Landmarks',
-    availableDocuments: 'Available Documents',
-    nearbyDevelopments: 'Nearby Developments',
-    commercialFeatures: 'Commercial Plot Features'
-  };
-  return labels[fieldName] || fieldName.charAt(0).toUpperCase() + fieldName.slice(1);
+ const labels: Record<string, string> = {
+   // Property Details fields
+   propertyType: 'Property Type',
+   buildingType: 'Building Type',
+   ageOfProperty: 'Age of Property',
+   bhkType: 'BHK Configuration',
+   floor: 'Floor',
+   totalFloors: 'Total Floors',
+   propertyAge: 'Property Age',
+   facing: 'Facing Direction',
+   builtUpArea: 'Built-up Area',
+   bathrooms: 'Bathrooms',
+   availableFrom: 'Available From',
+   
+   // Location fields
+   address: 'Complete Address',
+   city: 'City',
+   state: 'State',
+   pinCode: 'PIN Code',
+   locality: 'Locality',
+   
+   // ✅ UPDATED: Rental/Sale fields - Added maintenanceCharges
+   rentAmount: 'Monthly Rent Amount',
+   securityDeposit: 'Security Deposit',
+   maintenanceCharges: 'Maintenance Charges', // ✅ ADDED: Now mandatory field
+   advanceRent: 'Advance Rent',
+   maintenance: 'Maintenance',
+   camCharges: 'CAM Charges',
+   parking: 'Parking',
+   operatingHours: 'Operating Hours',
+   businessPreferences: 'Business Preferences',
+   furnishingStatus: 'Furnishing Status',
+   preferredTenants: 'Preferred Tenants',
+   
+   // Sale details field labels
+   expectedPrice: 'Expected Price',
+   maintenanceCost: 'Maintenance Cost',
+   kitchenType: 'Kitchen Type',
+   furnishing: 'Furnishing',
+   
+   // ✅ PG/Hostel room details field labels
+   roomType: 'Room Type',
+   roomCapacity: 'Room Capacity',
+   expectedRent: 'Expected Rent',
+   expectedDeposit: 'Expected Deposit',
+   bathroomType: 'Bathroom Type',
+   roomSize: 'Room Size',
+   mealOption: 'Meal Option',
+   roomFeatures: 'Room Features',
+   
+   // ✅ UPDATED: PG Details specific field labels
+   genderPreference: 'Place is available for',
+   occupantType: 'Preferred guests',
+   
+   // Features fields
+   propertyShowOption: 'Who Shows Property',
+   propertyCondition: 'Property Condition',
+   amenities: 'Amenities',
+   
+   // Commercial fields
+   spaceType: 'Space Type',
+   capacity: 'Capacity',
+   
+   // Flatmate fields
+   preferredGender: 'Preferred Gender',
+   
+   // ✅ ADDED: Land-specific field labels
+   plotFacing: 'Plot Facing',
+   developmentStatus: 'Development Status',
+   approvalStatus: 'Approval Status',
+   soilType: 'Soil Type',
+   boundaryType: 'Boundary Type',
+   waterAvailability: 'Water Availability',
+   electricityStatus: 'Electricity Status',
+   roadConnectivity: 'Road Connectivity',
+   additionalDetails: 'Additional Details',
+   
+   // ✅ ADDED: Land features field labels
+   distanceFromCity: 'Distance from City Center',
+   distanceFromHighway: 'Distance from Highway',
+   nearbyLandmarks: 'Nearby Landmarks',
+   availableDocuments: 'Available Documents',
+   nearbyDevelopments: 'Nearby Developments',
+   commercialFeatures: 'Commercial Plot Features'
+ };
+ return labels[fieldName] || fieldName.charAt(0).toUpperCase() + fieldName.slice(1);
 }
 
 // Export default for backward compatibility

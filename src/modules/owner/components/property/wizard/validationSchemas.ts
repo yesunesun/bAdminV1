@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/validationSchemas.ts
-// Version: 4.0.0
-// Last Modified: 10-04-2025 21:45 IST
-// Purpose: Added validation for PG/Hostel specific fields
+// Version: 4.1.0
+// Last Modified: 02-06-2025 15:30 IST
+// Purpose: Removed Monthly Rent and Security Deposit validation for PG/Hostel flow
 
 import { z } from 'zod';
 // Updated import to use the migrated constants file
@@ -78,8 +78,7 @@ export const propertyValidationSchema = z.object({
   hasWifi: z.boolean().optional(),
   hasGeyser: z.boolean().optional(),
   
-  // PG/Hostel Facility Details
-  monthlyRent: z.string().optional(),
+  // ✅ UPDATED: PG/Hostel Facility Details (removed monthlyRent)
   mealOption: z.enum(MEAL_OPTIONS as [string, ...string[]]).optional(),
   noticePeriod: z.string().optional(),
   genderPreference: z.string().optional(),
@@ -184,10 +183,8 @@ export const stepValidationSchemas = {
       propertyCondition: true,
       amenities: true,
     }),
-    // PG/Hostel Facility Validation
+    // ✅ UPDATED: PG/Hostel Facility Validation (removed monthlyRent and securityDeposit)
     propertyValidationSchema.pick({
-      monthlyRent: true,
-      securityDeposit: true,
       mealOption: true,
       noticePeriod: true,
       genderPreference: true,

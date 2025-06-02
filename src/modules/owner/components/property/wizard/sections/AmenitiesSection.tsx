@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/AmenitiesSection.tsx
-// Version: 4.0.0
-// Last Modified: 31-05-2025 12:00 IST
-// Purpose: Enhanced with Indian phone number validation and UI for alternate contact
+// Version: 4.1.0
+// Last Modified: 02-06-2025 15:30 IST
+// Purpose: Enhanced with validation blocking for invalid alternate contact and moved Gym/Gated Security to Other Amenities
 
 import React, { useCallback, useState, useEffect } from 'react';
 import { FormSection } from '@/components/FormSection';
@@ -106,8 +106,6 @@ export function AmenitiesSection({ form, stepId = 'res_rent_features' }: FormSec
   const [values, setValues] = useState({
     bathrooms: getField('bathrooms', '0'),
     balconies: getField('balconies', '0'),
-    hasGym: getField('hasGym', false),
-    gatedSecurity: getField('gatedSecurity', false),
     propertyShowOption: getField('propertyShowOption', ''),
     propertyCondition: getField('propertyCondition', ''),
     secondaryNumber: getField('secondaryNumber', ''),
@@ -122,6 +120,9 @@ export function AmenitiesSection({ form, stepId = 'res_rent_features' }: FormSec
     isTouched: false
   });
 
+  // Form blocking state - prevents progression if invalid phone number is entered
+  const [isFormBlocked, setIsFormBlocked] = useState(false);
+
   // Initialize steps structure and migrate data
   useEffect(() => {
     const steps = form.getValues('steps') || {};
@@ -134,7 +135,7 @@ export function AmenitiesSection({ form, stepId = 'res_rent_features' }: FormSec
     
     // Migrate existing root level fields to step structure
     const fieldsToMigrate = [
-      'bathrooms', 'balconies', 'hasGym', 'gatedSecurity', 
+      'bathrooms', 'balconies', 
       'propertyShowOption', 'propertyCondition', 'secondaryNumber',
       'hasSimilarUnits', 'amenities'
     ];
@@ -160,8 +161,6 @@ export function AmenitiesSection({ form, stepId = 'res_rent_features' }: FormSec
     setValues({
       bathrooms: stepData.bathrooms || formValues.bathrooms || '0',
       balconies: stepData.balconies || formValues.balconies || '0',
-      hasGym: stepData.hasGym || formValues.hasGym || false,
-      gatedSecurity: stepData.gatedSecurity || formValues.gatedSecurity || false,
       propertyShowOption: stepData.propertyShowOption || formValues.propertyShowOption || '',
       propertyCondition: stepData.propertyCondition || formValues.propertyCondition || '',
       secondaryNumber: stepData.secondaryNumber || formValues.secondaryNumber || '',
@@ -184,33 +183,45 @@ export function AmenitiesSection({ form, stepId = 'res_rent_features' }: FormSec
     updateFormAndState(type, newValue.toString());
   }, [values, updateFormAndState]);
 
-  // ✅ ENHANCED: Indian phone number validation
+  // ✅ ENHANCED: Indian phone number validation with form blocking
   const validateIndianPhone = useCallback((value: string) => {
     // Remove all non-digits
     const digits = value.replace(/\D/g, '');
     
     if (digits.length === 0) {
-      return { isValid: true, error: '' }; // Empty is valid (optional field)
+      return { isValid: true, error: '', shouldBlock: false }; // Empty is valid (optional field)
     }
     
     if (digits.length < 10) {
-      return { isValid: false, error: `Phone number must be exactly 10 digits (${digits.length}/10)` };
+      return { 
+        isValid: false, 
+        error: `Phone number must be exactly 10 digits (${digits.length}/10)`,
+        shouldBlock: true 
+      };
     }
     
     if (digits.length > 10) {
-      return { isValid: false, error: 'Phone number cannot exceed 10 digits' };
+      return { 
+        isValid: false, 
+        error: 'Phone number cannot exceed 10 digits',
+        shouldBlock: true 
+      };
     }
     
     // Check for valid Indian mobile number patterns
     const firstDigit = digits.charAt(0);
     if (!['6', '7', '8', '9'].includes(firstDigit)) {
-      return { isValid: false, error: 'Indian mobile numbers start with 6, 7, 8, or 9' };
+      return { 
+        isValid: false, 
+        error: 'Indian mobile numbers start with 6, 7, 8, or 9',
+        shouldBlock: true 
+      };
     }
     
-    return { isValid: true, error: '' };
+    return { isValid: true, error: '', shouldBlock: false };
   }, []);
 
-  // ✅ ENHANCED: Handle phone number input with strict validation
+  // ✅ ENHANCED: Handle phone number input with form blocking validation
   const handlePhoneInput = useCallback((value: string) => {
     // Remove all non-digits
     const numericValue = value.replace(/\D/g, '');
@@ -226,6 +237,9 @@ export function AmenitiesSection({ form, stepId = 'res_rent_features' }: FormSec
       error: validation.error,
       isTouched: true
     });
+    
+    // Block form progression if validation fails and field has content
+    setIsFormBlocked(validation.shouldBlock);
     
     updateFormAndState('secondaryNumber', limitedValue);
   }, [updateFormAndState, validateIndianPhone]);
@@ -253,13 +267,10 @@ export function AmenitiesSection({ form, stepId = 'res_rent_features' }: FormSec
     updateFormAndState('amenities', newAmenities);
   }, [values.amenities, updateFormAndState]);
 
-  // Quick amenities with icons
-  const quickAmenities = [
-    { id: 'hasGym', label: 'Gym', icon: HeartPulse },
-    { id: 'gatedSecurity', label: 'Gated Security', icon: Shield }
-  ];
+  // ✅ REMOVED: Quick amenities - Gym and Gated Security moved to Other Amenities
+  // Previously had quickAmenities array here - now removed
 
-  // Amenity icons mapping
+  // Amenity icons mapping - Updated to include Gym and Gated Security
   const otherAmenitiesIcons: Record<string, React.ComponentType> = {
     'Power Backup': Zap,
     'Lift': ArrowUpDown,
@@ -281,32 +292,64 @@ export function AmenitiesSection({ form, stepId = 'res_rent_features' }: FormSec
     'Fire Safety': Shield,
     'Shopping Center': Store,
     'Sewage Treatment Plant': Trash2,
-    'House Keeping': HomeIcon
+    'House Keeping': HomeIcon,
+    'Gym': HeartPulse, // ✅ MOVED: Now in Other Amenities
+    'Gated Security': Shield // ✅ MOVED: Now in Other Amenities
   };
 
   // Prepare select options
   const propertyShowOptions = PROPERTY_SHOW_OPTIONS.map(option => ({ value: option, label: option }));
   const propertyConditionOptions = PROPERTY_CONDITION_OPTIONS.map(option => ({ value: option, label: option }));
 
+  // ✅ ENHANCED: Calculate if step is truly valid (including phone validation)
+  const isStepCompletelyValid = stepIsValid && !isFormBlocked;
+
   return (
     <FormSection
       title="Amenities & Features"
       description="What does your property offer?"
     >
-      {/* Validation Progress */}
+      {/* Validation Progress - Enhanced with form blocking indicator */}
       {requiredFields.length > 0 && (
-        <div className="mb-6 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+        <div className={`mb-6 p-3 rounded-lg border ${
+          isFormBlocked 
+            ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+            : 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
+        }`}>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
+            <span className={`text-sm font-medium ${
+              isFormBlocked 
+                ? 'text-red-900 dark:text-red-100' 
+                : 'text-blue-900 dark:text-blue-100'
+            }`}>
               Step Completion: {completionPercentage}%
             </span>
-            <span className="text-xs text-blue-700 dark:text-blue-300">
-              {stepIsValid ? '✓ Ready to proceed' : 'Please complete required fields'}
+            <span className={`text-xs ${
+              isFormBlocked 
+                ? 'text-red-700 dark:text-red-300' 
+                : isStepCompletelyValid 
+                  ? 'text-green-700 dark:text-green-300' 
+                  : 'text-blue-700 dark:text-blue-300'
+            }`}>
+              {isFormBlocked 
+                ? '⚠️ Fix validation errors to proceed' 
+                : isStepCompletelyValid 
+                  ? '✓ Ready to proceed' 
+                  : 'Please complete required fields'
+              }
             </span>
           </div>
-          <div className="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-2">
+          <div className={`w-full rounded-full h-2 ${
+            isFormBlocked 
+              ? 'bg-red-200 dark:bg-red-800' 
+              : 'bg-blue-200 dark:bg-blue-800'
+          }`}>
             <div 
-              className="bg-blue-600 dark:bg-blue-400 h-2 rounded-full transition-all duration-300"
+              className={`h-2 rounded-full transition-all duration-300 ${
+                isFormBlocked 
+                  ? 'bg-red-600 dark:bg-red-400' 
+                  : 'bg-blue-600 dark:bg-blue-400'
+              }`}
               style={{ width: `${completionPercentage}%` }}
             />
           </div>
@@ -385,29 +428,6 @@ export function AmenitiesSection({ form, stepId = 'res_rent_features' }: FormSec
           </div>
         </div>
 
-        {/* Quick Amenities */}
-        <div className="grid grid-cols-2 gap-4">
-          {quickAmenities.map(({ id, label, icon: Icon }) => (
-            <div
-              key={id}
-              className="flex items-center gap-3 p-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-            >
-              <Checkbox
-                id={id}
-                checked={values[id as keyof typeof values] as boolean}
-                onCheckedChange={(checked) => updateFormAndState(id, checked)}
-              />
-              <label
-                htmlFor={id}
-                className="flex items-center gap-2 text-gray-700 dark:text-gray-300 cursor-pointer"
-              >
-                <Icon className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-                <span className="font-medium">{label}</span>
-              </label>
-            </div>
-          ))}
-        </div>
-
         {/* Property Show and Condition */}
         <div className="grid grid-cols-2 gap-6">
           <ValidatedSelect
@@ -443,7 +463,7 @@ export function AmenitiesSection({ form, stepId = 'res_rent_features' }: FormSec
           />
         </div>
 
-        {/* ✅ ENHANCED: Alternate Contact with Indian Phone Validation */}
+        {/* ✅ ENHANCED: Alternate Contact with Blocking Validation */}
         <div>
           <FormFieldLabel
             fieldName="secondaryNumber"
@@ -509,6 +529,14 @@ export function AmenitiesSection({ form, stepId = 'res_rent_features' }: FormSec
               <span>Valid Indian mobile number</span>
             </div>
           )}
+          
+          {/* ✅ NEW: Form Blocking Warning */}
+          {isFormBlocked && (
+            <div className="mt-2 flex items-center gap-2 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-2">
+              <XCircle className="h-4 w-4" />
+              <span>Please fix the alternate contact number or leave it empty to continue</span>
+            </div>
+          )}
         </div>
 
         {/* Similar Units */}
@@ -526,7 +554,7 @@ export function AmenitiesSection({ form, stepId = 'res_rent_features' }: FormSec
           </label>
         </div>
 
-        {/* Other Amenities */}
+        {/* ✅ UPDATED: Other Amenities - Now includes Gym and Gated Security */}
         <div>
           <FormFieldLabel
             fieldName="amenities"
@@ -534,7 +562,7 @@ export function AmenitiesSection({ form, stepId = 'res_rent_features' }: FormSec
             isValid={getFieldValidation('amenities').isValid}
             isTouched={getFieldValidation('amenities').isTouched}
             error={shouldShowFieldError('amenities') ? getFieldValidation('amenities').error : null}
-            helperText="Select all available amenities"
+            helperText="Select all available amenities (including Gym and Gated Security)"
             size="lg"
           >
             Other Amenities

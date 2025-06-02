@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/PGDetails.tsx
-// Version: 4.0.0
-// Last Modified: 31-05-2025 11:30 IST
-// Purpose: Added Monthly Rent and Security Deposit fields, fixed mandatory field validation
+// Version: 5.0.0
+// Last Modified: 02-06-2025 15:30 IST
+// Purpose: Removed Monthly Rent and Security Deposit fields, renamed "No Girl's Entry" to "No Opposite Gender's Entry"
 
 import React, { useEffect } from 'react';
 import { FormData, FormSectionProps } from '../types';
@@ -26,7 +26,7 @@ import {
   Textarea 
 } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
-import { Calendar, IndianRupee } from 'lucide-react';
+import { Calendar } from 'lucide-react';
 import { FLOW_TYPES } from '../constants/flows';
 
 const PGDetails: React.FC<FormSectionProps> = ({ 
@@ -99,9 +99,8 @@ const PGDetails: React.FC<FormSectionProps> = ({
     const fieldsToCheck = [
       'genderPreference', 'gender', 'occupantType', 'preferredGuests',
       'mealOption', 'foodIncluded', 'mealOptions', 'rules',
-      'noSmoking', 'noDrinking', 'noNonVeg', 'noGuardians', 'noGirlsEntry',
-      'gateClosingTime', 'availableFrom', 'description',
-      'monthlyRent', 'securityDeposit' // ✅ ADDED: New mandatory fields
+      'noSmoking', 'noDrinking', 'noNonVeg', 'noGuardians', 'noOppositeSexEntry',
+      'gateClosingTime', 'availableFrom', 'description'
     ];
     
     fieldsToCheck.forEach(field => {
@@ -118,6 +117,18 @@ const PGDetails: React.FC<FormSectionProps> = ({
         setValue(field, undefined);
       }
     });
+
+    // ✅ MIGRATION: Handle legacy "No Girl's Entry" rule rename
+    const currentRules = getValue('rules') || [];
+    if (Array.isArray(currentRules)) {
+      const updatedRules = currentRules.map(rule => 
+        rule === "No Girl's Entry" ? "No Opposite Gender's Entry" : rule
+      );
+      if (JSON.stringify(currentRules) !== JSON.stringify(updatedRules)) {
+        console.log("Migrating 'No Girl's Entry' to 'No Opposite Gender's Entry'");
+        setStepValue('rules', updatedRules);
+      }
+    }
     
     // Log current form state for debugging
     console.log("Current form state for PG Details:", getValues());
@@ -127,17 +138,13 @@ const PGDetails: React.FC<FormSectionProps> = ({
   const watchedValues = watch([
     getFieldPath('genderPreference'),
     getFieldPath('occupantType'),
-    getFieldPath('mealOption'),
-    getFieldPath('monthlyRent'),
-    getFieldPath('securityDeposit')
+    getFieldPath('mealOption')
   ]);
 
   console.log("Watched PG Details values:", {
     genderPreference: watchedValues[0],
     occupantType: watchedValues[1],
-    mealOption: watchedValues[2],
-    monthlyRent: watchedValues[3],
-    securityDeposit: watchedValues[4]
+    mealOption: watchedValues[2]
   });
 
   return (
@@ -323,73 +330,6 @@ const PGDetails: React.FC<FormSectionProps> = ({
         </div>
       </div>
 
-      {/* ✅ PRICING SECTION - Standard styling without colored containers */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-        {/* Monthly Rent - MANDATORY */}
-        <div className="space-y-2">
-          <RequiredLabel htmlFor={getFieldPath("monthlyRent")}>Monthly rent *</RequiredLabel>
-          <div className="relative">
-            <IndianRupee className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
-            <Input
-              id={getFieldPath("monthlyRent")}
-              type="number"
-              placeholder="Enter monthly rent"
-              value={getValue('monthlyRent') || ''}
-              onChange={(e) => {
-                const value = e.target.value ? parseFloat(e.target.value) : '';
-                setStepValue('monthlyRent', value, { shouldValidate: true });
-              }}
-              className={cn(
-                "pl-10",
-                errors.steps?.[actualStepId]?.monthlyRent && "border-destructive focus-visible:ring-destructive"
-              )}
-            />
-          </div>
-          {errors.steps?.[actualStepId]?.monthlyRent && (
-            <p className="text-sm text-destructive mt-1">
-              {errors.steps?.[actualStepId]?.monthlyRent?.message as string}
-            </p>
-          )}
-          {shouldShowFieldError('monthlyRent') && (
-            <p className="text-sm text-red-600 mt-0.5">
-              {getFieldValidation('monthlyRent').error}
-            </p>
-          )}
-        </div>
-
-        {/* Security Deposit - MANDATORY */}
-        <div className="space-y-2">
-          <RequiredLabel htmlFor={getFieldPath("securityDeposit")}>Security deposit *</RequiredLabel>
-          <div className="relative">
-            <IndianRupee className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
-            <Input
-              id={getFieldPath("securityDeposit")}
-              type="number"
-              placeholder="Enter security deposit"
-              value={getValue('securityDeposit') || ''}
-              onChange={(e) => {
-                const value = e.target.value ? parseFloat(e.target.value) : '';
-                setStepValue('securityDeposit', value, { shouldValidate: true });
-              }}
-              className={cn(
-                "pl-10",
-                errors.steps?.[actualStepId]?.securityDeposit && "border-destructive focus-visible:ring-destructive"
-              )}
-            />
-          </div>
-          {errors.steps?.[actualStepId]?.securityDeposit && (
-            <p className="text-sm text-destructive mt-1">
-              {errors.steps?.[actualStepId]?.securityDeposit?.message as string}
-            </p>
-          )}
-          {shouldShowFieldError('securityDeposit') && (
-            <p className="text-sm text-red-600 mt-0.5">
-              {getFieldValidation('securityDeposit').error}
-            </p>
-          )}
-        </div>
-      </div>
-
       {/* PG/Hostel Rules - OPTIONAL */}
       <div className="mb-6">
         <h3 className="text-base font-medium mb-4">PG/Hostel Rules (Optional)</h3>
@@ -444,28 +384,29 @@ const PGDetails: React.FC<FormSectionProps> = ({
             </label>
           </div>
           
+          {/* ✅ UPDATED: Renamed from "No Girl's Entry" to "No Opposite Gender's Entry" */}
           <div className="flex items-start space-x-2">
             <Checkbox
-              id="rule_noGirlsEntry"
-              checked={getValue('rules')?.includes('No Girl\'s Entry') || false}
+              id="rule_noOppositeSexEntry"
+              checked={getValue('rules')?.includes('No Opposite Gender\'s Entry') || false}
               onCheckedChange={(checked) => {
                 const currentRules = getValue('rules') || [];
                 if (checked) {
-                  setStepValue('rules', [...currentRules, 'No Girl\'s Entry'], { shouldValidate: true });
+                  setStepValue('rules', [...currentRules, 'No Opposite Gender\'s Entry'], { shouldValidate: true });
                 } else {
                   setStepValue(
                     'rules',
-                    currentRules.filter((item) => item !== 'No Girl\'s Entry'),
+                    currentRules.filter((item) => item !== 'No Opposite Gender\'s Entry'),
                     { shouldValidate: true }
                   );
                 }
               }}
             />
             <label
-              htmlFor="rule_noGirlsEntry"
+              htmlFor="rule_noOppositeSexEntry"
               className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
             >
-              No Girl's Entry
+              No Opposite Gender's Entry
             </label>
           </div>
           

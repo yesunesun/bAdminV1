@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/RentalDetails.tsx
-// Version: 3.1.0
-// Last Modified: 30-05-2025 20:50 IST
-// Purpose: Updated Additional Preferences section to match UI requirements with radio buttons
+// Version: 3.2.0
+// Last Modified: 02-06-2025 15:45 IST
+// Purpose: Added "Any" master toggle for preferred tenants and made maintenance charges mandatory
 
 import React, { useEffect, useState } from 'react';
 import { FormData, FormSectionProps } from '../types';
@@ -80,7 +80,7 @@ export const RentalDetails: React.FC<FormSectionProps> = ({
     rentAmount: getField('rentAmount', ''),
     rentNegotiable: getField('rentNegotiable', false),
     securityDeposit: getField('securityDeposit', ''),
-    maintenanceCharges: getField('maintenanceCharges', ''),
+    maintenanceCharges: getField('maintenanceCharges', ''), // Now mandatory
     availableFrom: getField('availableFrom', ''),
     furnishingStatus: getField('furnishingStatus', ''),
     preferredTenants: getField('preferredTenants', []),
@@ -90,6 +90,11 @@ export const RentalDetails: React.FC<FormSectionProps> = ({
     lockInPeriod: getField('lockInPeriod', 'no'), // Changed from hasLockInPeriod
     lockInPeriodMonths: getField('lockInPeriodMonths', '') // New field for months
   });
+
+  // ✅ NEW: Computed state for "Any" checkbox
+  const isAnySelected = values.preferredTenants.includes('Any');
+  const nonAnyTenants = TENANT_PREFERENCES.filter(pref => pref !== 'Any');
+  const areAllNonAnySelected = nonAnyTenants.every(pref => values.preferredTenants.includes(pref));
 
   // Migrate existing data from root to step object
   useEffect(() => {
@@ -153,6 +158,70 @@ export const RentalDetails: React.FC<FormSectionProps> = ({
     setValues(prev => ({ ...prev, [field]: value }));
     saveField(field, value);
     markFieldAsTouched(field);
+  };
+
+  // ✅ NEW: Handle "Any" checkbox toggle logic
+  const handleAnyToggle = (checked: boolean) => {
+    console.log('[handleAnyToggle] Any checkbox clicked, checked:', checked);
+    
+    let newPreferences: string[];
+    
+    if (checked) {
+      // "Any" was selected - select all tenant types including "Any"
+      newPreferences = [...TENANT_PREFERENCES];
+      console.log('[handleAnyToggle] Selecting all preferences:', newPreferences);
+    } else {
+      // "Any" was unselected - unselect all tenant types
+      newPreferences = [];
+      console.log('[handleAnyToggle] Clearing all preferences');
+    }
+    
+    updateFormAndState('preferredTenants', newPreferences);
+  };
+
+  // ✅ NEW: Handle individual tenant preference toggle
+  const handleTenantPreferenceToggle = (preference: string, checked: boolean) => {
+    console.log('[handleTenantPreferenceToggle] Preference:', preference, 'Checked:', checked);
+    
+    const currentPreferences = values.preferredTenants || [];
+    let newPreferences: string[];
+    
+    if (preference === 'Any') {
+      // Handle "Any" selection
+      handleAnyToggle(checked);
+      return;
+    }
+    
+    // Handle individual tenant type selection
+    if (checked) {
+      // Add the preference if not already present
+      newPreferences = currentPreferences.includes(preference) 
+        ? currentPreferences 
+        : [...currentPreferences, preference];
+      
+      // Check if all non-"Any" preferences are now selected
+      const allNonAnySelected = nonAnyTenants.every(pref => 
+        pref === preference || currentPreferences.includes(pref)
+      );
+      
+      // If all non-"Any" preferences are selected, also select "Any"
+      if (allNonAnySelected && !newPreferences.includes('Any')) {
+        newPreferences = [...newPreferences, 'Any'];
+        console.log('[handleTenantPreferenceToggle] All non-Any selected, adding Any');
+      }
+    } else {
+      // Remove the preference
+      newPreferences = currentPreferences.filter(item => item !== preference);
+      
+      // If "Any" was selected and we're removing a preference, also remove "Any"
+      if (newPreferences.includes('Any')) {
+        newPreferences = newPreferences.filter(item => item !== 'Any');
+        console.log('[handleTenantPreferenceToggle] Removed preference, also removing Any');
+      }
+    }
+    
+    console.log('[handleTenantPreferenceToggle] New preferences:', newPreferences);
+    updateFormAndState('preferredTenants', newPreferences);
   };
 
   // Handle numeric input for currency fields
@@ -287,7 +356,7 @@ export const RentalDetails: React.FC<FormSectionProps> = ({
           />
         </div>
 
-        {/* Maintenance and Available From */}
+        {/* ✅ UPDATED: Maintenance and Available From - Maintenance now MANDATORY */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <ValidatedInput
             form={form}
@@ -295,10 +364,10 @@ export const RentalDetails: React.FC<FormSectionProps> = ({
             label="Maintenance Charges"
             type="text"
             inputMode="numeric"
-            placeholder="e.g., 2000 (optional)"
+            placeholder="e.g., 2000"
             value={values.maintenanceCharges}
-            required={false}
-            helperText="Monthly maintenance charges in ₹"
+            required={true} // ✅ CHANGED: Now mandatory
+            helperText="Monthly maintenance charges in ₹ (required)" // ✅ UPDATED: Helper text indicates mandatory
             error={shouldShowFieldError('maintenanceCharges') ? getFieldValidation('maintenanceCharges').error : null}
             isValid={getFieldValidation('maintenanceCharges').isValid}
             isTouched={getFieldValidation('maintenanceCharges').isTouched}
@@ -344,7 +413,7 @@ export const RentalDetails: React.FC<FormSectionProps> = ({
           />
         </div>
 
-        {/* Preferred Tenants */}
+        {/* ✅ UPDATED: Preferred Tenants with "Any" Master Toggle */}
         <div>
           <FormFieldLabel
             fieldName="preferredTenants"
@@ -358,24 +427,37 @@ export const RentalDetails: React.FC<FormSectionProps> = ({
             Preferred Tenants
           </FormFieldLabel>
           
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-3">
-            {TENANT_PREFERENCES.map((preference) => (
+          {/* ✅ NEW: Master "Any" Checkbox with visual distinction */}
+          <div className="mt-3 mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-start space-x-3">
+              <Checkbox
+                id="tenantPref-Any-Master"
+                checked={isAnySelected}
+                onCheckedChange={(checked) => handleAnyToggle(!!checked)}
+                className="mt-1"
+              />
+              <div>
+                <label
+                  htmlFor="tenantPref-Any-Master"
+                  className="text-sm font-semibold text-blue-900 cursor-pointer"
+                >
+                  Any (Select All)
+                </label>
+                <p className="text-xs text-blue-700 mt-1">
+                  Check this to select all tenant types below, or uncheck to clear all selections
+                </p>
+              </div>
+            </div>
+          </div>
+          
+          {/* ✅ UPDATED: Individual tenant type checkboxes */}
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {nonAnyTenants.map((preference) => (
               <div key={preference} className="flex items-start space-x-2">
                 <Checkbox
                   id={`tenantPref-${preference}`}
                   checked={values.preferredTenants.includes(preference)}
-                  onCheckedChange={(checked) => {
-                    const currentPreferences = values.preferredTenants || [];
-                    let newPreferences;
-                    
-                    if (checked) {
-                      newPreferences = [...currentPreferences, preference];
-                    } else {
-                      newPreferences = currentPreferences.filter((item) => item !== preference);
-                    }
-                    
-                    updateFormAndState('preferredTenants', newPreferences);
-                  }}
+                  onCheckedChange={(checked) => handleTenantPreferenceToggle(preference, !!checked)}
                 />
                 <label
                   htmlFor={`tenantPref-${preference}`}
@@ -386,6 +468,16 @@ export const RentalDetails: React.FC<FormSectionProps> = ({
               </div>
             ))}
           </div>
+          
+          {/* ✅ NEW: Selection Status Indicator */}
+          {values.preferredTenants.length > 0 && (
+            <div className="mt-3 p-2 bg-green-50 border border-green-200 rounded text-sm text-green-800">
+              <strong>Selected:</strong> {values.preferredTenants.join(', ')}
+              {isAnySelected && (
+                <span className="ml-2 text-green-600 font-medium">(All types selected)</span>
+              )}
+            </div>
+          )}
         </div>
 
         {/* ✅ UPDATED: Additional Preferences with Radio Buttons */}
