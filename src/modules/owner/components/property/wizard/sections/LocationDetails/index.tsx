@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/LocationDetails/index.tsx
-// Version: 7.1.0
-// Last Modified: 29-05-2025 19:50 IST
-// Purpose: Fixed import paths and validation system - working version
+// Version: 7.2.0
+// Last Modified: 02-06-2025 14:30 IST
+// Purpose: Added automatic coordinate fetching when Continue is clicked without coordinates
 
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { FormSection } from '@/components/FormSection';
@@ -63,6 +63,7 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const [isGeolocating, setIsGeolocating] = useState(false);
   const [isGeocoding, setIsGeocoding] = useState(false);
+  const [isAutoFetchingCoordinates, setIsAutoFetchingCoordinates] = useState(false);
   const [mapInstance, setMapInstance] = useState<any>(null);
   const [markerInstance, setMarkerInstance] = useState<any>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
@@ -122,6 +123,18 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
     saveField(field, value);
     markFieldAsTouched(field);
   }, [saveField, markFieldAsTouched]);
+
+  // Check if coordinates are present and valid
+  const hasValidCoordinates = useCallback(() => {
+    const lat = values.latitude || getField('latitude');
+    const lng = values.longitude || getField('longitude');
+    
+    return lat && lng && 
+           !isNaN(parseFloat(String(lat))) && 
+           !isNaN(parseFloat(String(lng))) &&
+           parseFloat(String(lat)) !== 0 && 
+           parseFloat(String(lng)) !== 0;
+  }, [values.latitude, values.longitude, getField]);
 
   // Check for edit mode
   const isEditMode = window.location.pathname.includes('/edit');
@@ -300,14 +313,25 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
           if (stateComponent) {
             updateFormAndState('state', stateComponent.long_name);
           }
+          
+          // If this was triggered by auto-fetch, stop the loading state
+          if (isAutoFetchingCoordinates) {
+            setIsAutoFetchingCoordinates(false);
+          }
         } else {
           setLocationError(`Couldn't find the address on the map`);
+          if (isAutoFetchingCoordinates) {
+            setIsAutoFetchingCoordinates(false);
+          }
         }
       });
     } catch (error) {
       console.error('Error geocoding address:', error);
       setIsGeocoding(false);
       setLocationError('Error finding address');
+      if (isAutoFetchingCoordinates) {
+        setIsAutoFetchingCoordinates(false);
+      }
     }
   };
   
@@ -371,6 +395,216 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
     }
     geocodeAddress(values.address);
   };
+
+  // NEW: Auto-fetch coordinates when Continue is clicked without coordinates
+  const autoFetchCoordinates = useCallback(async () => {
+    console.log('[autoFetchCoordinates] Starting automatic coordinate fetching...');
+    
+    // If coordinates already exist, no need to fetch
+    if (hasValidCoordinates()) {
+      console.log('[autoFetchCoordinates] Valid coordinates already exist, skipping auto-fetch');
+      return Promise.resolve(true);
+    }
+
+    setIsAutoFetchingCoordinates(true);
+    setLocationError(null);
+
+    // Strategy 1: Try geocoding the address first (same as "Find on Map")
+    if (values.address && values.address.trim()) {
+      console.log('[autoFetchCoordinates] Trying to geocode address:', values.address);
+      
+      return new Promise<boolean>((resolve) => {
+        if (!mapLoaded || !window.google || !window.google.maps) {
+          console.log('[autoFetchCoordinates] Google Maps not loaded, cannot geocode');
+          setIsAutoFetchingCoordinates(false);
+          resolve(false);
+          return;
+        }
+
+        let fullAddress = values.address;
+        if (values.locality) fullAddress += `, ${values.locality}`;
+        fullAddress += ', Telangana, India';
+
+        const geocoder = new window.google.maps.Geocoder();
+        geocoder.geocode({ address: fullAddress }, (results: any, status: string) => {
+          if (status === 'OK' && results && results.length > 0) {
+            const location = results[0].geometry.location;
+            
+            console.log('[autoFetchCoordinates] Geocoding successful:', location.lat(), location.lng());
+            
+            updateFormAndState('latitude', location.lat());
+            updateFormAndState('longitude', location.lng());
+            setCoordinatesVerified(true);
+            
+            setShowCoordinateSuccess(true);
+            setTimeout(() => setShowCoordinateSuccess(false), 3000);
+            
+            if (mapInstance) {
+              mapInstance.setCenter(location);
+              updateMarkerPosition(location);
+            }
+            
+            setIsAutoFetchingCoordinates(false);
+            resolve(true);
+          } else {
+            console.log('[autoFetchCoordinates] Geocoding failed, trying current location...');
+            setIsAutoFetchingCoordinates(false);
+            resolve(false);
+          }
+        });
+      });
+    }
+
+    // Strategy 2: If no address or geocoding fails, try current location
+    console.log('[autoFetchCoordinates] No address available, trying current location...');
+    
+    return new Promise<boolean>((resolve) => {
+      if (!navigator.geolocation) {
+        console.log('[autoFetchCoordinates] Geolocation not supported');
+        setLocationError('Unable to get coordinates. Please use "Find on Map" or "Use My Location" buttons.');
+        setIsAutoFetchingCoordinates(false);
+        resolve(false);
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          
+          console.log('[autoFetchCoordinates] Current location obtained:', latitude, longitude);
+          
+          updateFormAndState('latitude', latitude);
+          updateFormAndState('longitude', longitude);
+          setCoordinatesVerified(true);
+          
+          setShowCoordinateSuccess(true);
+          setTimeout(() => setShowCoordinateSuccess(false), 3000);
+          
+          const latlng = { lat: latitude, lng: longitude };
+          if (mapInstance) {
+            mapInstance.setCenter(latlng);
+            updateMarkerPosition(latlng);
+          }
+          
+          reverseGeocode(latlng);
+          setIsAutoFetchingCoordinates(false);
+          resolve(true);
+        },
+        (error) => {
+          console.log('[autoFetchCoordinates] Geolocation failed:', error.message);
+          setLocationError('Unable to get coordinates automatically. Please use "Find on Map" or "Use My Location" buttons to set the location.');
+          setIsAutoFetchingCoordinates(false);
+          resolve(false);
+        },
+        {
+          enableHighAccuracy: false, // Use faster, less accurate location for auto-fetch
+          timeout: 5000, // Shorter timeout for auto-fetch
+          maximumAge: 300000 // Allow cached position up to 5 minutes old
+        }
+      );
+    });
+  }, [
+    hasValidCoordinates, 
+    values.address, 
+    values.locality, 
+    mapLoaded, 
+    mapInstance, 
+    updateFormAndState, 
+    reverseGeocode, 
+    updateMarkerPosition
+  ]);
+
+  // NEW: Enhanced navigation interceptor
+  useEffect(() => {
+    const handleBeforeNavigation = async (event: Event) => {
+      // Only intercept if coordinates are missing
+      if (hasValidCoordinates()) {
+        return; // Allow navigation
+      }
+
+      // Stop the default navigation
+      event.preventDefault();
+      event.stopPropagation();
+
+      console.log('[NavigationInterceptor] Coordinates missing, attempting auto-fetch...');
+
+      try {
+        const success = await autoFetchCoordinates();
+        
+        if (success) {
+          console.log('[NavigationInterceptor] Auto-fetch successful, coordinates obtained');
+          // Allow navigation to proceed by re-triggering the navigation
+          // Find the navigation button and trigger it again
+          setTimeout(() => {
+            const nextButton = document.querySelector('button[data-testid="next-button"], button:contains("Next"), button:contains("Continue")') as HTMLButtonElement;
+            if (nextButton) {
+              nextButton.click();
+            }
+          }, 100);
+        } else {
+          console.log('[NavigationInterceptor] Auto-fetch failed, showing error message');
+          setLocationError('Coordinates are required to proceed. Please use "Find on Map" or "Use My Location" buttons to set the location.');
+        }
+      } catch (error) {
+        console.error('[NavigationInterceptor] Error during auto-fetch:', error);
+        setLocationError('Unable to get coordinates automatically. Please use "Find on Map" or "Use My Location" buttons.');
+      }
+    };
+
+    // Find and attach to navigation buttons
+    const attachToNavigationButtons = () => {
+      // Look for common navigation button patterns
+      const selectors = [
+        'button[data-testid="next-button"]',
+        'button[type="submit"]',
+        'button:contains("Next")',
+        'button:contains("Continue")',
+        'button:contains("Proceed")'
+      ];
+
+      let buttons: HTMLButtonElement[] = [];
+      
+      // Use more reliable button finding
+      const allButtons = document.querySelectorAll('button');
+      allButtons.forEach(button => {
+        const text = button.textContent?.toLowerCase() || '';
+        if (text.includes('next') || text.includes('continue') || text.includes('proceed') || 
+            button.type === 'submit' || button.getAttribute('data-testid') === 'next-button') {
+          buttons.push(button);
+        }
+      });
+
+      buttons.forEach(button => {
+        // Remove existing listener if any
+        button.removeEventListener('click', handleBeforeNavigation, true);
+        // Add new listener with capture=true to intercept before other handlers
+        button.addEventListener('click', handleBeforeNavigation, true);
+      });
+
+      return buttons;
+    };
+
+    // Initial attachment
+    const buttons = attachToNavigationButtons();
+
+    // Re-attach when DOM changes (for dynamically added buttons)
+    const observer = new MutationObserver(() => {
+      attachToNavigationButtons();
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+
+    // Cleanup
+    return () => {
+      observer.disconnect();
+      buttons.forEach(button => {
+        button.removeEventListener('click', handleBeforeNavigation, true);
+      });
+    };
+  }, [hasValidCoordinates, autoFetchCoordinates]);
   
   // Get current location
   const getUserCurrentLocation = async () => {
@@ -508,6 +742,24 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
               className="bg-blue-600 h-2 rounded-full transition-all duration-300"
               style={{ width: `${completionPercentage}%` }}
             />
+          </div>
+        </div>
+      )}
+
+      {/* AUTO-FETCH STATUS: Show when automatically fetching coordinates */}
+      {isAutoFetchingCoordinates && (
+        <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-lg">
+          <div className="flex items-center">
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-yellow-600 mr-3"></div>
+            <div>
+              <strong className="font-medium">Getting location coordinates...</strong>
+              <p className="text-sm">
+                {values.address ? 
+                  'Trying to locate your address on the map...' : 
+                  'Trying to get your current location...'
+                }
+              </p>
+            </div>
           </div>
         </div>
       )}
@@ -703,6 +955,22 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
               <p className="text-sm text-green-800">
                 <strong>Coordinates:</strong> {parseFloat(String(values.latitude)).toFixed(6)}, {parseFloat(String(values.longitude)).toFixed(6)}
               </p>
+            </div>
+          )}
+
+          {/* COORDINATES REQUIREMENT NOTICE */}
+          {!hasValidCoordinates() && (
+            <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded">
+              <p className="text-sm">
+                <strong>📍 Location coordinates are required</strong><br/>
+                Please use one of the following options to set your property location:
+              </p>
+              <ul className="text-xs mt-2 ml-4 list-disc">
+                <li>Click "Find on Map" to locate your address</li>
+                <li>Click "Use My Location" to use your current position</li>
+                <li>Click directly on the map to select a location</li>
+                <li>Or simply click "Continue" and we'll try to locate your address automatically</li>
+              </ul>
             </div>
           )}
         </div>
