@@ -1,7 +1,7 @@
 // src/components/Search/hooks/useSearch.ts
-// Version: 3.0.0
-// Last Modified: 02-06-2025 18:40 IST
-// Purpose: Updated to use fixed search service with proper parameter mapping
+// Version: 2.1.0
+// Last Modified: 02-06-2025 15:30 IST
+// Purpose: Fixed Buy/Rent filter logic to properly handle action type mapping and search across all transaction types
 
 import { useState, useCallback, useEffect } from 'react';
 import { SearchFilters, SearchResult, SearchState } from '../types/search.types';
@@ -71,24 +71,62 @@ export const useSearch = (onSearchCallback?: (filters: SearchFilters) => void) =
       if (onSearchCallback) {
         onSearchCallback(searchFilters.filters);
       }
-      
-    } catch (error) {
-      console.error('Error loading latest properties:', error);
-      setSearchState(prev => ({
-        ...prev,
-        loading: false,
-        error: error instanceof Error ? error.message : 'Failed to load properties',
-        results: [],
-        totalCount: 0
-      }));
     }
-  }, [onSearchCallback, searchFilters.filters]);
+  }, [wasCleared, areFiltersEmpty, onSearchCallback, searchFilters.filters]);
 
   /**
-   * Enhanced smart search using the fixed search service
+   * FIXED: Transform ActionType to TransactionType for backend compatibility
+   * Now properly handles 'any' action type to search across all transaction types
+   */
+  const getTransactionTypeFromActionType = (actionType: string): string | null => {
+    console.log('🔄 Mapping actionType to transactionType:', actionType);
+    
+    switch (actionType) {
+      case 'buy':
+        console.log('✅ ActionType "buy" → TransactionType "buy"');
+        return 'buy';
+      case 'rent':
+        console.log('✅ ActionType "rent" → TransactionType "rent"');
+        return 'rent';
+      case 'any':
+      default:
+        console.log('✅ ActionType "any" → TransactionType null (search all types)');
+        return null; // FIXED: Return null for 'any' to search across all transaction types
+    }
+  };
+
+  /**
+   * UPDATED: Transform filters for backend compatibility with improved logic
+   */
+  const transformFiltersForBackend = (filters: SearchFilters) => {
+    const transactionType = getTransactionTypeFromActionType(filters.actionType);
+    
+    console.log('🔧 Transforming filters for backend:', {
+      original_actionType: filters.actionType,
+      mapped_transactionType: transactionType,
+      selectedPropertyType: filters.selectedPropertyType,
+      selectedSubType: filters.selectedSubType
+    });
+    
+    // Create a compatible filter object for the backend
+    const backendFilters = {
+      ...filters,
+      transactionType: transactionType // This can now be null for 'any'
+    };
+    
+    // FIXED: Remove actionType from backend filters since backend uses transactionType
+    delete (backendFilters as any).actionType;
+    
+    return backendFilters;
+  };
+
+  /**
+   * ENHANCED: Smart search that detects 6-character property codes and uses appropriate search method
+   * Now with improved Buy/Rent filter handling
    */
   const handleSearch = useCallback(async () => {
-    console.log('🔍 Search initiated with filters:', searchFilters.filters);
+    console.log('🔍 Search initiated with actionType:', searchFilters.filters.actionType);
+    console.log('📋 Full search filters:', searchFilters.filters);
     
     // Call external callback if provided
     if (onSearchCallback) {
@@ -105,11 +143,11 @@ export const useSearch = (onSearchCallback?: (filters: SearchFilters) => void) =
       let response;
       const query = searchFilters.filters.searchQuery?.trim();
       
-      // Check if all filters are empty - load latest properties
-      if (areFiltersEmpty()) {
-        console.log('🏠 No filters applied - loading latest properties');
-        response = await searchService.getLatestProperties(50);
-      }
+      // Transform filters for backend compatibility
+      const backendFilters = transformFiltersForBackend(searchFilters.filters);
+      
+      console.log('🎯 Backend filters after transformation:', backendFilters);
+      
       // Check if the search query is exactly a 6-character alphanumeric property code
       else if (query && searchService.isPropertyCode(query)) {
         console.log('🎯 Detected 6-character property code, using smart search');
@@ -118,13 +156,24 @@ export const useSearch = (onSearchCallback?: (filters: SearchFilters) => void) =
           limit: 50
         });
       } else {
-        // Use regular search with proper parameter mapping
-        console.log('🔍 Using regular search with proper parameter mapping');
-        response = await searchService.search(searchFilters.filters, {
-          page: 1,
-          limit: 50
-        });
+        // ENHANCED: Handle 'any' action type by searching across all property types if no specific transaction type
+        if (!backendFilters.transactionType && (!backendFilters.selectedPropertyType || backendFilters.selectedPropertyType === 'any')) {
+          console.log('🌐 Action type is "any" and no specific property type - using getLatestProperties');
+          response = await searchService.getLatestProperties(50);
+        } else {
+          console.log('🔍 Using regular search with specific filters');
+          response = await searchService.search(backendFilters, {
+            page: 1,
+            limit: 50
+          });
+        }
       }
+      
+      console.log('📊 Search completed:', {
+        resultCount: response.results.length,
+        totalCount: response.totalCount,
+        hasResults: response.results.length > 0
+      });
       
       setSearchState(prev => ({
         ...prev,
@@ -134,7 +183,7 @@ export const useSearch = (onSearchCallback?: (filters: SearchFilters) => void) =
       }));
       
     } catch (error) {
-      console.error('Search error:', error);
+      console.error('❌ Search error:', error);
       setSearchState(prev => ({
         ...prev,
         loading: false,

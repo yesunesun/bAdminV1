@@ -1,7 +1,7 @@
 // src/components/Search/services/searchService.ts
-// Version: 3.0.0
-// Last Modified: 02-06-2025 18:30 IST
-// Purpose: Fixed search service with proper parameter mapping for residential and commercial properties
+// Version: 10.2.0
+// Last Modified: 02-06-2025 15:45 IST
+// Purpose: Fixed Buy/Rent filtering by properly mapping transactionType to database flow types
 
 import { SearchFilters, SearchResult } from '../types/search.types';
 import { supabase } from '@/lib/supabase';
@@ -44,6 +44,52 @@ interface DatabaseSearchResult {
   primary_image: string | null;
   code?: string | null;
 }
+
+interface CommercialSearchResult {
+  id: string;
+  owner_id: string;
+  created_at: string;
+  updated_at: string;
+  property_type: string;
+  flow_type: string;
+  subtype: string;
+  total_count: number;
+  title: string;
+  price: number;
+  city: string;
+  state: string;
+  area: number;
+  owner_email: string;
+  status: string;
+  area_unit: string;
+  primary_image: string | null;
+  code?: string | null;
+}
+
+interface LandSearchResult {
+  id: string;
+  owner_id: string;
+  created_at: string;
+  updated_at: string;
+  property_type: string;
+  flow_type: string;
+  subtype: string;
+  total_count: number;
+  title: string;
+  price: number;
+  city: string;
+  state: string;
+  area: number;
+  owner_email: string;
+  status: string;
+  area_unit: string;
+  land_type: string;
+  primary_image: string | null;
+  code?: string | null;
+}
+
+// Union type for all database results
+type DatabaseSearchResult = ResidentialSearchResult | CommercialSearchResult | LandSearchResult;
 
 export class SearchService {
   /**
@@ -142,75 +188,188 @@ export class SearchService {
   }
 
   /**
-   * Search commercial properties using proper parameter mapping
+   * FIXED: Map transaction type and property type to specific database flow types
+   * This ensures Buy shows only Sale properties and Rent shows only Rental properties
    */
-  async searchCommercialProperties(filters: SearchFilters, options: SearchOptions = {}): Promise<SearchResponse> {
-    try {
-      console.log('🏢 Searching commercial properties with filters:', filters);
-      
-      // Build parameters according to search_commercial_properties function signature
-      const params = this.buildCommercialSearchParams(filters, options);
-      console.log('🔧 Commercial search parameters:', params);
-      
-      const { data, error } = await supabase.rpc('search_commercial_properties', params);
-      
-      if (error) {
-        console.error('❌ Commercial search error:', error);
-        throw new Error(`Commercial search failed: ${error.message}`);
-      }
-
-      const searchResults = data || [];
-      const totalCount = searchResults[0]?.total_count || 0;
-      
-      console.log('📊 Commercial search results:', {
-        resultCount: searchResults.length,
-        totalCount: totalCount,
-        params: params
-      });
-
-      const transformedResults = this.transformDatabaseResults(searchResults);
-      
-      return {
-        results: transformedResults,
-        totalCount: totalCount,
-        page: options.page || 1,
-        limit: options.limit || 50
-      };
-      
-    } catch (error) {
-      console.error('💥 Commercial search error:', error);
-      throw error;
+  private getFlowTypeFromTransactionAndProperty(transactionType: string | null, propertyType: string, subType?: string): string | null {
+    console.log('🔄 Mapping transaction and property to flow type:', { transactionType, propertyType, subType });
+    
+    // Handle special subtypes first
+    if (subType === 'pghostel' || subType === 'pg') {
+      console.log('✅ PG/Hostel subtype → residential_pghostel');
+      return 'residential_pghostel';
     }
+    
+    if (subType === 'flatmates') {
+      console.log('✅ Flatmates subtype → residential_flatmates');
+      return 'residential_flatmates';
+    }
+    
+    if (subType === 'coworking') {
+      console.log('✅ Coworking subtype → commercial_coworking');
+      return 'commercial_coworking';
+    }
+    
+    // If no transaction type specified, return null to search all
+    if (!transactionType) {
+      console.log('ℹ️ No transaction type specified → search all flow types');
+      return null;
+    }
+    
+    // Map transaction type + property type to specific flow types
+    if (propertyType === 'residential' || !propertyType || propertyType === 'any') {
+      if (transactionType === 'buy') {
+        console.log('✅ Buy + Residential → residential_sale');
+        return 'residential_sale';
+      } else if (transactionType === 'rent') {
+        console.log('✅ Rent + Residential → residential_rent');
+        return 'residential_rent';
+      }
+    }
+    
+    if (propertyType === 'commercial') {
+      if (transactionType === 'buy') {
+        console.log('✅ Buy + Commercial → commercial_sale');
+        return 'commercial_sale';
+      } else if (transactionType === 'rent') {
+        console.log('✅ Rent + Commercial → commercial_rent');
+        return 'commercial_rent';
+      }
+    }
+    
+    if (propertyType === 'land') {
+      // Land is always for sale (buy)
+      console.log('✅ Land property → land_sale');
+      return 'land_sale';
+    }
+    
+    // Default fallback
+    console.log('⚠️ No specific mapping found, using default');
+    return transactionType === 'buy' ? 'residential_sale' : 'residential_rent';
   }
 
   /**
-   * Search land properties
+   * DEPRECATED: Old mapping function - replaced by getFlowTypeFromTransactionAndProperty
+   */
+  private mapSubtypeToFlowType(propertyType: string, subtype: string, transactionType: string): string | null {
+    console.log('⚠️ Using deprecated mapSubtypeToFlowType - should use getFlowTypeFromTransactionAndProperty');
+    return this.getFlowTypeFromTransactionAndProperty(transactionType, propertyType, subtype);
+  }
+
+  /**
+   * Get property subtype for database filtering
+   */
+  private getPropertySubtype(subtype: string): string | null {
+    // Map frontend subtypes to database property types
+    const subtypeMapping: Record<string, string> = {
+      // Residential subtypes
+      'apartment': 'apartment',
+      'villa': 'villa',
+      'house': 'independent_house',
+      'studio': 'studio',
+      'duplex': 'duplex',
+      'penthouse': 'penthouse',
+      'farmhouse': 'farmhouse',
+      'independent': 'independent_house',
+      
+      // Commercial subtypes
+      'office_space': 'office_space',
+      'shop': 'shop',
+      'showroom': 'showroom',
+      'godown_warehouse': 'godown_warehouse',
+      'industrial_shed': 'industrial_shed',
+      'industrial_building': 'industrial_building',
+      'other_business': 'other_business',
+      'coworking': 'coworking',
+      
+      // Land subtypes
+      'residential_plot': 'residential_plot',
+      'commercial_plot': 'commercial_plot',
+      'agricultural_land': 'agricultural_land',
+      'industrial_land': 'industrial_land'
+    };
+
+    return subtypeMapping[subtype] || null;
+  }
+
+  /**
+   * Check if property subtype matches selected filter
+   */
+  private doesPropertyMatchSubtype(property: DatabaseSearchResult, selectedSubtype: string): boolean {
+    if (!selectedSubtype || selectedSubtype === 'any') {
+      return true; // No subtype filter applied
+    }
+
+    // For PG/Hostel and Flatmates, the flow type itself is the filter
+    if (selectedSubtype === 'pghostel' || selectedSubtype === 'flatmates') {
+      return property.flow_type.includes(selectedSubtype);
+    }
+
+    // For regular properties, we now rely on the database-level filtering
+    return true;
+  }
+
+  /**
+   * SIMPLIFIED: Get effective subtype - just pass through the special cases
+   */
+  private getEffectiveSubtype(filters: SearchFilters): string | null {
+    // Only handle special subtypes, let the database handle transaction type filtering
+    if (filters.selectedSubType === 'pghostel') {
+      return 'pghostel';
+    } else if (filters.selectedSubType === 'flatmates') {
+      return 'flatmates';
+    }
+    
+    // For everything else, return null and let buildSearchParams handle the transaction type
+    return null;
+  }
+
+  /**
+   * Main search method with FIXED transaction type filtering
    */
   async searchLandProperties(filters: SearchFilters, options: SearchOptions = {}): Promise<SearchResponse> {
     try {
-      console.log('🌍 Searching land properties with filters:', filters);
+      console.log('🔍 Starting search with filters:', filters);
+      console.log('🔧 Search options:', options);
       
-      // Build parameters according to search_land_properties function signature
-      const params = this.buildLandSearchParams(filters, options);
-      console.log('🔧 Land search parameters:', params);
+      const propertyType = filters.selectedPropertyType || 'residential';
+      const transactionType = (filters as any).transactionType; // Get the mapped transaction type
       
-      const { data, error } = await supabase.rpc('search_land_properties', params);
+      console.log('💡 Transaction type for filtering:', transactionType);
       
-      if (error) {
-        console.error('❌ Land search error:', error);
-        throw new Error(`Land search failed: ${error.message}`);
+      let searchResults: DatabaseSearchResult[] = [];
+      let totalCount = 0;
+      
+      if (propertyType === 'any' || !propertyType) {
+        searchResults = await this.searchAllPropertyTypes(filters, options);
+        totalCount = searchResults[0]?.total_count || 0;
+      } else {
+        const { data, error } = await this.callPropertySpecificSearch(propertyType, filters, options);
+        
+        if (error) {
+          console.error('❌ Database search error:', error);
+          throw new Error(`Database search failed: ${error.message}`);
+        }
+        
+        searchResults = data || [];
+        totalCount = searchResults[0]?.total_count || 0;
       }
 
-      const searchResults = data || [];
-      const totalCount = searchResults[0]?.total_count || 0;
-      
-      console.log('📊 Land search results:', {
+      console.log('📊 Raw database results:', {
         resultCount: searchResults.length,
         totalCount: totalCount,
-        params: params
+        propertyType: propertyType,
+        transactionType: transactionType,
+        firstResultFlowType: searchResults[0]?.flow_type,
+        firstResultHasPrimaryImage: searchResults[0]?.primary_image ? 'YES' : 'NO'
       });
 
-      const transformedResults = this.transformDatabaseResults(searchResults);
+      // Transform results
+      let transformedResults = this.transformDatabaseResults(searchResults);
+      transformedResults = SearchFallbackService.enhanceSearchResults(transformedResults);
+      
+      const duration = searchPerformanceMonitor.end(transformedResults.length, totalCount);
+      logSearchResults(transformedResults, totalCount, duration);
       
       return {
         results: transformedResults,
@@ -226,88 +385,156 @@ export class SearchService {
   }
 
   /**
-   * Build parameters for residential property search
+   * FIXED: Call the appropriate property-specific search function with transaction type filtering
    */
-  private buildResidentialSearchParams(filters: SearchFilters, options: SearchOptions): Record<string, any> {
-    const params: Record<string, any> = {
-      p_limit: options.limit || 50,
-      p_offset: ((options.page || 1) - 1) * (options.limit || 50)
-    };
-
-    // Search query
-    if (filters.searchQuery?.trim()) {
-      params.p_search_query = filters.searchQuery.trim();
+  private async callPropertySpecificSearch(
+    propertyType: string, 
+    filters: SearchFilters, 
+    options: SearchOptions
+  ) {
+    const searchParams = this.buildSearchParams(filters, options);
+    
+    console.log('📡 Calling database search with params:', searchParams);
+    
+    switch (propertyType) {
+      case 'residential':
+        console.log('🏠 Calling search_residential_properties with params:', searchParams);
+        return await supabase.rpc('search_residential_properties', {
+          p_subtype: searchParams.p_subtype,
+          p_property_subtype: searchParams.p_property_subtype,
+          p_search_query: searchParams.p_search_query,
+          p_city: searchParams.p_city,
+          p_state: searchParams.p_state,
+          p_min_price: searchParams.p_min_price,
+          p_max_price: searchParams.p_max_price,
+          p_bedrooms: searchParams.p_bedrooms,
+          p_bathrooms: searchParams.p_bathrooms,
+          p_area_min: searchParams.p_area_min,
+          p_area_max: searchParams.p_area_max,
+          p_limit: searchParams.p_limit,
+          p_offset: searchParams.p_offset
+        });
+        
+      case 'commercial':
+        console.log('🏢 Calling search_commercial_properties with params:', searchParams);
+        return await supabase.rpc('search_commercial_properties', {
+          p_subtype: searchParams.p_subtype,
+          p_property_subtype: searchParams.p_property_subtype,
+          p_search_query: searchParams.p_search_query,
+          p_min_price: searchParams.p_min_price,
+          p_max_price: searchParams.p_max_price,
+          p_city: searchParams.p_city,
+          p_state: searchParams.p_state,
+          p_area_min: searchParams.p_area_min,
+          p_area_max: searchParams.p_area_max,
+          p_limit: searchParams.p_limit,
+          p_offset: searchParams.p_offset
+        });
+        
+      case 'land':
+        console.log('🌍 Calling search_land_properties with params:', searchParams);
+        return await supabase.rpc('search_land_properties', {
+          p_property_subtype: searchParams.p_property_subtype,
+          p_search_query: searchParams.p_search_query,
+          p_min_price: searchParams.p_min_price,
+          p_max_price: searchParams.p_max_price,
+          p_city: searchParams.p_city,
+          p_state: searchParams.p_state,
+          p_area_min: searchParams.p_area_min,
+          p_area_max: searchParams.p_area_max,
+          p_limit: searchParams.p_limit,
+          p_offset: searchParams.p_offset
+        });
+        
+      default:
+        console.log('🏠 Defaulting to search_residential_properties');
+        return await supabase.rpc('search_residential_properties', {
+          p_subtype: searchParams.p_subtype,
+          p_property_subtype: searchParams.p_property_subtype,
+          p_search_query: searchParams.p_search_query,
+          p_city: searchParams.p_city,
+          p_state: searchParams.p_state,
+          p_min_price: searchParams.p_min_price,
+          p_max_price: searchParams.p_max_price,
+          p_bedrooms: searchParams.p_bedrooms,
+          p_bathrooms: searchParams.p_bathrooms,
+          p_area_min: searchParams.p_area_min,
+          p_area_max: searchParams.p_area_max,
+          p_limit: searchParams.p_limit,
+          p_offset: searchParams.p_offset
+        });
     }
+  }
 
-    // Location filters
-    if (filters.selectedLocation && filters.selectedLocation !== 'any') {
-      const locationMapping: Record<string, string> = {
-        'hyderabad': 'Hyderabad',
-        'secunderabad': 'Secunderabad',
-        'warangal': 'Warangal',
-        'nizamabad': 'Nizamabad',
-        'karimnagar': 'Karimnagar',
-        'khammam': 'Khammam',
-        'mahbubnagar': 'Mahbubnagar',
-        'nalgonda': 'Nalgonda',
-        'adilabad': 'Adilabad',
-        'medak': 'Medak',
-        'rangareddy': 'Rangareddy',
-        'sangareddy': 'Sangareddy',
-        'siddipet': 'Siddipet',
-        'vikarabad': 'Vikarabad'
-      };
-      
-      params.p_city = locationMapping[filters.selectedLocation] || filters.selectedLocation;
-      params.p_state = 'Telangana';
-    }
+  /**
+   * SIMPLIFIED: Search all property types with correct p_subtype parameter
+   */
+  private async searchAllPropertyTypes(filters: SearchFilters, options: SearchOptions): Promise<DatabaseSearchResult[]> {
+    const searchParams = this.buildSearchParams(filters, options);
+    const limit = Math.floor((searchParams.p_limit || 50) / 3);
+    
+    console.log('🌐 Searching all property types with params:', { p_subtype: searchParams.p_subtype });
+    
+    try {
+      const [residentialResult, commercialResult, landResult] = await Promise.allSettled([
+        supabase.rpc('search_residential_properties', {
+          p_subtype: searchParams.p_subtype,
+          p_property_subtype: searchParams.p_property_subtype,
+          p_search_query: searchParams.p_search_query,
+          p_city: searchParams.p_city,
+          p_state: searchParams.p_state,
+          p_min_price: searchParams.p_min_price,
+          p_max_price: searchParams.p_max_price,
+          p_bedrooms: searchParams.p_bedrooms,
+          p_bathrooms: searchParams.p_bathrooms,
+          p_area_min: searchParams.p_area_min,
+          p_area_max: searchParams.p_area_max,
+          p_limit: limit,
+          p_offset: 0
+        }),
+        supabase.rpc('search_commercial_properties', {
+          p_subtype: searchParams.p_subtype,
+          p_property_subtype: searchParams.p_property_subtype,
+          p_search_query: searchParams.p_search_query,
+          p_min_price: searchParams.p_min_price,
+          p_max_price: searchParams.p_max_price,
+          p_city: searchParams.p_city,
+          p_state: searchParams.p_state,
+          p_area_min: searchParams.p_area_min,
+          p_area_max: searchParams.p_area_max,
+          p_limit: limit,
+          p_offset: 0
+        }),
+        supabase.rpc('search_land_properties', {
+          p_property_subtype: searchParams.p_property_subtype,
+          p_search_query: searchParams.p_search_query,
+          p_min_price: searchParams.p_min_price,
+          p_max_price: searchParams.p_max_price,
+          p_city: searchParams.p_city,
+          p_state: searchParams.p_state,
+          p_area_min: searchParams.p_area_min,
+          p_area_max: searchParams.p_area_max,
+          p_limit: limit,
+          p_offset: 0
+        })
+      ]);
 
-    // Map action type to subtype (transaction type)
-    if (filters.actionType && filters.actionType !== 'any') {
-      if (filters.selectedPropertyType === 'pghostel') {
-        params.p_subtype = 'pghostel';
-      } else if (filters.selectedPropertyType === 'flatmates') {
-        params.p_subtype = 'flatmates';
-      } else {
-        // Regular residential properties
-        switch (filters.actionType) {
-          case 'buy':
-          case 'sell':
-            params.p_subtype = 'sale';
-            break;
-          case 'rent':
-            params.p_subtype = 'rent';
-            break;
-        }
+      let combinedResults: DatabaseSearchResult[] = [];
+      let totalCount = 0;
+
+      if (residentialResult.status === 'fulfilled' && residentialResult.value.data) {
+        combinedResults.push(...residentialResult.value.data);
+        totalCount += residentialResult.value.data[0]?.total_count || 0;
       }
-    }
 
-    // Property subtype (villa, apartment, etc.)
-    if (filters.selectedSubType && filters.selectedSubType !== 'any') {
-      const propertySubtypeMapping: Record<string, string> = {
-        'apartment': 'apartment',
-        'independent_house': 'independent_house',
-        'villa': 'villa',
-        'penthouse': 'penthouse',
-        'studio_apartment': 'studio_apartment',
-        'service_apartment': 'service_apartment',
-        'single_sharing': 'single_sharing',
-        'double_sharing': 'double_sharing',
-        'triple_sharing': 'triple_sharing',
-        'four_sharing': 'four_sharing',
-        'dormitory': 'dormitory'
-      };
-      
-      if (propertySubtypeMapping[filters.selectedSubType]) {
-        params.p_property_subtype = propertySubtypeMapping[filters.selectedSubType];
+      if (commercialResult.status === 'fulfilled' && commercialResult.value.data) {
+        combinedResults.push(...commercialResult.value.data);
+        totalCount += commercialResult.value.data[0]?.total_count || 0;
       }
-    }
 
-    // BHK filter (bedrooms)
-    if (filters.selectedBHK && filters.selectedBHK !== 'any') {
-      const bhkNumber = this.extractBHKNumber(filters.selectedBHK);
-      if (bhkNumber) {
-        params.p_bedrooms = bhkNumber;
+      if (landResult.status === 'fulfilled' && landResult.value.data) {
+        combinedResults.push(...landResult.value.data);
+        totalCount += landResult.value.data[0]?.total_count || 0;
       }
     }
 
@@ -324,98 +551,7 @@ export class SearchService {
   }
 
   /**
-   * Build parameters for commercial property search
-   */
-  private buildCommercialSearchParams(filters: SearchFilters, options: SearchOptions): Record<string, any> {
-    const params: Record<string, any> = {
-      p_limit: options.limit || 50,
-      p_offset: ((options.page || 1) - 1) * (options.limit || 50)
-    };
-
-    // Search query
-    if (filters.searchQuery?.trim()) {
-      params.p_search_query = filters.searchQuery.trim();
-    }
-
-    // Location filters
-    if (filters.selectedLocation && filters.selectedLocation !== 'any') {
-      const locationMapping: Record<string, string> = {
-        'hyderabad': 'Hyderabad',
-        'secunderabad': 'Secunderabad',
-        'warangal': 'Warangal',
-        'nizamabad': 'Nizamabad',
-        'karimnagar': 'Karimnagar',
-        'khammam': 'Khammam',
-        'mahbubnagar': 'Mahbubnagar',
-        'nalgonda': 'Nalgonda',
-        'adilabad': 'Adilabad',
-        'medak': 'Medak',
-        'rangareddy': 'Rangareddy',
-        'sangareddy': 'Sangareddy',
-        'siddipet': 'Siddipet',
-        'vikarabad': 'Vikarabad'
-      };
-      
-      params.p_city = locationMapping[filters.selectedLocation] || filters.selectedLocation;
-      params.p_state = 'Telangana';
-    }
-
-    // Map action type to subtype for commercial
-    if (filters.actionType && filters.actionType !== 'any') {
-      if (filters.selectedSubType === 'coworking' || 
-          ['private_office', 'dedicated_desk', 'hot_desk', 'meeting_room', 'conference_room', 'event_space', 'virtual_office'].includes(filters.selectedSubType)) {
-        params.p_subtype = 'coworking';
-      } else {
-        switch (filters.actionType) {
-          case 'buy':
-          case 'sell':
-            params.p_subtype = 'sale';
-            break;
-          case 'rent':
-            params.p_subtype = 'rent';
-            break;
-        }
-      }
-    }
-
-    // Property subtype for commercial
-    if (filters.selectedSubType && filters.selectedSubType !== 'any') {
-      const commercialSubtypeMapping: Record<string, string> = {
-        'office_space': 'office_space',
-        'shop': 'shop',
-        'showroom': 'showroom',
-        'godown_warehouse': 'godown_warehouse',
-        'industrial_shed': 'industrial_shed',
-        'industrial_building': 'industrial_building',
-        'other_business': 'other_business',
-        'private_office': 'private_office',
-        'dedicated_desk': 'dedicated_desk',
-        'hot_desk': 'hot_desk',
-        'meeting_room': 'meeting_room',
-        'conference_room': 'conference_room',
-        'event_space': 'event_space',
-        'virtual_office': 'virtual_office'
-      };
-      
-      if (commercialSubtypeMapping[filters.selectedSubType]) {
-        params.p_property_subtype = commercialSubtypeMapping[filters.selectedSubType];
-      }
-    }
-
-    // Price range filter
-    if (filters.selectedPriceRange && filters.selectedPriceRange !== 'any') {
-      const priceRange = this.parsePriceRange(filters.selectedPriceRange);
-      if (priceRange) {
-        params.p_min_price = priceRange.min;
-        params.p_max_price = priceRange.max;
-      }
-    }
-
-    return params;
-  }
-
-  /**
-   * Build parameters for land property search according to search_land_properties function
+   * FIXED: Build search parameters with correct p_subtype mapping for database functions
    */
   private buildLandSearchParams(filters: SearchFilters, options: SearchOptions): Record<string, any> {
     const params: Record<string, any> = {
@@ -451,27 +587,54 @@ export class SearchService {
       params.p_state = 'Telangana';
     }
 
-    // NO p_subtype parameter for land - it's always for sale by default
+    // FIXED: Set p_subtype based on transactionType and special property types
+    const transactionType = (filters as any).transactionType;
+    
+    // Handle special property types first (they override transaction type)
+    if (filters.selectedPropertyType === 'pghostel' || filters.selectedSubType === 'pghostel') {
+      params.p_subtype = 'pghostel';
+      console.log('✅ PG/Hostel property → p_subtype = "pghostel"');
+    } else if (filters.selectedPropertyType === 'flatmates' || filters.selectedSubType === 'flatmates') {
+      params.p_subtype = 'flatmates';
+      console.log('✅ Flatmates property → p_subtype = "flatmates"');
+    } else if (transactionType) {
+      // Handle regular Buy/Rent for other property types
+      if (transactionType === 'buy') {
+        params.p_subtype = 'sale';  // Buy = Sale properties
+        console.log('✅ Buy filter → p_subtype = "sale"');
+      } else if (transactionType === 'rent') {
+        params.p_subtype = 'rent';  // Rent = Rental properties
+        console.log('✅ Rent filter → p_subtype = "rent"');
+      }
+      // If transactionType is null (Any), don't set p_subtype to search all
+    }
 
-    // Property subtype for land (agricultural, residential, commercial, industrial)
+    // Handle special subtypes that override transaction type (legacy support)
     if (filters.selectedSubType && filters.selectedSubType !== 'any') {
-      const landSubtypeMapping: Record<string, string> = {
-        // Standard land types as per documentation
-        'agricultural_land': 'agricultural',
-        'agricultural': 'agricultural',
-        'residential_plot': 'residential', 
-        'residential': 'residential',
-        'commercial_plot': 'commercial',
-        'commercial': 'commercial',
-        'industrial_land': 'industrial',
-        'industrial': 'industrial',
-        'mixed_use_land': 'mixed_use',
-        'mixed_use': 'mixed_use'
-      };
-      
-      if (landSubtypeMapping[filters.selectedSubType]) {
-        params.p_property_subtype = landSubtypeMapping[filters.selectedSubType];
-        console.log('🌍 Land property subtype applied:', landSubtypeMapping[filters.selectedSubType]);
+      if (filters.selectedSubType === 'pghostel') {
+        params.p_subtype = 'pghostel';
+        console.log('✅ PG/Hostel subtype → p_subtype = "pghostel"');
+      } else if (filters.selectedSubType === 'flatmates') {
+        params.p_subtype = 'flatmates';
+        console.log('✅ Flatmates subtype → p_subtype = "flatmates"');
+      }
+    }
+
+    // Add property subtype parameter for more specific filtering
+    if (filters.selectedSubType && filters.selectedSubType !== 'any') {
+      const propertySubtype = this.getPropertySubtype(filters.selectedSubType);
+      if (propertySubtype) {
+        params.p_property_subtype = propertySubtype;
+        console.log('🔍 Property subtype parameter:', propertySubtype);
+      }
+    }
+
+    // BHK filter (bedrooms) - only for residential properties
+    if (filters.selectedBHK && filters.selectedBHK !== 'any' && filters.selectedPropertyType === 'residential') {
+      const bhkNumber = this.extractBHKNumber(filters.selectedBHK);
+      if (bhkNumber) {
+        params.p_bedrooms = bhkNumber;
+        console.log('🏠 BHK filter applied:', bhkNumber);
       }
     }
 
@@ -504,169 +667,28 @@ export class SearchService {
   }
 
   /**
-   * Main search method with proper routing to property-specific functions
-   */
-  async search(filters: SearchFilters, options: SearchOptions = {}): Promise<SearchResponse> {
-    try {
-      console.log('🔍 Starting search with filters:', filters);
-      
-      const propertyType = filters.selectedPropertyType || 'residential';
-      
-      // Route to appropriate search function based on property type
-      switch (propertyType) {
-        case 'residential':
-        case 'pghostel':
-        case 'flatmates':
-          return await this.searchResidentialProperties(filters, options);
-          
-        case 'commercial':
-          return await this.searchCommercialProperties(filters, options);
-          
-        case 'land':
-          return await this.searchLandProperties(filters, options);
-          
-        case 'any':
-        default:
-          // Search all property types and combine results
-          return await this.searchAllPropertyTypes(filters, options);
-      }
-      
-    } catch (error) {
-      console.error('💥 Search error:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Smart search that detects property codes and uses appropriate search method
-   */
-  async smartSearch(filters: SearchFilters, options: SearchOptions = {}): Promise<SearchResponse> {
-    const query = filters.searchQuery?.trim();
-    
-    // If query is exactly a 6-character alphanumeric code, try code search first
-    if (query && this.isPropertyCode(query)) {
-      console.log('🎯 Detected 6-character property code, trying code search first:', query);
-      
-      try {
-        const codeResults = await this.searchByCode(query, true);
-        
-        if (codeResults.results.length > 0) {
-          console.log('✅ Found property by code, returning results');
-          return codeResults;
-        }
-        
-        console.log('ℹ️ No results by code, falling back to regular search');
-      } catch (error) {
-        console.log('⚠️ Code search failed, falling back to regular search:', error);
-      }
-    }
-    
-    // Fall back to regular search
-    return this.search(filters, options);
-  }
-
-  /**
-   * Search all property types and combine results
-   */
-  async searchAllPropertyTypes(filters: SearchFilters, options: SearchOptions = {}): Promise<SearchResponse> {
-    try {
-      console.log('🌐 Searching all property types');
-      
-      const limit = Math.floor((options.limit || 50) / 3);
-      const limitedOptions = { ...options, limit };
-      
-      const [residentialResults, commercialResults, landResults] = await Promise.allSettled([
-        this.searchResidentialProperties(filters, limitedOptions),
-        this.searchCommercialProperties(filters, limitedOptions),
-        this.searchLandProperties(filters, limitedOptions)
-      ]);
-
-      let combinedResults: SearchResult[] = [];
-      let totalCount = 0;
-
-      if (residentialResults.status === 'fulfilled') {
-        combinedResults.push(...residentialResults.value.results);
-        totalCount += residentialResults.value.totalCount;
-      } else {
-        console.error('❌ Residential search failed:', residentialResults.reason);
-      }
-
-      if (commercialResults.status === 'fulfilled') {
-        combinedResults.push(...commercialResults.value.results);
-        totalCount += commercialResults.value.totalCount;
-      } else {
-        console.error('❌ Commercial search failed:', commercialResults.reason);
-      }
-
-      if (landResults.status === 'fulfilled') {
-        combinedResults.push(...landResults.value.results);
-        totalCount += landResults.value.totalCount;
-      } else {
-        console.error('❌ Land search failed:', landResults.reason);
-      }
-
-      // Sort by created_at desc
-      combinedResults.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-      console.log(`✅ Combined search: ${combinedResults.length} results from all property types`);
-      
-      return {
-        results: combinedResults,
-        totalCount: totalCount,
-        page: options.page || 1,
-        limit: options.limit || 50
-      };
-      
-    } catch (error) {
-      console.error('❌ Error in searchAllPropertyTypes:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Get latest properties using get_latest_properties SQL function
-   */
-  async getLatestProperties(limit: number = 50): Promise<SearchResponse> {
-    try {
-      console.log('🏠 Getting latest properties with limit:', limit);
-      
-      const { data, error } = await supabase.rpc('get_latest_properties', {
-        p_limit: limit
-      });
-      
-      if (error) {
-        console.error('❌ get_latest_properties error:', error);
-        throw new Error(`Failed to get latest properties: ${error.message}`);
-      }
-      
-      const searchResults = data || [];
-      const totalCount = searchResults[0]?.total_count || searchResults.length;
-      
-      const transformedResults = this.transformDatabaseResults(searchResults);
-      
-      return {
-        results: transformedResults,
-        totalCount: totalCount,
-        page: 1,
-        limit: limit
-      };
-      
-    } catch (error) {
-      console.error('💥 Latest properties error:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Transform database results to SearchResult format
+   * Transform database results to SearchResult format with primary_image and code
    */
   private transformDatabaseResults(dbResults: DatabaseSearchResult[]): SearchResult[] {
     return dbResults.map(dbResult => {
-      // Determine transaction type from flow_type or subtype
-      const transactionType = this.extractTransactionType(dbResult.flow_type, dbResult.subtype);
+      const transactionType = this.extractTransactionType(dbResult.flow_type);
+      const displaySubtype = this.extractDisplaySubtype(dbResult.flow_type, dbResult.subtype, dbResult.title);
       
-      // Format BHK
-      const bhk = dbResult.bedrooms ? `${dbResult.bedrooms}bhk` : null;
+      // Type-safe property extraction
+      const bedrooms = 'bedrooms' in dbResult ? dbResult.bedrooms : null;
+      const bathrooms = 'bathrooms' in dbResult ? dbResult.bathrooms : null;
+      const bhk = bedrooms && bedrooms > 0 ? `${bedrooms}bhk` : null;
+      
+      const price = dbResult.price && dbResult.price > 0 ? dbResult.price : 0;
+      const area = dbResult.area && dbResult.area > 0 ? dbResult.area : 0;
+      
+      // Extract primary_image from database result
+      const primaryImage = dbResult.primary_image || null;
+      
+      // Extract property code from database result
+      const propertyCode = dbResult.code || null;
+      
+      console.log(`🖼️ Transforming property ${dbResult.id}: flow_type = ${dbResult.flow_type}, transaction = ${transactionType}, primary_image = ${primaryImage}, code = ${propertyCode}`);
       
       return {
         id: dbResult.id,
