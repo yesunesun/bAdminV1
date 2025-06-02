@@ -1,7 +1,7 @@
 // src/components/Search/services/searchService.ts
-// Version: 10.2.0
-// Last Modified: 02-06-2025 15:45 IST
-// Purpose: Fixed Buy/Rent filtering by properly mapping transactionType to database flow types
+// Version: 10.3.0
+// Last Modified: 02-06-2025 20:30 IST
+// Purpose: Fixed Buy/Rent filtering when Property Type is "Any" by properly passing p_subtype to all property searches
 
 import { SearchFilters, SearchResult } from '../types/search.types';
 import { supabase } from '@/lib/supabase';
@@ -550,18 +550,23 @@ export class SearchService {
   }
 
   /**
-   * SIMPLIFIED: Search all property types with correct p_subtype parameter
+   * FIXED: Search all property types with proper p_subtype filtering for Buy/Rent
+   * This method now ensures that when "Rent + Any" is selected, only rental properties are returned
    */
   private async searchAllPropertyTypes(filters: SearchFilters, options: SearchOptions): Promise<DatabaseSearchResult[]> {
     const searchParams = this.buildSearchParams(filters, options);
     const limit = Math.floor((searchParams.p_limit || 50) / 3);
     
-    console.log('🌐 Searching all property types with params:', { p_subtype: searchParams.p_subtype });
+    console.log('🌐 Searching all property types with CRITICAL p_subtype filter:', { 
+      p_subtype: searchParams.p_subtype,
+      note: 'This p_subtype will be passed to ALL property searches to ensure Buy/Rent filtering works'
+    });
     
     try {
+      // FIXED: Pass p_subtype to all three searches to ensure Buy/Rent filtering works for "Any" property type
       const [residentialResult, commercialResult, landResult] = await Promise.allSettled([
         supabase.rpc('search_residential_properties', {
-          p_subtype: searchParams.p_subtype,
+          p_subtype: searchParams.p_subtype, // CRITICAL: Pass rent/sale filter
           p_property_subtype: searchParams.p_property_subtype,
           p_search_query: searchParams.p_search_query,
           p_city: searchParams.p_city,
@@ -576,7 +581,7 @@ export class SearchService {
           p_offset: 0
         }),
         supabase.rpc('search_commercial_properties', {
-          p_subtype: searchParams.p_subtype,
+          p_subtype: searchParams.p_subtype, // CRITICAL: Pass rent/sale filter
           p_property_subtype: searchParams.p_property_subtype,
           p_search_query: searchParams.p_search_query,
           p_min_price: searchParams.p_min_price,
@@ -588,36 +593,48 @@ export class SearchService {
           p_limit: limit,
           p_offset: 0
         }),
-        supabase.rpc('search_land_properties', {
-          p_property_subtype: searchParams.p_property_subtype,
-          p_search_query: searchParams.p_search_query,
-          p_min_price: searchParams.p_min_price,
-          p_max_price: searchParams.p_max_price,
-          p_city: searchParams.p_city,
-          p_state: searchParams.p_state,
-          p_area_min: searchParams.p_area_min,
-          p_area_max: searchParams.p_area_max,
-          p_limit: limit,
-          p_offset: 0
-        })
+        // CONDITIONAL: Only search land properties if Buy is selected (land is only for sale)
+        ...(searchParams.p_subtype === 'sale' || !searchParams.p_subtype ? [
+          supabase.rpc('search_land_properties', {
+            p_property_subtype: searchParams.p_property_subtype,
+            p_search_query: searchParams.p_search_query,
+            p_min_price: searchParams.p_min_price,
+            p_max_price: searchParams.p_max_price,
+            p_city: searchParams.p_city,
+            p_state: searchParams.p_state,
+            p_area_min: searchParams.p_area_min,
+            p_area_max: searchParams.p_area_max,
+            p_limit: limit,
+            p_offset: 0
+          })
+        ] : [])
       ]);
 
       let combinedResults: DatabaseSearchResult[] = [];
       let totalCount = 0;
 
       if (residentialResult.status === 'fulfilled' && residentialResult.value.data) {
-        combinedResults.push(...residentialResult.value.data);
-        totalCount += residentialResult.value.data[0]?.total_count || 0;
+        const resData = residentialResult.value.data;
+        combinedResults.push(...resData);
+        totalCount += resData[0]?.total_count || 0;
+        console.log(`🏠 Residential results: ${resData.length} (with p_subtype: ${searchParams.p_subtype})`);
       }
 
       if (commercialResult.status === 'fulfilled' && commercialResult.value.data) {
-        combinedResults.push(...commercialResult.value.data);
-        totalCount += commercialResult.value.data[0]?.total_count || 0;
+        const comData = commercialResult.value.data;
+        combinedResults.push(...comData);
+        totalCount += comData[0]?.total_count || 0;
+        console.log(`🏢 Commercial results: ${comData.length} (with p_subtype: ${searchParams.p_subtype})`);
       }
 
-      if (landResult.status === 'fulfilled' && landResult.value.data) {
-        combinedResults.push(...landResult.value.data);
-        totalCount += landResult.value.data[0]?.total_count || 0;
+      // Only process land results if they were searched (Buy or Any)
+      if (landResult && landResult.status === 'fulfilled' && landResult.value.data) {
+        const landData = landResult.value.data;
+        combinedResults.push(...landData);
+        totalCount += landData[0]?.total_count || 0;
+        console.log(`🌍 Land results: ${landData.length} (only searched for Buy/Any)`);
+      } else if (searchParams.p_subtype === 'rent') {
+        console.log(`🌍 Land results: 0 (skipped for Rent filter - land is only for sale)`);
       }
 
       // Sort by created_at desc
@@ -628,6 +645,8 @@ export class SearchService {
         combinedResults[0].total_count = totalCount;
       }
 
+      console.log(`📊 FINAL searchAllPropertyTypes results: ${combinedResults.length} total properties (p_subtype: ${searchParams.p_subtype})`);
+      
       return combinedResults;
       
     } catch (error) {

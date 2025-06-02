@@ -1,12 +1,12 @@
 // src/components/Search/types/search.types.ts
-// Version: 2.1.0
-// Last Modified: 01-06-2025 23:50 IST
-// Purpose: Added property code field to SearchResult interface
+// Version: 2.2.0
+// Last Modified: 02-06-2025 20:15 IST
+// Purpose: Fixed SearchFilters interface to use actionType instead of transactionType for consistency
 
 export interface SearchFilters {
   searchQuery: string;
   selectedLocation: string;
-  transactionType: string;
+  actionType: string; // FIXED: Changed from transactionType to actionType for consistency
   selectedPropertyType: string;
   selectedSubType: string;
   selectedBHK: string;
@@ -33,7 +33,7 @@ export interface SearchResult {
   createdAt: string;
   status: string;
   primary_image: string | null; // Image filename from database
-  code?: string | null; // ADDED: Property code from meta.code
+  code?: string | null; // Property code from meta.code
 }
 
 export interface SearchState {
@@ -44,7 +44,7 @@ export interface SearchState {
   totalCount: number;
 }
 
-export type FilterType = 'transactionType' | 'propertyType' | 'subType' | 'bhkType' | 'priceRange' | 'location';
+export type FilterType = 'actionType' | 'propertyType' | 'subType' | 'bhkType' | 'priceRange' | 'location'; // FIXED: Changed transactionType to actionType
 
 export interface SearchContainerProps {
   onSearch?: (filters: SearchFilters) => void;
