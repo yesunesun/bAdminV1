@@ -1,9 +1,9 @@
 // src/modules/owner/components/property/wizard/sections/RentalDetails.tsx
-// Version: 2.2.0
-// Last Modified: 17-05-2025 16:45 IST
-// Purpose: Fixed form field registration to save data in step object structure
+// Version: 3.1.0
+// Last Modified: 30-05-2025 20:50 IST
+// Purpose: Updated Additional Preferences section to match UI requirements with radio buttons
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { FormData, FormSectionProps } from '../types';
 import { 
   RENTAL_TYPES, 
@@ -13,355 +13,455 @@ import {
   PARKING_OPTIONS 
 } from '../constants';
 import { FormSection } from '@/components/FormSection';
-import { RequiredLabel } from '@/components/ui/RequiredLabel';
-import { 
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { 
-  Input 
-} from '@/components/ui/input';
-import { 
-  Checkbox 
-} from '@/components/ui/checkbox';
+import { ValidatedInput } from '@/components/ui/ValidatedInput';
+import { ValidatedSelect } from '@/components/ui/ValidatedSelect';
+import { FormFieldLabel } from '@/components/ui/RequiredLabel';
+import { Checkbox } from '@/components/ui/checkbox';
+import { useStepValidation } from '../hooks/useStepValidation';
 import { cn } from '@/lib/utils';
-import { useStepForm } from '../hooks/useStepForm';
 
 export const RentalDetails: React.FC<FormSectionProps> = ({ 
   form,
   mode = 'create',
   adType,
-  stepId = 'res_rent_rental' // Explicitly set the step ID
+  stepId = 'res_rent_rental'
 }) => {
   const isEditMode = mode === 'edit';
   
-  // Use the useStepForm hook for proper step-based registration
-  const { 
-    registerField, 
-    getFieldError, 
-    setFieldValue, 
-    getFieldValue, 
-    watchField,
-    getFieldId,
-    migrateRootFields
-  } = useStepForm(form, stepId);
+  // Initialize validation system
+  const {
+    validateField,
+    getFieldValidation,
+    getFieldConfig,
+    shouldShowFieldError,
+    markFieldAsTouched,
+    validateCurrentStep,
+    isValid: stepIsValid,
+    completionPercentage,
+    requiredFields
+  } = useStepValidation({
+    form,
+    flowType: 'residential_rent',
+    currentStepId: stepId
+  });
+
+  // Helper functions for form data management
+  const getField = (fieldName: string, defaultValue?: any) => {
+    const path = `steps.${stepId}.${fieldName}`;
+    const stepValue = form.getValues(path);
+    if (stepValue !== undefined) return stepValue;
+    
+    // Fallback to root level
+    const rootValue = form.getValues(fieldName);
+    return rootValue !== undefined ? rootValue : defaultValue;
+  };
   
-  // Migrate existing data from root to step object on component mount
+  const saveField = (fieldName: string, value: any) => {
+    const path = `steps.${stepId}.${fieldName}`;
+    
+    // Ensure steps structure exists
+    const steps = form.getValues('steps') || {};
+    if (!steps[stepId]) {
+      form.setValue('steps', {
+        ...steps,
+        [stepId]: {}
+      }, { shouldValidate: false });
+    }
+    
+    // Set value in step structure
+    form.setValue(path, value, { shouldValidate: true });
+    
+    // Trigger field validation
+    validateField(fieldName);
+  };
+
+  // State for form values
+  const [values, setValues] = useState({
+    rentAmount: getField('rentAmount', ''),
+    rentNegotiable: getField('rentNegotiable', false),
+    securityDeposit: getField('securityDeposit', ''),
+    maintenanceCharges: getField('maintenanceCharges', ''),
+    availableFrom: getField('availableFrom', ''),
+    furnishingStatus: getField('furnishingStatus', ''),
+    preferredTenants: getField('preferredTenants', []),
+    // ✅ UPDATED: Updated preference fields to match UI requirements
+    nonVegCooking: getField('nonVegCooking', 'doesntMatter'), // Changed from nonVegAllowed
+    pets: getField('pets', 'doesntMatter'), // Changed from petsAllowed
+    lockInPeriod: getField('lockInPeriod', 'no'), // Changed from hasLockInPeriod
+    lockInPeriodMonths: getField('lockInPeriodMonths', '') // New field for months
+  });
+
+  // Migrate existing data from root to step object
   useEffect(() => {
     const fieldsToMigrate = [
-      'rentalType', 'rentAmount', 'rentNegotiable', 'securityDeposit', 
-      'availableFrom', 'maintenance', 'furnishing', 'parking', 
-      'preferredTenants', 'nonVegAllowed', 'petsAllowed', 
-      'hasLockInPeriod', 'lockInPeriod'
+      'rentAmount', 'rentNegotiable', 'securityDeposit', 'maintenanceCharges',
+      'availableFrom', 'furnishingStatus', 'preferredTenants', 
+      'nonVegCooking', 'pets', 'lockInPeriod', 'lockInPeriodMonths'
     ];
     
-    migrateRootFields(fieldsToMigrate);
-  }, [migrateRootFields]);
-  
-  // Watch for dependencies using the step structure
-  const rentalType = watchField('rentalType');
-  const rentNegotiable = watchField('rentNegotiable');
+    fieldsToMigrate.forEach(field => {
+      const rootValue = form.getValues(field);
+      const stepValue = form.getValues(`steps.${stepId}.${field}`);
+      
+      if (rootValue !== undefined && stepValue === undefined) {
+        saveField(field, rootValue);
+      }
+    });
+    
+    // Migrate old field names to new ones
+    const oldNonVegAllowed = getField('nonVegAllowed');
+    if (oldNonVegAllowed !== undefined && !getField('nonVegCooking')) {
+      saveField('nonVegCooking', oldNonVegAllowed ? 'allowed' : 'notAllowed');
+    }
+    
+    const oldPetsAllowed = getField('petsAllowed');
+    if (oldPetsAllowed !== undefined && !getField('pets')) {
+      saveField('pets', oldPetsAllowed ? 'allowed' : 'notAllowed');
+    }
+    
+    const oldHasLockInPeriod = getField('hasLockInPeriod');
+    if (oldHasLockInPeriod !== undefined && !getField('lockInPeriod')) {
+      saveField('lockInPeriod', oldHasLockInPeriod ? 'yes' : 'no');
+    }
+    
+    // Update component state
+    updateStateFromForm();
+  }, []);
+
+  // Update component state from form values
+  const updateStateFromForm = () => {
+    const stepData = form.getValues(`steps.${stepId}`) || {};
+    const formValues = form.getValues();
+    
+    setValues({
+      rentAmount: stepData.rentAmount || formValues.rentAmount || '',
+      rentNegotiable: stepData.rentNegotiable || formValues.rentNegotiable || false,
+      securityDeposit: stepData.securityDeposit || formValues.securityDeposit || '',
+      maintenanceCharges: stepData.maintenanceCharges || formValues.maintenanceCharges || '',
+      availableFrom: stepData.availableFrom || formValues.availableFrom || '',
+      furnishingStatus: stepData.furnishingStatus || formValues.furnishingStatus || '',
+      preferredTenants: stepData.preferredTenants || formValues.preferredTenants || [],
+      nonVegCooking: stepData.nonVegCooking || formValues.nonVegCooking || 'doesntMatter',
+      pets: stepData.pets || formValues.pets || 'doesntMatter',
+      lockInPeriod: stepData.lockInPeriod || formValues.lockInPeriod || 'no',
+      lockInPeriodMonths: stepData.lockInPeriodMonths || formValues.lockInPeriodMonths || ''
+    });
+  };
+
+  // Update form and trigger validation
+  const updateFormAndState = (field: string, value: any) => {
+    setValues(prev => ({ ...prev, [field]: value }));
+    saveField(field, value);
+    markFieldAsTouched(field);
+  };
+
+  // Handle numeric input for currency fields
+  const handleCurrencyInput = (value: string, fieldName: string) => {
+    // Remove non-digits and limit to reasonable values
+    const numericValue = value.replace(/\D/g, '');
+    if (numericValue.length <= 8) { // Max 99,999,999
+      updateFormAndState(fieldName, numericValue);
+    }
+  };
+
+  // Prepare select options
+  const furnishingOptions = FURNISHING_OPTIONS.map(option => ({ value: option, label: option }));
+  const maintenanceOptions = MAINTENANCE_OPTIONS.map(option => ({ value: option, label: option }));
+
+  // Get minimum date (today)
+  const today = new Date().toISOString().split('T')[0];
+
+  // ✅ NEW: Radio button component for preferences
+  const PreferenceRadioGroup = ({ 
+    name, 
+    label, 
+    value, 
+    onChange, 
+    options 
+  }: {
+    name: string;
+    label: string;
+    value: string;
+    onChange: (value: string) => void;
+    options: Array<{ value: string; label: string }>;
+  }) => (
+    <div>
+      <h4 className="text-sm font-medium text-gray-900 mb-3">{label}</h4>
+      <div className="flex gap-6">
+        {options.map((option) => (
+          <label key={option.value} className="flex items-center cursor-pointer">
+            <input
+              type="radio"
+              name={name}
+              value={option.value}
+              checked={value === option.value}
+              onChange={(e) => onChange(e.target.value)}
+              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-2"
+            />
+            <span className="ml-2 text-sm text-gray-700">{option.label}</span>
+          </label>
+        ))}
+      </div>
+    </div>
+  );
 
   return (
     <FormSection
       title="Rental Details"
       description="Specify your rental terms and preferences"
     >
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Rental Type */}
-        <div className="space-y-2">
-          <RequiredLabel htmlFor={getFieldId('rentalType')}>Rental Type</RequiredLabel>
-          <Select
-            value={getFieldValue('rentalType') || 'rent'}
-            onValueChange={(value) => setFieldValue('rentalType', value as 'rent' | 'lease')}
-            disabled={isEditMode}
-          >
-            <SelectTrigger 
-              id={getFieldId('rentalType')}
-              className={cn(
-                "w-full",
-                getFieldError('rentalType') && "border-destructive focus-visible:ring-destructive"
-              )}
-            >
-              <SelectValue placeholder="Select Type" />
-            </SelectTrigger>
-            <SelectContent>
-              {RENTAL_TYPES.map((type) => (
-                <SelectItem key={type.id} value={type.id}>
-                  {type.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {getFieldError('rentalType') && (
-            <p className="text-sm text-destructive mt-1">{getFieldError('rentalType')?.message as string}</p>
-          )}
-        </div>
-
-        {/* Rent Amount */}
-        <div className="space-y-2">
-          <RequiredLabel htmlFor={getFieldId('rentAmount')}>
-            {rentalType === 'lease' ? 'Lease Amount (₹)' : 'Rent Amount (₹) per month'}
-          </RequiredLabel>
-          <div className="relative">
-            <Input
-              id={getFieldId('rentAmount')}
-              type="text"
-              {...registerField('rentAmount')}
-              placeholder="e.g. 15000"
-              className={cn(
-                getFieldError('rentAmount') && "border-destructive focus-visible:ring-destructive"
-              )}
+      {/* Validation Progress */}
+      {requiredFields.length > 0 && (
+        <div className="mb-6 p-3 bg-blue-50 rounded-lg border border-blue-200">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-blue-900">
+              Step Completion: {completionPercentage}%
+            </span>
+            <span className="text-xs text-blue-700">
+              {stepIsValid ? '✓ Ready to proceed' : 'Please complete required fields'}
+            </span>
+          </div>
+          <div className="w-full bg-blue-200 rounded-full h-2">
+            <div 
+              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+              style={{ width: `${completionPercentage}%` }}
             />
-            <div className="absolute right-3 top-2.5">
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-6">
+        {/* Rent Amount and Security Deposit */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <ValidatedInput
+              form={form}
+              name="rentAmount"
+              label="Monthly Rent Amount"
+              type="text"
+              inputMode="numeric"
+              placeholder="e.g., 15000"
+              value={values.rentAmount}
+              required={true}
+              helperText="Enter monthly rent in ₹"
+              error={shouldShowFieldError('rentAmount') ? getFieldValidation('rentAmount').error : null}
+              isValid={getFieldValidation('rentAmount').isValid}
+              isTouched={getFieldValidation('rentAmount').isTouched}
+              onValidation={(field, value) => handleCurrencyInput(value, field)}
+              onChange={(e) => handleCurrencyInput(e.target.value, 'rentAmount')}
+              size="lg"
+            />
+            
+            {/* Negotiable checkbox */}
+            <div className="flex items-center space-x-2 mt-2">
               <Checkbox
-                id={getFieldId('rentNegotiable')}
-                checked={rentNegotiable}
-                onCheckedChange={(checked) => setFieldValue('rentNegotiable', !!checked)}
+                id="rentNegotiable"
+                checked={values.rentNegotiable}
+                onCheckedChange={(checked) => updateFormAndState('rentNegotiable', !!checked)}
               />
               <label
-                htmlFor={getFieldId('rentNegotiable')}
-                className="ml-1.5 text-xs font-medium text-muted-foreground cursor-pointer"
+                htmlFor="rentNegotiable"
+                className="text-sm font-medium text-gray-700 cursor-pointer"
               >
-                Negotiable
+                Price is negotiable
               </label>
             </div>
           </div>
-          {getFieldError('rentAmount') && (
-            <p className="text-sm text-destructive mt-1">{getFieldError('rentAmount')?.message as string}</p>
-          )}
-        </div>
 
-        {/* Security Deposit */}
-        <div className="space-y-2">
-          <RequiredLabel htmlFor={getFieldId('securityDeposit')}>Security Deposit (₹)</RequiredLabel>
-          <Input
-            id={getFieldId('securityDeposit')}
+          <ValidatedInput
+            form={form}
+            name="securityDeposit"
+            label="Security Deposit"
             type="text"
-            {...registerField('securityDeposit')}
-            placeholder="e.g. 50000"
-            className={cn(
-              getFieldError('securityDeposit') && "border-destructive focus-visible:ring-destructive"
-            )}
+            inputMode="numeric"
+            placeholder="e.g., 50000"
+            value={values.securityDeposit}
+            required={true}
+            helperText="Security deposit amount in ₹"
+            error={shouldShowFieldError('securityDeposit') ? getFieldValidation('securityDeposit').error : null}
+            isValid={getFieldValidation('securityDeposit').isValid}
+            isTouched={getFieldValidation('securityDeposit').isTouched}
+            onValidation={(field, value) => handleCurrencyInput(value, field)}
+            onChange={(e) => handleCurrencyInput(e.target.value, 'securityDeposit')}
+            size="lg"
           />
-          {getFieldError('securityDeposit') && (
-            <p className="text-sm text-destructive mt-1">{getFieldError('securityDeposit')?.message as string}</p>
-          )}
         </div>
 
-        {/* Maintenance */}
-        <div className="space-y-2">
-          <RequiredLabel htmlFor={getFieldId('maintenance')}>Maintenance</RequiredLabel>
-          <Select
-            value={getFieldValue('maintenance') || ''}
-            onValueChange={(value) => setFieldValue('maintenance', value)}
-          >
-            <SelectTrigger 
-              id={getFieldId('maintenance')}
-              className={cn(
-                "w-full",
-                getFieldError('maintenance') && "border-destructive focus-visible:ring-destructive"
-              )}
-            >
-              <SelectValue placeholder="Select Maintenance Option" />
-            </SelectTrigger>
-            <SelectContent>
-              {MAINTENANCE_OPTIONS.map((option) => (
-                <SelectItem key={option} value={option}>
-                  {option}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {getFieldError('maintenance') && (
-            <p className="text-sm text-destructive mt-1">{getFieldError('maintenance')?.message as string}</p>
-          )}
-        </div>
+        {/* Maintenance and Available From */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <ValidatedInput
+            form={form}
+            name="maintenanceCharges"
+            label="Maintenance Charges"
+            type="text"
+            inputMode="numeric"
+            placeholder="e.g., 2000 (optional)"
+            value={values.maintenanceCharges}
+            required={false}
+            helperText="Monthly maintenance charges in ₹"
+            error={shouldShowFieldError('maintenanceCharges') ? getFieldValidation('maintenanceCharges').error : null}
+            isValid={getFieldValidation('maintenanceCharges').isValid}
+            isTouched={getFieldValidation('maintenanceCharges').isTouched}
+            onValidation={(field, value) => handleCurrencyInput(value, field)}
+            onChange={(e) => handleCurrencyInput(e.target.value, 'maintenanceCharges')}
+            size="lg"
+          />
 
-        {/* Available From */}
-        <div className="space-y-2">
-          <RequiredLabel htmlFor={getFieldId('availableFrom')}>Available From</RequiredLabel>
-          <Input
-            id={getFieldId('availableFrom')}
+          <ValidatedInput
+            form={form}
+            name="availableFrom"
+            label="Available From"
             type="date"
-            {...registerField('availableFrom')}
-            className={cn(
-              getFieldError('availableFrom') && "border-destructive focus-visible:ring-destructive"
-            )}
+            value={values.availableFrom}
+            required={true}
+            helperText="When will the property be available?"
+            error={shouldShowFieldError('availableFrom') ? getFieldValidation('availableFrom').error : null}
+            isValid={getFieldValidation('availableFrom').isValid}
+            isTouched={getFieldValidation('availableFrom').isTouched}
+            onValidation={(field, value) => updateFormAndState(field, value)}
+            onChange={(e) => updateFormAndState('availableFrom', e.target.value)}
+            min={today}
+            size="lg"
           />
-          {getFieldError('availableFrom') && (
-            <p className="text-sm text-destructive mt-1">{getFieldError('availableFrom')?.message as string}</p>
-          )}
         </div>
 
         {/* Furnishing Status */}
-        <div className="space-y-2">
-          <RequiredLabel htmlFor={getFieldId('furnishing')}>Furnishing Status</RequiredLabel>
-          <Select
-            value={getFieldValue('furnishing') || ''}
-            onValueChange={(value) => setFieldValue('furnishing', value)}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <ValidatedSelect
+            form={form}
+            name="furnishingStatus"
+            label="Furnishing Status"
+            placeholder="Select furnishing status"
+            options={furnishingOptions}
+            value={values.furnishingStatus}
+            required={true}
+            error={shouldShowFieldError('furnishingStatus') ? getFieldValidation('furnishingStatus').error : null}
+            isValid={getFieldValidation('furnishingStatus').isValid}
+            isTouched={getFieldValidation('furnishingStatus').isTouched}
+            onValidation={(field, value) => updateFormAndState(field, value)}
+            onValueChange={(value) => updateFormAndState('furnishingStatus', value)}
+            size="lg"
+          />
+        </div>
+
+        {/* Preferred Tenants */}
+        <div>
+          <FormFieldLabel
+            fieldName="preferredTenants"
+            required={true}
+            isValid={getFieldValidation('preferredTenants').isValid}
+            isTouched={getFieldValidation('preferredTenants').isTouched}
+            error={shouldShowFieldError('preferredTenants') ? getFieldValidation('preferredTenants').error : null}
+            helperText="Select who can rent this property"
+            size="lg"
           >
-            <SelectTrigger 
-              id={getFieldId('furnishing')}
-              className={cn(
-                "w-full",
-                getFieldError('furnishing') && "border-destructive focus-visible:ring-destructive"
-              )}
-            >
-              <SelectValue placeholder="Select Furnishing Status" />
-            </SelectTrigger>
-            <SelectContent>
-              {FURNISHING_OPTIONS.map((option) => (
-                <SelectItem key={option} value={option}>
-                  {option}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {getFieldError('furnishing') && (
-            <p className="text-sm text-destructive mt-1">{getFieldError('furnishing')?.message as string}</p>
-          )}
-        </div>
-
-        {/* Parking */}
-        <div className="space-y-2">
-          <RequiredLabel htmlFor={getFieldId('parking')}>Parking</RequiredLabel>
-          <Select
-            value={getFieldValue('parking') || ''}
-            onValueChange={(value) => setFieldValue('parking', value)}
-          >
-            <SelectTrigger 
-              id={getFieldId('parking')}
-              className={cn(
-                "w-full",
-                getFieldError('parking') && "border-destructive focus-visible:ring-destructive"
-              )}
-            >
-              <SelectValue placeholder="Select Parking Option" />
-            </SelectTrigger>
-            <SelectContent>
-              {PARKING_OPTIONS.map((option) => (
-                <SelectItem key={option} value={option}>
-                  {option}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {getFieldError('parking') && (
-            <p className="text-sm text-destructive mt-1">{getFieldError('parking')?.message as string}</p>
-          )}
-        </div>
-      </div>
-
-      {/* Preferred Tenants */}
-      <div className="mt-8">
-        <RequiredLabel>Preferred Tenants</RequiredLabel>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-2">
-          {TENANT_PREFERENCES.map((preference) => (
-            <div key={preference} className="flex items-start space-x-2">
-              <Checkbox
-                id={getFieldId(`tenantPref-${preference}`)}
-                checked={(getFieldValue('preferredTenants') || []).includes(preference)}
-                onCheckedChange={(checked) => {
-                  const currentPreferences = getFieldValue('preferredTenants') || [];
-                  if (checked) {
-                    setFieldValue('preferredTenants', [...currentPreferences, preference]);
-                  } else {
-                    setFieldValue(
-                      'preferredTenants',
-                      currentPreferences.filter((item) => item !== preference)
-                    );
-                  }
-                }}
-              />
-              <label
-                htmlFor={getFieldId(`tenantPref-${preference}`)}
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-              >
-                {preference}
-              </label>
-            </div>
-          ))}
-        </div>
-        {getFieldError('preferredTenants') && (
-          <p className="text-sm text-destructive mt-2">{getFieldError('preferredTenants')?.message as string}</p>
-        )}
-      </div>
-
-      {/* Additional Rental Info - can be expanded as needed */}
-      <div className="mt-8">
-        <h3 className="text-base font-medium mb-3">Additional Information</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="flex items-start space-x-2">
-            <Checkbox
-              id={getFieldId('nonVegAllowed')}
-              checked={getFieldValue('nonVegAllowed') || false}
-              onCheckedChange={(checked) => setFieldValue('nonVegAllowed', !!checked)}
-            />
-            <label
-              htmlFor={getFieldId('nonVegAllowed')}
-              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-            >
-              Non-Veg Allowed
-            </label>
-          </div>
+            Preferred Tenants
+          </FormFieldLabel>
           
-          <div className="flex items-start space-x-2">
-            <Checkbox
-              id={getFieldId('petsAllowed')}
-              checked={getFieldValue('petsAllowed') || false}
-              onCheckedChange={(checked) => setFieldValue('petsAllowed', !!checked)}
-            />
-            <label
-              htmlFor={getFieldId('petsAllowed')}
-              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-            >
-              Pets Allowed
-            </label>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-3">
+            {TENANT_PREFERENCES.map((preference) => (
+              <div key={preference} className="flex items-start space-x-2">
+                <Checkbox
+                  id={`tenantPref-${preference}`}
+                  checked={values.preferredTenants.includes(preference)}
+                  onCheckedChange={(checked) => {
+                    const currentPreferences = values.preferredTenants || [];
+                    let newPreferences;
+                    
+                    if (checked) {
+                      newPreferences = [...currentPreferences, preference];
+                    } else {
+                      newPreferences = currentPreferences.filter((item) => item !== preference);
+                    }
+                    
+                    updateFormAndState('preferredTenants', newPreferences);
+                  }}
+                />
+                <label
+                  htmlFor={`tenantPref-${preference}`}
+                  className="text-sm font-medium leading-none cursor-pointer"
+                >
+                  {preference}
+                </label>
+              </div>
+            ))}
           </div>
+        </div>
+
+        {/* ✅ UPDATED: Additional Preferences with Radio Buttons */}
+        <div className="space-y-6">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Additional Preferences</h3>
           
-          <div className="flex items-start space-x-2">
-            <Checkbox
-              id={getFieldId('hasLockInPeriod')}
-              checked={getFieldValue('hasLockInPeriod') || false}
-              onCheckedChange={(checked) => {
-                setFieldValue('hasLockInPeriod', !!checked);
-                if (!checked) {
-                  setFieldValue('lockInPeriod', '');
+          {/* Non-Veg Cooking */}
+          <PreferenceRadioGroup
+            name="nonVegCooking"
+            label="Non-Veg Cooking"
+            value={values.nonVegCooking}
+            onChange={(value) => updateFormAndState('nonVegCooking', value)}
+            options={[
+              { value: 'allowed', label: 'Allowed' },
+              { value: 'notAllowed', label: 'Not Allowed' },
+              { value: 'doesntMatter', label: "Doesn't Matter" }
+            ]}
+          />
+
+          {/* Pets */}
+          <PreferenceRadioGroup
+            name="pets"
+            label="Pets"
+            value={values.pets}
+            onChange={(value) => updateFormAndState('pets', value)}
+            options={[
+              { value: 'allowed', label: 'Allowed' },
+              { value: 'notAllowed', label: 'Not Allowed' },
+              { value: 'doesntMatter', label: "Doesn't Matter" }
+            ]}
+          />
+
+          {/* Lock-in Period */}
+          <div>
+            <PreferenceRadioGroup
+              name="lockInPeriod"
+              label="Lock-in Period"
+              value={values.lockInPeriod}
+              onChange={(value) => {
+                updateFormAndState('lockInPeriod', value);
+                if (value === 'no') {
+                  updateFormAndState('lockInPeriodMonths', '');
                 }
               }}
+              options={[
+                { value: 'yes', label: 'Yes (show field)' },
+                { value: 'no', label: 'No' },
+                { value: 'doesntMatter', label: "Doesn't Matter" }
+              ]}
             />
-            <label
-              htmlFor={getFieldId('hasLockInPeriod')}
-              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-            >
-              Has Lock-in Period
-            </label>
-          </div>
-        </div>
-        
-        {getFieldValue('hasLockInPeriod') && (
-          <div className="mt-4 max-w-xs">
-            <RequiredLabel htmlFor={getFieldId('lockInPeriod')}>Lock-in Period (months)</RequiredLabel>
-            <Input
-              id={getFieldId('lockInPeriod')}
-              type="number"
-              min={1}
-              max={36}
-              {...registerField('lockInPeriod')}
-              placeholder="e.g. 6"
-              className={cn(
-                getFieldError('lockInPeriod') && "border-destructive focus-visible:ring-destructive"
-              )}
-            />
-            {getFieldError('lockInPeriod') && (
-              <p className="text-sm text-destructive mt-1">{getFieldError('lockInPeriod')?.message as string}</p>
+            
+            {/* Lock-in Period Input - shown when "Yes" is selected */}
+            {values.lockInPeriod === 'yes' && (
+              <div className="mt-4 max-w-xs">
+                <ValidatedInput
+                  form={form}
+                  name="lockInPeriodMonths"
+                  label="Lock-in Period in Months"
+                  type="number"
+                  placeholder="e.g., 6"
+                  value={values.lockInPeriodMonths}
+                  required={values.lockInPeriod === 'yes'}
+                  helperText="Lock-in period in months"
+                  error={shouldShowFieldError('lockInPeriodMonths') ? getFieldValidation('lockInPeriodMonths').error : null}
+                  isValid={getFieldValidation('lockInPeriodMonths').isValid}
+                  isTouched={getFieldValidation('lockInPeriodMonths').isTouched}
+                  onValidation={(field, value) => updateFormAndState(field, value)}
+                  onChange={(e) => updateFormAndState('lockInPeriodMonths', e.target.value)}
+                  min="1"
+                  max="36"
+                  size="lg"
+                />
+              </div>
             )}
           </div>
-        )}
+        </div>
       </div>
     </FormSection>
   );

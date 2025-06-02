@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/components/FormNavigation.tsx
-// Version: 6.2.0
-// Last Modified: 26-01-2025 02:00 IST
-// Purpose: Fix URL construction for PG/Hostel and other special listing types
+// Version: 7.0.0
+// Last Modified: 30-05-2025 16:15 IST
+// Purpose: Added proper validation checks to prevent navigation on incomplete steps
 
 import React, { useMemo } from 'react';
 import { cn } from '@/lib/utils';
@@ -22,6 +22,8 @@ interface Step {
   icon?: React.ElementType;
   description?: string;
   hidden?: boolean;
+  isValid?: boolean; // NEW: Add validation status
+  completionPercentage?: number; // NEW: Add completion percentage
 }
 
 interface FormNavigationProps {
@@ -31,6 +33,8 @@ interface FormNavigationProps {
   category?: string;
   adType?: string;
   steps: Step[];
+  // NEW: Add validation props
+  stepValidationStatus?: Record<number, { isValid: boolean; completionPercentage: number }>;
 }
 
 // Map step IDs to icons
@@ -261,7 +265,8 @@ const NavigationComponent = (props: FormNavigationProps) => {
     propertyId,
     category = '',
     adType = '',
-    steps = []
+    steps = [],
+    stepValidationStatus = {} // NEW: Validation status for steps
   } = props;
   
   const navigate = useNavigate();
@@ -323,52 +328,93 @@ const NavigationComponent = (props: FormNavigationProps) => {
     return flowSteps;
   }, [steps, flowSteps]);
 
-  // FIXED: Handle clicking on steps for navigation with proper URL construction
+  // NEW: Enhanced step click handler with validation check
   const handleStepClick = (index: number, stepId: string) => {
-    // Only allow navigation to previous steps in create mode
-    if (currentStep > index + 1) {
-      try {
-        console.log('[FormNavigation] Step click:', {
-          index,
-          stepId,
-          currentStep,
-          targetStep: index + 1,
-          currentPath: window.location.pathname,
-          category,
-          adType
+    const targetStepNumber = index + 1;
+    
+    console.log('[FormNavigation] Step click attempt:', {
+      index,
+      stepId,
+      currentStep,
+      targetStep: targetStepNumber,
+      stepValidationStatus
+    });
+
+    // Allow navigation to current step (refresh)
+    if (currentStep === targetStepNumber) {
+      console.log('[FormNavigation] Refreshing current step');
+      onStepChange(targetStepNumber);
+      return;
+    }
+
+    // Only allow navigation to previous steps OR next step if current step is valid
+    if (targetStepNumber < currentStep) {
+      // Navigation to previous steps is always allowed
+      console.log('[FormNavigation] Navigating to previous step');
+      navigateToStep(index, stepId, targetStepNumber);
+    } else if (targetStepNumber === currentStep + 1) {
+      // Navigation to next step - check if current step is valid
+      const currentStepValidation = stepValidationStatus[currentStep];
+      
+      if (currentStepValidation && currentStepValidation.isValid) {
+        console.log('[FormNavigation] Current step is valid, allowing navigation to next step');
+        navigateToStep(index, stepId, targetStepNumber);
+      } else {
+        console.log('[FormNavigation] Current step is invalid, blocking navigation to next step', currentStepValidation);
+        // Show user feedback that current step needs to be completed
+        alert('Please complete all required fields in the current step before proceeding.');
+        return;
+      }
+    } else {
+      // Navigation to steps further ahead is not allowed
+      console.log('[FormNavigation] Navigation to future steps is not allowed');
+      alert('Please complete the steps in order.');
+      return;
+    }
+  };
+
+  // Helper function to actually navigate
+  const navigateToStep = (index: number, stepId: string, targetStepNumber: number) => {
+    try {
+      console.log('[FormNavigation] Executing navigation:', {
+        index,
+        stepId,
+        targetStepNumber,
+        currentPath: window.location.pathname,
+        category,
+        adType
+      });
+      
+      // Parse current URL to extract category and type
+      const currentPath = window.location.pathname;
+      const pathRegex = /\/properties\/list\/([^\/]+)\/([^\/]+)(?:\/([^\/]+))?/;
+      const match = currentPath.match(pathRegex);
+      
+      if (match) {
+        const [, urlCategory, urlType] = match;
+        
+        // Construct the new URL with proper URL-friendly type
+        const urlFriendlyType = getURLFriendlyType(adType);
+        const newUrl = `/properties/list/${urlCategory}/${urlFriendlyType}/${stepId}`;
+        
+        console.log('[FormNavigation] Navigating to:', {
+          from: currentPath,
+          to: newUrl,
+          parts: { urlCategory, originalAdType: adType, urlFriendlyType, stepId }
         });
         
-        // Parse current URL to extract category and type
-        const currentPath = window.location.pathname;
-        const pathRegex = /\/properties\/list\/([^\/]+)\/([^\/]+)(?:\/([^\/]+))?/;
-        const match = currentPath.match(pathRegex);
-        
-        if (match) {
-          const [, urlCategory, urlType] = match;
-          
-          // FIXED: Construct the new URL with proper URL-friendly type
-          const urlFriendlyType = getURLFriendlyType(adType);
-          const newUrl = `/properties/list/${urlCategory}/${urlFriendlyType}/${stepId}`;
-          
-          console.log('[FormNavigation] Navigating to:', {
-            from: currentPath,
-            to: newUrl,
-            parts: { urlCategory, originalAdType: adType, urlFriendlyType, stepId }
-          });
-          
-          navigate(newUrl);
-          // Update internal step state
-          onStepChange(index + 1);
-        } else {
-          console.warn('[FormNavigation] Could not parse current URL for navigation:', currentPath);
-          // Fallback to just updating the step state
-          onStepChange(index + 1);
-        }
-      } catch (error) {
-        console.error('[FormNavigation] Error navigating:', error);
+        navigate(newUrl);
+        // Update internal step state
+        onStepChange(targetStepNumber);
+      } else {
+        console.warn('[FormNavigation] Could not parse current URL for navigation:', currentPath);
         // Fallback to just updating the step state
-        onStepChange(index + 1);
+        onStepChange(targetStepNumber);
       }
+    } catch (error) {
+      console.error('[FormNavigation] Error navigating:', error);
+      // Fallback to just updating the step state
+      onStepChange(targetStepNumber);
     }
   };
 
@@ -408,7 +454,8 @@ const NavigationComponent = (props: FormNavigationProps) => {
     flowType,
     currentStep,
     flowSteps: flowSteps.map(s => s.id),
-    stepsToRender: stepsToRender.map(s => ({ id: s.id, title: s.title }))
+    stepsToRender: stepsToRender.map(s => ({ id: s.id, title: s.title })),
+    stepValidationStatus
   });
 
   return (
@@ -417,23 +464,31 @@ const NavigationComponent = (props: FormNavigationProps) => {
         <div className="flex space-x-2" style={{ display: 'flex', gap: '0.5rem', minWidth: 'max-content' }}>
           {stepsToRender.map((step, index) => {
             // Make sure we have a proper React component, not a string or unknown type
-            // Using a more defensive approach to handle any type of icon input
             let IconComponent: React.ElementType;
             
             if (React.isValidElement(step.icon)) {
-              // If it's already a valid React element, use its type
               IconComponent = step.icon.type;
             } else if (typeof step.icon === 'function') {
-              // If it's a function component
               IconComponent = step.icon;
             } else {
-              // Fallback to a default icon
               IconComponent = Settings;
             }
             
-            const isActive = currentStep === index + 1;
-            const isPassed = currentStep > index + 1;
-            const isClickable = isPassed; // Only previous steps are clickable in create mode
+            const stepNumber = index + 1;
+            const isActive = currentStep === stepNumber;
+            const isPassed = currentStep > stepNumber;
+            const stepValidation = stepValidationStatus[stepNumber];
+            
+            // NEW: Enhanced clickable logic with validation
+            const isClickable = 
+              stepNumber < currentStep || // Previous steps are always clickable
+              stepNumber === currentStep || // Current step is clickable (refresh)
+              (stepNumber === currentStep + 1 && stepValidationStatus[currentStep]?.isValid); // Next step only if current is valid
+            
+            // NEW: Visual indicators for validation status
+            const hasValidationInfo = stepValidation !== undefined;
+            const isValid = stepValidation?.isValid ?? true;
+            const completionPercentage = stepValidation?.completionPercentage ?? 100;
             
             return (
               <button
@@ -448,26 +503,55 @@ const NavigationComponent = (props: FormNavigationProps) => {
                   fontSize: '0.875rem',
                   borderRadius: '0.5rem',
                   transition: 'all 0.2s',
-                  backgroundColor: isActive ? '#0ea5e9' : isPassed ? '#e0f2fe' : '#f1f5f9',
-                  color: isActive ? 'white' : isPassed ? '#0ea5e9' : '#334155',
+                  backgroundColor: isActive 
+                    ? (isValid ? '#0ea5e9' : '#ef4444') 
+                    : isPassed 
+                    ? '#e0f2fe' 
+                    : '#f1f5f9',
+                  color: isActive 
+                    ? 'white' 
+                    : isPassed 
+                    ? '#0ea5e9' 
+                    : '#334155',
                   opacity: isClickable ? 1 : 0.6,
                   cursor: isClickable ? 'pointer' : 'not-allowed',
-                  border: 'none',
-                  outline: 'none'
+                  border: hasValidationInfo && !isValid && isActive ? '2px solid #fbbf24' : 'none',
+                  outline: 'none',
+                  position: 'relative'
                 }}
                 className={cn(
-                  "flex items-center px-3 py-2 text-sm rounded-lg transition-colors",
+                  "flex items-center px-3 py-2 text-sm rounded-lg transition-colors relative",
                   "focus:outline-none focus:ring-2 focus:ring-ring/30",
                   isActive 
-                    ? "bg-primary text-primary-foreground" 
+                    ? (isValid ? "bg-primary text-primary-foreground" : "bg-destructive text-destructive-foreground")
                     : isPassed
                     ? "bg-primary/10 text-primary hover:bg-primary/20"
                     : "bg-secondary text-secondary-foreground hover:bg-secondary/90",
                   !isClickable && "opacity-60 cursor-not-allowed"
                 )}
+                title={
+                  hasValidationInfo 
+                    ? `${step.title} - ${completionPercentage}% complete ${isValid ? '✓' : '⚠️'}`
+                    : step.title
+                }
               >
                 <IconComponent className="w-4 h-4 mr-1.5" style={{ marginRight: '0.375rem' }} />
                 <span>{step.title}</span>
+                
+                {/* NEW: Validation indicator */}
+                {hasValidationInfo && isActive && (
+                  <div 
+                    className="absolute -bottom-1 left-0 h-1 bg-current rounded-b-lg transition-all duration-300"
+                    style={{ width: `${completionPercentage}%` }}
+                  />
+                )}
+                
+                {/* NEW: Status icon */}
+                {hasValidationInfo && isActive && (
+                  <span className="ml-1 text-xs">
+                    {isValid ? '✓' : '⚠️'}
+                  </span>
+                )}
               </button>
             );
           })}

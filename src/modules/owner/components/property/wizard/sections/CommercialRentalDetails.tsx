@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/CommercialRentalDetails.tsx
-// Version: 1.1.0
-// Last Modified: 29-05-2025 14:50 IST
-// Purpose: Removed duplicate furnishing field - now handled in Features step only
+// Version: 2.0.0
+// Last Modified: 30-05-2025 17:15 IST
+// Purpose: Added step completion validation system integration
 
 import React, { useEffect } from 'react';
 import { FormData, FormSectionProps } from '../types';
@@ -28,6 +28,7 @@ import {
 import { 
   Checkbox 
 } from '@/components/ui/checkbox';
+import { useStepValidation } from '../hooks/useStepValidation';
 import { cn } from '@/lib/utils';
 import { useStepForm } from '../hooks/useStepForm';
 
@@ -39,6 +40,21 @@ export const CommercialRentalDetails: React.FC<FormSectionProps> = ({
 }) => {
   const isEditMode = mode === 'edit';
   
+  // ✅ ADDED: Initialize validation system
+  const {
+    validateField,
+    getFieldValidation,
+    shouldShowFieldError,
+    markFieldAsTouched,
+    isValid: stepIsValid,
+    completionPercentage,
+    requiredFields
+  } = useStepValidation({
+    form,
+    flowType: 'commercial_rent',
+    currentStepId: stepId
+  });
+  
   // Use the useStepForm hook for proper step-based registration
   const { 
     registerField, 
@@ -49,6 +65,13 @@ export const CommercialRentalDetails: React.FC<FormSectionProps> = ({
     getFieldId,
     migrateRootFields
   } = useStepForm(form, stepId);
+  
+  // ✅ ADDED: Update form and state with validation
+  const updateFormAndState = (field: string, value: any) => {
+    setFieldValue(field, value);
+    markFieldAsTouched(field);
+    validateField(field);
+  };
   
   // Migrate existing data from root to step object on component mount (removed furnishing)
   useEffect(() => {
@@ -88,6 +111,26 @@ export const CommercialRentalDetails: React.FC<FormSectionProps> = ({
       title="Commercial Rental Details"
       description="Specify your commercial rental terms and business preferences"
     >
+      {/* ✅ ADDED: Progress indicator */}
+      {requiredFields.length > 0 && (
+        <div className="mb-6 p-3 bg-blue-50 rounded-lg border border-blue-200">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-blue-900">
+              Step Completion: {completionPercentage}%
+            </span>
+            <span className="text-xs text-blue-700">
+              {stepIsValid ? '✓ Ready to proceed' : 'Please complete required fields'}
+            </span>
+          </div>
+          <div className="w-full bg-blue-200 rounded-full h-2">
+            <div 
+              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+              style={{ width: `${completionPercentage}%` }}
+            />
+          </div>
+        </div>
+      )}
+
       <div className="space-y-6">
         
         {/* First Row - Rental Type and Rent Amount */}
@@ -97,7 +140,7 @@ export const CommercialRentalDetails: React.FC<FormSectionProps> = ({
             <RequiredLabel htmlFor={getFieldId('rentalType')}>Rental Type</RequiredLabel>
             <Select
               value={getFieldValue('rentalType') || 'rent'}
-              onValueChange={(value) => setFieldValue('rentalType', value as 'rent' | 'lease')}
+              onValueChange={(value) => updateFormAndState('rentalType', value as 'rent' | 'lease')}
               disabled={isEditMode}
             >
               <SelectTrigger 
@@ -117,6 +160,12 @@ export const CommercialRentalDetails: React.FC<FormSectionProps> = ({
                 ))}
               </SelectContent>
             </Select>
+            {/* ✅ ADDED: Error message display */}
+            {shouldShowFieldError('rentalType') && (
+              <p className="text-sm text-red-600 mt-0.5">
+                {getFieldValidation('rentalType').error}
+              </p>
+            )}
             {getFieldError('rentalType') && (
               <p className="text-sm text-destructive mt-1">{getFieldError('rentalType')?.message as string}</p>
             )}
@@ -136,12 +185,13 @@ export const CommercialRentalDetails: React.FC<FormSectionProps> = ({
                 className={cn(
                   getFieldError('rentAmount') && "border-destructive focus-visible:ring-destructive"
                 )}
+                onChange={(e) => updateFormAndState('rentAmount', e.target.value)}
               />
               <div className="absolute right-3 top-2.5">
                 <Checkbox
                   id={getFieldId('rentNegotiable')}
                   checked={rentNegotiable}
-                  onCheckedChange={(checked) => setFieldValue('rentNegotiable', !!checked)}
+                  onCheckedChange={(checked) => updateFormAndState('rentNegotiable', !!checked)}
                 />
                 <label
                   htmlFor={getFieldId('rentNegotiable')}
@@ -154,6 +204,12 @@ export const CommercialRentalDetails: React.FC<FormSectionProps> = ({
             {getFieldValue('rentAmount') && !isNaN(Number(getFieldValue('rentAmount'))) && (
               <p className="text-sm text-teal-500 text-right">
                 {formatToIndianCurrency(Number(getFieldValue('rentAmount')))}
+              </p>
+            )}
+            {/* ✅ ADDED: Error message display */}
+            {shouldShowFieldError('rentAmount') && (
+              <p className="text-sm text-red-600 mt-0.5">
+                {getFieldValidation('rentAmount').error}
               </p>
             )}
             {getFieldError('rentAmount') && (
@@ -175,7 +231,14 @@ export const CommercialRentalDetails: React.FC<FormSectionProps> = ({
               className={cn(
                 getFieldError('securityDeposit') && "border-destructive focus-visible:ring-destructive"
               )}
+              onChange={(e) => updateFormAndState('securityDeposit', e.target.value)}
             />
+            {/* ✅ ADDED: Error message display */}
+            {shouldShowFieldError('securityDeposit') && (
+              <p className="text-sm text-red-600 mt-0.5">
+                {getFieldValidation('securityDeposit').error}
+              </p>
+            )}
             {getFieldError('securityDeposit') && (
               <p className="text-sm text-destructive mt-1">{getFieldError('securityDeposit')?.message as string}</p>
             )}
@@ -194,7 +257,14 @@ export const CommercialRentalDetails: React.FC<FormSectionProps> = ({
               className={cn(
                 getFieldError('advanceRent') && "border-destructive focus-visible:ring-destructive"
               )}
+              onChange={(e) => updateFormAndState('advanceRent', e.target.value)}
             />
+            {/* ✅ ADDED: Error message display */}
+            {shouldShowFieldError('advanceRent') && (
+              <p className="text-sm text-red-600 mt-0.5">
+                {getFieldValidation('advanceRent').error}
+              </p>
+            )}
             {getFieldError('advanceRent') && (
               <p className="text-sm text-destructive mt-1">{getFieldError('advanceRent')?.message as string}</p>
             )}
@@ -208,7 +278,7 @@ export const CommercialRentalDetails: React.FC<FormSectionProps> = ({
             <RequiredLabel htmlFor={getFieldId('maintenance')}>Maintenance</RequiredLabel>
             <Select
               value={getFieldValue('maintenance') || ''}
-              onValueChange={(value) => setFieldValue('maintenance', value)}
+              onValueChange={(value) => updateFormAndState('maintenance', value)}
             >
               <SelectTrigger 
                 id={getFieldId('maintenance')}
@@ -227,6 +297,12 @@ export const CommercialRentalDetails: React.FC<FormSectionProps> = ({
                 ))}
               </SelectContent>
             </Select>
+            {/* ✅ ADDED: Error message display */}
+            {shouldShowFieldError('maintenance') && (
+              <p className="text-sm text-red-600 mt-0.5">
+                {getFieldValidation('maintenance').error}
+              </p>
+            )}
             {getFieldError('maintenance') && (
               <p className="text-sm text-destructive mt-1">{getFieldError('maintenance')?.message as string}</p>
             )}
@@ -243,8 +319,15 @@ export const CommercialRentalDetails: React.FC<FormSectionProps> = ({
               className={cn(
                 getFieldError('camCharges') && "border-destructive focus-visible:ring-destructive"
               )}
+              onChange={(e) => updateFormAndState('camCharges', e.target.value)}
             />
             <p className="text-xs text-gray-500">Common Area Maintenance charges</p>
+            {/* ✅ ADDED: Error message display */}
+            {shouldShowFieldError('camCharges') && (
+              <p className="text-sm text-red-600 mt-0.5">
+                {getFieldValidation('camCharges').error}
+              </p>
+            )}
             {getFieldError('camCharges') && (
               <p className="text-sm text-destructive mt-1">{getFieldError('camCharges')?.message as string}</p>
             )}
@@ -263,7 +346,14 @@ export const CommercialRentalDetails: React.FC<FormSectionProps> = ({
               className={cn(
                 getFieldError('availableFrom') && "border-destructive focus-visible:ring-destructive"
               )}
+              onChange={(e) => updateFormAndState('availableFrom', e.target.value)}
             />
+            {/* ✅ ADDED: Error message display */}
+            {shouldShowFieldError('availableFrom') && (
+              <p className="text-sm text-red-600 mt-0.5">
+                {getFieldValidation('availableFrom').error}
+              </p>
+            )}
             {getFieldError('availableFrom') && (
               <p className="text-sm text-destructive mt-1">{getFieldError('availableFrom')?.message as string}</p>
             )}
@@ -274,7 +364,7 @@ export const CommercialRentalDetails: React.FC<FormSectionProps> = ({
             <RequiredLabel htmlFor={getFieldId('parking')}>Parking</RequiredLabel>
             <Select
               value={getFieldValue('parking') || ''}
-              onValueChange={(value) => setFieldValue('parking', value)}
+              onValueChange={(value) => updateFormAndState('parking', value)}
             >
               <SelectTrigger 
                 id={getFieldId('parking')}
@@ -293,6 +383,12 @@ export const CommercialRentalDetails: React.FC<FormSectionProps> = ({
                 ))}
               </SelectContent>
             </Select>
+            {/* ✅ ADDED: Error message display */}
+            {shouldShowFieldError('parking') && (
+              <p className="text-sm text-red-600 mt-0.5">
+                {getFieldValidation('parking').error}
+              </p>
+            )}
             {getFieldError('parking') && (
               <p className="text-sm text-destructive mt-1">{getFieldError('parking')?.message as string}</p>
             )}
@@ -306,7 +402,7 @@ export const CommercialRentalDetails: React.FC<FormSectionProps> = ({
             <RequiredLabel htmlFor={getFieldId('operatingHours')}>Operating Hours</RequiredLabel>
             <Select
               value={getFieldValue('operatingHours') || ''}
-              onValueChange={(value) => setFieldValue('operatingHours', value)}
+              onValueChange={(value) => updateFormAndState('operatingHours', value)}
             >
               <SelectTrigger 
                 id={getFieldId('operatingHours')}
@@ -325,6 +421,12 @@ export const CommercialRentalDetails: React.FC<FormSectionProps> = ({
                 ))}
               </SelectContent>
             </Select>
+            {/* ✅ ADDED: Error message display */}
+            {shouldShowFieldError('operatingHours') && (
+              <p className="text-sm text-red-600 mt-0.5">
+                {getFieldValidation('operatingHours').error}
+              </p>
+            )}
             {getFieldError('operatingHours') && (
               <p className="text-sm text-destructive mt-1">{getFieldError('operatingHours')?.message as string}</p>
             )}
@@ -349,9 +451,9 @@ export const CommercialRentalDetails: React.FC<FormSectionProps> = ({
                   onCheckedChange={(checked) => {
                     const currentPreferences = getFieldValue('businessPreferences') || [];
                     if (checked) {
-                      setFieldValue('businessPreferences', [...currentPreferences, business]);
+                      updateFormAndState('businessPreferences', [...currentPreferences, business]);
                     } else {
-                      setFieldValue(
+                      updateFormAndState(
                         'businessPreferences',
                         currentPreferences.filter((item) => item !== business)
                       );
@@ -367,6 +469,12 @@ export const CommercialRentalDetails: React.FC<FormSectionProps> = ({
               </div>
             ))}
           </div>
+          {/* ✅ ADDED: Error message display */}
+          {shouldShowFieldError('businessPreferences') && (
+            <p className="text-sm text-red-600 mt-0.5">
+              {getFieldValidation('businessPreferences').error}
+            </p>
+          )}
           {getFieldError('businessPreferences') && (
             <p className="text-sm text-destructive mt-2">{getFieldError('businessPreferences')?.message as string}</p>
           )}
@@ -384,9 +492,9 @@ export const CommercialRentalDetails: React.FC<FormSectionProps> = ({
                   id={getFieldId('hasLockInPeriod')}
                   checked={hasLockInPeriod || false}
                   onCheckedChange={(checked) => {
-                    setFieldValue('hasLockInPeriod', !!checked);
+                    updateFormAndState('hasLockInPeriod', !!checked);
                     if (!checked) {
-                      setFieldValue('lockInPeriod', '');
+                      updateFormAndState('lockInPeriod', '');
                     }
                   }}
                 />
@@ -402,7 +510,7 @@ export const CommercialRentalDetails: React.FC<FormSectionProps> = ({
                 <div className="ml-6">
                   <Select
                     value={getFieldValue('lockInPeriod') || ''}
-                    onValueChange={(value) => setFieldValue('lockInPeriod', value)}
+                    onValueChange={(value) => updateFormAndState('lockInPeriod', value)}
                   >
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Select Lock-in Period" />
@@ -424,7 +532,7 @@ export const CommercialRentalDetails: React.FC<FormSectionProps> = ({
               <Checkbox
                 id={getFieldId('includesUtilities')}
                 checked={includesUtilities || false}
-                onCheckedChange={(checked) => setFieldValue('includesUtilities', !!checked)}
+                onCheckedChange={(checked) => updateFormAndState('includesUtilities', !!checked)}
               />
               <div>
                 <label

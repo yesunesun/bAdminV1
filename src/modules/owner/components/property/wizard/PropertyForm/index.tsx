@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/PropertyForm/index.tsx
-// Version: 11.2.0
-// Last Modified: 26-01-2025 02:00 IST
-// Purpose: Fixed URL construction for PG/Hostel and other special listing types
+// Version: 11.4.0
+// Last Modified: 30-01-2025 15:35 IST
+// Purpose: Fixed step validation status passing to FormNavigation component
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -12,7 +12,7 @@ import { FormData } from '../types';
 import { STEPS } from '../constants';
 import { FLOW_TYPES, FLOW_STEP_SEQUENCES } from '../constants/flows';
 import { useFlow } from '@/contexts/FlowContext';
-import { getURLFriendlyType } from '@/contexts/FlowContext'; // Import the helper function
+import { getURLFriendlyType } from '@/contexts/FlowContext';
 
 // Components
 import FormHeader from './components/FormHeader';
@@ -28,6 +28,7 @@ import FormDataDebug from '../components/FormDataDebug';
 // Hooks
 import { useStepNavigation } from './hooks/useStepNavigation';
 import { useFormDataChangeTracking } from '../hooks/useFormDataChangeTracking';
+import { useStepValidation } from '../hooks/useStepValidation';
 
 // Utils
 import { cleanFormData } from '../utils/formCleaningUtils';
@@ -96,7 +97,6 @@ export function PropertyForm({
           if (onTypeSelect) {
             onTypeSelect(category, adType, city);
           } else {
-            // FlowContext will handle navigation
             redirectToPropertySelection();
           }
         }}
@@ -157,42 +157,125 @@ export function PropertyForm({
     city: selectedCity || initialData?.locality || ''
   });
 
+  // Initialize validation system for current step
+  const currentStepId = flowSteps[formStep - 1]?.id || '';
+  const {
+    isValid: stepIsValid,
+    canProceedToNextStep,
+    completionPercentage,
+    getValidationSummary,
+    blockNavigation,
+    validateCurrentStep
+  } = useStepValidation({
+    form,
+    flowType: flowType || 'residential_rent',
+    currentStepId
+  });
+
   // Track form data changes
   useFormDataChangeTracking(form);
 
-  // FIXED: Custom next step handler with proper URL construction
-  const handleNextStepWithNavigation = () => {
+  // Create step validation status for all steps (FIXED)
+  const stepValidationStatus = React.useMemo(() => {
+    const status: Record<number, { isValid: boolean; completionPercentage: number }> = {};
+    
+    // For now, only calculate for current step to avoid performance issues
+    // In a full implementation, you might want to calculate for all steps
+    status[formStep] = {
+      isValid: stepIsValid,
+      completionPercentage: completionPercentage
+    };
+    
+    console.log('[PropertyForm] Step validation status:', status);
+    return status;
+  }, [formStep, stepIsValid, completionPercentage]);
+
+  // ENHANCED: Next step handler with validation blocking
+  const handleNextStepWithValidation = () => {
+    console.log('[PropertyForm] handleNextStepWithValidation called:', {
+      currentStep: formStep,
+      currentStepId,
+      stepIsValid,
+      canProceed: canProceedToNextStep()
+    });
+
+    // Validate current step before proceeding
+    if (!canProceedToNextStep()) {
+      console.log('[PropertyForm] Navigation blocked - validation failed');
+      
+      // Get validation summary for user feedback
+      const summary = getValidationSummary();
+      const missingFields = summary?.invalidFields.map(f => f.name) || [];
+      
+      // Show user-friendly alert
+      const fieldLabels = {
+        propertyType: 'Property Type',
+        bhkType: 'BHK Configuration',
+        floor: 'Floor',
+        totalFloors: 'Total Floors',
+        propertyAge: 'Property Age',
+        facing: 'Facing Direction',
+        builtUpArea: 'Built-up Area',
+        bathrooms: 'Bathrooms',
+        address: 'Address',
+        city: 'City',
+        state: 'State',
+        pinCode: 'PIN Code',
+        locality: 'Locality',
+        expectedPrice: 'Expected Price',
+        maintenanceCost: 'Maintenance Cost',
+        kitchenType: 'Kitchen Type',
+        availableFrom: 'Available From',
+        furnishing: 'Furnishing',
+        parking: 'Parking'
+      };
+
+      const missingFieldLabels = missingFields.map(field => 
+        fieldLabels[field as keyof typeof fieldLabels] || field
+      );
+
+      alert(`Please complete these required fields before proceeding:\n\n• ${missingFieldLabels.join('\n• ')}`);
+      
+      // Scroll to first missing field
+      const firstMissingField = missingFields[0];
+      if (firstMissingField) {
+        const fieldElement = document.querySelector(`[name="${firstMissingField}"]`) || 
+                            document.querySelector(`input[placeholder*="${firstMissingField}"]`) ||
+                            document.querySelector(`select[name="${firstMissingField}"]`);
+        
+        if (fieldElement) {
+          fieldElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          setTimeout(() => {
+            if ('focus' in fieldElement) {
+              (fieldElement as HTMLElement).focus();
+            }
+          }, 500);
+        }
+      }
+      
+      return; // Block navigation
+    }
+
+    // Validation passed - proceed to next step
     const nextStep = formStep + 1;
     const maxSteps = flowSteps.length;
     
-    console.log('[PropertyForm] handleNextStepWithNavigation:', {
+    console.log('[PropertyForm] Validation passed, proceeding to next step:', {
       currentStep: formStep,
       nextStep,
-      maxSteps,
-      flowSteps: flowSteps.map(s => s.id),
-      category,
-      listingType,
-      displayListingType: listingType
+      maxSteps
     });
     
     if (nextStep <= maxSteps) {
-      // Update the current step first
       setCurrentStep(nextStep);
       
-      // FIXED: Convert display listing type to URL-friendly format
       const urlFriendlyType = getURLFriendlyType(listingType);
       const stepName = flowSteps[nextStep - 1]?.id || 'details';
       const newUrl = `/properties/list/${category.toLowerCase()}/${urlFriendlyType}/${stepName}`;
       
       console.log('[PropertyForm] Navigating to next step:', {
         from: window.location.pathname,
-        to: newUrl,
-        parts: { 
-          category: category.toLowerCase(), 
-          originalListingType: listingType,
-          urlFriendlyType, 
-          stepName 
-        }
+        to: newUrl
       });
       
       navigate(newUrl, { replace: true });
@@ -201,35 +284,20 @@ export function PropertyForm({
     }
   };
 
-  // FIXED: Custom previous step handler with proper URL construction
+  // Previous step handler with proper URL construction
   const handlePreviousStepWithNavigation = () => {
     const prevStep = Math.max(formStep - 1, 1);
     
     console.log('[PropertyForm] handlePreviousStepWithNavigation:', {
       currentStep: formStep,
-      prevStep,
-      category,
-      listingType
+      prevStep
     });
     
-    // Update the current step first
     setCurrentStep(prevStep);
     
-    // FIXED: Convert display listing type to URL-friendly format
     const urlFriendlyType = getURLFriendlyType(listingType);
     const stepName = flowSteps[prevStep - 1]?.id || 'details';
     const newUrl = `/properties/list/${category.toLowerCase()}/${urlFriendlyType}/${stepName}`;
-    
-    console.log('[PropertyForm] Navigating to previous step:', {
-      from: window.location.pathname,
-      to: newUrl,
-      parts: { 
-        category: category.toLowerCase(), 
-        originalListingType: listingType,
-        urlFriendlyType, 
-        stepName 
-      }
-    });
     
     navigate(newUrl, { replace: true });
   };
@@ -248,7 +316,7 @@ export function PropertyForm({
     form, 
     formStep, 
     formIsSaleMode, 
-    originalHandleNextStep: handleNextStepWithNavigation,
+    originalHandleNextStep: handleNextStepWithValidation, // Use validation-enabled handler
     setCurrentStep, 
     STEPS: flowSteps
   });
@@ -294,28 +362,21 @@ export function PropertyForm({
       const formData = form.getValues();
       console.log('[PropertyForm] Form data before save:', formData);
       
-      // Clean the form data
       const cleanedData = cleanFormData(formData);
       
-      // Ensure we have flow information from context
       cleanedData.flow = {
         category,
         listingType,
         flowType
       };
       
-      // Ensure we have a title
       if (!cleanedData.title) {
         cleanedData.title = `${category} ${listingType} Property`;
       }
       
-      // Apply the form changes
       form.reset(cleanedData);
       
-      // Call the original save function
       await handleSaveAsDraft();
-      
-      // Wait for state to update
       await new Promise(resolve => setTimeout(resolve, 500));
       
       const effectivePropertyId = savedPropertyId || propertyId || propertyIdAfterSave;
@@ -334,14 +395,17 @@ export function PropertyForm({
   const effectivePropertyId = savedPropertyId || propertyId || propertyIdAfterSave;
   const isReviewStep = flowSteps[formStep - 1]?.id.includes('review') || false;
 
-  console.log('[PropertyForm] Rendering with:', {
-    category,
-    listingType,
-    flowType,
-    formStep,
-    currentStepId: flowSteps[formStep - 1]?.id,
-    visibleSteps: visibleSteps?.map(step => step.id),
-    isReviewStep
+  // Get validation summary for step navigation component
+  const validationSummary = getValidationSummary();
+  const validationErrors = validationSummary ? validationSummary.invalidFields.map(f => f.label) : [];
+
+  console.log('[PropertyForm] Rendering with validation:', {
+    currentStepId,
+    stepIsValid,
+    canProceed: canProceedToNextStep(),
+    completionPercentage,
+    validationErrors,
+    stepValidationStatus
   });
 
   return (
@@ -361,11 +425,11 @@ export function PropertyForm({
           />
         </div>
 
+        {/* FIXED: Pass stepValidationStatus to FormNavigation */}
         <FormNavigation 
           currentStep={formStep} 
           onStepChange={(newStep) => {
             setCurrentStep(newStep);
-            // FIXED: Use URL-friendly type in navigation
             const urlFriendlyType = getURLFriendlyType(listingType);
             const stepName = flowSteps[newStep - 1]?.id || 'details';
             const newUrl = `/properties/list/${category.toLowerCase()}/${urlFriendlyType}/${stepName}`;
@@ -375,6 +439,7 @@ export function PropertyForm({
           category={category}
           adType={listingType}
           steps={visibleSteps}
+          stepValidationStatus={stepValidationStatus}
         />
 
         <div className="p-6">
@@ -412,14 +477,27 @@ export function PropertyForm({
                 handleImageUploadComplete={handleImageUploadComplete}
               />
               
-              {/* Step Navigation (Previous/Next buttons) */}
+              {/* Enhanced Step Navigation with Validation */}
               <StepNavigation 
                 formStep={formStep}
                 STEPS={flowSteps}
                 handlePreviousStep={handlePreviousStepWithNavigation}
-                handleNextStep={handleNextStepWithNavigation}
+                handleNextStep={handleNextStepWithValidation} // Use validation-enabled handler
                 isLastStep={isReviewStep}
                 disablePrevious={saving || saveInProgress}
+                
+                // Validation props
+                canProceed={canProceedToNextStep()}
+                isValidating={false}
+                validationErrors={validationErrors}
+                completionPercentage={completionPercentage}
+                requiredFieldsRemaining={validationSummary?.totalRequiredFields - validationSummary?.completedFields || 0}
+                
+                // UI props
+                showProgress={true}
+                showValidationSummary={true}
+                size="md"
+                variant="default"
               />
             </div>
           </div>

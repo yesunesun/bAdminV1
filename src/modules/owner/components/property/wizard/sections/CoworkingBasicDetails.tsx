@@ -1,15 +1,16 @@
 // src/modules/owner/components/property/wizard/sections/CoworkingBasicDetails.tsx
-// Version: 1.1.0
-// Last Modified: 17-05-2025 14:30 IST
-// Purpose: Fix form field registration to save data in the proper step object
+// Version: 2.0.0
+// Last Modified: 30-05-2025 18:00 IST
+// Purpose: Added step completion validation system for progress tracking
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import { FormSection } from '@/components/FormSection';
 import { RequiredLabel } from '@/components/ui/RequiredLabel';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { FormSectionProps } from '../types';
 import { useStepForm } from '../hooks/useStepForm';
+import { useStepValidation } from '../hooks/useStepValidation';
 import { 
   COWORKING_SPACE_TYPES
 } from '../constants/coworkingDetails';
@@ -26,6 +27,22 @@ const CoworkingBasicDetails: React.FC<FormSectionProps> = ({
     getFieldValue,
     getFieldId
   } = useStepForm(form, stepId);
+
+  // ✅ ADDED: Initialize validation system
+  const flowType = form.getValues('flow.flowType') || 'commercial_coworking';
+  const {
+    validateField,
+    getFieldValidation,
+    shouldShowFieldError,
+    markFieldAsTouched,
+    isValid: stepIsValid,
+    completionPercentage,
+    requiredFields
+  } = useStepValidation({
+    form,
+    flowType,
+    currentStepId: stepId
+  });
   
   // Migrate data from root to step object if needed
   useEffect(() => {
@@ -45,12 +62,41 @@ const CoworkingBasicDetails: React.FC<FormSectionProps> = ({
       }
     });
   }, []);
+
+  // ✅ ADDED: Enhanced field update with validation
+  const updateFormAndState = useCallback((field: string, value: any) => {
+    setFieldValue(field, value);
+    
+    // Mark field as touched and validate
+    markFieldAsTouched(field);
+    validateField(field);
+  }, [setFieldValue, markFieldAsTouched, validateField]);
   
   return (
     <FormSection
       title="Co-working Space Basic Information"
       description="Provide basic information about your co-working space property"
     >
+      {/* ✅ ADDED: Progress indicator (like LocationDetails) */}
+      {requiredFields.length > 0 && (
+        <div className="mb-6 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
+              Step Completion: {completionPercentage}%
+            </span>
+            <span className="text-xs text-blue-700 dark:text-blue-300">
+              {stepIsValid ? '✓ Ready to proceed' : 'Please complete required fields'}
+            </span>
+          </div>
+          <div className="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-2">
+            <div 
+              className="bg-blue-600 dark:bg-blue-400 h-2 rounded-full transition-all duration-300"
+              style={{ width: `${completionPercentage}%` }}
+            />
+          </div>
+        </div>
+      )}
+
       <div className="space-y-6">
         {/* Property Title */}
         <div className="mb-6">
@@ -62,9 +108,16 @@ const CoworkingBasicDetails: React.FC<FormSectionProps> = ({
             placeholder="Enter a catchy title for your co-working space"
             className="h-12 px-4 py-2 rounded-xl border border-border bg-background w-full"
             {...registerField('title')}
+            onChange={(e) => updateFormAndState('title', e.target.value)}
           />
           {getFieldError('title') && (
             <p className="text-sm text-destructive mt-1">{getFieldError('title')?.message as string}</p>
+          )}
+          {/* ✅ ADDED: Validation error display */}
+          {shouldShowFieldError('title') && (
+            <p className="text-sm text-red-600 mt-0.5">
+              {getFieldValidation('title').error}
+            </p>
           )}
           <p className="mt-1 text-xs text-muted-foreground">
             A good title helps your property stand out (e.g., "Modern Co-working Space in HITEC City")
@@ -80,6 +133,7 @@ const CoworkingBasicDetails: React.FC<FormSectionProps> = ({
             id={getFieldId('propertyType')}
             className="w-full h-12 px-4 py-2 rounded-xl border border-border bg-background"
             {...registerField('propertyType')}
+            onChange={(e) => updateFormAndState('propertyType', e.target.value)}
           >
             <option value="">Select space type</option>
             {COWORKING_SPACE_TYPES.map((type) => (
@@ -90,6 +144,12 @@ const CoworkingBasicDetails: React.FC<FormSectionProps> = ({
           </select>
           {getFieldError('propertyType') && (
             <p className="text-sm text-destructive mt-1">{getFieldError('propertyType')?.message as string}</p>
+          )}
+          {/* ✅ ADDED: Validation error display */}
+          {shouldShowFieldError('propertyType') && (
+            <p className="text-sm text-red-600 mt-0.5">
+              {getFieldValidation('propertyType').error}
+            </p>
           )}
         </div>
         
@@ -105,9 +165,16 @@ const CoworkingBasicDetails: React.FC<FormSectionProps> = ({
               placeholder="e.g., 2000"
               className="h-12 px-4 py-2 rounded-xl border border-border bg-background w-full"
               {...registerField('builtUpArea')}
+              onChange={(e) => updateFormAndState('builtUpArea', parseFloat(e.target.value) || 0)}
             />
             {getFieldError('builtUpArea') && (
               <p className="text-sm text-destructive mt-1">{getFieldError('builtUpArea')?.message as string}</p>
+            )}
+            {/* ✅ ADDED: Validation error display */}
+            {shouldShowFieldError('builtUpArea') && (
+              <p className="text-sm text-red-600 mt-0.5">
+                {getFieldValidation('builtUpArea').error}
+              </p>
             )}
           </div>
           
@@ -119,6 +186,7 @@ const CoworkingBasicDetails: React.FC<FormSectionProps> = ({
               id={getFieldId('builtUpAreaUnit')}
               className="w-full h-12 px-4 py-2 rounded-xl border border-border bg-background"
               {...registerField('builtUpAreaUnit')}
+              onChange={(e) => updateFormAndState('builtUpAreaUnit', e.target.value)}
             >
               <option value="sqft">Square Feet</option>
               <option value="sqyd">Square Yards</option>
@@ -138,6 +206,7 @@ const CoworkingBasicDetails: React.FC<FormSectionProps> = ({
             id={getFieldId('propertyAge')}
             className="w-full h-12 px-4 py-2 rounded-xl border border-border bg-background"
             {...registerField('propertyAge')}
+            onChange={(e) => updateFormAndState('propertyAge', e.target.value)}
           >
             <option value="">Select property age</option>
             <option value="New">Brand New</option>
@@ -149,6 +218,12 @@ const CoworkingBasicDetails: React.FC<FormSectionProps> = ({
           </select>
           {getFieldError('propertyAge') && (
             <p className="text-sm text-destructive mt-1">{getFieldError('propertyAge')?.message as string}</p>
+          )}
+          {/* ✅ ADDED: Validation error display */}
+          {shouldShowFieldError('propertyAge') && (
+            <p className="text-sm text-red-600 mt-0.5">
+              {getFieldValidation('propertyAge').error}
+            </p>
           )}
         </div>
         
@@ -164,9 +239,16 @@ const CoworkingBasicDetails: React.FC<FormSectionProps> = ({
               placeholder="e.g., 3"
               className="h-12 px-4 py-2 rounded-xl border border-border bg-background w-full"
               {...registerField('floor')}
+              onChange={(e) => updateFormAndState('floor', parseInt(e.target.value) || 0)}
             />
             {getFieldError('floor') && (
               <p className="text-sm text-destructive mt-1">{getFieldError('floor')?.message as string}</p>
+            )}
+            {/* ✅ ADDED: Validation error display */}
+            {shouldShowFieldError('floor') && (
+              <p className="text-sm text-red-600 mt-0.5">
+                {getFieldValidation('floor').error}
+              </p>
             )}
           </div>
           
@@ -180,9 +262,16 @@ const CoworkingBasicDetails: React.FC<FormSectionProps> = ({
               placeholder="e.g., 10"
               className="h-12 px-4 py-2 rounded-xl border border-border bg-background w-full"
               {...registerField('totalFloors')}
+              onChange={(e) => updateFormAndState('totalFloors', parseInt(e.target.value) || 0)}
             />
             {getFieldError('totalFloors') && (
               <p className="text-sm text-destructive mt-1">{getFieldError('totalFloors')?.message as string}</p>
+            )}
+            {/* ✅ ADDED: Validation error display */}
+            {shouldShowFieldError('totalFloors') && (
+              <p className="text-sm text-red-600 mt-0.5">
+                {getFieldValidation('totalFloors').error}
+              </p>
             )}
           </div>
         </div>
@@ -196,6 +285,7 @@ const CoworkingBasicDetails: React.FC<FormSectionProps> = ({
             id={getFieldId('facing')}
             className="w-full h-12 px-4 py-2 rounded-xl border border-border bg-background"
             {...registerField('facing')}
+            onChange={(e) => updateFormAndState('facing', e.target.value)}
           >
             <option value="">Select direction</option>
             <option value="North">North</option>
@@ -209,6 +299,12 @@ const CoworkingBasicDetails: React.FC<FormSectionProps> = ({
           </select>
           {getFieldError('facing') && (
             <p className="text-sm text-destructive mt-1">{getFieldError('facing')?.message as string}</p>
+          )}
+          {/* ✅ ADDED: Validation error display */}
+          {shouldShowFieldError('facing') && (
+            <p className="text-sm text-red-600 mt-0.5">
+              {getFieldValidation('facing').error}
+            </p>
           )}
         </div>
         
@@ -226,6 +322,7 @@ const CoworkingBasicDetails: React.FC<FormSectionProps> = ({
             rows={3}
             className="w-full px-4 py-3 rounded-xl border border-border bg-background min-h-24"
             {...registerField('description')}
+            onChange={(e) => updateFormAndState('description', e.target.value)}
           />
           {getFieldError('description') && (
             <p className="text-sm text-destructive mt-1">{getFieldError('description')?.message as string}</p>

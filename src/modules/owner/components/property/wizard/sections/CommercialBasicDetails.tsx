@@ -1,14 +1,15 @@
 // src/modules/owner/components/property/wizard/sections/CommercialBasicDetails.tsx
-// Version: 1.6.0
-// Last Modified: 29-05-2025 14:45 IST
-// Purpose: Removed duplicate furnishing field - now handled in Features step only
+// Version: 3.0.0
+// Last Modified: 30-05-2025 23:20 IST
+// Purpose: Added cross-field validation for floor vs totalFloors and improved ageOfProperty tracking
 
-import React, { useEffect, useState, useRef, useMemo } from 'react';
+import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { FormSection } from '@/components/FormSection';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FormSectionProps } from '../types';
 import { RequiredLabel } from '@/components/ui/RequiredLabel';
+import { useStepValidation } from '../hooks/useStepValidation';
 import {
   COMMERCIAL_PROPERTY_TYPES,
   PROPERTY_TO_BUILDING_TYPES,
@@ -21,6 +22,23 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
   
   // Track if initial form values have been processed
   const initialProcessDone = useRef(false);
+
+  // Initialize validation system
+  const {
+    validateField,
+    getFieldValidation,
+    getFieldConfig,
+    shouldShowFieldError,
+    markFieldAsTouched,
+    validateCurrentStep,
+    isValid: stepIsValid,
+    completionPercentage,
+    requiredFields
+  } = useStepValidation({
+    form,
+    flowType: 'commercial_rent',
+    currentStepId: stepId
+  });
   
   // Get initial form values directly
   const initialValues = form.getValues();
@@ -32,7 +50,7 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
     buildingType: initialStepValues.buildingType || initialValues.buildingType || '',
     ageOfProperty: initialStepValues.ageOfProperty || initialValues.ageOfProperty || '',
     builtUpArea: initialStepValues.builtUpArea || initialValues.builtUpArea || '',
-    builtUpAreaUnit: initialStepValues.builtUpAreaUnit || initialValues.builtUpAreaUnit || 'sqft', // Always default to sqft
+    builtUpAreaUnit: initialStepValues.builtUpAreaUnit || initialValues.builtUpAreaUnit || 'sqft',
     floor: initialStepValues.floor || initialValues.floor || '',
     totalFloors: initialStepValues.totalFloors || initialValues.totalFloors || '',
     cabins: initialStepValues.cabins || initialValues.cabins || '',
@@ -42,6 +60,9 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
     bikeParking: initialStepValues.bikeParking || initialValues.bikeParking || '',
     title: initialStepValues.title || initialValues.title || ''
   });
+  
+  // ✅ SIMPLIFIED: Remove complex cross-field validation since we handle it directly
+  const [crossFieldErrors, setCrossFieldErrors] = useState<Record<string, string>>({});
   
   // Get available building types based on selected property type
   const availableBuildingTypes = useMemo(() => {
@@ -58,12 +79,35 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
   // Debug counter to track re-renders and updates
   const updateCounter = useRef(0);
   
+  // ✅ SIMPLIFIED: Remove complex validation functions since we handle it directly in UI
+  // The validation is now handled directly in the onBlur event and display logic
+  
   // Clean up on unmount
   useEffect(() => {
     return () => {
       isMounted.current = false;
     };
   }, []);
+
+  // Helper functions for form data management
+  const saveField = useCallback((fieldName: string, value: any) => {
+    const path = `steps.${stepId}.${fieldName}`;
+    
+    // Ensure steps structure exists
+    const steps = form.getValues('steps') || {};
+    if (!steps[stepId]) {
+      form.setValue('steps', {
+        ...steps,
+        [stepId]: {}
+      }, { shouldValidate: false });
+    }
+    
+    // Set value in step structure
+    form.setValue(path, value, { shouldValidate: true });
+    
+    // Trigger field validation
+    validateField(fieldName);
+  }, [form, stepId, validateField]);
 
   // Helper function to get field value from the correct path
   const getFieldValue = (fieldName: string, defaultValue: any = '') => {
@@ -76,7 +120,7 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
     return rootValue !== undefined ? rootValue : defaultValue;
   };
   
-  // Helper function to set field ONLY in step location (no more dual registration)
+  // Helper function to set field ONLY in step location
   const setFieldValue = (fieldName: string, value: any, validate = false) => {
     // Only set in step structure
     form.setValue(`steps.${stepId}.${fieldName}`, value, { shouldValidate: validate });
@@ -86,7 +130,7 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
   useEffect(() => {
     console.log('Setting up form subscription for commercial basic details');
     
-    // Watch all fields that we're interested in (removed furnishing)
+    // Watch all fields that we're interested in
     const watchFields = [
       'propertyType',
       'buildingType',
@@ -141,7 +185,7 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
         setFieldValue('builtUpAreaUnit', 'sqft', false);
       }
       
-      // Migrate root level values to step structure if they exist and clear root (removed furnishing)
+      // Migrate root level values to step structure if they exist and clear root
       const fieldsToMove = [
         'propertyType', 'buildingType', 'ageOfProperty', 'builtUpArea',
         'builtUpAreaUnit', 'floor', 'totalFloors', 'cabins', 'conferenceRooms',
@@ -174,7 +218,7 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
   const updateStateFromForm = (validateAfter = false, source = 'unknown') => {
     if (!isMounted.current) return;
     
-    // Get values from step structure first, then fall back to root level (removed furnishing)
+    // Get values from step structure first, then fall back to root level
     const newValues = {
       propertyType: getFieldValue('propertyType', ''),
       buildingType: getFieldValue('buildingType', ''),
@@ -214,22 +258,26 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
     }
   };
   
-  // Update form when local state changes
-  const updateFormAndState = (field: string, value: any) => {
+  // ✅ UPDATED: Update form and state with validation
+  const updateFormAndState = useCallback((field: string, value: any) => {
     // Update local state
     setValues(prev => ({
       ...prev,
       [field]: value
     }));
     
-    // Update form field ONLY in step structure
-    setFieldValue(field, value, true);
+    // Update form field in step structure and trigger validation
+    saveField(field, value);
+    markFieldAsTouched(field);
     
     // Debug log
     console.log(`Updated ${field} to:`, value);
-  };
+  }, [saveField, markFieldAsTouched]);
   
-  // Process numeric input
+  // ✅ SIMPLIFIED: Remove complex useEffect since validation is now handled directly
+  // No need for complex cross-field validation watching
+  
+  // Process numeric input with immediate validation
   const handleNumberInput = (value: string, fieldName: string) => {
     if (value === '') {
       updateFormAndState(fieldName, '');
@@ -273,6 +321,26 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
       description="Tell us about your commercial property"
       className="text-base"
     >
+      {/* Validation Progress */}
+      {requiredFields.length > 0 && (
+        <div className="mb-6 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
+              Step Completion: {completionPercentage}%
+            </span>
+            <span className="text-xs text-blue-700 dark:text-blue-300">
+              {stepIsValid ? '✓ Ready to proceed' : 'Please complete required fields'}
+            </span>
+          </div>
+          <div className="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-2">
+            <div 
+              className="bg-blue-600 dark:bg-blue-400 h-2 rounded-full transition-all duration-300"
+              style={{ width: `${completionPercentage}%` }}
+            />
+          </div>
+        </div>
+      )}
+
       <div className="space-y-4">
         {/* Commercial Property Type & Building Type */}
         <div className="grid grid-cols-2 gap-4">
@@ -293,6 +361,7 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
                 ))}
               </SelectContent>
             </Select>
+            {/* ✅ REMOVED: No validation messages for other fields */}
           </div>
 
           <div>
@@ -316,6 +385,7 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
                 ))}
               </SelectContent>
             </Select>
+            {/* ✅ REMOVED: No validation messages for other fields */}
           </div>
         </div>
 
@@ -326,6 +396,7 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
             <Select 
               value={values.ageOfProperty}
               onValueChange={(value) => {
+                console.log('Age of Property selected:', value);
                 updateFormAndState('ageOfProperty', value);
                 setFieldValue('constructionAge', value, false);
               }}
@@ -341,6 +412,7 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
                 ))}
               </SelectContent>
             </Select>
+            {/* ✅ REMOVED: No validation messages for other fields */}
           </div>
 
           <div>
@@ -375,6 +447,7 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
                     }
                   }}
                 />
+                {/* ✅ REMOVED: No validation messages for other fields */}
               </div>
               <Select 
                 defaultValue="sqft"
@@ -410,6 +483,7 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
               placeholder="Floor number (0 = ground)"
               onChange={(e) => handleNumberInput(e.target.value, 'floor')}
             />
+            {/* ✅ REMOVED: No validation messages for Floor field */}
           </div>
 
           <div>
@@ -421,7 +495,23 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
               value={values.totalFloors}
               placeholder="Building total floors"
               onChange={(e) => handleNumberInput(e.target.value, 'totalFloors')}
+              onBlur={(e) => {
+                // ✅ NEW: Validate minimum value when field loses focus
+                const val = e.target.value;
+                const floorVal = values.floor;
+                
+                if (val && floorVal && parseInt(val) < parseInt(floorVal)) {
+                  console.log(`Auto-correcting totalFloors from ${val} to ${floorVal}`);
+                  updateFormAndState('totalFloors', floorVal);
+                }
+              }}
             />
+            {/* ✅ NEW: Show validation message like built-up area */}
+            {values.totalFloors && values.floor && parseInt(values.totalFloors) < parseInt(values.floor) && (
+              <p className="text-sm text-red-600 mt-1">
+                Total floors should be greater than or equal to Floor
+              </p>
+            )}
           </div>
         </div>
 
@@ -454,7 +544,7 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
           </div>
         )}
 
-        {/* Reception Area - Single Column (removed furnishing field) */}
+        {/* Reception Area - Single Column */}
         {isOfficeType && (
           <div className="grid grid-cols-2 gap-4">
             <div>
