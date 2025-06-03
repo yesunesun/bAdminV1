@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/SaleDetails.tsx
-// Version: 6.0.0
-// Last Modified: 30-05-2025 16:30 IST
-// Purpose: Fixed step completion indicator and validation for Residential Sale flow
+// Version: 6.1.0
+// Last Modified: 03-06-2025 14:45 IST
+// Purpose: Updated Expected Price field UX to match Commercial Rent pattern with inline Negotiable checkbox
 
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { FormSection } from '@/components/FormSection';
@@ -287,6 +287,21 @@ export function SaleDetails({ form, adType, stepId: providedStepId }: SaleDetail
   tomorrow.setDate(tomorrow.getDate() + 1);
   const minDate = tomorrow.toISOString().split('T')[0];
 
+  // Function to convert number to Indian currency format (like in CommercialRentalDetails)
+  const formatToIndianCurrency = (value: number): string => {
+    if (!value) return '';
+    
+    if (value >= 10000000) {
+      return `₹ ${(value / 10000000).toFixed(2)} Crores`;
+    } else if (value >= 100000) {
+      return `₹ ${(value / 100000).toFixed(0)} Lacs`;
+    } else if (value >= 1000) {
+      return `₹ ${(value / 1000).toFixed(0)} Thousand`;
+    } else {
+      return `₹ ${value}`;
+    }
+  };
+
   return (
     <FormSection
       title="Sale Details"
@@ -315,6 +330,7 @@ export function SaleDetails({ form, adType, stepId: providedStepId }: SaleDetail
       <div className="space-y-4">
         {/* Expected Price and Maintenance Cost - Two Column */}
         <div className="grid grid-cols-2 gap-4">
+          {/* Expected Price with inline Negotiable checkbox - NEW UX PATTERN */}
           <div>
             <RequiredLabel required>Expected Price</RequiredLabel>
             <div className="relative">
@@ -323,13 +339,33 @@ export function SaleDetails({ form, adType, stepId: providedStepId }: SaleDetail
               </span>
               <Input
                 type="text"
-                className="h-11 pl-9 text-base"
+                className="h-11 pl-9 pr-24 text-base"
                 value={expectedPriceValue}
                 onChange={handleExpectedPriceChange}
                 placeholder="Enter amount"
                 name="expectedPrice"
               />
+              {/* NEW: Inline Negotiable checkbox - matching CommercialRentalDetails pattern */}
+              <div className="absolute right-3 top-2.5">
+                <Checkbox
+                  id="priceNegotiable"
+                  checked={!!priceNegotiable}
+                  onCheckedChange={(checked) => updateFormAndState('priceNegotiable', checked as boolean)}
+                />
+                <label
+                  htmlFor="priceNegotiable"
+                  className="ml-1.5 text-xs font-medium text-muted-foreground cursor-pointer"
+                >
+                  Negotiable
+                </label>
+              </div>
             </div>
+            {/* NEW: Show formatted currency like in CommercialRentalDetails */}
+            {expectedPriceValue && !isNaN(Number(expectedPriceValue)) && (
+              <p className="text-sm text-teal-500 text-right">
+                {formatToIndianCurrency(Number(expectedPriceValue))}
+              </p>
+            )}
             {/* FIXED: Added proper validation error display */}
             {shouldShowFieldError('expectedPrice') && (
               <p className="text-sm text-red-600 mt-0.5">
@@ -365,19 +401,8 @@ export function SaleDetails({ form, adType, stepId: providedStepId }: SaleDetail
           </div>
         </div>
 
-        {/* Price Negotiable and Kitchen Type - Two Column */}
+        {/* Kitchen Type and Available From - Two Column (removed Price Negotiable from here) */}
         <div className="grid grid-cols-2 gap-4">
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="priceNegotiable"
-              checked={!!priceNegotiable}
-              onCheckedChange={(checked) => updateFormAndState('priceNegotiable', checked as boolean)}
-            />
-            <label htmlFor="priceNegotiable" className="text-base text-slate-700 cursor-pointer">
-              Price Negotiable
-            </label>
-          </div>
-
           <div>
             <RequiredLabel required>Kitchen Type</RequiredLabel>
             <Select 
@@ -402,10 +427,7 @@ export function SaleDetails({ form, adType, stepId: providedStepId }: SaleDetail
               </p>
             )}
           </div>
-        </div>
 
-        {/* Available From and Furnishing - Two Column */}
-        <div className="grid grid-cols-2 gap-4">
           <div>
             <RequiredLabel required>Available From</RequiredLabel>
             <Input
@@ -422,7 +444,10 @@ export function SaleDetails({ form, adType, stepId: providedStepId }: SaleDetail
               </p>
             )}
           </div>
+        </div>
 
+        {/* Furnishing and Parking - Two Column */}
+        <div className="grid grid-cols-2 gap-4">
           <div>
             <RequiredLabel required>Furnishing</RequiredLabel>
             <Select 
@@ -447,32 +472,31 @@ export function SaleDetails({ form, adType, stepId: providedStepId }: SaleDetail
               </p>
             )}
           </div>
-        </div>
 
-        {/* Parking */}
-        <div>
-          <RequiredLabel required>Parking</RequiredLabel>
-          <Select 
-            value={parking}
-            onValueChange={value => updateFormAndState('parking', value)}
-          >
-            <SelectTrigger className="h-11 text-base">
-              <SelectValue placeholder="Available parking?" />
-            </SelectTrigger>
-            <SelectContent>
-              {PARKING_OPTIONS.map(option => (
-                <SelectItem key={option} value={option} className="text-base">
-                  {option}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {/* FIXED: Added proper validation error display */}
-          {shouldShowFieldError('parking') && (
-            <p className="text-sm text-red-600 mt-0.5">
-              {getFieldValidation('parking').error}
-            </p>
-          )}
+          <div>
+            <RequiredLabel required>Parking</RequiredLabel>
+            <Select 
+              value={parking}
+              onValueChange={value => updateFormAndState('parking', value)}
+            >
+              <SelectTrigger className="h-11 text-base">
+                <SelectValue placeholder="Available parking?" />
+              </SelectTrigger>
+              <SelectContent>
+                {PARKING_OPTIONS.map(option => (
+                  <SelectItem key={option} value={option} className="text-base">
+                    {option}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {/* FIXED: Added proper validation error display */}
+            {shouldShowFieldError('parking') && (
+              <p className="text-sm text-red-600 mt-0.5">
+                {getFieldValidation('parking').error}
+              </p>
+            )}
+          </div>
         </div>
 
         {/* Description */}
