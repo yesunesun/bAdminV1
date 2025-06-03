@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/hooks/useStepValidation.ts
-// Version: 5.12.0
-// Last Modified: 03-06-2025 16:45 IST
-// Purpose: Fixed Commercial Co-working details validation - added all mandatory fields
+// Version: 5.13.0
+// Last Modified: 03-06-2025 18:20 IST
+// Purpose: Fixed Land Features validation - commercialFeatures only required for Commercial Plot land type
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { UseFormReturn } from 'react-hook-form';
@@ -43,7 +43,7 @@ export function useStepValidation({
    lastCheckedStep: ''
  });
  
- // ✅ FIXED: Get required fields for current step - Updated Commercial Co-working details
+ // ✅ FIXED: Get required fields for current step - Updated Land Features to be conditional
  const getRequiredFieldsForStep = useCallback((stepId: string): string[] => {
    const stepFieldMap: Record<string, string[]> = {
      // ✅ FIXED: Basic details steps - Removed bathrooms from ALL residential property details steps
@@ -173,20 +173,36 @@ export function useStepValidation({
        // Note: 'additionalInformation' is optional
      ],
      
-     // ✅ UPDATED: Land features step - added mandatory sections
-     'land_sale_land_features': [
-       'nearbyDevelopments',    // Nearby Developments (required - at least one option)
-       'commercialFeatures',    // Commercial Plot Features (required - at least one option, if commercial land)
-       'availableDocuments'     // Available Documents (required - at least one option)
-       // nearbyLandmarks is optional - removed from required fields
-     ],
-     
      // Default fallback
      'default': []
    };
    
+   // ✅ FIXED: Dynamic Land Features Requirements Based on Land Type
+   if (stepId === 'land_sale_land_features') {
+     const baseRequiredFields = [
+       'nearbyDevelopments',    // Nearby Developments (required - at least one option)
+       'availableDocuments'     // Available Documents (required - at least one option)
+       // nearbyLandmarks is optional - removed from required fields
+     ];
+     
+     // Check land type from basic details step to determine if commercialFeatures is required
+     try {
+       const landType = form.getValues('steps.land_sale_basic_details.propertyType') || '';
+       console.log(`[getRequiredFieldsForStep] Land type detected: ${landType}`);
+       
+       if (landType === 'Commercial Plot') {
+         baseRequiredFields.push('commercialFeatures'); // Add commercialFeatures only for Commercial Plot
+         console.log(`[getRequiredFieldsForStep] Added commercialFeatures to required fields for Commercial Plot`);
+       }
+     } catch (error) {
+       console.warn('[getRequiredFieldsForStep] Error checking land type:', error);
+     }
+     
+     return baseRequiredFields;
+   }
+   
    return stepFieldMap[stepId] || stepFieldMap['default'];
- }, []);
+ }, [form]);
 
  // ✅ NEW: Cross-field validation rules
  const getCrossFieldValidationRules = useCallback((stepId: string): CrossFieldValidationRule[] => {
@@ -640,12 +656,27 @@ const hasValidationError = useCallback((fieldName: string) => {
   return hasCrossFieldError;
 }, [currentStepId, getRequiredFieldsForStep, hasFieldValue, validateCrossFields]);
 
+// ✅ UPDATED: Enhanced getFieldConfig to handle conditional requirements
 const getFieldConfig = useCallback((fieldName: string) => {
   const requiredFields = getRequiredFieldsForStep(currentStepId);
+  
+  // ✅ FIXED: Special handling for commercialFeatures - only required for Commercial Plot
+  if (fieldName === 'commercialFeatures' && currentStepId === 'land_sale_land_features') {
+    try {
+      const landType = form.getValues('steps.land_sale_basic_details.propertyType') || '';
+      const isRequired = landType === 'Commercial Plot';
+      console.log(`[getFieldConfig] commercialFeatures required for ${landType}: ${isRequired}`);
+      return { required: isRequired };
+    } catch (error) {
+      console.warn('[getFieldConfig] Error checking land type for commercialFeatures:', error);
+      return { required: false }; // Default to not required if error
+    }
+  }
+  
   return { 
     required: requiredFields.includes(fieldName)
   };
-}, [currentStepId, getRequiredFieldsForStep]);
+}, [currentStepId, getRequiredFieldsForStep, form]);
 
 const markFieldAsTouched = useCallback(() => {
   // No-op for now
