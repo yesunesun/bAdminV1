@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/hooks/useStepValidation.ts
-// Version: 5.11.0
-// Last Modified: 03-06-2025 15:35 IST
-// Purpose: Fixed Commercial Co-working basic details validation - updated required fields mapping
+// Version: 5.12.0
+// Last Modified: 03-06-2025 16:45 IST
+// Purpose: Fixed Commercial Co-working details validation - added all mandatory fields
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { UseFormReturn } from 'react-hook-form';
@@ -43,7 +43,7 @@ export function useStepValidation({
    lastCheckedStep: ''
  });
  
- // ✅ FIXED: Get required fields for current step - Updated Commercial Co-working basic details
+ // ✅ FIXED: Get required fields for current step - Updated Commercial Co-working details
  const getRequiredFieldsForStep = useCallback((stepId: string): string[] => {
    const stepFieldMap: Record<string, string[]> = {
      // ✅ FIXED: Basic details steps - Removed bathrooms from ALL residential property details steps
@@ -153,8 +153,25 @@ export function useStepValidation({
      // ✅ FIXED: PG details - REMOVED monthlyRent and securityDeposit
      'res_pg_pg_details': ['genderPreference', 'occupantType', 'mealOption', 'availableFrom'],
      
-     // Coworking details
-     'com_cow_coworking_details': ['spaceType', 'capacity', 'rentAmount'],
+     // ✅ FIXED: Coworking details - COMPLETE list of mandatory fields matching CoworkingDetails.tsx
+     'com_cow_coworking_details': [
+       'coworkingSpaceType',     // Co-working Space Type
+       'totalCapacity',          // Total Capacity  
+       'availableCapacity',      // Available Capacity
+       'pricingStructure',       // Pricing Structure
+       'basePrice',              // Base Price
+       'leaseTerm',              // Lease Term
+       'securityDeposit',        // Security Deposit
+       'bookingOption',          // Booking Option
+       'openingTime',            // Opening Time
+       'closingTime',            // Closing Time
+       'operatingDays',          // Operating Days (at least one day)
+       'internetSpeed',          // Internet Speed
+       'coworkingAmenities',     // Amenities (at least one)
+       'officeSize',             // Office Size
+       'seatingCapacity'         // Seating Capacity
+       // Note: 'additionalInformation' is optional
+     ],
      
      // ✅ UPDATED: Land features step - added mandatory sections
      'land_sale_land_features': [
@@ -241,6 +258,29 @@ export function useStepValidation({
         }
       }
     ],
+    // ✅ ADDED: Commercial Co-working details capacity validation
+    'com_cow_coworking_details': [
+      {
+        fields: ['totalCapacity', 'availableCapacity'],
+        validate: (values) => {
+          const totalCapacity = parseInt(values.totalCapacity);
+          const availableCapacity = parseInt(values.availableCapacity);
+          
+          if (isNaN(totalCapacity) || isNaN(availableCapacity)) {
+            return { isValid: true }; // Skip validation if either is not a number
+          }
+          
+          if (availableCapacity > totalCapacity) {
+            return { 
+              isValid: false, 
+              error: 'Available Capacity cannot be greater than Total Capacity' 
+            };
+          }
+          
+          return { isValid: true };
+        }
+      }
+    ],
     'res_rent_basic_details': [
       {
         fields: ['floor', 'totalFloors'],
@@ -308,7 +348,7 @@ const hasFieldValue = useCallback((fieldName: string): boolean => {
         
         // Enhanced validation for different field types
         if (Array.isArray(value)) {
-          // For arrays (like preferredTenants, roomFeatures, idealFor), check if it has at least one item
+          // For arrays (like operatingDays, coworkingAmenities), check if it has at least one item
           return value.length > 0;
         } else if (typeof value === 'boolean') {
           // For booleans, consider them valid regardless of true/false
@@ -318,8 +358,12 @@ const hasFieldValue = useCallback((fieldName: string): boolean => {
           return value.trim() !== '';
         } else if (typeof value === 'number') {
           // ✅ UPDATED: For numbers, check if not NaN and greater than 0 (except certain fields which can be 0)
-          // Added maintenanceCharges to fields that can be 0 but cannot be empty
-          if (fieldName === 'bathrooms' || fieldName === 'balconies' || fieldName === 'maintenanceCharges' || fieldName === 'maintenanceCost' || fieldName === 'expectedDeposit' || fieldName === 'floor' || fieldName === 'roomCapacity') {
+          // Added capacity fields to fields that can be 0 but cannot be empty
+          if (fieldName === 'bathrooms' || fieldName === 'balconies' || fieldName === 'maintenanceCharges' || 
+              fieldName === 'maintenanceCost' || fieldName === 'expectedDeposit' || fieldName === 'floor' || 
+              fieldName === 'roomCapacity' || fieldName === 'totalCapacity' || fieldName === 'availableCapacity' ||
+              fieldName === 'officeSize' || fieldName === 'seatingCapacity' || fieldName === 'basePrice' ||
+              fieldName === 'securityDeposit') {
             return !isNaN(value) && value >= 0;
           }
           return !isNaN(value) && value > 0;
@@ -346,8 +390,12 @@ const hasFieldValue = useCallback((fieldName: string): boolean => {
         } else if (typeof rootValue === 'string') {
           return rootValue.trim() !== '';
         } else if (typeof rootValue === 'number') {
-          // ✅ UPDATED: Added maintenanceCharges and roomCapacity to fields that can be 0
-          if (fieldName === 'bathrooms' || fieldName === 'balconies' || fieldName === 'maintenanceCharges' || fieldName === 'maintenanceCost' || fieldName === 'expectedDeposit' || fieldName === 'floor' || fieldName === 'roomCapacity') {
+          // ✅ UPDATED: Added capacity fields to fields that can be 0
+          if (fieldName === 'bathrooms' || fieldName === 'balconies' || fieldName === 'maintenanceCharges' || 
+              fieldName === 'maintenanceCost' || fieldName === 'expectedDeposit' || fieldName === 'floor' || 
+              fieldName === 'roomCapacity' || fieldName === 'totalCapacity' || fieldName === 'availableCapacity' ||
+              fieldName === 'officeSize' || fieldName === 'seatingCapacity' || fieldName === 'basePrice' ||
+              fieldName === 'securityDeposit') {
             return !isNaN(rootValue) && rootValue >= 0;
           }
           return !isNaN(rootValue) && rootValue > 0;
@@ -389,10 +437,11 @@ const validateCrossFields = useCallback((): Array<{ name: string; label: string;
       // Run the validation
       const result = rule.validate(values);
       if (!result.isValid && result.error) {
-        // ✅ UPDATED: Add error for totalFloors field (the second field in the rule)
+        // ✅ UPDATED: Add error for the appropriate field based on validation type
+        const errorFieldName = currentStepId === 'com_cow_coworking_details' ? 'availableCapacity' : 'totalFloors';
         crossFieldErrors.push({
-          name: 'totalFloors', // Always show error on totalFloors field
-          label: getFieldLabel('totalFloors'),
+          name: errorFieldName,
+          label: getFieldLabel(errorFieldName),
           error: result.error
         });
       }
@@ -565,9 +614,9 @@ const getFieldValidation = useCallback((fieldName: string) => {
 }, [hasFieldValue, validateCrossFields]);
 
 const shouldShowFieldError = useCallback((fieldName: string) => {
-  // ✅ UPDATED: Only show cross-field validation errors for totalFloors field
-  // But still track all validation for step completion
-  if (fieldName !== 'totalFloors') {
+  // ✅ UPDATED: Only show cross-field validation errors for specific fields
+  // Show errors for totalFloors (floor validation) and availableCapacity (capacity validation)
+  if (fieldName !== 'totalFloors' && fieldName !== 'availableCapacity') {
     return false; // No validation messages for any other fields
   }
   
@@ -664,143 +713,160 @@ useEffect(() => {
 return {
   isValid,
   canProceedToNextStep,
-  completionPercentage,
-  getValidationSummary,
-  blockNavigation,
-  validateCurrentStep,
-  requiredFields,
-  
-  // Field-level validation functions
-  validateField,
-  getFieldValidation,
-  getFieldConfig,
-  shouldShowFieldError,
-  markFieldAsTouched,
-  hasValidationError // ✅ NEW: Added for internal validation checking
+ completionPercentage,
+ getValidationSummary,
+ blockNavigation,
+ validateCurrentStep,
+ requiredFields,
+ 
+ // Field-level validation functions
+ validateField,
+ getFieldValidation,
+ getFieldConfig,
+ shouldShowFieldError,
+ markFieldAsTouched,
+ hasValidationError // ✅ NEW: Added for internal validation checking
 };
 }
 
 // Helper function to get user-friendly field labels - ✅ UPDATED: Added Commercial Co-working field labels
 function getFieldLabel(fieldName: string): string {
 const labels: Record<string, string> = {
-  // Property Details fields
-  propertyType: 'Property Type',
-  buildingType: 'Building Type',
-  ageOfProperty: 'Age of Property',
-  bhkType: 'BHK Configuration',
-  floor: 'Floor',
-  totalFloors: 'Total Floors',
-  propertyAge: 'Property Age',
-  facing: 'Facing Direction',
-  builtUpArea: 'Built-up Area',
-  bathrooms: 'Bathrooms',
-  availableFrom: 'Available From',
-  
-  // ✅ ADDED: Commercial Co-working specific fields
-  title: 'Property Title',
-  spaceType: 'Co-working Space Type',
-  
-  // Location fields
-  address: 'Complete Address',
-  city: 'City',
-  state: 'State',
-  pinCode: 'PIN Code',
-  locality: 'Locality',
-  
-  // ✅ UPDATED: Rental/Sale fields - Added maintenanceCharges and Commercial Sale specific fields
-  rentalType: 'Rental Type',
-  rentAmount: 'Monthly Rent Amount',
-  securityDeposit: 'Security Deposit',
-  maintenanceCharges: 'Maintenance Charges', // ✅ ADDED: Now mandatory field
-  advanceRent: 'Advance Rent',
-  maintenance: 'Maintenance',
-  camCharges: 'CAM Charges',
-  parking: 'Parking',
-  operatingHours: 'Operating Hours',
-  businessPreferences: 'Business Preferences',
-  furnishingStatus: 'Furnishing Status',
-  preferredTenants: 'Preferred Tenants',
-  
-  // ✅ ADDED: Commercial Sale specific field labels
-  expectedPrice: 'Expected Price',
-  ownershipType: 'Ownership Type',
-  idealFor: 'Ideal For',
-  
-  // ✅ NEW: Commercial Features Essential Facilities field labels
-  powerBackup: 'Power Backup',
-  lift: 'Lift/Elevator',
-  parkingType: 'Parking',
-  washroomType: 'Washroom(s)',
-  waterStorage: 'Water Storage Facility',
-  security: 'Security',
-  
-  // ✅ NEW: Commercial Features Property Status & Furnishing field labels  
-  propertyCondition: 'Property Condition',
-  furnishingType: 'Furnishing',
-  
-  // ✅ NEW: Commercial Features Checkbox Groups field labels
-  amenities: 'Commercial Amenities',
-  facilities: 'Commercial Facilities', 
-  infrastructureFeatures: 'Infrastructure Features',
-  
-  // Sale details field labels
-  maintenanceCost: 'Maintenance Cost',
-  kitchenType: 'Kitchen Type',
-  furnishing: 'Furnishing',
-  
-  // ✅ PG/Hostel room details field labels (also used for Flatmates Room Details)
-  roomType: 'Room Type',
-  roomCapacity: 'Room Capacity',
-  expectedRent: 'Expected Rent',
-  expectedDeposit: 'Expected Deposit',
-  bathroomType: 'Bathroom Type',
-  roomSize: 'Room Size',
-  mealOption: 'Meal Option',
-  roomFeatures: 'Room Features',
-  
-  // ✅ UPDATED: PG Details specific field labels
-  genderPreference: 'Place is available for',
-  occupantType: 'Preferred guests',
-  
-  // Features fields
-  propertyShowOption: 'Who Shows Property',
-  
-  // Commercial fields
-  capacity: 'Capacity',
-  
-  // ✅ ADDED: Flatmate Details specific field labels
-  hasAttachedBathroom: 'Attached Bathroom',
-  hasAC: 'AC Room',
-  hasBalcony: 'Balcony',
-  isNonVegAllowed: 'Non-Veg Allowed',
-  isSmokingAllowed: 'Smoking Allowed',
-  isDrinkingAllowed: 'Drinking Allowed',
-  propertyShowPerson: 'Who Will Show the Property',
-  waterSupply: 'Water Supply',
-  directions: 'Directions to Property',
-  about: 'Additional Details About Flatmate Requirements',
-  
-  // Legacy flatmate fields (for backward compatibility)
-  preferredGender: 'Preferred Gender',
-  
-  // ✅ ADDED: Land-specific field labels
-  plotFacing: 'Plot Facing',
-  developmentStatus: 'Development Status',
-  approvalStatus: 'Approval Status',
-  soilType: 'Soil Type',
-  boundaryType: 'Boundary Type',
-  waterAvailability: 'Water Availability',
-  electricityStatus: 'Electricity Status',
-  roadConnectivity: 'Road Connectivity',
-  additionalDetails: 'Additional Details',
-  
-  // ✅ ADDED: Land features field labels
-  distanceFromCity: 'Distance from City Center',
-  distanceFromHighway: 'Distance from Highway',
-  nearbyLandmarks: 'Nearby Landmarks',
-  availableDocuments: 'Available Documents',
-  nearbyDevelopments: 'Nearby Developments',
-  commercialFeatures: 'Commercial Plot Features'
+ // Property Details fields
+ propertyType: 'Property Type',
+ buildingType: 'Building Type',
+ ageOfProperty: 'Age of Property',
+ bhkType: 'BHK Configuration',
+ floor: 'Floor',
+ totalFloors: 'Total Floors',
+ propertyAge: 'Property Age',
+ facing: 'Facing Direction',
+ builtUpArea: 'Built-up Area',
+ bathrooms: 'Bathrooms',
+ availableFrom: 'Available From',
+ 
+ // ✅ ADDED: Commercial Co-working specific fields
+ title: 'Property Title',
+ spaceType: 'Co-working Space Type',
+ 
+ // Location fields
+ address: 'Complete Address',
+ city: 'City',
+ state: 'State',
+ pinCode: 'PIN Code',
+ locality: 'Locality',
+ 
+ // ✅ UPDATED: Rental/Sale fields - Added maintenanceCharges and Commercial Sale specific fields
+ rentalType: 'Rental Type',
+ rentAmount: 'Monthly Rent Amount',
+ securityDeposit: 'Security Deposit',
+ maintenanceCharges: 'Maintenance Charges', // ✅ ADDED: Now mandatory field
+ advanceRent: 'Advance Rent',
+ maintenance: 'Maintenance',
+ camCharges: 'CAM Charges',
+ parking: 'Parking',
+ operatingHours: 'Operating Hours',
+ businessPreferences: 'Business Preferences',
+ furnishingStatus: 'Furnishing Status',
+ preferredTenants: 'Preferred Tenants',
+ 
+ // ✅ ADDED: Commercial Sale specific field labels
+ expectedPrice: 'Expected Price',
+ ownershipType: 'Ownership Type',
+ idealFor: 'Ideal For',
+ 
+ // ✅ NEW: Commercial Features Essential Facilities field labels
+ powerBackup: 'Power Backup',
+ lift: 'Lift/Elevator',
+ parkingType: 'Parking',
+ washroomType: 'Washroom(s)',
+ waterStorage: 'Water Storage Facility',
+ security: 'Security',
+ 
+ // ✅ NEW: Commercial Features Property Status & Furnishing field labels  
+ propertyCondition: 'Property Condition',
+ furnishingType: 'Furnishing',
+ 
+ // ✅ NEW: Commercial Features Checkbox Groups field labels
+ amenities: 'Commercial Amenities',
+ facilities: 'Commercial Facilities', 
+ infrastructureFeatures: 'Infrastructure Features',
+ 
+ // Sale details field labels
+ maintenanceCost: 'Maintenance Cost',
+ kitchenType: 'Kitchen Type',
+ furnishing: 'Furnishing',
+ 
+ // ✅ PG/Hostel room details field labels (also used for Flatmates Room Details)
+ roomType: 'Room Type',
+ roomCapacity: 'Room Capacity',
+ expectedRent: 'Expected Rent',
+ expectedDeposit: 'Expected Deposit',
+ bathroomType: 'Bathroom Type',
+ roomSize: 'Room Size',
+ mealOption: 'Meal Option',
+ roomFeatures: 'Room Features',
+ 
+ // ✅ UPDATED: PG Details specific field labels
+ genderPreference: 'Place is available for',
+ occupantType: 'Preferred guests',
+ 
+ // Features fields
+ propertyShowOption: 'Who Shows Property',
+ 
+ // ✅ ADDED: Commercial Co-working specific field labels
+ coworkingSpaceType: 'Co-working Space Type',
+ totalCapacity: 'Total Capacity',
+ availableCapacity: 'Available Capacity',
+ pricingStructure: 'Pricing Structure',
+ basePrice: 'Base Price',
+ leaseTerm: 'Lease Term',
+ bookingOption: 'Booking Option',
+ openingTime: 'Opening Time',
+ closingTime: 'Closing Time',
+ operatingDays: 'Operating Days',
+ internetSpeed: 'Internet Speed',
+ coworkingAmenities: 'Amenities',
+ officeSize: 'Office Size',
+ seatingCapacity: 'Seating Capacity',
+ additionalInformation: 'Additional Information',
+ 
+ // Commercial fields
+ capacity: 'Capacity',
+ 
+ // ✅ ADDED: Flatmate Details specific field labels
+ hasAttachedBathroom: 'Attached Bathroom',
+ hasAC: 'AC Room',
+ hasBalcony: 'Balcony',
+ isNonVegAllowed: 'Non-Veg Allowed',
+ isSmokingAllowed: 'Smoking Allowed',
+ isDrinkingAllowed: 'Drinking Allowed',
+ propertyShowPerson: 'Who Will Show the Property',
+ waterSupply: 'Water Supply',
+ directions: 'Directions to Property',
+ about: 'Additional Details About Flatmate Requirements',
+ 
+ // Legacy flatmate fields (for backward compatibility)
+ preferredGender: 'Preferred Gender',
+ 
+ // ✅ ADDED: Land-specific field labels
+ plotFacing: 'Plot Facing',
+ developmentStatus: 'Development Status',
+ approvalStatus: 'Approval Status',
+ soilType: 'Soil Type',
+ boundaryType: 'Boundary Type',
+ waterAvailability: 'Water Availability',
+ electricityStatus: 'Electricity Status',
+ roadConnectivity: 'Road Connectivity',
+ additionalDetails: 'Additional Details',
+ 
+ // ✅ ADDED: Land features field labels
+ distanceFromCity: 'Distance from City Center',
+ distanceFromHighway: 'Distance from Highway',
+ nearbyLandmarks: 'Nearby Landmarks',
+ availableDocuments: 'Available Documents',
+ nearbyDevelopments: 'Nearby Developments',
+ commercialFeatures: 'Commercial Plot Features'
 };
 return labels[fieldName] || fieldName.charAt(0).toUpperCase() + fieldName.slice(1);
 }

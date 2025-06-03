@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/CoworkingBasicDetails.tsx
-// Version: 2.1.0
-// Last Modified: 03-06-2025 15:30 IST
-// Purpose: Fixed mandatory field marking and validation consistency for Commercial Co-working flow
+// Version: 2.2.0
+// Last Modified: 03-06-2025 17:00 IST
+// Purpose: Fixed mandatory field marking - added required prop to all RequiredLabel components
 
 import React, { useEffect, useCallback } from 'react';
 import { FormSection } from '@/components/FormSection';
@@ -98,9 +98,9 @@ const CoworkingBasicDetails: React.FC<FormSectionProps> = ({
       )}
 
       <div className="space-y-6">
-        {/* Property Title - ✅ FIXED: Updated placeholder text */}
+        {/* Property Title - ✅ FIXED: Added required prop */}
         <div className="mb-6">
-          <RequiredLabel htmlFor={getFieldId('title')} className="mb-2 block">
+          <RequiredLabel htmlFor={getFieldId('title')} className="mb-2 block" required>
             Property Title
           </RequiredLabel>
           <Input
@@ -124,9 +124,9 @@ const CoworkingBasicDetails: React.FC<FormSectionProps> = ({
           </p>
         </div>
         
-        {/* Space Type - ✅ FIXED: Added RequiredLabel for mandatory field */}
+        {/* Space Type - ✅ FIXED: Added required prop */}
         <div className="mb-6">
-          <RequiredLabel htmlFor={getFieldId('propertyType')} className="mb-2 block">
+          <RequiredLabel htmlFor={getFieldId('propertyType')} className="mb-2 block" required>
             Co-working Space Type
           </RequiredLabel>
           <select
@@ -153,10 +153,10 @@ const CoworkingBasicDetails: React.FC<FormSectionProps> = ({
           )}
         </div>
         
-        {/* Total Area - ✅ FIXED: Added RequiredLabel for mandatory field */}
+        {/* Total Area - ✅ FIXED: Added required prop to builtUpArea */}
         <div className="grid md:grid-cols-2 gap-4 mb-6">
           <div>
-            <RequiredLabel htmlFor={getFieldId('builtUpArea')} className="mb-2 block">
+            <RequiredLabel htmlFor={getFieldId('builtUpArea')} className="mb-2 block" required>
               Total Area
             </RequiredLabel>
             <Input
@@ -179,7 +179,7 @@ const CoworkingBasicDetails: React.FC<FormSectionProps> = ({
           </div>
           
           <div>
-            <RequiredLabel htmlFor={getFieldId('builtUpAreaUnit')} className="mb-2 block">
+            <RequiredLabel htmlFor={getFieldId('builtUpAreaUnit')} className="mb-2 block" required>
               Area Unit
             </RequiredLabel>
             <select
@@ -197,9 +197,9 @@ const CoworkingBasicDetails: React.FC<FormSectionProps> = ({
           </div>
         </div>
         
-        {/* Property Age - ✅ FIXED: Added RequiredLabel for mandatory field */}
+        {/* Property Age - ✅ FIXED: Added required prop */}
         <div className="mb-6">
-          <RequiredLabel htmlFor={getFieldId('propertyAge')} className="mb-2 block">
+          <RequiredLabel htmlFor={getFieldId('propertyAge')} className="mb-2 block" required>
             Property Age
           </RequiredLabel>
           <select
@@ -227,10 +227,10 @@ const CoworkingBasicDetails: React.FC<FormSectionProps> = ({
           )}
         </div>
         
-        {/* Floor and Total Floors - ✅ FIXED: Added RequiredLabel for mandatory fields */}
+        {/* Floor and Total Floors - ✅ FIXED: Added required prop to both fields */}
         <div className="grid md:grid-cols-2 gap-4 mb-6">
           <div>
-            <RequiredLabel htmlFor={getFieldId('floor')} className="mb-2 block">
+            <RequiredLabel htmlFor={getFieldId('floor')} className="mb-2 block" required>
               Floor
             </RequiredLabel>
             <Input
@@ -253,7 +253,7 @@ const CoworkingBasicDetails: React.FC<FormSectionProps> = ({
           </div>
           
           <div>
-            <RequiredLabel htmlFor={getFieldId('totalFloors')} className="mb-2 block">
+            <RequiredLabel htmlFor={getFieldId('totalFloors')} className="mb-2 block" required>
               Total Floors
             </RequiredLabel>
             <Input
@@ -276,9 +276,9 @@ const CoworkingBasicDetails: React.FC<FormSectionProps> = ({
           </div>
         </div>
         
-        {/* Facing - ✅ FIXED: Added RequiredLabel for mandatory field */}
+        {/* Facing - ✅ FIXED: Added required prop */}
         <div className="mb-6">
-          <RequiredLabel htmlFor={getFieldId('facing')} className="mb-2 block">
+          <RequiredLabel htmlFor={getFieldId('facing')} className="mb-2 block" required>
             Facing Direction
           </RequiredLabel>
           <select
@@ -308,7 +308,7 @@ const CoworkingBasicDetails: React.FC<FormSectionProps> = ({
           )}
         </div>
         
-        {/* Short Description - ✅ KEPT: Optional field, no RequiredLabel */}
+        {/* Short Description - ✅ KEPT: Optional field, no required prop */}
         <div>
           <div className="flex items-center justify-between mb-2">
             <label htmlFor={getFieldId('description')} className="text-sm font-medium text-foreground">

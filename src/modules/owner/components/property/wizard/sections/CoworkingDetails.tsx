@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/CoworkingDetails.tsx
-// Version: 2.0.0
-// Last Modified: 30-05-2025 18:05 IST
-// Purpose: Added step completion validation system for progress tracking
+// Version: 2.1.0
+// Last Modified: 03-06-2025 16:50 IST
+// Purpose: Fixed mandatory field marking - added required prop to all RequiredLabel components
 
 import React, { useEffect, useCallback } from 'react';
 import { FormSection } from '@/components/FormSection';
@@ -126,9 +126,9 @@ const CoworkingDetails: React.FC<FormSectionProps> = ({
       )}
 
       <div className="space-y-6">
-        {/* Space Type - This might be redundant with basic details */}
+        {/* Space Type - ✅ FIXED: Added required prop */}
         <div className="mb-6">
-          <RequiredLabel htmlFor={getFieldId('coworkingSpaceType')} className="mb-2 block">
+          <RequiredLabel htmlFor={getFieldId('coworkingSpaceType')} className="mb-2 block" required>
             Co-working Space Type
           </RequiredLabel>
           <select
@@ -155,10 +155,10 @@ const CoworkingDetails: React.FC<FormSectionProps> = ({
           )}
         </div>
         
-        {/* Capacity */}
+        {/* Capacity - ✅ FIXED: Added required prop to both fields */}
         <div className="grid md:grid-cols-2 gap-4 mb-6">
           <div>
-            <RequiredLabel htmlFor={getFieldId('totalCapacity')} className="mb-2 block">
+            <RequiredLabel htmlFor={getFieldId('totalCapacity')} className="mb-2 block" required>
               Total Capacity
             </RequiredLabel>
             <Input
@@ -181,7 +181,7 @@ const CoworkingDetails: React.FC<FormSectionProps> = ({
           </div>
           
           <div>
-            <RequiredLabel htmlFor={getFieldId('availableCapacity')} className="mb-2 block">
+            <RequiredLabel htmlFor={getFieldId('availableCapacity')} className="mb-2 block" required>
               Available Capacity
             </RequiredLabel>
             <Input
@@ -204,9 +204,9 @@ const CoworkingDetails: React.FC<FormSectionProps> = ({
           </div>
         </div>
         
-        {/* Pricing Structure */}
+        {/* Pricing Structure - ✅ FIXED: Added required prop */}
         <div className="mb-6">
-          <RequiredLabel htmlFor={getFieldId('pricingStructure')} className="mb-2 block">
+          <RequiredLabel htmlFor={getFieldId('pricingStructure')} className="mb-2 block" required>
             Pricing Structure
           </RequiredLabel>
           <select
@@ -233,9 +233,9 @@ const CoworkingDetails: React.FC<FormSectionProps> = ({
           )}
         </div>
         
-        {/* Base Price */}
+        {/* Base Price - ✅ FIXED: Added required prop */}
         <div className="mb-6">
-          <RequiredLabel htmlFor={getFieldId('basePrice')} className="mb-2 block">
+          <RequiredLabel htmlFor={getFieldId('basePrice')} className="mb-2 block" required>
             Base Price (₹)
           </RequiredLabel>
           <Input
@@ -257,9 +257,9 @@ const CoworkingDetails: React.FC<FormSectionProps> = ({
           )}
         </div>
         
-        {/* Lease Term */}
+        {/* Lease Term - ✅ FIXED: Added required prop */}
         <div className="mb-6">
-          <RequiredLabel htmlFor={getFieldId('leaseTerm')} className="mb-2 block">
+          <RequiredLabel htmlFor={getFieldId('leaseTerm')} className="mb-2 block" required>
             Lease Term
           </RequiredLabel>
           <select
@@ -286,9 +286,9 @@ const CoworkingDetails: React.FC<FormSectionProps> = ({
           )}
         </div>
         
-        {/* Security Deposit */}
+        {/* Security Deposit - ✅ FIXED: Added required prop */}
         <div className="mb-6">
-          <RequiredLabel htmlFor={getFieldId('securityDeposit')} className="mb-2 block">
+          <RequiredLabel htmlFor={getFieldId('securityDeposit')} className="mb-2 block" required>
             Security Deposit (₹)
           </RequiredLabel>
           <Input
@@ -310,9 +310,9 @@ const CoworkingDetails: React.FC<FormSectionProps> = ({
           )}
         </div>
         
-        {/* Booking Option */}
+        {/* Booking Option - ✅ FIXED: Added required prop */}
         <div className="mb-6">
-          <RequiredLabel htmlFor={getFieldId('bookingOption')} className="mb-2 block">
+          <RequiredLabel htmlFor={getFieldId('bookingOption')} className="mb-2 block" required>
             Booking Option
           </RequiredLabel>
           <select
@@ -339,10 +339,10 @@ const CoworkingDetails: React.FC<FormSectionProps> = ({
           )}
         </div>
         
-        {/* Operating Hours */}
+        {/* Operating Hours - ✅ FIXED: Added required prop to both fields */}
         <div className="grid md:grid-cols-2 gap-4 mb-6">
           <div>
-            <RequiredLabel htmlFor={getFieldId('openingTime')} className="mb-2 block">
+            <RequiredLabel htmlFor={getFieldId('openingTime')} className="mb-2 block" required>
               Opening Time
             </RequiredLabel>
             <Input
@@ -368,7 +368,7 @@ const CoworkingDetails: React.FC<FormSectionProps> = ({
           </div>
           
           <div>
-            <RequiredLabel htmlFor={getFieldId('closingTime')} className="mb-2 block">
+            <RequiredLabel htmlFor={getFieldId('closingTime')} className="mb-2 block" required>
               Closing Time
             </RequiredLabel>
             <Input
@@ -397,9 +397,9 @@ const CoworkingDetails: React.FC<FormSectionProps> = ({
           <input type="hidden" {...registerField('operatingHours')} />
         </div>
         
-        {/* Operating Days */}
+        {/* Operating Days - ✅ FIXED: Added required prop */}
         <div className="mb-6">
-          <RequiredLabel className="mb-2 block">Operating Days</RequiredLabel>
+          <RequiredLabel className="mb-2 block" required>Operating Days</RequiredLabel>
           <div className="flex flex-wrap gap-2">
             {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => (
               <label 
@@ -435,9 +435,9 @@ const CoworkingDetails: React.FC<FormSectionProps> = ({
           )}
         </div>
         
-        {/* Internet Speed */}
+        {/* Internet Speed - ✅ FIXED: Added required prop */}
         <div className="mb-6">
-          <RequiredLabel htmlFor={getFieldId('internetSpeed')} className="mb-2 block">
+          <RequiredLabel htmlFor={getFieldId('internetSpeed')} className="mb-2 block" required>
             Internet Speed
           </RequiredLabel>
           <select
@@ -464,9 +464,9 @@ const CoworkingDetails: React.FC<FormSectionProps> = ({
           )}
         </div>
         
-        {/* Coworking Amenities */}
+        {/* Coworking Amenities - ✅ FIXED: Added required prop */}
         <div className="mb-6">
-          <RequiredLabel className="mb-2 block">Amenities</RequiredLabel>
+          <RequiredLabel className="mb-2 block" required>Amenities</RequiredLabel>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
             {COWORKING_AMENITIES.map((amenity) => (
               <label 
@@ -502,12 +502,12 @@ const CoworkingDetails: React.FC<FormSectionProps> = ({
           )}
         </div>
         
-        {/* Additional Information */}
+        {/* Additional Information - ✅ KEPT: Optional field, no required prop */}
         <div className="mb-6">
           <div className="flex items-center justify-between mb-2">
-            <RequiredLabel htmlFor={getFieldId('additionalInformation')}>
+            <label htmlFor={getFieldId('additionalInformation')} className="text-sm font-medium text-foreground">
               Additional Information
-            </RequiredLabel>
+            </label>
             <div className="text-xs text-muted-foreground italic">Optional</div>
           </div>
           <Textarea
@@ -523,10 +523,10 @@ const CoworkingDetails: React.FC<FormSectionProps> = ({
           )}
         </div>
         
-        {/* Office Size and Seating Capacity */}
+        {/* Office Size and Seating Capacity - ✅ FIXED: Added required prop to both fields */}
         <div className="grid md:grid-cols-2 gap-4 mb-6">
           <div>
-            <RequiredLabel htmlFor={getFieldId('officeSize')} className="mb-2 block">
+            <RequiredLabel htmlFor={getFieldId('officeSize')} className="mb-2 block" required>
               Office Size (sqft)
             </RequiredLabel>
             <Input
@@ -549,7 +549,7 @@ const CoworkingDetails: React.FC<FormSectionProps> = ({
           </div>
           
           <div>
-            <RequiredLabel htmlFor={getFieldId('seatingCapacity')} className="mb-2 block">
+            <RequiredLabel htmlFor={getFieldId('seatingCapacity')} className="mb-2 block" required>
               Seating Capacity
             </RequiredLabel>
             <Input
