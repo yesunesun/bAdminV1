@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyDetails/LandSaleDetailsSection.tsx
-// Version: 1.4.0
-// Last Modified: 25-05-2025 18:15 IST
-// Purpose: Removed unused Soil Type field and refined the component
+// Version: 1.5.0
+// Last Modified: 03-06-2025 16:15 IST
+// Purpose: Fixed land type extraction from propertyType and implemented conditional rendering for empty fields
 
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -17,6 +17,15 @@ const LandSaleDetailsSection: React.FC<LandSaleDetailsSectionProps> = ({ landDet
     if (value === '') return defaultValue;
     if (value === 0 && defaultValue !== '0') return defaultValue;
     return String(value);
+  };
+
+  // Check if a value should be displayed (not empty/null/undefined)
+  const shouldDisplayField = (value: any): boolean => {
+    if (value === null || value === undefined || value === '') return false;
+    if (value === 0) return false; // Don't show zero values for land details
+    if (Array.isArray(value) && value.length === 0) return false;
+    if (typeof value === 'object' && Object.keys(value).length === 0) return false;
+    return true;
   };
 
   // Format currency in Indian Rupees
@@ -46,11 +55,19 @@ const LandSaleDetailsSection: React.FC<LandSaleDetailsSectionProps> = ({ landDet
       landDetails.expectedPrice || 
       (landDetails.price ? landDetails.price.toString() : '0');
     
+    // FIXED: Extract land type from propertyType field (this was the main issue)
+    const landType = 
+      landDetails.propertyType ||           // This is where "Residential Plot" is stored
+      basicDetails.propertyType ||
+      landDetails.landType || 
+      basicDetails.landType || 
+      '';
+    
     // Combine data from all potential locations, prioritizing the most specific
     return {
       expectedPrice: expectedPrice,
       isNegotiable: basicDetails.isNegotiable || landDetails.isNegotiable || false,
-      landType: landDetails.landType || basicDetails.landType || '',
+      landType: landType, // Using the fixed extraction
       plotArea: landDetails.builtUpArea || basicDetails.builtUpArea || '',
       plotAreaUnit: landDetails.builtUpAreaUnit || basicDetails.builtUpAreaUnit || 'sqft',
       plotLength: landDetails.plotLength || basicDetails.plotLength || '',
@@ -92,12 +109,108 @@ const LandSaleDetailsSection: React.FC<LandSaleDetailsSectionProps> = ({ landDet
     return `${area} ${unit || 'sqft'}`;
   };
 
-  // Format dimensions
+  // Format dimensions - only return if both values exist
   const formatDimensions = (length: any, width: any): string => {
-    if (!length && !width) return '-';
-    if (length && width) return `${length} × ${width}`;
-    return formatPropertyValue(length || width);
+    if (!length || !width) return '';
+    return `${length} × ${width}`;
   };
+
+  // Create an array of field configurations with conditional rendering
+  const fieldConfigurations = [
+    {
+      key: 'landType',
+      label: 'Land Type',
+      value: data.landType,
+      show: shouldDisplayField(data.landType)
+    },
+    {
+      key: 'plotArea',
+      label: 'Plot Area',
+      value: formatArea(data.plotArea, data.plotAreaUnit),
+      show: shouldDisplayField(data.plotArea)
+    },
+    {
+      key: 'plotDimensions',
+      label: 'Plot Dimensions',
+      value: formatDimensions(data.plotLength, data.plotWidth),
+      show: shouldDisplayField(data.plotLength) && shouldDisplayField(data.plotWidth)
+    },
+    {
+      key: 'plotFacing',
+      label: 'Plot Facing',
+      value: data.plotFacing,
+      show: shouldDisplayField(data.plotFacing)
+    },
+    {
+      key: 'approvalStatus',
+      label: 'Approval Status',
+      value: data.approvalStatus,
+      show: shouldDisplayField(data.approvalStatus)
+    },
+    {
+      key: 'boundaryType',
+      label: 'Boundary Type',
+      value: data.boundaryType,
+      show: shouldDisplayField(data.boundaryType)
+    },
+    {
+      key: 'topography',
+      label: 'Topography',
+      value: data.topography,
+      show: shouldDisplayField(data.topography)
+    },
+    {
+      key: 'waterAvailability',
+      label: 'Water Availability',
+      value: data.waterAvailability,
+      show: shouldDisplayField(data.waterAvailability)
+    },
+    {
+      key: 'electricityStatus',
+      label: 'Electricity Status',
+      value: data.electricityStatus,
+      show: shouldDisplayField(data.electricityStatus)
+    },
+    {
+      key: 'roadConnectivity',
+      label: 'Road Connectivity',
+      value: data.roadConnectivity,
+      show: shouldDisplayField(data.roadConnectivity)
+    },
+    {
+      key: 'developmentStatus',
+      label: 'Development Status',
+      value: data.developmentStatus,
+      show: shouldDisplayField(data.developmentStatus)
+    },
+    {
+      key: 'floorSpaceIndex',
+      label: 'Floor Space Index',
+      value: data.floorSpaceIndex,
+      show: shouldDisplayField(data.floorSpaceIndex)
+    },
+    {
+      key: 'surveyNumber',
+      label: 'Survey Number',
+      value: data.surveyNumber,
+      show: shouldDisplayField(data.surveyNumber)
+    },
+    {
+      key: 'khataNumber',
+      label: 'Khata Number',
+      value: data.khataNumber,
+      show: shouldDisplayField(data.khataNumber)
+    },
+    {
+      key: 'rera',
+      label: 'RERA ID',
+      value: data.rera,
+      show: shouldDisplayField(data.rera)
+    }
+  ];
+
+  // Filter out fields that shouldn't be displayed
+  const visibleFields = fieldConfigurations.filter(field => field.show);
 
   return (
     <Card className="overflow-hidden">
@@ -115,105 +228,34 @@ const LandSaleDetailsSection: React.FC<LandSaleDetailsSectionProps> = ({ landDet
           </div>
         </div>
         
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <p className="text-sm text-muted-foreground">Land Type</p>
-            <p className="font-medium">{formatPropertyValue(data.landType)}</p>
+        {/* Conditionally render fields in a responsive grid */}
+        {visibleFields.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {visibleFields.map((field) => (
+              <div key={field.key}>
+                <p className="text-sm text-muted-foreground">{field.label}</p>
+                <p className="font-medium">{field.value}</p>
+              </div>
+            ))}
           </div>
-          
-          <div>
-            <p className="text-sm text-muted-foreground">Plot Area</p>
-            <p className="font-medium">
-              {formatArea(data.plotArea, data.plotAreaUnit)}
-            </p>
+        ) : (
+          <div className="text-center py-4">
+            <p className="text-muted-foreground">No additional land details available.</p>
           </div>
+        )}
 
-          <div>
-            <p className="text-sm text-muted-foreground">Plot Dimensions</p>
-            <p className="font-medium">
-              {formatDimensions(data.plotLength, data.plotWidth)}
-            </p>
-          </div>
-          
-          <div>
-            <p className="text-sm text-muted-foreground">Plot Facing</p>
-            <p className="font-medium">{formatPropertyValue(data.plotFacing)}</p>
-          </div>
-          
-          <div>
-            <p className="text-sm text-muted-foreground">Approval Status</p>
-            <p className="font-medium">{formatPropertyValue(data.approvalStatus)}</p>
-          </div>
-          
-          <div>
-            <p className="text-sm text-muted-foreground">Boundary Type</p>
-            <p className="font-medium">{formatPropertyValue(data.boundaryType)}</p>
-          </div>
-          
-          <div>
-            <p className="text-sm text-muted-foreground">Topography</p>
-            <p className="font-medium">{formatPropertyValue(data.topography)}</p>
-          </div>
-          
-          <div>
-            <p className="text-sm text-muted-foreground">Water Availability</p>
-            <p className="font-medium">{formatPropertyValue(data.waterAvailability)}</p>
-          </div>
-          
-          <div>
-            <p className="text-sm text-muted-foreground">Electricity Status</p>
-            <p className="font-medium">{formatPropertyValue(data.electricityStatus)}</p>
-          </div>
-          
-          <div>
-            <p className="text-sm text-muted-foreground">Road Connectivity</p>
-            <p className="font-medium">{formatPropertyValue(data.roadConnectivity)}</p>
-          </div>
-          
-          <div>
-            <p className="text-sm text-muted-foreground">Development Status</p>
-            <p className="font-medium">{formatPropertyValue(data.developmentStatus)}</p>
-          </div>
-
-          {data.floorSpaceIndex && (
-            <div>
-              <p className="text-sm text-muted-foreground">Floor Space Index</p>
-              <p className="font-medium">{formatPropertyValue(data.floorSpaceIndex)}</p>
-            </div>
-          )}
-
-          {data.surveyNumber && (
-            <div>
-              <p className="text-sm text-muted-foreground">Survey Number</p>
-              <p className="font-medium">{formatPropertyValue(data.surveyNumber)}</p>
-            </div>
-          )}
-
-          {data.khataNumber && (
-            <div>
-              <p className="text-sm text-muted-foreground">Khata Number</p>
-              <p className="font-medium">{formatPropertyValue(data.khataNumber)}</p>
-            </div>
-          )}
-
-          {data.rera && (
-            <div>
-              <p className="text-sm text-muted-foreground">RERA ID</p>
-              <p className="font-medium">{formatPropertyValue(data.rera)}</p>
-            </div>
-          )}
-        </div>
-
-        {data.description && (
-          <div className="mt-4 pt-4 border-t border-gray-200">
-            <p className="text-sm text-muted-foreground mb-1">Description</p>
+        {/* Description section - only show if description exists */}
+        {shouldDisplayField(data.description) && (
+          <div className="mt-6 pt-4 border-t border-gray-200">
+            <p className="text-sm text-muted-foreground mb-2">Description</p>
             <p className="whitespace-pre-line">{data.description}</p>
           </div>
         )}
         
-        {data.nearbyLandmarks && (
+        {/* Nearby landmarks section - only show if landmarks exist */}
+        {shouldDisplayField(data.nearbyLandmarks) && (
           <div className="mt-4 pt-4 border-t border-gray-200">
-            <p className="text-sm text-muted-foreground mb-1">Nearby Landmarks</p>
+            <p className="text-sm text-muted-foreground mb-2">Nearby Landmarks</p>
             <p>{data.nearbyLandmarks}</p>
           </div>
         )}
