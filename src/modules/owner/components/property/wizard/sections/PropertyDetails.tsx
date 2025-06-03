@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/PropertyDetails.tsx
-// Version: 4.6.0
-// Last Modified: 30-05-2025 20:45 IST
-// Purpose: Fixed Property Type placeholder, progress calculation, and made Available From mandatory
+// Version: 4.7.0
+// Last Modified: 03-06-2025 12:45 IST
+// Purpose: Removed Bathrooms field and updated mandatory validations for Residential Rent flow
 
 import React, { useEffect, useState, useRef } from 'react';
 import { FormSection } from '@/components/FormSection';
@@ -47,10 +47,10 @@ export function PropertyDetails({
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
 
-  // ✅ FIXED: Updated required fields to include availableFrom
+  // ✅ UPDATED: Removed 'bathrooms' from required fields
   const requiredFields = [
     'propertyType', 'bhkType', 'floor', 'totalFloors', 
-    'propertyAge', 'facing', 'builtUpArea', 'bathrooms', 'availableFrom'
+    'propertyAge', 'facing', 'builtUpArea', 'availableFrom'
   ];
 
   // Helper functions for form data management
@@ -108,7 +108,7 @@ export function PropertyDetails({
     }
   };
 
-  // Basic field validation
+  // ✅ UPDATED: Basic field validation - removed bathrooms validation logic
   const validateField = (fieldName: string, value: any) => {
     let error = '';
     
@@ -123,12 +123,8 @@ export function PropertyDetails({
     switch (fieldName) {
       case 'floor':
       case 'totalFloors':
-      case 'bathrooms':
         if (value && (isNaN(parseInt(value)) || parseInt(value) < 0)) {
           error = `${getFieldLabel(fieldName)} must be a valid number`;
-        }
-        if (fieldName === 'bathrooms' && value && parseInt(value) < 1) {
-          error = 'At least 1 bathroom is required';
         }
         break;
       case 'builtUpArea':
@@ -158,7 +154,7 @@ export function PropertyDetails({
     return error === '';
   };
 
-  // Get user-friendly field label
+  // ✅ UPDATED: Get user-friendly field label - removed bathrooms
   const getFieldLabel = (fieldName: string): string => {
     const labels: Record<string, string> = {
       propertyType: 'Property Type',
@@ -168,7 +164,6 @@ export function PropertyDetails({
       propertyAge: 'Property Age',
       facing: 'Facing Direction',
       builtUpArea: 'Built-up Area',
-      bathrooms: 'Bathrooms',
       availableFrom: 'Available From'
     };
     return labels[fieldName] || fieldName;
@@ -182,10 +177,10 @@ export function PropertyDetails({
     return touchedFields.has(fieldName) && validationErrors[fieldName];
   };
 
-  // State for form values
+  // ✅ UPDATED: State for form values - removed bathrooms
   const [values, setValues] = useState({
     title: getField('title', ''),
-    propertyType: getField('propertyType', '') || category || 'Apartment', // ✅ FIXED: Default to 'Apartment'
+    propertyType: getField('propertyType', '') || category || 'Apartment',
     bhkType: getField('bhkType', ''),
     floor: getField('floor', ''),
     totalFloors: getField('totalFloors', ''),
@@ -193,7 +188,6 @@ export function PropertyDetails({
     facing: getField('facing', ''),
     builtUpArea: getField('builtUpArea', ''),
     builtUpAreaUnit: getField('builtUpAreaUnit', 'sqft'),
-    bathrooms: getField('bathrooms', ''),
     availableFrom: getField('availableFrom', '')
   });
 
@@ -204,13 +198,13 @@ export function PropertyDetails({
     };
   }, []);
 
-  // Initialize and migrate data
+  // ✅ UPDATED: Initialize and migrate data - removed bathrooms handling
   useEffect(() => {
     if (initialProcessDone.current) return;
     
     initialProcessDone.current = true;
     
-    // ✅ FIXED: Set default property type if none exists
+    // Set default property type if none exists
     if (!getField('propertyType')) {
       const defaultPropertyType = category || 'Apartment';
       saveField('propertyType', defaultPropertyType);
@@ -221,12 +215,12 @@ export function PropertyDetails({
       saveField('builtUpAreaUnit', 'sqft');
     }
     
-    // Process nested structure (v2 format)
+    // Process nested structure (v2 format) - removed bathrooms
     const basicDetails = form.getValues('basicDetails');
     if (basicDetails) {
       const fieldsToMigrate = [
         'title', 'propertyType', 'bhkType', 'floor', 'totalFloors', 
-        'propertyAge', 'facing', 'builtUpArea', 'builtUpAreaUnit', 'bathrooms', 'availableFrom'
+        'propertyAge', 'facing', 'builtUpArea', 'builtUpAreaUnit', 'availableFrom'
       ];
       
       fieldsToMigrate.forEach(field => {
@@ -239,10 +233,10 @@ export function PropertyDetails({
       });
     }
     
-    // Migrate from root to step structure
+    // Migrate from root to step structure - removed bathrooms
     const rootFields = [
       'title', 'propertyType', 'bhkType', 'floor', 'totalFloors', 
-      'propertyAge', 'facing', 'builtUpArea', 'builtUpAreaUnit', 'bathrooms', 'availableFrom'
+      'propertyAge', 'facing', 'builtUpArea', 'builtUpAreaUnit', 'availableFrom'
     ];
     
     rootFields.forEach(field => {
@@ -258,7 +252,7 @@ export function PropertyDetails({
     updateStateFromForm();
   }, []);
 
-  // Update component state from form values
+  // ✅ UPDATED: Update component state from form values - removed bathrooms
   const updateStateFromForm = () => {
     if (!isMounted.current) return;
     
@@ -267,7 +261,7 @@ export function PropertyDetails({
     
     const newValues = {
       title: stepData.title || formValues.title || '',
-      propertyType: stepData.propertyType || formValues.propertyType || category || 'Apartment', // ✅ FIXED: Default to 'Apartment'
+      propertyType: stepData.propertyType || formValues.propertyType || category || 'Apartment',
       bhkType: stepData.bhkType || formValues.bhkType || '',
       floor: stepData.floor?.toString() || formValues.floor || '',
       totalFloors: stepData.totalFloors?.toString() || formValues.totalFloors || '',
@@ -275,7 +269,6 @@ export function PropertyDetails({
       facing: stepData.facing || formValues.facing || '',
       builtUpArea: stepData.builtUpArea?.toString() || formValues.builtUpArea || '',
       builtUpAreaUnit: stepData.builtUpAreaUnit || formValues.builtUpAreaUnit || 'sqft',
-      bathrooms: stepData.bathrooms?.toString() || formValues.bathrooms || '',
       availableFrom: stepData.availableFrom || formValues.availableFrom || ''
     };
     
@@ -304,7 +297,7 @@ export function PropertyDetails({
     updateFormAndState(fieldName, numValue.toString());
   };
 
-  // ✅ FIXED: Calculate completion percentage properly - only count fields that actually have values
+  // Calculate completion percentage properly - only count fields that actually have values
   const completionPercentage = () => {
     const completedFields = requiredFields.filter(field => {
       const value = values[field as keyof typeof values];
@@ -348,7 +341,8 @@ export function PropertyDetails({
         </div>
         {!isStepValid && (
           <p className="text-xs text-blue-600 mt-2">
-            Required fields: Property Type, BHK, Floor, Total Floors, Age, Facing, Built-up Area, Bathrooms, Available From
+            {/* ✅ UPDATED: Removed Bathrooms from required fields text */}
+            Required fields: Property Type, BHK, Floor, Total Floors, Age, Facing, Built-up Area, Available From
           </p>
         )}
       </div>
@@ -377,7 +371,6 @@ export function PropertyDetails({
               onValueChange={(value) => updateFormAndState('propertyType', value)}
             >
               <SelectTrigger className="h-12 text-base mt-2">
-                {/* ✅ FIXED: Changed placeholder to "Select Property Type" */}
                 <SelectValue placeholder="Select Property Type" />
               </SelectTrigger>
               <SelectContent className="text-base">
@@ -451,25 +444,8 @@ export function PropertyDetails({
           </div>
         </div>
 
-        {/* Bathrooms and Property Age */}
+        {/* ✅ UPDATED: Property Age and Facing - removed Bathrooms, moved Property Age to first column */}
         <div className="grid grid-cols-2 gap-4">
-          <div>
-            <RequiredLabel required className="text-base">Bathrooms</RequiredLabel>
-            <Input
-              type="number"
-              min="1"
-              max="10"
-              className="h-12 text-base mt-2"
-              value={values.bathrooms}
-              placeholder="Number of bathrooms"
-              onChange={(e) => handleNumberInput(e.target.value, 'bathrooms')}
-              onBlur={() => markFieldTouched('bathrooms')}
-            />
-            {shouldShowError('bathrooms') && (
-              <p className="text-sm text-red-500 mt-2">⚠️ {validationErrors.bathrooms}</p>
-            )}
-          </div>
-
           <div>
             <RequiredLabel required className="text-base">Property Age</RequiredLabel>
             <Select 
@@ -491,10 +467,7 @@ export function PropertyDetails({
               <p className="text-sm text-red-500 mt-2">⚠️ {validationErrors.propertyAge}</p>
             )}
           </div>
-        </div>
 
-        {/* Facing Direction and Available From */}
-        <div className="grid grid-cols-2 gap-4">
           <div>
             <RequiredLabel required className="text-base">Facing Direction</RequiredLabel>
             <Select 
@@ -516,8 +489,10 @@ export function PropertyDetails({
               <p className="text-sm text-red-500 mt-2">⚠️ {validationErrors.facing}</p>
             )}
           </div>
+        </div>
 
-          {/* ✅ FIXED: Made Available From mandatory */}
+        {/* ✅ UPDATED: Available From (moved to single column since we have space now) */}
+        <div className="grid grid-cols-2 gap-4">
           <div>
             <RequiredLabel required className="text-base">Available From</RequiredLabel>
             <Input
@@ -531,6 +506,11 @@ export function PropertyDetails({
             {shouldShowError('availableFrom') && (
               <p className="text-sm text-red-500 mt-2">⚠️ {validationErrors.availableFrom}</p>
             )}
+          </div>
+          
+          {/* Empty column to maintain balanced layout */}
+          <div className="invisible">
+            {/* Placeholder for balanced grid */}
           </div>
         </div>
 

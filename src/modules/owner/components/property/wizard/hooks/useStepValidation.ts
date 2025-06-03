@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/hooks/useStepValidation.ts
-// Version: 5.8.0
-// Last Modified: 02-06-2025 19:35 IST
-// Purpose: Fixed commercial sale features validation to match actual CommercialFeatures.tsx requirements
+// Version: 5.9.0
+// Last Modified: 03-06-2025 12:50 IST
+// Purpose: Fixed Residential Rent validation - removed bathrooms from required fields
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { UseFormReturn } from 'react-hook-form';
@@ -43,11 +43,11 @@ export function useStepValidation({
    lastCheckedStep: ''
  });
  
- // ✅ FIXED: Get required fields for current step - Corrected Commercial Sale Features validation
+ // ✅ FIXED: Get required fields for current step - Removed bathrooms from Residential Rent basic details
  const getRequiredFieldsForStep = useCallback((stepId: string): string[] => {
    const stepFieldMap: Record<string, string[]> = {
-     // Basic details steps - ✅ UPDATED: Added availableFrom to all property details steps
-     'res_rent_basic_details': ['propertyType', 'bhkType', 'floor', 'totalFloors', 'propertyAge', 'facing', 'builtUpArea', 'bathrooms', 'availableFrom'],
+     // ✅ UPDATED: Basic details steps - Removed bathrooms from residential rent, added availableFrom to all property details steps
+     'res_rent_basic_details': ['propertyType', 'bhkType', 'floor', 'totalFloors', 'propertyAge', 'facing', 'builtUpArea', 'availableFrom'],
      'res_sale_basic_details': ['propertyType', 'bhkType', 'floor', 'totalFloors', 'propertyAge', 'facing', 'builtUpArea', 'bathrooms', 'availableFrom'],
      
      // ✅ FIXED: Residential Flatmates basic details (Room Details component) - matches actual RoomDetails.tsx fields

@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/sections/RentalDetails.tsx
-// Version: 3.2.0
-// Last Modified: 02-06-2025 15:45 IST
-// Purpose: Added "Any" master toggle for preferred tenants and made maintenance charges mandatory
+// Version: 3.3.0
+// Last Modified: 03-06-2025 12:30 IST
+// Purpose: Updated Monthly Rent Amount + Price is Negotiable UI to match Commercial Rent design pattern
 
 import React, { useEffect, useState } from 'react';
 import { FormData, FormSectionProps } from '../types';
@@ -16,6 +16,8 @@ import { FormSection } from '@/components/FormSection';
 import { ValidatedInput } from '@/components/ui/ValidatedInput';
 import { ValidatedSelect } from '@/components/ui/ValidatedSelect';
 import { FormFieldLabel } from '@/components/ui/RequiredLabel';
+import { RequiredLabel } from '@/components/ui/RequiredLabel';
+import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useStepValidation } from '../hooks/useStepValidation';
 import { cn } from '@/lib/utils';
@@ -95,6 +97,21 @@ export const RentalDetails: React.FC<FormSectionProps> = ({
   const isAnySelected = values.preferredTenants.includes('Any');
   const nonAnyTenants = TENANT_PREFERENCES.filter(pref => pref !== 'Any');
   const areAllNonAnySelected = nonAnyTenants.every(pref => values.preferredTenants.includes(pref));
+
+  // ✅ NEW: Function to format number to Indian currency format (matching Commercial Rent)
+  const formatToIndianCurrency = (value: number): string => {
+    if (!value) return '';
+    
+    if (value >= 10000000) {
+      return `₹ ${(value / 10000000).toFixed(2)} Crores`;
+    } else if (value >= 100000) {
+      return `₹ ${(value / 100000).toFixed(0)} Lacs`;
+    } else if (value >= 1000) {
+      return `₹ ${(value / 1000).toFixed(0)} Thousand`;
+    } else {
+      return `₹ ${value}`;
+    }
+  };
 
   // Migrate existing data from root to step object
   useEffect(() => {
@@ -300,41 +317,50 @@ export const RentalDetails: React.FC<FormSectionProps> = ({
       )}
 
       <div className="space-y-6">
-        {/* Rent Amount and Security Deposit */}
+        {/* ✅ UPDATED: Rent Amount and Security Deposit with new Monthly Rent Amount design */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <ValidatedInput
-              form={form}
-              name="rentAmount"
-              label="Monthly Rent Amount"
-              type="text"
-              inputMode="numeric"
-              placeholder="e.g., 15000"
-              value={values.rentAmount}
-              required={true}
-              helperText="Enter monthly rent in ₹"
-              error={shouldShowFieldError('rentAmount') ? getFieldValidation('rentAmount').error : null}
-              isValid={getFieldValidation('rentAmount').isValid}
-              isTouched={getFieldValidation('rentAmount').isTouched}
-              onValidation={(field, value) => handleCurrencyInput(value, field)}
-              onChange={(e) => handleCurrencyInput(e.target.value, 'rentAmount')}
-              size="lg"
-            />
-            
-            {/* Negotiable checkbox */}
-            <div className="flex items-center space-x-2 mt-2">
-              <Checkbox
-                id="rentNegotiable"
-                checked={values.rentNegotiable}
-                onCheckedChange={(checked) => updateFormAndState('rentNegotiable', !!checked)}
+          {/* ✅ UPDATED: Monthly Rent Amount - now matches Commercial Rent pattern */}
+          <div className="space-y-2">
+            <RequiredLabel htmlFor="rentAmount" required>
+              Monthly Rent Amount (₹)
+            </RequiredLabel>
+            <div className="relative">
+              <Input
+                id="rentAmount"
+                type="text"
+                placeholder="e.g. 15000"
+                className={cn(
+                  shouldShowFieldError('rentAmount') && "border-destructive focus-visible:ring-destructive"
+                )}
+                value={values.rentAmount}
+                onChange={(e) => handleCurrencyInput(e.target.value, 'rentAmount')}
               />
-              <label
-                htmlFor="rentNegotiable"
-                className="text-sm font-medium text-gray-700 cursor-pointer"
-              >
-                Price is negotiable
-              </label>
+              <div className="absolute right-3 top-2.5">
+                <Checkbox
+                  id="rentNegotiable"
+                  checked={values.rentNegotiable}
+                  onCheckedChange={(checked) => updateFormAndState('rentNegotiable', !!checked)}
+                />
+                <label
+                  htmlFor="rentNegotiable"
+                  className="ml-1.5 text-xs font-medium text-muted-foreground cursor-pointer"
+                >
+                  Negotiable
+                </label>
+              </div>
             </div>
+            {/* ✅ NEW: Currency formatting display (matching Commercial Rent) */}
+            {values.rentAmount && !isNaN(Number(values.rentAmount)) && (
+              <p className="text-sm text-teal-500 text-right">
+                {formatToIndianCurrency(Number(values.rentAmount))}
+              </p>
+            )}
+            {/* ✅ Validation error display */}
+            {shouldShowFieldError('rentAmount') && (
+              <p className="text-sm text-red-600 mt-0.5">
+                {getFieldValidation('rentAmount').error}
+              </p>
+            )}
           </div>
 
           <ValidatedInput

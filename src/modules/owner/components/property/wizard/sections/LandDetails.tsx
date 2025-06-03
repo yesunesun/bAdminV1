@@ -1,13 +1,14 @@
 // src/modules/owner/components/property/wizard/sections/LandDetails.tsx
-// Version: 4.1.0
-// Last Modified: 30-05-2025 22:30 IST
-// Purpose: Fixed required field markings (*) and aligned field names with validation system
+// Version: 4.2.0
+// Last Modified: 03-06-2025 12:15 IST
+// Purpose: Updated Expected Price + Negotiable UI to match Commercial Rent design pattern
 
 import React, { useEffect, useCallback, useState } from 'react';
 import { FormSection } from '@/components/FormSection';
 import { RequiredLabel } from '@/components/ui/RequiredLabel';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useStepValidation } from '../hooks/useStepValidation';
 import { cn } from '@/lib/utils';
 import { FormSectionProps } from '../types';
@@ -121,6 +122,21 @@ const LandDetails: React.FC<FormSectionProps> = ({
     return () => subscription.unsubscribe();
   }, [form, stepId]);
 
+  // ✅ NEW: Function to format number to Indian currency format (matching Commercial Rent)
+  const formatToIndianCurrency = (value: number): string => {
+    if (!value) return '';
+    
+    if (value >= 10000000) {
+      return `₹ ${(value / 10000000).toFixed(2)} Crores`;
+    } else if (value >= 100000) {
+      return `₹ ${(value / 100000).toFixed(0)} Lacs`;
+    } else if (value >= 1000) {
+      return `₹ ${(value / 1000).toFixed(0)} Thousand`;
+    } else {
+      return `₹ ${value}`;
+    }
+  };
+
   const isAgricultural = localState.propertyType === 'Agricultural Land';
   
   return (
@@ -215,7 +231,7 @@ const LandDetails: React.FC<FormSectionProps> = ({
           </div>
         </div>
         
-        {/* Plot Facing and Price */}
+        {/* Plot Facing and Price - ✅ UPDATED: Expected Price now matches Commercial Rent pattern */}
         <div className="grid md:grid-cols-2 gap-4 mb-6">
           <div>
             <RequiredLabel 
@@ -240,37 +256,51 @@ const LandDetails: React.FC<FormSectionProps> = ({
             </select>
           </div>
           
-          <div>
+          {/* ✅ UPDATED: Expected Price field now matches Commercial Rent design exactly */}
+          <div className="space-y-2">
             <RequiredLabel 
               htmlFor="expectedPrice" 
-              className="mb-2 block"
               required={true}
             >
               Expected Price (₹)
             </RequiredLabel>
-            <Input
-              id="expectedPrice"
-              type="text"
-              placeholder="e.g., 5000000"
-              className="h-12 px-4 py-2 rounded-xl border border-border bg-background w-full"
-              value={localState.expectedPrice}
-              onChange={(e) => saveField('expectedPrice', e.target.value)}
-            />
-            <div className="flex items-center space-x-2 pt-2 mt-1">
-              <input
-                type="checkbox"
-                id="isNegotiable"
-                className="h-4 w-4 text-primary border-gray-300 focus:ring-primary"
-                checked={localState.isNegotiable || false}
-                onChange={(e) => saveField('isNegotiable', e.target.checked)}
+            <div className="relative">
+              <Input
+                id="expectedPrice"
+                type="text"
+                placeholder="e.g. 5000000"
+                className={cn(
+                  shouldShowFieldError('expectedPrice') && "border-destructive focus-visible:ring-destructive"
+                )}
+                value={localState.expectedPrice}
+                onChange={(e) => saveField('expectedPrice', e.target.value)}
               />
-              <label
-                htmlFor="isNegotiable"
-                className="text-sm text-gray-600 font-medium"
-              >
-                Price Negotiable
-              </label>
+              <div className="absolute right-3 top-2.5">
+                <Checkbox
+                  id="priceNegotiable"
+                  checked={localState.isNegotiable}
+                  onCheckedChange={(checked) => saveField('isNegotiable', !!checked)}
+                />
+                <label
+                  htmlFor="priceNegotiable"
+                  className="ml-1.5 text-xs font-medium text-muted-foreground cursor-pointer"
+                >
+                  Negotiable
+                </label>
+              </div>
             </div>
+            {/* ✅ NEW: Currency formatting display (matching Commercial Rent) */}
+            {localState.expectedPrice && !isNaN(Number(localState.expectedPrice)) && (
+              <p className="text-sm text-teal-500 text-right">
+                {formatToIndianCurrency(Number(localState.expectedPrice))}
+              </p>
+            )}
+            {/* ✅ Validation error display */}
+            {shouldShowFieldError('expectedPrice') && (
+              <p className="text-sm text-red-600 mt-0.5">
+                {getFieldValidation('expectedPrice').error}
+              </p>
+            )}
           </div>
         </div>
         
@@ -460,30 +490,6 @@ const LandDetails: React.FC<FormSectionProps> = ({
               )}
             </div>
           </div>
-        </div>
-        
-        {/* Road Connectivity - ✅ FIXED: Has proper required marking */}
-        <div className="mb-6">
-          <RequiredLabel 
-            htmlFor="roadConnectivity" 
-            className="mb-2 block"
-            required={getFieldConfig('roadConnectivity').required}
-          >
-            Road Connectivity
-          </RequiredLabel>
-          <select
-            id="roadConnectivity"
-            className="w-full h-12 px-4 py-2 rounded-xl border border-border bg-background"
-            value={localState.roadConnectivity}
-            onChange={(e) => saveField('roadConnectivity', e.target.value)}
-          >
-            <option value="">Select road connectivity</option>
-            {ROAD_CONNECTIVITY.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
         </div>
         
         {/* Additional Details - ✅ FIXED: Has proper required marking (optional field) */}
