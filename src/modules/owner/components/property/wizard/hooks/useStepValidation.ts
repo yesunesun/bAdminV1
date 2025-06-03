@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/hooks/useStepValidation.ts
-// Version: 5.10.0
-// Last Modified: 03-06-2025 14:35 IST
-// Purpose: Fixed residential sale validation - removed bathrooms from property details step
+// Version: 5.11.0
+// Last Modified: 03-06-2025 15:35 IST
+// Purpose: Fixed Commercial Co-working basic details validation - updated required fields mapping
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { UseFormReturn } from 'react-hook-form';
@@ -43,7 +43,7 @@ export function useStepValidation({
    lastCheckedStep: ''
  });
  
- // ✅ FIXED: Get required fields for current step - Removed bathrooms from ALL property details steps
+ // ✅ FIXED: Get required fields for current step - Updated Commercial Co-working basic details
  const getRequiredFieldsForStep = useCallback((stepId: string): string[] => {
    const stepFieldMap: Record<string, string[]> = {
      // ✅ FIXED: Basic details steps - Removed bathrooms from ALL residential property details steps
@@ -59,7 +59,9 @@ export function useStepValidation({
      // ✅ FIXED: Commercial basic details - exactly matching UI requirements
      'com_rent_basic_details': ['propertyType', 'buildingType', 'ageOfProperty', 'builtUpArea', 'floor', 'totalFloors'],
      'com_sale_basic_details': ['propertyType', 'buildingType', 'ageOfProperty', 'builtUpArea', 'floor', 'totalFloors'],
-     'com_cow_basic_details': ['propertyType', 'spaceType', 'capacity'],
+     
+     // ✅ FIXED: Commercial Co-working basic details - Updated to match actual mandatory fields
+     'com_cow_basic_details': ['title', 'propertyType', 'builtUpArea', 'propertyAge', 'floor', 'totalFloors', 'facing'],
      
      // ✅ UPDATED: Land basic details - now includes expectedPrice as required
      'land_sale_basic_details': [
@@ -203,6 +205,29 @@ export function useStepValidation({
            const totalFloors = parseInt(values.totalFloors);
            if (isNaN(floor) || isNaN(totalFloors)) {
             return { isValid: true };
+          }
+          
+          if (totalFloors < floor) {
+            return { 
+              isValid: false, 
+              error: 'Total Floors should be equal to or greater than Floor' 
+            };
+          }
+          
+          return { isValid: true };
+        }
+      }
+    ],
+    // ✅ ADDED: Commercial Co-working basic details floor validation
+    'com_cow_basic_details': [
+      {
+        fields: ['floor', 'totalFloors'],
+        validate: (values) => {
+          const floor = parseInt(values.floor);
+          const totalFloors = parseInt(values.totalFloors);
+          
+          if (isNaN(floor) || isNaN(totalFloors)) {
+            return { isValid: true }; // Skip validation if either is not a number
           }
           
           if (totalFloors < floor) {
@@ -655,7 +680,7 @@ return {
 };
 }
 
-// Helper function to get user-friendly field labels - ✅ UPDATED: Added Commercial Sale field labels
+// Helper function to get user-friendly field labels - ✅ UPDATED: Added Commercial Co-working field labels
 function getFieldLabel(fieldName: string): string {
 const labels: Record<string, string> = {
   // Property Details fields
@@ -670,6 +695,10 @@ const labels: Record<string, string> = {
   builtUpArea: 'Built-up Area',
   bathrooms: 'Bathrooms',
   availableFrom: 'Available From',
+  
+  // ✅ ADDED: Commercial Co-working specific fields
+  title: 'Property Title',
+  spaceType: 'Co-working Space Type',
   
   // Location fields
   address: 'Complete Address',
@@ -737,7 +766,6 @@ const labels: Record<string, string> = {
   propertyShowOption: 'Who Shows Property',
   
   // Commercial fields
-  spaceType: 'Space Type',
   capacity: 'Capacity',
   
   // ✅ ADDED: Flatmate Details specific field labels

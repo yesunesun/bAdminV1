@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/validation/fieldValidationConfig.ts
-// Version: 2.4.0
-// Last Modified: 03-06-2025 14:30 IST
-// Purpose: Fixed residential sale validation - removed bathrooms requirement and fixed totalFloors validation
+// Version: 2.5.0
+// Last Modified: 03-06-2025 15:40 IST
+// Purpose: Fixed Commercial Co-working validation - Added title and facing fields validation
 
 // Validation types
 export type ValidationRule = {
@@ -85,7 +85,7 @@ export const COMMON_VALIDATIONS = {
   }
 };
 
-// ✅ UPDATED: Fixed totalFloors validation and conditionally required bathrooms
+// ✅ UPDATED: Added Commercial Co-working specific field validations
 export const BASIC_FIELD_VALIDATIONS: Record<string, ValidationRule> = {
   // Location fields
   address: COMMON_VALIDATIONS.ADDRESS,
@@ -93,6 +93,20 @@ export const BASIC_FIELD_VALIDATIONS: Record<string, ValidationRule> = {
   state: COMMON_VALIDATIONS.REQUIRED,
   pinCode: COMMON_VALIDATIONS.PIN_CODE,
   locality: COMMON_VALIDATIONS.REQUIRED,
+  
+  // ✅ ADDED: Commercial Co-working specific validations
+  title: { 
+    required: true, 
+    minLength: 5, 
+    maxLength: 100,
+    custom: (value: any) => {
+      if (!value || typeof value !== 'string') return 'Property title is required';
+      const trimmedValue = value.trim();
+      if (trimmedValue.length < 5) return 'Property title must be at least 5 characters';
+      if (trimmedValue.length > 100) return 'Property title must not exceed 100 characters';
+      return null;
+    }
+  },
   
   // Property details - ✅ FIXED: Updated totalFloors validation to handle string/number conversion
   propertyType: COMMON_VALIDATIONS.REQUIRED,
@@ -231,6 +245,11 @@ const shouldRequireBathrooms = (flowType: string, stepId: string): boolean => {
     return false;
   }
   
+  // Commercial Co-working should NOT require bathrooms in basic details step
+  if (flowType === 'commercial_coworking' && stepId === 'com_cow_basic_details') {
+    return false;
+  }
+  
   // Check if current flow/step combination should require bathrooms
   const requiredSteps = bathroomRequiredFlows[flowType] || [];
   return requiredSteps.includes(stepId);
@@ -307,6 +326,9 @@ const getFieldLabel = (fieldName: string): string => {
     latitude: 'Latitude',
     longitude: 'Longitude',
     availableFrom: 'Available From',
+    
+    // ✅ ADDED: Commercial Co-working specific field labels
+    title: 'Property Title',
     
     // Sale details field labels
     expectedPrice: 'Expected Price',
@@ -386,7 +408,7 @@ export const validateStep = (stepId: string, formData: any): { isValid: boolean;
   };
 };
 
-// ✅ UPDATED: Fixed required fields mapping - removed bathrooms from property details steps
+// ✅ UPDATED: Fixed required fields mapping - Updated Commercial Co-working basic details
 const getRequiredFieldsForStep = (stepId: string): string[] => {
   const stepFieldMap: Record<string, string[]> = {
     // ✅ FIXED: Residential rent - removed bathrooms from basic details
@@ -418,8 +440,8 @@ const getRequiredFieldsForStep = (stepId: string): string[] => {
     'com_sale_sale_details': ['expectedPrice', 'ownershipType', 'availableFrom'],
     'com_sale_features': ['powerBackup', 'lift', 'parkingType', 'washroomType', 'propertyCondition'],
     
-    // Commercial coworking
-    'com_cow_basic_details': ['propertyType', 'spaceType', 'capacity'],
+    // ✅ UPDATED: Commercial coworking - Updated to match actual mandatory fields
+    'com_cow_basic_details': ['title', 'propertyType', 'builtUpArea', 'propertyAge', 'floor', 'totalFloors', 'facing'],
     'com_cow_location': ['address', 'city', 'state', 'pinCode', 'locality'],
     'com_cow_features': ['propertyShowOption', 'propertyCondition', 'amenities'],
     
@@ -466,6 +488,9 @@ const getFieldType = (fieldName: string): FieldConfig['type'] => {
     bathrooms: 'number',
     builtUpArea: 'number',
     availableFrom: 'date',
+    
+    // ✅ ADDED: Commercial Co-working specific field types
+    title: 'text',
     
     // Sale details field types
     expectedPrice: 'number',
@@ -537,9 +562,11 @@ const getStepName = (stepId: string): string => {
     'com_sale_location': 'Location Details',
     'com_sale_sale_details': 'Sale Details',
     'com_sale_features': 'Commercial Features',
-    'com_cow_basic_details': 'Coworking Details',
+    
+    // ✅ UPDATED: Commercial Co-working step names
+    'com_cow_basic_details': 'Co-working Basic Details',
     'com_cow_location': 'Location Details',
-    'com_cow_features': 'Coworking Features',
+    'com_cow_features': 'Co-working Features',
     
     'land_sale_basic_details': 'Land Details',
     'land_sale_location': 'Location Details',

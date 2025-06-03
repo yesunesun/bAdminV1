@@ -1,21 +1,65 @@
 // src/modules/seeker/services/utilityService.ts
-// Version: 2.3.0
-// Last Modified: 14-05-2025 22:00 IST
-// Purpose: Final improvements to price extraction for all property types
+// Version: 2.4.1
+// Last Modified: 02-06-2025 16:25 IST
+// Purpose: Fixed syntax error in extractImagesFromProperty function
 
 import { supabase } from '@/lib/supabase';
 import { markerPins } from './constants';
 import { PropertyType } from '@/modules/owner/components/property/types';
 
-// Format price to Indian format (e.g. ₹1.5 Cr, ₹75 L)
-export const formatPrice = (price: number): string => {
-  if (price >= 10000000) {
-    return `₹${(price / 10000000).toFixed(2)} Cr`;
-  } else if (price >= 100000) {
-    return `₹${(price / 100000).toFixed(2)} L`;
-  } else {
-    return `₹${price.toLocaleString('en-IN')}`;
+// Format price to Indian format with comprehensive null checking
+export const formatPrice = (price: number | null | undefined): string => {
+  // Handle null, undefined, or invalid values
+  if (price === null || price === undefined || isNaN(price) || price <= 0) {
+    return '';
   }
+
+  const numPrice = Number(price);
+  
+  if (numPrice >= 10000000) {
+    return `₹${(numPrice / 10000000).toFixed(2)} Cr`;
+  } else if (numPrice >= 100000) {
+    return `₹${(numPrice / 100000).toFixed(2)} L`;
+  } else {
+    return `₹${numPrice.toLocaleString('en-IN')}`;
+  }
+};
+
+// Helper to check if a value is valid for display
+export const isValidValue = (value: any): boolean => {
+  if (value === null || value === undefined) return false;
+  if (typeof value === 'string' && value.trim() === '') return false;
+  if (typeof value === 'number' && (isNaN(value) || value <= 0)) return false;
+  return true;
+};
+
+// Helper to check if a string field is valid for display
+export const isValidStringField = (value: any): boolean => {
+  return value && typeof value === 'string' && value.trim().length > 0;
+};
+
+// Helper to check if a number field is valid for display
+export const isValidNumberField = (value: any): boolean => {
+  return value !== null && value !== undefined && !isNaN(Number(value)) && Number(value) > 0;
+};
+
+// Helper to safely format area
+export const formatArea = (area: number | null | undefined, unit: string = 'sq.ft'): string => {
+  if (!isValidNumberField(area)) return '';
+  return `${Number(area).toLocaleString('en-IN')} ${unit}`;
+};
+
+// Helper to safely format bedrooms/bathrooms
+export const formatRoomCount = (count: number | null | undefined, type: 'bedroom' | 'bathroom'): string => {
+  if (!isValidNumberField(count)) return '';
+  const num = Number(count);
+  return type === 'bedroom' ? `${num} BHK` : `${num}`;
+};
+
+// Helper to safely format location
+export const formatLocation = (address?: string, city?: string, state?: string): string => {
+  const parts = [address, city, state].filter(part => isValidStringField(part));
+  return parts.length > 0 ? parts.join(', ') : '';
 };
 
 // Get marker pin URL based on property type
@@ -660,31 +704,31 @@ export const extractImagesFromProperty = (property: any) => {
       }
     } else {
       // Try various paths where images might be stored in property_details (legacy structure)
-      if (details.images && Array.isArray(details.images)) {
-        images = details.images;
-      } else if (details.photos?.images && Array.isArray(details.photos.images)) {
-        images = details.photos.images;
-      } else if (details.media?.images && Array.isArray(details.media.images)) {
-        images = details.media.images;
-      } else if (details.imageFiles && Array.isArray(details.imageFiles)) {
-        images = details.imageFiles;
-      }
-    }
-    
-    // If images were found, process them to have consistent properties
-    if (images.length > 0) {
-      return images.map((img, idx) => ({
-        id: img.id || `img-${idx}`,
-        url: img.dataUrl || img.url || '',
-        is_primary: !!img.isPrimary || !!img.is_primary,
-        display_order: img.display_order || idx
-      }));
-    }
-    
-    // No images found
-    return [];
-  } catch (error) {
-    console.error('Error extracting images:', error);
-    return [];
-  }
+     if (details.images && Array.isArray(details.images)) {
+       images = details.images;
+     } else if (details.photos?.images && Array.isArray(details.photos.images)) {
+       images = details.photos.images;
+     } else if (details.media?.images && Array.isArray(details.media.images)) {
+       images = details.media.images;
+     } else if (details.imageFiles && Array.isArray(details.imageFiles)) {
+       images = details.imageFiles;
+     }
+   }
+   
+   // If images were found, process them to have consistent properties
+   if (images.length > 0) {
+     return images.map((img, idx) => ({
+       id: img.id || `img-${idx}`,
+       url: img.dataUrl || img.url || '',
+       is_primary: !!img.isPrimary || !!img.is_primary,
+       display_order: img.display_order || idx
+     }));
+   }
+   
+   // No images found
+   return [];
+ } catch (error) {
+   console.error('Error extracting images:', error);
+   return [];
+ }
 };

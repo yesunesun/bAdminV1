@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyItem.tsx
-// Version: 6.1.0
-// Last Modified: 02-06-2025 13:30 IST
-// Purpose: Enhanced UI with improved hover effects, spacing, and visual hierarchy
+// Version: 6.2.0
+// Last Modified: 02-06-2025 16:20 IST
+// Purpose: Implemented comprehensive conditional rendering for all fields
 
 import React, { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
@@ -13,6 +13,13 @@ import {
 } from 'lucide-react';
 import FavoriteButton from './FavoriteButton';
 import { formatPrice } from '../services/seekerService';
+import { 
+  isValidStringField, 
+  isValidNumberField, 
+  formatArea, 
+  formatRoomCount, 
+  formatLocation 
+} from '../services/utilityService';
 import { FLOW_TYPES } from '@/modules/owner/components/property/wizard/constants/flows';
 import { 
   formatDetailedLocation,
@@ -58,18 +65,18 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
       // Handle SearchResult format
       return {
         id: property.id,
-        title: property.title,
-        location: property.location,
-        price: property.price,
-        propertyType: property.propertyType,
-        transactionType: property.transactionType,
-        subType: (property as any).subType || '',
-        bhk: (property as any).bhk || '',
-        area: (property as any).area || 0,
-        ownerName: (property as any).ownerName || 'Property Owner',
-        primary_image: (property as any).primary_image || null,
-        createdAt: (property as any).createdAt || '',
-        status: (property as any).status || 'active'
+        title: isValidStringField(property.title) ? property.title : '',
+        location: isValidStringField(property.location) ? property.location : '',
+        price: isValidNumberField(property.price) ? property.price : null,
+        propertyType: isValidStringField(property.propertyType) ? property.propertyType : '',
+        transactionType: isValidStringField(property.transactionType) ? property.transactionType : '',
+        subType: isValidStringField((property as any).subType) ? (property as any).subType : '',
+        bhk: isValidStringField((property as any).bhk) ? (property as any).bhk : '',
+        area: isValidNumberField((property as any).area) ? (property as any).area : null,
+        ownerName: isValidStringField((property as any).ownerName) ? (property as any).ownerName : '',
+        primary_image: isValidStringField((property as any).primary_image) ? (property as any).primary_image : null,
+        createdAt: isValidStringField((property as any).createdAt) ? (property as any).createdAt : '',
+        status: isValidStringField((property as any).status) ? (property as any).status : 'active'
       };
     } else {
       // Handle PropertyType format (legacy)
@@ -78,18 +85,19 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
       
       return {
         id: property.id,
-        title: details.flow?.title || 'Property Listing',
+        title: isValidStringField(details.flow?.title) ? details.flow.title : 'Property Listing',
         location: formatDetailedLocation(property),
-        price: property.price || 0,
-        propertyType: property.property_type || 'residential',
+        price: isValidNumberField(property.price) ? property.price : null,
+        propertyType: isValidStringField(property.property_type) ? property.property_type : 'residential',
         transactionType: flowType.includes('sale') ? 'buy' : 'rent',
-        subType: details.basicDetails?.propertyType || '',
-        bhk: details.basicDetails?.bhkType || '',
-        area: details.basicDetails?.builtUpArea || property.square_feet || 0,
+        subType: isValidStringField(details.basicDetails?.propertyType) ? details.basicDetails.propertyType : '',
+        bhk: isValidStringField(details.basicDetails?.bhkType) ? details.basicDetails.bhkType : '',
+        area: isValidNumberField(details.basicDetails?.builtUpArea || property.square_feet) ? 
+               (details.basicDetails?.builtUpArea || property.square_feet) : null,
         ownerName: 'Property Owner',
-        primary_image: property.primary_image || null,
-        createdAt: property.created_at || '',
-        status: property.status || 'active'
+        primary_image: isValidStringField(property.primary_image) ? property.primary_image : null,
+        createdAt: isValidStringField(property.created_at) ? property.created_at : '',
+        status: isValidStringField(property.status) ? property.status : 'active'
       };
     }
   }, [property]);
@@ -147,10 +155,11 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
   // Generate display data for SearchResult
   const displayData = useMemo(() => {
     if (isSearchResult(property)) {
-      // For SearchResult, create simplified display data
-      const formattedPrice = propertyData.transactionType === 'rent' 
-        ? `${formatPrice(propertyData.price)} per month`
-        : formatPrice(propertyData.price);
+      // For SearchResult, create simplified display data with conditional rendering
+      const formattedPrice = propertyData.price ? 
+        (propertyData.transactionType === 'rent' 
+          ? `${formatPrice(propertyData.price)} per month`
+          : formatPrice(propertyData.price)) : '';
 
       const icons = [];
       
@@ -163,13 +172,24 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
       }
       
       // Add area info if available
-      if (propertyData.area && propertyData.area > 0) {
-        icons.push({ icon: <Square className="h-3 w-3 mr-1" />, text: `${propertyData.area} sq.ft` });
+      if (propertyData.area) {
+        const areaText = formatArea(propertyData.area);
+        if (areaText) {
+          icons.push({ icon: <Square className="h-3 w-3 mr-1" />, text: areaText });
+        }
       }
       
       // Add property type icon
-      const propertyTypeIcon = propertyData.propertyType === 'commercial' ? Building : Home;
-      icons.push({ icon: React.createElement(propertyTypeIcon, { className: "h-3 w-3 mr-1" }), text: propertyData.subType || propertyData.propertyType });
+      if (propertyData.propertyType || propertyData.subType) {
+        const propertyTypeIcon = propertyData.propertyType === 'commercial' ? Building : Home;
+        const typeText = propertyData.subType || propertyData.propertyType;
+        if (typeText) {
+          icons.push({ 
+            icon: React.createElement(propertyTypeIcon, { className: "h-3 w-3 mr-1" }), 
+            text: typeText 
+          });
+        }
+      }
 
       return {
         price: formattedPrice,
@@ -222,15 +242,17 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
         onMouseLeave={() => onHover(propertyData.id, false)}
         onClick={() => onSelect(property)}
       >
-        {/* Enhanced Property Name with better typography */}
-        <div className="mb-3">
-          <Link
-            to={`/seeker/property/${propertyData.id}`}
-            className="text-sm font-semibold text-blue-600 hover:text-blue-700 hover:underline truncate block transition-colors duration-200"
-          >
-            {propertyData.title}
-          </Link>
-        </div>
+        {/* Enhanced Property Name with conditional rendering */}
+        {propertyData.title && (
+          <div className="mb-3">
+            <Link
+              to={`/seeker/property/${propertyData.id}`}
+              className="text-sm font-semibold text-blue-600 hover:text-blue-700 hover:underline truncate block transition-colors duration-200"
+            >
+              {propertyData.title}
+            </Link>
+          </div>
+        )}
         
         <Link 
           to={`/seeker/property/${propertyData.id}`} 
@@ -255,46 +277,56 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
           
           {/* Enhanced Property details with improved spacing */}
           <div className="flex-1 min-w-0 space-y-2">
-            {/* Enhanced Location with better styling */}
-            <div className="flex items-center text-xs text-muted-foreground">
-              <MapPin className="h-3 w-3 mr-1.5 flex-shrink-0 text-blue-500" />
-              <span className="truncate font-medium">
-                {propertyData.location}
-              </span>
-            </div>
-            
-            {/* Enhanced Price with better typography */}
-            <p className="text-sm font-bold text-foreground">
-              {displayData.price}
-            </p>
-            
-            {/* Enhanced Property specs with better spacing */}
-            <div className="flex items-center gap-3 text-xs text-muted-foreground">
-              {displayData.icons.map((icon, index) => (
-                <span key={index} className="flex items-center hover:text-foreground transition-colors duration-200">
-                  <span className="text-blue-500">{icon.icon}</span>
-                  <span className="whitespace-nowrap font-medium">{icon.text}</span>
+            {/* Enhanced Location with conditional rendering */}
+            {propertyData.location && (
+              <div className="flex items-center text-xs text-muted-foreground">
+                <MapPin className="h-3 w-3 mr-1.5 flex-shrink-0 text-blue-500" />
+                <span className="truncate font-medium">
+                  {propertyData.location}
                 </span>
-              ))}
-            </div>
+              </div>
+            )}
             
-            {/* Enhanced Property Type and Listing Type Badges */}
+            {/* Enhanced Price with conditional rendering */}
+            {displayData.price && (
+              <p className="text-sm font-bold text-foreground">
+                {displayData.price}
+              </p>
+            )}
+            
+            {/* Enhanced Property specs with conditional rendering */}
+            {displayData.icons.length > 0 && (
+              <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                {displayData.icons.map((icon, index) => (
+                  <span key={index} className="flex items-center hover:text-foreground transition-colors duration-200">
+                    <span className="text-blue-500">{icon.icon}</span>
+                    <span className="whitespace-nowrap font-medium">{icon.text}</span>
+                  </span>
+                ))}
+              </div>
+            )}
+            
+            {/* Enhanced Property Type and Listing Type Badges with conditional rendering */}
             <div className="mt-3 flex flex-wrap gap-2">
               {/* Enhanced Property Type Badge */}
-              <div className="inline-flex items-center text-xs text-white px-2.5 py-1 rounded-full bg-gradient-to-r from-gray-500 to-gray-600 font-medium shadow-sm">
-                {displayData.propertyType}
-              </div>
+              {displayData.propertyType && (
+                <div className="inline-flex items-center text-xs text-white px-2.5 py-1 rounded-full bg-gradient-to-r from-gray-500 to-gray-600 font-medium shadow-sm">
+                  {displayData.propertyType}
+                </div>
+              )}
               
               {/* Enhanced Listing Type Badge */}
-              <div className={`
-                inline-flex items-center text-xs text-white px-2.5 py-1 rounded-full font-medium shadow-sm
-                ${displayData.listingDisplay.toLowerCase().includes('rent') 
-                  ? 'bg-gradient-to-r from-blue-500 to-blue-600' 
-                  : 'bg-gradient-to-r from-green-500 to-green-600'
-                }
-              `}>
-                {displayData.listingDisplay}
-              </div>
+              {displayData.listingDisplay && (
+                <div className={`
+                  inline-flex items-center text-xs text-white px-2.5 py-1 rounded-full font-medium shadow-sm
+                  ${displayData.listingDisplay.toLowerCase().includes('rent') 
+                    ? 'bg-gradient-to-r from-blue-500 to-blue-600' 
+                    : 'bg-gradient-to-r from-green-500 to-green-600'
+                  }
+                `}>
+                  {displayData.listingDisplay}
+                </div>
+              )}
             </div>
           </div>
           
@@ -308,123 +340,251 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
   );
 };
 
-// Enhanced helper function for PropertyType format with better styling
+// Enhanced helper function for PropertyType format with conditional rendering
 function getFlowSpecificDisplayData(property: PropertyType, flowType: string, details: any) {
   const basicDetails = details.basicDetails || {};
   const saleInfo = details.saleInfo || {};
   const rentalInfo = details.rentalInfo || {};
   
-  // Default values
-  let price = formatPrice(property.price || 0);
+  // Default values with conditional checks
+  let price = '';
   let icons = [];
-  let propertyType = basicDetails.propertyType || property.property_type || 'Apartment';
-  let listingDisplay = flowType.includes('sale') ? 'For Sale' : 'For Rent';
+  let propertyType = '';
+  let listingDisplay = '';
   
-  // Flow-specific logic
+  // Only set if valid
+  if (isValidNumberField(property.price)) {
+    price = formatPrice(property.price);
+  }
+  
+  if (isValidStringField(basicDetails.propertyType) || isValidStringField(property.property_type)) {
+    propertyType = basicDetails.propertyType || property.property_type;
+  }
+  
+  if (flowType) {
+    listingDisplay = flowType.includes('sale') ? 'For Sale' : 'For Rent';
+  }
+  
+  // Flow-specific logic with conditional rendering
   switch (flowType) {
     case FLOW_TYPES.RESIDENTIAL_RENT:
-      price = `${formatPrice(rentalInfo.rentAmount || property.price || 0)} per month`;
-      icons = [
-        { icon: <Bed className="h-3 w-3 mr-1" />, text: basicDetails.bhkType?.charAt(0) || property.bedrooms || 0 },
-        { icon: <Bath className="h-3 w-3 mr-1" />, text: basicDetails.bathrooms || property.bathrooms || 0 },
-        { icon: <Square className="h-3 w-3 mr-1" />, text: `${basicDetails.builtUpArea || property.square_feet || 0} ${basicDetails.builtUpAreaUnit || 'sq.ft'}` }
-      ];
-      if (rentalInfo.furnishingStatus) {
+      if (isValidNumberField(rentalInfo.rentAmount || property.price)) {
+        price = `${formatPrice(rentalInfo.rentAmount || property.price)} per month`;
+      }
+      
+      // Only add icons if data exists
+      if (isValidStringField(basicDetails.bhkType) || isValidNumberField(property.bedrooms)) {
+        const bhkText = basicDetails.bhkType?.charAt(0) || property.bedrooms;
+        if (bhkText) {
+          icons.push({ icon: <Bed className="h-3 w-3 mr-1" />, text: bhkText });
+        }
+      }
+      
+      if (isValidNumberField(basicDetails.bathrooms || property.bathrooms)) {
+        icons.push({ icon: <Bath className="h-3 w-3 mr-1" />, text: basicDetails.bathrooms || property.bathrooms });
+      }
+      
+      if (isValidNumberField(basicDetails.builtUpArea || property.square_feet)) {
+        const areaText = formatArea(basicDetails.builtUpArea || property.square_feet, basicDetails.builtUpAreaUnit);
+        if (areaText) {
+          icons.push({ icon: <Square className="h-3 w-3 mr-1" />, text: areaText });
+        }
+      }
+      
+      if (isValidStringField(rentalInfo.furnishingStatus)) {
         icons.push({ icon: <Home className="h-3 w-3 mr-1" />, text: rentalInfo.furnishingStatus });
       }
+      
       listingDisplay = "For Rent";
       break;
       
     case FLOW_TYPES.RESIDENTIAL_SALE:
-      price = formatPrice(saleInfo.expectedPrice || property.price || 0);
-      icons = [
-        { icon: <Bed className="h-3 w-3 mr-1" />, text: basicDetails.bhkType?.charAt(0) || property.bedrooms || 0 },
-        { icon: <Bath className="h-3 w-3 mr-1" />, text: basicDetails.bathrooms || property.bathrooms || 0 },
-        { icon: <Square className="h-3 w-3 mr-1" />, text: `${basicDetails.builtUpArea || property.square_feet || 0} ${basicDetails.builtUpAreaUnit || 'sq.ft'}` }
-      ];
+      if (isValidNumberField(saleInfo.expectedPrice || property.price)) {
+        price = formatPrice(saleInfo.expectedPrice || property.price);
+      }
+      
+      // Only add icons if data exists
+      if (isValidStringField(basicDetails.bhkType) || isValidNumberField(property.bedrooms)) {
+        const bhkText = basicDetails.bhkType?.charAt(0) || property.bedrooms;
+        if (bhkText) {
+          icons.push({ icon: <Bed className="h-3 w-3 mr-1" />, text: bhkText });
+        }
+      }
+      
+      if (isValidNumberField(basicDetails.bathrooms || property.bathrooms)) {
+        icons.push({ icon: <Bath className="h-3 w-3 mr-1" />, text: basicDetails.bathrooms || property.bathrooms });
+      }
+      
+      if (isValidNumberField(basicDetails.builtUpArea || property.square_feet)) {
+        const areaText = formatArea(basicDetails.builtUpArea || property.square_feet, basicDetails.builtUpAreaUnit);
+        if (areaText) {
+          icons.push({ icon: <Square className="h-3 w-3 mr-1" />, text: areaText });
+        }
+      }
+      
       listingDisplay = "For Sale";
       break;
       
     case FLOW_TYPES.RESIDENTIAL_FLATMATES:
       const flatmateInfo = details.flatmateInfo || {};
-      price = `${formatPrice(flatmateInfo.rent || property.price || 0)} per month`;
-      icons = [
-        { icon: <Users className="h-3 w-3 mr-1" />, text: `${flatmateInfo.totalFlatmates || 2} flatmates` },
-        { icon: <Bed className="h-3 w-3 mr-1" />, text: flatmateInfo.roomType || 'Shared' },
-        { icon: <Utensils className="h-3 w-3 mr-1" />, text: flatmateInfo.foodPreference || 'Any' }
-      ];
+      if (isValidNumberField(flatmateInfo.rent || property.price)) {
+        price = `${formatPrice(flatmateInfo.rent || property.price)} per month`;
+      }
+      
+      if (isValidNumberField(flatmateInfo.totalFlatmates)) {
+        icons.push({ icon: <Users className="h-3 w-3 mr-1" />, text: `${flatmateInfo.totalFlatmates} flatmates` });
+      }
+      
+      if (isValidStringField(flatmateInfo.roomType)) {
+        icons.push({ icon: <Bed className="h-3 w-3 mr-1" />, text: flatmateInfo.roomType });
+      }
+      
+      if (isValidStringField(flatmateInfo.foodPreference)) {
+        icons.push({ icon: <Utensils className="h-3 w-3 mr-1" />, text: flatmateInfo.foodPreference });
+      }
+      
       listingDisplay = "Flatmates";
       break;
       
     case FLOW_TYPES.RESIDENTIAL_PGHOSTEL:
       const pgInfo = details.pgInfo || {};
-      price = `${formatPrice(pgInfo.rent || property.price || 0)} per month`;
-      icons = [
-        { icon: <Users className="h-3 w-3 mr-1" />, text: pgInfo.genderPreference || 'Any' },
-        { icon: <Bed className="h-3 w-3 mr-1" />, text: pgInfo.roomType || 'Shared' },
-        { icon: <Utensils className="h-3 w-3 mr-1" />, text: pgInfo.foodIncluded ? 'Food Included' : 'No Food' }
-      ];
+      if (isValidNumberField(pgInfo.rent || property.price)) {
+        price = `${formatPrice(pgInfo.rent || property.price)} per month`;
+      }
+      
+      if (isValidStringField(pgInfo.genderPreference)) {
+        icons.push({ icon: <Users className="h-3 w-3 mr-1" />, text: pgInfo.genderPreference });
+      }
+      
+      if (isValidStringField(pgInfo.roomType)) {
+        icons.push({ icon: <Bed className="h-3 w-3 mr-1" />, text: pgInfo.roomType });
+      }
+      
+      if (pgInfo.foodIncluded !== undefined) {
+        icons.push({ icon: <Utensils className="h-3 w-3 mr-1" />, text: pgInfo.foodIncluded ? 'Food Included' : 'No Food' });
+      }
+      
       listingDisplay = "PG/Hostel";
       break;
       
     case FLOW_TYPES.COMMERCIAL_RENT:
       const commercialRentalInfo = details.commercialRentalInfo || {};
-      price = `${formatPrice(commercialRentalInfo.rentAmount || property.price || 0)} per month`;
-      icons = [
-        { icon: <Building className="h-3 w-3 mr-1" />, text: basicDetails.commercialType || 'Office' },
-        { icon: <Square className="h-3 w-3 mr-1" />, text: `${basicDetails.area || property.square_feet || 0} sq.ft` },
-        { icon: <Briefcase className="h-3 w-3 mr-1" />, text: commercialRentalInfo.suitableFor || 'Business' }
-      ];
+      if (isValidNumberField(commercialRentalInfo.rentAmount || property.price)) {
+        price = `${formatPrice(commercialRentalInfo.rentAmount || property.price)} per month`;
+      }
+      
+      if (isValidStringField(basicDetails.commercialType)) {
+        icons.push({ icon: <Building className="h-3 w-3 mr-1" />, text: basicDetails.commercialType });
+      }
+      
+      if (isValidNumberField(basicDetails.area || property.square_feet)) {
+        const areaText = formatArea(basicDetails.area || property.square_feet);
+        if (areaText) {
+          icons.push({ icon: <Square className="h-3 w-3 mr-1" />, text: areaText });
+        }
+      }
+      
+      if (isValidStringField(commercialRentalInfo.suitableFor)) {
+        icons.push({ icon: <Briefcase className="h-3 w-3 mr-1" />, text: commercialRentalInfo.suitableFor });
+      }
+      
       listingDisplay = "For Rent";
       break;
       
     case FLOW_TYPES.COMMERCIAL_SALE:
       const commercialSaleInfo = details.commercialSaleInfo || {};
-      price = formatPrice(commercialSaleInfo.salePrice || property.price || 0);
-      icons = [
-        { icon: <Building className="h-3 w-3 mr-1" />, text: basicDetails.commercialType || 'Office' },
-        { icon: <Square className="h-3 w-3 mr-1" />, text: `${basicDetails.area || property.square_feet || 0} sq.ft` },
-        { icon: <FileText className="h-3 w-3 mr-1" />, text: commercialSaleInfo.ownershipType || 'Freehold' }
-      ];
+      if (isValidNumberField(commercialSaleInfo.salePrice || property.price)) {
+        price = formatPrice(commercialSaleInfo.salePrice || property.price);
+      }
+      
+      if (isValidStringField(basicDetails.commercialType)) {
+        icons.push({ icon: <Building className="h-3 w-3 mr-1" />, text: basicDetails.commercialType });
+      }
+      
+      if (isValidNumberField(basicDetails.area || property.square_feet)) {
+        const areaText = formatArea(basicDetails.area || property.square_feet);
+        if (areaText) {
+          icons.push({ icon: <Square className="h-3 w-3 mr-1" />, text: areaText });
+        }
+      }
+      
+      if (isValidStringField(commercialSaleInfo.ownershipType)) {
+        icons.push({ icon: <FileText className="h-3 w-3 mr-1" />, text: commercialSaleInfo.ownershipType });
+      }
+      
       listingDisplay = "For Sale";
       break;
       
     case FLOW_TYPES.COMMERCIAL_COWORKING:
       const coworkingInfo = details.coworkingInfo || {};
-      price = `${formatPrice(coworkingInfo.seatPrice || property.price || 0)} per seat/month`;
-      icons = [
-        { icon: <Coffee className="h-3 w-3 mr-1" />, text: `${coworkingInfo.totalSeats || 0} seats` },
-        { icon: <Square className="h-3 w-3 mr-1" />, text: `${basicDetails.area || property.square_feet || 0} sq.ft` },
-        { icon: <Building className="h-3 w-3 mr-1" />, text: coworkingInfo.workspaceType || 'Open Desk' }
-      ];
+      if (isValidNumberField(coworkingInfo.seatPrice || property.price)) {
+        price = `${formatPrice(coworkingInfo.seatPrice || property.price)} per seat/month`;
+      }
+      
+      if (isValidNumberField(coworkingInfo.totalSeats)) {
+        icons.push({ icon: <Coffee className="h-3 w-3 mr-1" />, text: `${coworkingInfo.totalSeats} seats` });
+      }
+      
+      if (isValidNumberField(basicDetails.area || property.square_feet)) {
+        const areaText = formatArea(basicDetails.area || property.square_feet);
+        if (areaText) {
+          icons.push({ icon: <Square className="h-3 w-3 mr-1" />, text: areaText });
+        }
+      }
+      
+      if (isValidStringField(coworkingInfo.workspaceType)) {
+        icons.push({ icon: <Building className="h-3 w-3 mr-1" />, text: coworkingInfo.workspaceType });
+      }
+      
       listingDisplay = "Coworking";
       break;
       
     case FLOW_TYPES.LAND_SALE:
       const landInfo = details.landInfo || {};
-      price = formatPrice(landInfo.price || property.price || 0);
-      icons = [
-        { icon: <Map className="h-3 w-3 mr-1" />, text: `${landInfo.area || property.square_feet || 0} ${landInfo.areaUnit || 'sq.ft'}` },
-        { icon: <FileText className="h-3 w-3 mr-1" />, text: landInfo.landType || 'Residential' },
-        { icon: <Building className="h-3 w-3 mr-1" />, text: landInfo.ownershipType || 'Freehold' }
-      ];
+      if (isValidNumberField(landInfo.price || property.price)) {
+        price = formatPrice(landInfo.price || property.price);
+      }
+      
+      if (isValidNumberField(landInfo.area || property.square_feet)) {
+        const areaText = formatArea(landInfo.area || property.square_feet, landInfo.areaUnit);
+        if (areaText) {
+          icons.push({ icon: <Map className="h-3 w-3 mr-1" />, text: areaText });
+        }
+      }
+      
+      if (isValidStringField(landInfo.landType)) {
+        icons.push({ icon: <FileText className="h-3 w-3 mr-1" />, text: landInfo.landType });
+      }
+      
+      if (isValidStringField(landInfo.ownershipType)) {
+        icons.push({ icon: <Building className="h-3 w-3 mr-1" />, text: landInfo.ownershipType });
+      }
+      
       listingDisplay = "Land for Sale";
       break;
       
     default:
-      // Fallback for unknown flow types
-      icons = [
-        { icon: <Building className="h-3 w-3 mr-1" />, text: propertyType },
-        { icon: <Square className="h-3 w-3 mr-1" />, text: `${property.square_feet || 0} sq.ft` }
-      ];
+      // Fallback for unknown flow types - only show if data exists
+      if (propertyType) {
+        icons.push({ icon: <Building className="h-3 w-3 mr-1" />, text: propertyType });
+      }
+      
+      if (isValidNumberField(property.square_feet)) {
+        const areaText = formatArea(property.square_feet);
+        if (areaText) {
+          icons.push({ icon: <Square className="h-3 w-3 mr-1" />, text: areaText });
+        }
+      }
       break;
   }
   
-  // Handle price edge cases
-  if (property.price === 0) {
-    price = 'Price on request';
-  } else if (property.price === 1) {
-    price = 'Contact for price';
+  // Handle special price cases - only show if there's meaningful data
+  if (!price) {
+    if (property.price === 0) {
+      price = 'Price on request';
+    } else if (property.price === 1) {
+      price = 'Contact for price';
+    }
   }
   
   return {
