@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/hooks/useStepValidation.ts
-// Version: 5.9.0
-// Last Modified: 03-06-2025 12:50 IST
-// Purpose: Fixed Residential Rent validation - removed bathrooms from required fields
+// Version: 5.10.0
+// Last Modified: 03-06-2025 14:35 IST
+// Purpose: Fixed residential sale validation - removed bathrooms from property details step
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { UseFormReturn } from 'react-hook-form';
@@ -43,12 +43,12 @@ export function useStepValidation({
    lastCheckedStep: ''
  });
  
- // ✅ FIXED: Get required fields for current step - Removed bathrooms from Residential Rent basic details
+ // ✅ FIXED: Get required fields for current step - Removed bathrooms from ALL property details steps
  const getRequiredFieldsForStep = useCallback((stepId: string): string[] => {
    const stepFieldMap: Record<string, string[]> = {
-     // ✅ UPDATED: Basic details steps - Removed bathrooms from residential rent, added availableFrom to all property details steps
+     // ✅ FIXED: Basic details steps - Removed bathrooms from ALL residential property details steps
      'res_rent_basic_details': ['propertyType', 'bhkType', 'floor', 'totalFloors', 'propertyAge', 'facing', 'builtUpArea', 'availableFrom'],
-     'res_sale_basic_details': ['propertyType', 'bhkType', 'floor', 'totalFloors', 'propertyAge', 'facing', 'builtUpArea', 'bathrooms', 'availableFrom'],
+     'res_sale_basic_details': ['propertyType', 'bhkType', 'floor', 'totalFloors', 'propertyAge', 'facing', 'builtUpArea', 'availableFrom'], // ✅ REMOVED bathrooms
      
      // ✅ FIXED: Residential Flatmates basic details (Room Details component) - matches actual RoomDetails.tsx fields
      'res_flat_basic_details': ['roomType', 'roomCapacity', 'expectedRent', 'expectedDeposit', 'bathroomType', 'roomSize', 'mealOption'],
@@ -97,7 +97,7 @@ export function useStepValidation({
      // ✅ FIXED: Commercial Sale Details - Added the correct mandatory fields
      'com_sale_sale_details': ['expectedPrice', 'ownershipType', 'availableFrom', 'idealFor'],
      
-     // Features steps - ✅ FIXED: Commercial rent features now use correct commercial fields
+     // ✅ FIXED: Features steps - bathrooms are only required in FEATURES steps, not property details
      'res_rent_features': ['bathrooms', 'propertyShowOption', 'propertyCondition', 'amenities'],
      'res_sale_features': ['bathrooms', 'propertyShowOption', 'propertyCondition', 'amenities'],
      'res_flat_features': ['bathrooms', 'propertyShowOption', 'propertyCondition', 'amenities'],

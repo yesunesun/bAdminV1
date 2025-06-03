@@ -1,7 +1,7 @@
 // src/modules/owner/components/property/wizard/validation/fieldValidationConfig.ts
-// Version: 2.3.0
-// Last Modified: 02-06-2025 16:00 IST
-// Purpose: Removed Monthly Rent and Security Deposit from PG Details validation
+// Version: 2.4.0
+// Last Modified: 03-06-2025 14:30 IST
+// Purpose: Fixed residential sale validation - removed bathrooms requirement and fixed totalFloors validation
 
 // Validation types
 export type ValidationRule = {
@@ -85,7 +85,7 @@ export const COMMON_VALIDATIONS = {
   }
 };
 
-// Basic validation configurations - UPDATED: Added availableFrom as required for property details
+// ✅ UPDATED: Fixed totalFloors validation and conditionally required bathrooms
 export const BASIC_FIELD_VALIDATIONS: Record<string, ValidationRule> = {
   // Location fields
   address: COMMON_VALIDATIONS.ADDRESS,
@@ -94,16 +94,62 @@ export const BASIC_FIELD_VALIDATIONS: Record<string, ValidationRule> = {
   pinCode: COMMON_VALIDATIONS.PIN_CODE,
   locality: COMMON_VALIDATIONS.REQUIRED,
   
-  // Property details - ✅ UPDATED: Added availableFrom as required
+  // Property details - ✅ FIXED: Updated totalFloors validation to handle string/number conversion
   propertyType: COMMON_VALIDATIONS.REQUIRED,
   bhkType: COMMON_VALIDATIONS.REQUIRED,
-  floor: { required: true, min: 0 },
-  totalFloors: { required: true, min: 1 },
+  floor: { 
+    required: true, 
+    min: 0,
+    custom: (value: any) => {
+      if (!value && value !== 0) return 'Floor is required';
+      const numValue = typeof value === 'string' ? parseInt(value) : value;
+      if (isNaN(numValue) || numValue < 0) return 'Floor must be a valid number (0 or greater)';
+      return null;
+    }
+  },
+  totalFloors: { 
+    required: true, 
+    min: 1,
+    custom: (value: any) => {
+      if (!value) return 'Total floors is required';
+      const numValue = typeof value === 'string' ? parseInt(value) : value;
+      if (isNaN(numValue) || numValue < 1) return 'Total floors must be a valid number (1 or greater)';
+      return null;
+    }
+  },
   propertyAge: COMMON_VALIDATIONS.REQUIRED,
   facing: COMMON_VALIDATIONS.REQUIRED,
-  builtUpArea: { required: true, min: 100 },
-  bathrooms: { required: true, min: 1 },
-  availableFrom: COMMON_VALIDATIONS.REQUIRED, // ✅ ADDED: Now required for property details
+  builtUpArea: { 
+    required: true, 
+    min: 100,
+    custom: (value: any) => {
+      if (!value) return 'Built-up area is required';
+      const numValue = typeof value === 'string' ? parseInt(value) : value;
+      if (isNaN(numValue) || numValue < 100) return 'Built-up area must be at least 100 sq ft';
+      return null;
+    }
+  },
+  // ✅ FIXED: Made bathrooms conditionally required based on flow type
+  bathrooms: { 
+    required: false, // Default to not required
+    min: 1,
+    custom: (value: any, formData: any) => {
+      // Check if bathrooms should be required for this specific flow/step
+      const flowType = formData?.flow?.flowType || formData?.flowType;
+      const currentStep = getCurrentStepId(formData);
+      
+      // Only require bathrooms for flows that actually have this field in their form
+      const requiresBathrooms = shouldRequireBathrooms(flowType, currentStep);
+      
+      if (requiresBathrooms) {
+        if (!value) return 'Bathrooms is required';
+        const numValue = typeof value === 'string' ? parseInt(value) : value;
+        if (isNaN(numValue) || numValue < 1) return 'Bathrooms must be at least 1';
+      }
+      return null;
+    }
+  },
+  availableFrom: COMMON_VALIDATIONS.REQUIRED,
   
   // Sale details fields
   expectedPrice: { required: true, min: 10000 },
@@ -137,7 +183,7 @@ export const BASIC_FIELD_VALIDATIONS: Record<string, ValidationRule> = {
   // Commercial sale fields  
   ownershipType: COMMON_VALIDATIONS.REQUIRED,
   
-  // ✅ ADDED: PG/Hostel room details fields
+  // PG/Hostel room details fields
   roomType: COMMON_VALIDATIONS.REQUIRED,
   roomCapacity: { required: true, min: 1 },
   expectedRent: { required: true, min: 1000 },
@@ -145,7 +191,7 @@ export const BASIC_FIELD_VALIDATIONS: Record<string, ValidationRule> = {
   bathroomType: COMMON_VALIDATIONS.REQUIRED,
   roomSize: { required: true, min: 50 },
   mealOption: COMMON_VALIDATIONS.REQUIRED,
-  roomFeatures: { required: false }, // Room features are optional
+  roomFeatures: { required: false },
   
   // PG Details specific fields
   genderPreference: COMMON_VALIDATIONS.REQUIRED,
@@ -158,6 +204,36 @@ export const BASIC_FIELD_VALIDATIONS: Record<string, ValidationRule> = {
   // Coordinates
   latitude: COMMON_VALIDATIONS.REQUIRED,
   longitude: COMMON_VALIDATIONS.REQUIRED
+};
+
+// ✅ NEW: Helper function to determine current step ID
+const getCurrentStepId = (formData: any): string => {
+  // Try to get from various possible locations
+  return formData?.currentStep || 
+         formData?.stepId || 
+         formData?.currentStepId ||
+         '';
+};
+
+// ✅ NEW: Helper function to determine if bathrooms should be required
+const shouldRequireBathrooms = (flowType: string, stepId: string): boolean => {
+  // Map of flows and steps that should require bathrooms
+  const bathroomRequiredFlows = {
+    'residential_rent': ['res_rent_features'],
+    'commercial_rent': ['com_rent_features'],
+    'commercial_sale': ['com_sale_features'],
+    'residential_pghostel': ['res_pg_features'],
+    'residential_flatmates': ['res_flat_features']
+  };
+  
+  // Residential sale should NOT require bathrooms in property details step
+  if (flowType === 'residential_sale' && stepId === 'res_sale_basic_details') {
+    return false;
+  }
+  
+  // Check if current flow/step combination should require bathrooms
+  const requiredSteps = bathroomRequiredFlows[flowType] || [];
+  return requiredSteps.includes(stepId);
 };
 
 // Helper functions for validation
@@ -212,7 +288,7 @@ export const validateField = (fieldName: string, value: any, formData?: any): st
   return null;
 };
 
-// Get user-friendly field label - UPDATED: Added availableFrom label
+// Get user-friendly field label
 const getFieldLabel = (fieldName: string): string => {
   const labels: Record<string, string> = {
     address: 'Address',
@@ -230,7 +306,7 @@ const getFieldLabel = (fieldName: string): string => {
     bathrooms: 'Bathrooms',
     latitude: 'Latitude',
     longitude: 'Longitude',
-    availableFrom: 'Available From', // ✅ ADDED: Label for availableFrom
+    availableFrom: 'Available From',
     
     // Sale details field labels
     expectedPrice: 'Expected Price',
@@ -264,7 +340,7 @@ const getFieldLabel = (fieldName: string): string => {
     // Commercial sale field labels
     ownershipType: 'Ownership Type',
     
-    // ✅ ADDED: PG/Hostel room details field labels
+    // PG/Hostel room details field labels
     roomType: 'Room Type',
     roomCapacity: 'Room Capacity',
     expectedRent: 'Expected Rent',
@@ -298,7 +374,7 @@ export const validateStep = (stepId: string, formData: any): { isValid: boolean;
   // Validate each required field
   for (const fieldName of requiredFields) {
     const fieldValue = stepData[fieldName];
-    const error = validateField(fieldName, fieldValue, formData);
+    const error = validateField(fieldName, fieldValue, { ...formData, currentStep: stepId });
     if (error) {
       errors[fieldName] = error;
     }
@@ -310,24 +386,24 @@ export const validateStep = (stepId: string, formData: any): { isValid: boolean;
   };
 };
 
-// Get required fields for step - ✅ UPDATED: Removed monthlyRent and securityDeposit from PG details
+// ✅ UPDATED: Fixed required fields mapping - removed bathrooms from property details steps
 const getRequiredFieldsForStep = (stepId: string): string[] => {
   const stepFieldMap: Record<string, string[]> = {
-    // Residential rent - ✅ UPDATED: Added availableFrom to basic details
-    'res_rent_basic_details': ['propertyType', 'bhkType', 'floor', 'totalFloors', 'propertyAge', 'facing', 'builtUpArea', 'bathrooms', 'availableFrom'],
+    // ✅ FIXED: Residential rent - removed bathrooms from basic details
+    'res_rent_basic_details': ['propertyType', 'bhkType', 'floor', 'totalFloors', 'propertyAge', 'facing', 'builtUpArea', 'availableFrom'],
     'res_rent_location': ['address', 'city', 'state', 'pinCode', 'locality'],
     'res_rent_features': ['bathrooms', 'propertyShowOption', 'propertyCondition', 'amenities'],
     
-    // Residential sale - ✅ UPDATED: Added availableFrom to basic details
-    'res_sale_basic_details': ['propertyType', 'bhkType', 'floor', 'totalFloors', 'propertyAge', 'facing', 'builtUpArea', 'bathrooms', 'availableFrom'],
+    // ✅ FIXED: Residential sale - removed bathrooms from basic details
+    'res_sale_basic_details': ['propertyType', 'bhkType', 'floor', 'totalFloors', 'propertyAge', 'facing', 'builtUpArea', 'availableFrom'],
     'res_sale_location': ['address', 'city', 'state', 'pinCode', 'locality'],
     'res_sale_sale_details': ['expectedPrice', 'maintenanceCost', 'kitchenType', 'availableFrom', 'furnishing', 'parking'],
     'res_sale_features': ['bathrooms', 'propertyShowOption', 'propertyCondition', 'amenities'],
     
-    // ✅ UPDATED: PG/Hostel steps - Removed monthlyRent and securityDeposit from res_pg_pg_details
+    // PG/Hostel steps - bathrooms handled in room details or features
     'res_pg_basic_details': ['roomType', 'roomCapacity', 'expectedRent', 'expectedDeposit', 'bathroomType', 'roomSize', 'mealOption'],
     'res_pg_location': ['address', 'city', 'state', 'pinCode', 'locality'],
-    'res_pg_pg_details': ['genderPreference', 'occupantType', 'mealOption', 'availableFrom'], // ✅ FIXED: Removed monthlyRent and securityDeposit
+    'res_pg_pg_details': ['genderPreference', 'occupantType', 'mealOption', 'availableFrom'],
     'res_pg_features': ['propertyShowOption', 'propertyCondition', 'amenities'],
     
     // Commercial rent
@@ -377,7 +453,7 @@ export const getStepValidationConfig = (flowType: string, stepId: string): StepV
   };
 };
 
-// Get field type - UPDATED: Added availableFrom field type
+// Get field type
 const getFieldType = (fieldName: string): FieldConfig['type'] => {
   const typeMap: Record<string, FieldConfig['type']> = {
     address: 'textarea',
@@ -389,7 +465,7 @@ const getFieldType = (fieldName: string): FieldConfig['type'] => {
     totalFloors: 'number',
     bathrooms: 'number',
     builtUpArea: 'number',
-    availableFrom: 'date', // ✅ ADDED: availableFrom field type
+    availableFrom: 'date',
     
     // Sale details field types
     expectedPrice: 'number',
@@ -417,7 +493,7 @@ const getFieldType = (fieldName: string): FieldConfig['type'] => {
     propertyCondition: 'select',
     ownershipType: 'radio',
     
-    // ✅ ADDED: PG/Hostel field types
+    // PG/Hostel field types
     roomType: 'select',
     roomCapacity: 'number',
     expectedRent: 'number',
@@ -435,7 +511,7 @@ const getFieldType = (fieldName: string): FieldConfig['type'] => {
   return typeMap[fieldName] || 'text';
 };
 
-// Get step name - UPDATED: Added commercial and PG step names
+// Get step name
 const getStepName = (stepId: string): string => {
   const nameMap: Record<string, string> = {
     'res_rent_basic_details': 'Property Details',
@@ -446,7 +522,7 @@ const getStepName = (stepId: string): string => {
     'res_sale_sale_details': 'Sale Details',
     'res_sale_features': 'Amenities & Features',
     
-    // ✅ ADDED: PG/Hostel step names
+    // PG/Hostel step names
     'res_pg_basic_details': 'Room Details',
     'res_pg_location': 'Location Details',
     'res_pg_pg_details': 'PG Details',
