@@ -1,11 +1,12 @@
 // src/modules/seeker/components/PropertyDetails/PricingDetailsSection.tsx
-// Version: 1.0.0
-// Last Modified: 27-05-2025 16:50 IST
+// Version: 1.1.0
+// Last Modified: 03-06-2025 15:00 IST
 // Purpose: Reusable component for displaying sale/rental pricing details
+// Fixed: Price Negotiation field now renders as Yes/No instead of currency
 
 import React from 'react';
 import { Card } from '@/components/ui/card';
-import { formatIndianRupees, renderFieldValue } from './utils/dataFormatters';
+import { formatIndianRupees, renderFieldValue, formatBoolean } from './utils/dataFormatters';
 
 interface PricingDetailsSectionProps {
   listingType: string;
@@ -41,6 +42,28 @@ const PricingDetailsSection: React.FC<PricingDetailsSectionProps> = ({
   const additionalDetails = Object.entries(pricingDetails)
     .filter(([key]) => !excludedFields.includes(key));
 
+  // Helper function to format field values with special handling for negotiable fields
+  const formatFieldValue = (value: any, fieldKey: string): string => {
+    const key = fieldKey.toLowerCase();
+    
+    // Special handling for negotiable fields - these should be Yes/No, not currency
+    if (key.includes('negotiable')) {
+      return formatBoolean(value);
+    }
+    
+    // For all other fields, use the standard renderFieldValue function
+    return renderFieldValue(value, fieldKey);
+  };
+
+  // Helper function to format field labels
+  const formatFieldLabel = (key: string): string => {
+    return key
+      .replace(/([A-Z])/g, ' $1') // Add space before capital letters
+      .replace(/^./, str => str.toUpperCase()) // Capitalize first letter
+      .replace(/_/g, ' ') // Replace underscores with spaces
+      .trim();
+  };
+
   return (
     <Card className="p-4 md:p-6 shadow-sm">
       <h2 className="text-xl font-semibold mb-4">{sectionTitle}</h2>
@@ -62,10 +85,10 @@ const PricingDetailsSection: React.FC<PricingDetailsSectionProps> = ({
           {additionalDetails.map(([key, value]) => (
             <div key={key} className="flex flex-col">
               <span className="text-sm font-medium text-gray-500 capitalize">
-                {key.replace(/([A-Z])/g, ' $1').trim()}
+                {formatFieldLabel(key)}
               </span>
               <span className="text-gray-900">
-                {renderFieldValue(value, key)}
+                {formatFieldValue(value, key)}
               </span>
             </div>
           ))}

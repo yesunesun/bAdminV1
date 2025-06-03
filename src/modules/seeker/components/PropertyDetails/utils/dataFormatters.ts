@@ -1,7 +1,8 @@
 // src/modules/seeker/components/PropertyDetails/utils/dataFormatters.ts
-// Version: 1.1.0
-// Last Modified: 27-01-2025 12:00 IST
+// Version: 1.2.0
+// Last Modified: 03-06-2025 15:05 IST
 // Purpose: Simplified formatting utilities that work without complex imports
+// Fixed: Improved field type detection to properly handle negotiable fields
 
 /**
  * Format currency in Indian Rupees with proper symbol and notation
@@ -78,9 +79,21 @@ export function renderFieldValue(value: any, fieldKey: string): string {
   
   const key = fieldKey.toLowerCase();
   
-  // Price fields
-  if (key.includes('price') || key.includes('rent') || key.includes('deposit') || 
-      key.includes('cost') || key.includes('amount') || key.includes('charge')) {
+  // Boolean fields - CHECK THESE FIRST before price fields
+  if (key.includes('negotiable') || key.includes('available') || key.includes('parking') ||
+      key.includes('furnished') || key.includes('lift') || key.includes('security') ||
+      (key.includes('price') && key.includes('negotiable'))) {
+    if (typeof value === 'boolean' || value === 'true' || value === 'false' ||
+        value === 'yes' || value === 'no') {
+      return typeof value === 'boolean' ? (value ? 'Yes' : 'No') : 
+             (value.toLowerCase() === 'true' || value.toLowerCase() === 'yes' ? 'Yes' : 'No');
+    }
+  }
+  
+  // Price fields - BUT EXCLUDE negotiable fields
+  if ((key.includes('price') || key.includes('rent') || key.includes('deposit') || 
+      key.includes('cost') || key.includes('amount') || key.includes('charge')) &&
+      !key.includes('negotiable')) {
     return formatIndianRupees(value);
   }
   
@@ -93,16 +106,6 @@ export function renderFieldValue(value: any, fieldKey: string): string {
   if (key.includes('date') || key.includes('from') || key.includes('available') ||
       key.includes('possession')) {
     return formatIndianDate(value);
-  }
-  
-  // Boolean fields
-  if (key.includes('available') || key.includes('negotiable') || key.includes('parking') ||
-      key.includes('furnished') || key.includes('lift') || key.includes('security')) {
-    if (typeof value === 'boolean' || value === 'true' || value === 'false' ||
-        value === 'yes' || value === 'no') {
-      return typeof value === 'boolean' ? (value ? 'Yes' : 'No') : 
-             (value.toLowerCase() === 'true' || value.toLowerCase() === 'yes' ? 'Yes' : 'No');
-    }
   }
   
   // Default: return formatted value
