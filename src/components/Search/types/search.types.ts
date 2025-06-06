@@ -1,7 +1,7 @@
 // src/components/Search/types/search.types.ts
-// Version: 2.2.0
-// Last Modified: 02-06-2025 20:15 IST
-// Purpose: Fixed SearchFilters interface to use actionType instead of transactionType for consistency
+// Version: 3.0.0
+// Last Modified: 07-06-2025 15:45 IST
+// Purpose: Added latitude and longitude fields to SearchResult for map marker rendering
 
 export interface SearchFilters {
   searchQuery: string;
@@ -34,6 +34,9 @@ export interface SearchResult {
   status: string;
   primary_image: string | null; // Image filename from database
   code?: string | null; // Property code from meta.code
+  // NEW: Coordinate fields for map marker rendering
+  latitude?: number; // Latitude coordinate from search SQL functions
+  longitude?: number; // Longitude coordinate from search SQL functions
 }
 
 export interface SearchState {

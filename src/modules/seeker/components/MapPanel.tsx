@@ -1,20 +1,21 @@
 // src/modules/seeker/components/MapPanel.tsx
-// Version: 3.0.0
-// Last Modified: 06-06-2025 15:30 IST
-// Purpose: Fixed zoom issues - enabled scroll wheel zoom and improved initial zoom levels
+// Version: 3.1.0
+// Last Modified: 07-01-2025 16:45 IST
+// Purpose: Enhanced map interactions with hover effects, property counter, and improved marker behavior
 
-import React, { useCallback, useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useGoogleMaps, DEFAULT_MAP_CENTER } from '../hooks/useGoogleMaps';
 import { GoogleMap, InfoWindow, Marker } from '@react-google-maps/api';
 import { Button } from '@/components/ui/button';
 import { Property } from '@/modules/owner/components/property/types';
 import { useNavigate } from 'react-router-dom';
+import { MapPin } from 'lucide-react';
 
 // Enhanced map container style for rounded corners
 const mapContainerStyle = {
   width: '100%',
   height: '100%',
-  borderRadius: '16px', // Adding rounded corners
+  borderRadius: '16px',
 };
 
 // Enhanced map options with better zoom controls and enabled scroll wheel
@@ -23,8 +24,8 @@ const mapOptions = {
   zoomControl: true,
   streetViewControl: false,
   mapTypeControl: false,
-  scrollwheel: true, // FIXED: Enable scroll wheel zoom without Command key
-  gestureHandling: 'greedy', // FIXED: Allow all gestures without modifier keys
+  scrollwheel: true,
+  gestureHandling: 'greedy',
   styles: [
     {
       featureType: 'all',
@@ -64,10 +65,10 @@ const MapPanel: React.FC<MapPanelProps> = ({
   const navigate = useNavigate();
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [mapReady, setMapReady] = useState(false);
-  const [displayedMarkers, setDisplayedMarkers] = useState<string[]>([]);
-  
+  const [visiblePropertiesCount, setVisiblePropertiesCount] = useState<number>(0);
+
   // Enhanced coordinate extraction with multiple fallback strategies
-  const extractCoordinates = (property: Property) => {
+  const extractCoordinates = useCallback((property: Property) => {
     try {
       console.log(`Extracting coordinates for property ${property.id}`);
       
@@ -121,7 +122,6 @@ const MapPanel: React.FC<MapPanelProps> = ({
       if (property.property_details?.steps) {
         const steps = property.property_details.steps;
         
-        // Look for location-related steps
         for (const [stepKey, stepData] of Object.entries(steps)) {
           if (typeof stepData === 'object' && stepData !== null && 
               (stepKey.includes('location') || stepKey.includes('Location'))) {
@@ -140,21 +140,17 @@ const MapPanel: React.FC<MapPanelProps> = ({
         }
       }
       
-      // Strategy 5: Generate predictable coordinates for Hyderabad area (both dev and production)
-      // This ensures all properties appear on the map while real coordinates are being synced
+      // Strategy 5: Generate predictable coordinates for Hyderabad area
       console.log(`⚠ No valid coordinates found for property ${property.id}, generating fallback coordinates`);
       
-      // Generate a consistent coordinate based on property ID hash
       const hash = property.id.split('').reduce((acc, char) => {
         return acc + char.charCodeAt(0);
       }, 0);
       
-      // Generate coordinates within a reasonable area around Hyderabad
-      const latOffset = (hash % 200) / 10000; // Range: 0 to 0.02 degrees
-      const lngOffset = ((hash * 3) % 200) / 10000; // Range: 0 to 0.02 degrees
+      const latOffset = (hash % 200) / 10000;
+      const lngOffset = ((hash * 3) % 200) / 10000;
       
-      // Add some variation while keeping all points in Hyderabad area
-      const fallbackLat = DEFAULT_MAP_CENTER.lat + latOffset - 0.01; // ±0.01 degree variation
+      const fallbackLat = DEFAULT_MAP_CENTER.lat + latOffset - 0.01;
       const fallbackLng = DEFAULT_MAP_CENTER.lng + lngOffset - 0.01;
       
       console.log(`Generated fallback coordinates for ${property.id}: ${fallbackLat}, ${fallbackLng}`);
@@ -166,22 +162,104 @@ const MapPanel: React.FC<MapPanelProps> = ({
       
     } catch (error) {
       console.error(`Error extracting coordinates for property ${property.id}:`, error);
-      
-      // Final fallback - return center coordinates
       return DEFAULT_MAP_CENTER;
     }
-  };
+  }, []);
+
+  // Create custom marker icons for different states
+  const createMarkerIcon = useCallback((isHovered: boolean, isActive: boolean) => {
+    const scale = isHovered || isActive ? 1.6 : 1.3; // Increased base size and hover size
+    const fillColor = isHovered || isActive ? '#3B82F6' : '#DC2626'; // Blue when hovered/active, dark red otherwise
+    
+    return {
+      path: 'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z',
+      fillColor: fillColor,
+      fillOpacity: 0.9,
+      strokeColor: '#FFFFFF',
+      strokeWeight: 2,
+      scale: scale,
+      anchor: new google.maps.Point(12, 24), // Anchor at the bottom point of the pin
+    };
+  }, []);
 
   // Navigate to property detail page
   const handlePropertyClick = useCallback((property: Property) => {
     navigate(`/properties/${property.id}`);
   }, [navigate]);
 
+  // Update visible properties count when map bounds change
+  const updateVisiblePropertiesCount = useCallback(() => {
+    if (!map || !isLoaded) return;
+
+    try {
+      const bounds = map.getBounds();
+      if (!bounds) return;
+
+      let visibleCount = 0;
+      properties.forEach(property => {
+        const coords = extractCoordinates(property);
+        const position = new google.maps.LatLng(coords.lat, coords.lng);
+        if (bounds.contains(position)) {
+          visibleCount++;
+        }
+      });
+
+      setVisiblePropertiesCount(visibleCount);
+      console.log(`📊 Visible properties: ${visibleCount} of ${properties.length}`);
+    } catch (error) {
+      console.error('Error updating visible properties count:', error);
+      setVisiblePropertiesCount(properties.length); // Fallback to total count
+    }
+  }, [map, isLoaded, properties, extractCoordinates]);
+
+  // Auto-pan map to show hovered property marker
+  const panToPropertyIfNeeded = useCallback((propertyId: string) => {
+    if (!map || !isLoaded) return;
+
+    try {
+      const property = properties.find(p => p.id === propertyId);
+      if (!property) return;
+
+      const coords = extractCoordinates(property);
+      const position = new google.maps.LatLng(coords.lat, coords.lng);
+      const bounds = map.getBounds();
+
+      // Check if marker is visible in current viewport
+      if (!bounds || !bounds.contains(position)) {
+        console.log(`📍 Panning to property ${propertyId} at ${coords.lat}, ${coords.lng}`);
+        
+        // Smoothly pan to the marker position
+        map.panTo(position);
+        
+        // Optional: Adjust zoom if too far out
+        const currentZoom = map.getZoom() || 11;
+        if (currentZoom < 12) {
+          setTimeout(() => {
+            map.setZoom(13);
+          }, 300); // Wait for pan to complete
+        }
+      }
+    } catch (error) {
+      console.error('Error panning to property:', error);
+    }
+  }, [map, isLoaded, properties, extractCoordinates]);
+
+  // Watch for hoveredPropertyId changes and pan to marker if needed
+  useEffect(() => {
+    if (hoveredPropertyId) {
+      panToPropertyIfNeeded(hoveredPropertyId);
+    }
+  }, [hoveredPropertyId, panToPropertyIfNeeded]);
+
   // Handle map load with enhanced styling and better zoom management
   const onMapLoad = useCallback((map: google.maps.Map) => {
     console.log('Map loaded successfully');
     setMap(map);
     setMapReady(true);
+    
+    // Add bounds event listener to update visible count
+    map.addListener('bounds_changed', updateVisiblePropertiesCount);
+    map.addListener('zoom_changed', updateVisiblePropertiesCount);
     
     // Add bounds if we have properties
     if (properties.length > 0) {
@@ -197,47 +275,44 @@ const MapPanel: React.FC<MapPanelProps> = ({
         
         if (validPoints > 0) {
           setTimeout(() => {
-            // IMPROVED: Better zoom level logic for city-wide view
             if (validPoints === 1) {
-              // Single property - show neighborhood level
               map.setCenter(extractCoordinates(properties[0]));
               map.setZoom(16);
             } else if (validPoints <= 3) {
-              // Few properties - show area level
               map.fitBounds(bounds);
               map.setZoom(Math.min(map.getZoom() || 14, 14));
             } else if (validPoints <= 10) {
-              // Medium number - show district level
               map.fitBounds(bounds);
               map.setZoom(Math.min(map.getZoom() || 13, 13));
             } else {
-              // Many properties - show city level with better visibility
               map.fitBounds(bounds);
               const currentZoom = map.getZoom() || 11;
-              map.setZoom(Math.max(Math.min(currentZoom, 12), 10)); // Ensure zoom is between 10-12
+              map.setZoom(Math.max(Math.min(currentZoom, 12), 10));
             }
+            
+            // Update visible count after setting bounds
+            setTimeout(updateVisiblePropertiesCount, 500);
           }, 100);
         }
       } catch (e) {
         console.error('Error fitting bounds:', e);
-        // Fallback to default center and zoom
         map.setCenter(DEFAULT_MAP_CENTER);
         map.setZoom(11);
       }
     } else {
-      // No properties - default to Hyderabad city view
       map.setCenter(DEFAULT_MAP_CENTER);
       map.setZoom(11);
     }
-  }, [properties]);
+  }, [properties, updateVisiblePropertiesCount, extractCoordinates]);
 
-  // Log markers for debugging
+  // Update visible count when properties change
   useEffect(() => {
     if (isLoaded && mapReady) {
       console.log(`📍 Displaying ${properties.length} markers on map`);
-      setDisplayedMarkers(properties.map(p => p.id));
       
-      // Log coordinate statistics
+      // Update visible count after a short delay to ensure map is ready
+      setTimeout(updateVisiblePropertiesCount, 300);
+      
       const coordinateStats = properties.reduce((stats, property) => {
         const coords = extractCoordinates(property);
         const isRealCoord = property.coordinates || 
@@ -255,7 +330,7 @@ const MapPanel: React.FC<MapPanelProps> = ({
       
       console.log(`📊 Coordinate statistics: ${coordinateStats.real} real, ${coordinateStats.fallback} fallback`);
     }
-  }, [properties, isLoaded, mapReady, hoveredPropertyId]);
+  }, [properties, isLoaded, mapReady, updateVisiblePropertiesCount, extractCoordinates]);
 
   // Enhanced error state with better styling
   if (loadError) {
@@ -304,16 +379,27 @@ const MapPanel: React.FC<MapPanelProps> = ({
   }
 
   return (
-    <div className="w-full h-full rounded-2xl overflow-hidden">
+    <div className="w-full h-full rounded-2xl overflow-hidden relative">
+      {/* Property Count Indicator - Top Right Corner */}
+      <div className="absolute top-4 right-4 z-10 bg-white/95 backdrop-blur-sm rounded-full px-4 py-2 shadow-lg border border-border/20">
+        <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+          <MapPin className="h-4 w-4 text-primary" />
+          <span>
+            {visiblePropertiesCount} of {properties.length} properties
+          </span>
+        </div>
+      </div>
+
       <GoogleMap
         mapContainerStyle={mapContainerStyle}
         center={DEFAULT_MAP_CENTER}
-        zoom={11} // IMPROVED: Better default zoom for city view
+        zoom={11}
         options={mapOptions}
         onLoad={onMapLoad}
       >
         {properties.map((property) => {
-          const isActive = hoveredPropertyId === property.id || activeProperty?.id === property.id;
+          const isHovered = hoveredPropertyId === property.id;
+          const isActive = activeProperty?.id === property.id;
           const position = extractCoordinates(property);
           
           return (
@@ -321,17 +407,9 @@ const MapPanel: React.FC<MapPanelProps> = ({
               key={property.id}
               position={position}
               onClick={() => setActiveProperty(property)}
-              animation={isActive ? google.maps.Animation.BOUNCE : undefined}
+              animation={isHovered || isActive ? google.maps.Animation.BOUNCE : undefined}
               title={property.title || `Property ${property.id}`}
-              // Enhanced marker with custom icon for active state
-              icon={isActive ? {
-                path: google.maps.SymbolPath.CIRCLE,
-                scale: 8,
-                fillColor: '#3B82F6',
-                fillOpacity: 1,
-                strokeColor: '#FFFFFF',
-                strokeWeight: 2,
-              } : undefined}
+              icon={createMarkerIcon(isHovered, isActive)}
             />
           );
         })}

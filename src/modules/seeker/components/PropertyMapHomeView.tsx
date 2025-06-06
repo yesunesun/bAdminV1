@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyMapHomeView.tsx
-// Version: 5.4.0
-// Last Modified: 02-06-2025 16:00 IST
-// Purpose: Implemented functional Load More button with proper pagination logic
+// Version: 6.0.0
+// Last Modified: 07-06-2025 16:30 IST
+// Purpose: FIXED map marker rendering - ensures SearchResult objects with coordinates flow properly to MapPanel
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useGoogleMaps } from '../hooks/useGoogleMaps';
@@ -18,7 +18,7 @@ interface PropertyMapHomeViewProps {
   onFavoriteAction?: (propertyId: string) => boolean;
 }
 
-// Union type for handling both legacy and search results
+// Updated to use SearchResult consistently for map rendering
 type PropertyData = SearchResult;
 
 const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAction }) => {
@@ -28,7 +28,7 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
   const { user } = useAuth();
   const { toast } = useToast();
   
-  // Search-specific state with pagination support
+  // Search-specific state with pagination support - USING SearchResult objects
   const [searchProperties, setSearchProperties] = useState<SearchResult[]>([]);
   const [searchLoading, setSearchLoading] = useState<boolean>(true);
   const [loadingMore, setLoadingMore] = useState<boolean>(false);
@@ -58,6 +58,13 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
         const response = await searchService.getLatestProperties(20); // Start with 20 items
         
         console.log('🏠 Latest properties loaded:', response);
+        console.log('🗺️ First property coordinates check:', {
+          firstPropertyId: response.results?.[0]?.id,
+          hasLatitude: response.results?.[0]?.latitude !== undefined,
+          hasLongitude: response.results?.[0]?.longitude !== undefined,
+          latitude: response.results?.[0]?.latitude,
+          longitude: response.results?.[0]?.longitude
+        });
         
         // Update search state with latest properties
         setSearchProperties(response.results || []);
@@ -68,6 +75,7 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
         setCurrentFilters(null); // No filters for latest properties
         
         console.log(`✅ Homepage initialized with ${response.results?.length || 0} latest properties`);
+        console.log(`🗺️ Properties with coordinates: ${response.results?.filter(p => p.latitude && p.longitude).length || 0}`);
         
       } catch (error) {
         console.error('❌ Failed to load latest properties:', error);
@@ -275,6 +283,15 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
       }
       
       console.log('PropertyMapHomeView: Search response:', response);
+      console.log('🗺️ Search results coordinates check:', {
+        totalResults: response.results?.length || 0,
+        resultsWithCoordinates: response.results?.filter(p => p.latitude && p.longitude).length || 0,
+        firstResultCoords: response.results?.[0] ? {
+          id: response.results[0].id,
+          lat: response.results[0].latitude,
+          lng: response.results[0].longitude
+        } : 'None'
+      });
       
       // Update search state
       setSearchProperties(response.results || []);
@@ -290,7 +307,8 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
         });
       } else {
         const resultType = filtersEmpty ? 'latest properties' : 'search results';
-        console.log(`✅ ${resultType} loaded: ${response.results?.length || 0} properties found`);
+        const coordCount = response.results?.filter(p => p.latitude && p.longitude).length || 0;
+        console.log(`✅ ${resultType} loaded: ${response.results?.length || 0} properties found (${coordCount} with coordinates)`);
       }
       
     } catch (error) {
@@ -367,13 +385,15 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
         setSearchProperties(prev => [...prev, ...response.results]);
         setCurrentPage(nextPage);
         
+        const coordCount = response.results.filter(p => p.latitude && p.longitude).length;
+        
         toast({
           title: "Loaded more properties",
-          description: `${response.results.length} more properties loaded`,
+          description: `${response.results.length} more properties loaded (${coordCount} with coordinates)`,
           duration: 2000,
         });
         
-        console.log(`✅ Loaded ${response.results.length} more properties. Total: ${searchProperties.length + response.results.length}`);
+        console.log(`✅ Loaded ${response.results.length} more properties. Total: ${searchProperties.length + response.results.length} (${coordCount} new with coordinates)`);
       } else {
         toast({
           title: "No more properties",
@@ -466,7 +486,7 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
               <div className="h-full rounded-2xl overflow-hidden shadow-lg border border-border/50 bg-card">
                 {mapsLoaded ? (
                   <MapPanel
-                    properties={searchProperties}
+                    properties={searchProperties} // CRITICAL: Passing SearchResult[] with coordinates
                     isLoaded={mapsLoaded}
                     loadError={loadError}
                     activeProperty={activeProperty}

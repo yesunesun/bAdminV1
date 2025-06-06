@@ -1,7 +1,7 @@
 // src/components/Search/services/searchService.ts
-// Version: 10.3.0
-// Last Modified: 02-06-2025 20:30 IST
-// Purpose: Fixed Buy/Rent filtering when Property Type is "Any" by properly passing p_subtype to all property searches
+// Version: 11.0.0
+// Last Modified: 07-06-2025 15:50 IST
+// Purpose: FIXED coordinate propagation - database latitude/longitude now flow to SearchResult objects for map markers
 
 import { SearchFilters, SearchResult } from '../types/search.types';
 import { supabase } from '@/lib/supabase';
@@ -28,7 +28,7 @@ export interface SearchOptions {
   sortOrder?: 'asc' | 'desc';
 }
 
-// UPDATED: Database result interfaces with primary_image and code fields
+// UPDATED: Database result interfaces with primary_image, code, and coordinate fields
 interface ResidentialSearchResult {
   id: string;
   owner_id: string;
@@ -51,6 +51,8 @@ interface ResidentialSearchResult {
   land_type: string | null;
   primary_image: string | null;
   code?: string | null;
+  latitude?: number; // NEW: Coordinate from database
+  longitude?: number; // NEW: Coordinate from database
 }
 
 interface CommercialSearchResult {
@@ -72,6 +74,8 @@ interface CommercialSearchResult {
   area_unit: string;
   primary_image: string | null;
   code?: string | null;
+  latitude?: number; // NEW: Coordinate from database
+  longitude?: number; // NEW: Coordinate from database
 }
 
 interface LandSearchResult {
@@ -94,6 +98,8 @@ interface LandSearchResult {
   land_type: string;
   primary_image: string | null;
   code?: string | null;
+  latitude?: number; // NEW: Coordinate from database
+  longitude?: number; // NEW: Coordinate from database
 }
 
 // Union type for all database results
@@ -137,10 +143,11 @@ export class SearchService {
         code: trimmedCode,
         resultCount: searchResults.length,
         totalCount: totalCount,
-        foundProperty: searchResults.length > 0 ? searchResults[0].title : 'None'
+        foundProperty: searchResults.length > 0 ? searchResults[0].title : 'None',
+        hasCoordinates: searchResults.length > 0 && searchResults[0].latitude && searchResults[0].longitude ? 'YES' : 'NO'
       });
 
-      // Transform results using the same transformation logic
+      // Transform results using the updated transformation logic
       let transformedResults = this.transformDatabaseResults(searchResults);
       transformedResults = SearchFallbackService.enhanceSearchResults(transformedResults);
       
@@ -243,10 +250,11 @@ export class SearchService {
       console.log('📊 Latest properties results:', {
         resultCount: searchResults.length,
         totalCount: totalCount,
-        firstResultHasPrimaryImage: searchResults[0]?.primary_image ? 'YES' : 'NO'
+        firstResultHasPrimaryImage: searchResults[0]?.primary_image ? 'YES' : 'NO',
+        firstResultHasCoordinates: searchResults[0]?.latitude && searchResults[0]?.longitude ? 'YES' : 'NO'
       });
 
-      // Transform results using the same transformation logic
+      // Transform results using the updated transformation logic
       let transformedResults = this.transformDatabaseResults(searchResults);
       transformedResults = SearchFallbackService.enhanceSearchResults(transformedResults);
       
@@ -329,14 +337,6 @@ export class SearchService {
   }
 
   /**
-   * DEPRECATED: Old mapping function - replaced by getFlowTypeFromTransactionAndProperty
-   */
-  private mapSubtypeToFlowType(propertyType: string, subtype: string, transactionType: string): string | null {
-    console.log('⚠️ Using deprecated mapSubtypeToFlowType - should use getFlowTypeFromTransactionAndProperty');
-    return this.getFlowTypeFromTransactionAndProperty(transactionType, propertyType, subtype);
-  }
-
-  /**
    * Get property subtype for database filtering
    */
   private getPropertySubtype(subtype: string): string | null {
@@ -370,38 +370,6 @@ export class SearchService {
     };
 
     return subtypeMapping[subtype] || null;
-  }
-
-  /**
-   * Check if property subtype matches selected filter
-   */
-  private doesPropertyMatchSubtype(property: DatabaseSearchResult, selectedSubtype: string): boolean {
-    if (!selectedSubtype || selectedSubtype === 'any') {
-      return true; // No subtype filter applied
-    }
-
-    // For PG/Hostel and Flatmates, the flow type itself is the filter
-    if (selectedSubtype === 'pghostel' || selectedSubtype === 'flatmates') {
-      return property.flow_type.includes(selectedSubtype);
-    }
-
-    // For regular properties, we now rely on the database-level filtering
-    return true;
-  }
-
-  /**
-   * SIMPLIFIED: Get effective subtype - just pass through the special cases
-   */
-  private getEffectiveSubtype(filters: SearchFilters): string | null {
-    // Only handle special subtypes, let the database handle transaction type filtering
-    if (filters.selectedSubType === 'pghostel') {
-      return 'pghostel';
-    } else if (filters.selectedSubType === 'flatmates') {
-      return 'flatmates';
-    }
-    
-    // For everything else, return null and let buildSearchParams handle the transaction type
-    return null;
   }
 
   /**
@@ -443,10 +411,11 @@ export class SearchService {
         propertyType: propertyType,
         transactionType: transactionType,
         firstResultFlowType: searchResults[0]?.flow_type,
-        firstResultHasPrimaryImage: searchResults[0]?.primary_image ? 'YES' : 'NO'
+        firstResultHasPrimaryImage: searchResults[0]?.primary_image ? 'YES' : 'NO',
+        firstResultHasCoordinates: searchResults[0]?.latitude && searchResults[0]?.longitude ? 'YES' : 'NO'
       });
 
-      // Transform results
+      // Transform results using the updated transformation logic
       let transformedResults = this.transformDatabaseResults(searchResults);
       transformedResults = SearchFallbackService.enhanceSearchResults(transformedResults);
       
@@ -756,7 +725,7 @@ export class SearchService {
   }
 
   /**
-   * Transform database results to SearchResult format with primary_image and code
+   * CRITICAL FIX: Transform database results to SearchResult format with coordinate propagation
    */
   private transformDatabaseResults(dbResults: DatabaseSearchResult[]): SearchResult[] {
     return dbResults.map(dbResult => {
@@ -777,7 +746,11 @@ export class SearchService {
       // Extract property code from database result
       const propertyCode = dbResult.code || null;
       
-      console.log(`🖼️ Transforming property ${dbResult.id}: flow_type = ${dbResult.flow_type}, transaction = ${transactionType}, primary_image = ${primaryImage}, code = ${propertyCode}`);
+      // CRITICAL FIX: Extract and propagate coordinate data from database
+      const latitude = dbResult.latitude || null;
+      const longitude = dbResult.longitude || null;
+      
+      console.log(`🗺️ Transforming property ${dbResult.id}: flow_type = ${dbResult.flow_type}, transaction = ${transactionType}, coordinates = ${latitude && longitude ? `(${latitude}, ${longitude})` : 'NONE'}, primary_image = ${primaryImage}, code = ${propertyCode}`);
       
       return {
         id: dbResult.id,
@@ -794,7 +767,10 @@ export class SearchService {
         createdAt: dbResult.created_at,
         status: dbResult.status || 'active',
         primary_image: primaryImage,
-        code: propertyCode
+        code: propertyCode,
+        // CRITICAL FIX: Include coordinate data for map marker rendering
+        latitude: latitude,
+        longitude: longitude
       } as SearchResult;
     });
   }
