@@ -1,7 +1,7 @@
 // src/modules/seeker/components/MapPanel.tsx
-// Version: 2.9.0
-// Last Modified: 06-06-2025 14:45 IST
-// Purpose: Fixed coordinate extraction to work consistently in both development and production
+// Version: 3.0.0
+// Last Modified: 06-06-2025 15:30 IST
+// Purpose: Fixed zoom issues - enabled scroll wheel zoom and improved initial zoom levels
 
 import React, { useCallback, useState, useEffect } from 'react';
 import { useGoogleMaps, DEFAULT_MAP_CENTER } from '../hooks/useGoogleMaps';
@@ -17,12 +17,14 @@ const mapContainerStyle = {
   borderRadius: '16px', // Adding rounded corners
 };
 
-// Enhanced map options with better styling
+// Enhanced map options with better zoom controls and enabled scroll wheel
 const mapOptions = {
   disableDefaultUI: false,
   zoomControl: true,
   streetViewControl: false,
   mapTypeControl: false,
+  scrollwheel: true, // FIXED: Enable scroll wheel zoom without Command key
+  gestureHandling: 'greedy', // FIXED: Allow all gestures without modifier keys
   styles: [
     {
       featureType: 'all',
@@ -175,7 +177,7 @@ const MapPanel: React.FC<MapPanelProps> = ({
     navigate(`/properties/${property.id}`);
   }, [navigate]);
 
-  // Handle map load with enhanced styling
+  // Handle map load with enhanced styling and better zoom management
   const onMapLoad = useCallback((map: google.maps.Map) => {
     console.log('Map loaded successfully');
     setMap(map);
@@ -195,19 +197,37 @@ const MapPanel: React.FC<MapPanelProps> = ({
         
         if (validPoints > 0) {
           setTimeout(() => {
-            map.fitBounds(bounds);
+            // IMPROVED: Better zoom level logic for city-wide view
             if (validPoints === 1) {
-              map.setZoom(15); // Closer zoom for single property
-            } else if (validPoints <= 5) {
-              map.setZoom(12); // Medium zoom for few properties
+              // Single property - show neighborhood level
+              map.setCenter(extractCoordinates(properties[0]));
+              map.setZoom(16);
+            } else if (validPoints <= 3) {
+              // Few properties - show area level
+              map.fitBounds(bounds);
+              map.setZoom(Math.min(map.getZoom() || 14, 14));
+            } else if (validPoints <= 10) {
+              // Medium number - show district level
+              map.fitBounds(bounds);
+              map.setZoom(Math.min(map.getZoom() || 13, 13));
             } else {
-              map.setZoom(11); // Wider zoom for many properties
+              // Many properties - show city level with better visibility
+              map.fitBounds(bounds);
+              const currentZoom = map.getZoom() || 11;
+              map.setZoom(Math.max(Math.min(currentZoom, 12), 10)); // Ensure zoom is between 10-12
             }
           }, 100);
         }
       } catch (e) {
         console.error('Error fitting bounds:', e);
+        // Fallback to default center and zoom
+        map.setCenter(DEFAULT_MAP_CENTER);
+        map.setZoom(11);
       }
+    } else {
+      // No properties - default to Hyderabad city view
+      map.setCenter(DEFAULT_MAP_CENTER);
+      map.setZoom(11);
     }
   }, [properties]);
 
@@ -288,7 +308,7 @@ const MapPanel: React.FC<MapPanelProps> = ({
       <GoogleMap
         mapContainerStyle={mapContainerStyle}
         center={DEFAULT_MAP_CENTER}
-        zoom={12}
+        zoom={11} // IMPROVED: Better default zoom for city view
         options={mapOptions}
         onLoad={onMapLoad}
       >
