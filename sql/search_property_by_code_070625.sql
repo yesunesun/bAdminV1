@@ -1,53 +1,34 @@
--- src/database/functions/get_latest_properties.sql
--- Version: 1.0.0
--- Last Modified: 01-06-2025 22:45 IST
--- Purpose: Get top 50 latest properties across all types sorted by creation date
+-- /Users/wenceslausyesunesun/ActiveProjects/Bhoomitalli/bAdminV1/sql/search_property_by_code_070625.sql
+-- Last Modified: 07-06-2025 01:00 IST
+-- Purpose: Latest function definitions extracted from database
+-- Generated from: /Users/wenceslausyesunesun/ActiveProjects/Bhoomitalli/bAdminV1/sql/search_property_by_code.sql
 
 -- =============================================================================
--- MAIN FUNCTION: Get latest properties (top 50, sorted by date)
+-- EXTRACTED FUNCTION DEFINITIONS
 -- =============================================================================
-CREATE OR REPLACE FUNCTION get_latest_properties(
-    p_limit INTEGER DEFAULT 50
-)
-RETURNS TABLE(
-    id UUID,
-    owner_id UUID,
-    created_at TIMESTAMP WITH TIME ZONE,
-    updated_at TIMESTAMP WITH TIME ZONE,
-    property_type TEXT,
-    flow_type TEXT,
-    subtype TEXT,
-    total_count BIGINT,
-    title TEXT,
-    price NUMERIC,
-    city TEXT,
-    state TEXT,
-    area NUMERIC,
-    owner_email TEXT,
-    status TEXT,
-    bedrooms INTEGER,
-    bathrooms NUMERIC,
-    area_unit TEXT,
-    land_type TEXT,
-    primary_image TEXT
-)
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
+
+-- Function 1: search_property_by_code
+-- -----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.search_property_by_code(p_code text)
+ RETURNS TABLE(id uuid, owner_id uuid, created_at timestamp with time zone, updated_at timestamp with time zone, property_type text, flow_type text, subtype text, total_count bigint, title text, price numeric, city text, state text, area numeric, owner_email text, status text, bedrooms integer, bathrooms numeric, area_unit text, land_type text, primary_image text, code text)
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
 DECLARE
     v_total_count BIGINT;
 BEGIN
-    -- Validate limit parameter
-    IF p_limit IS NULL OR p_limit <= 0 OR p_limit > 1000 THEN
-        p_limit := 50;
+    -- Validate input
+    IF p_code IS NULL OR trim(p_code) = '' THEN
+        RAISE EXCEPTION 'Property code cannot be null or empty';
     END IF;
 
-    -- Get total count of active properties
+    -- Get total count of matching properties
     SELECT COUNT(*) INTO v_total_count
     FROM properties_v2 p
-    WHERE p.status IS DISTINCT FROM 'deleted';
+    WHERE p.status IS DISTINCT FROM 'deleted'
+      AND p.property_details->'meta'->>'code' = p_code;
 
-    -- Return results for all property types
+    -- Return results for matching properties
     RETURN QUERY
     SELECT 
         -- MANDATORY CORE (8 fields)
@@ -290,13 +271,42 @@ BEGIN
             p.property_details->'steps'->'images'->>'primaryImage',
             p.property_details->'media'->'photos'->>'primaryImage',
             p.property_details->'images'->>'primary'
-        )::TEXT as primary_image
+        )::TEXT as primary_image,
+        
+        -- Property code from meta
+        p.property_details->'meta'->>'code'::TEXT as code
         
     FROM properties_v2 p
     LEFT JOIN profiles prof ON p.owner_id = prof.id
     WHERE p.status IS DISTINCT FROM 'deleted'
-    ORDER BY p.created_at DESC
-    LIMIT p_limit;
+      AND p.property_details->'meta'->>'code' = p_code
+    ORDER BY p.created_at DESC;
     
 END;
-$$;
+$function$
+;
+
+-- Function 2: search_property_by_code_insensitive
+-- -----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.search_property_by_code_insensitive(p_code text)
+ RETURNS TABLE(id uuid, owner_id uuid, created_at timestamp with time zone, updated_at timestamp with time zone, property_type text, flow_type text, subtype text, total_count bigint, title text, price numeric, city text, state text, area numeric, owner_email text, status text, bedrooms integer, bathrooms numeric, area_unit text, land_type text, primary_image text, code text)
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+BEGIN
+    -- Validate input
+    IF p_code IS NULL OR trim(p_code) = '' THEN
+        RAISE EXCEPTION 'Property code cannot be null or empty';
+    END IF;
+
+    -- Call the main function with uppercase code for case-insensitive search
+    RETURN QUERY
+    SELECT * FROM search_property_by_code(UPPER(trim(p_code)));
+    
+END;
+$function$
+;
+
+-- =============================================================================
+-- END OF FILE - 2 functions extracted
+-- =============================================================================

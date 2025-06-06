@@ -1,42 +1,23 @@
--- sql/find_similar_properties.sql
--- Version: 1.0.0
--- Last Modified: 01-06-2025 23:15 IST
--- Purpose: Find similar properties based on weighted similarity scoring
+-- /Users/wenceslausyesunesun/ActiveProjects/Bhoomitalli/bAdminV1/sql/find_similar_properties_070625.sql
+-- Last Modified: 07-06-2025 18:30 IST
+-- Purpose: Similar properties functions with coordinate extraction support
+-- Updated: Added latitude and longitude extraction for all property types
 
 -- =============================================================================
--- MAIN FUNCTION: Find similar properties with weighted scoring
+-- EXTRACTED FUNCTION DEFINITIONS WITH COORDINATE SUPPORT
 -- =============================================================================
-CREATE OR REPLACE FUNCTION find_similar_properties(
-    p_property_id UUID,
-    p_limit INTEGER DEFAULT 10,
-    p_min_similarity_score NUMERIC DEFAULT 0.3
-)
-RETURNS TABLE(
-    id UUID,
-    owner_id UUID,
-    created_at TIMESTAMP WITH TIME ZONE,
-    updated_at TIMESTAMP WITH TIME ZONE,
-    property_type TEXT,
-    flow_type TEXT,
-    subtype TEXT,
-    title TEXT,
-    price NUMERIC,
-    city TEXT,
-    state TEXT,
-    area NUMERIC,
-    owner_email TEXT,
-    status TEXT,
-    bedrooms INTEGER,
-    bathrooms NUMERIC,
-    area_unit TEXT,
-    land_type TEXT,
-    primary_image TEXT,
-    similarity_score NUMERIC,
-    similarity_factors JSONB
-)
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
+
+-- Function 1: find_similar_properties (UPDATED WITH COORDINATES)
+-- -----------------------------------------------------------------------------
+
+-- Drop existing function to update return type
+DROP FUNCTION IF EXISTS public.find_similar_properties(uuid,integer,numeric);
+
+CREATE OR REPLACE FUNCTION public.find_similar_properties(p_property_id uuid, p_limit integer DEFAULT 10, p_min_similarity_score numeric DEFAULT 0.3)
+ RETURNS TABLE(id uuid, owner_id uuid, created_at timestamp with time zone, updated_at timestamp with time zone, property_type text, flow_type text, subtype text, title text, price numeric, city text, state text, area numeric, owner_email text, status text, bedrooms integer, bathrooms numeric, area_unit text, land_type text, primary_image text, similarity_score numeric, similarity_factors jsonb, latitude numeric, longitude numeric)
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
 DECLARE
     v_target_property RECORD;
     v_target_flow_type TEXT;
@@ -103,42 +84,19 @@ BEGIN
         SELECT * FROM find_similar_land_properties(p_property_id, v_target_property.property_details, p_limit, p_min_similarity_score);
     END IF;
 END;
-$$;
+$function$
+;
 
--- =============================================================================
--- HELPER FUNCTION: Find similar residential properties
--- =============================================================================
-CREATE OR REPLACE FUNCTION find_similar_residential_properties(
-    p_property_id UUID,
-    p_target_details JSONB,
-    p_limit INTEGER,
-    p_min_similarity_score NUMERIC
-)
-RETURNS TABLE(
-    id UUID,
-    owner_id UUID,
-    created_at TIMESTAMP WITH TIME ZONE,
-    updated_at TIMESTAMP WITH TIME ZONE,
-    property_type TEXT,
-    flow_type TEXT,
-    subtype TEXT,
-    title TEXT,
-    price NUMERIC,
-    city TEXT,
-    state TEXT,
-    area NUMERIC,
-    owner_email TEXT,
-    status TEXT,
-    bedrooms INTEGER,
-    bathrooms NUMERIC,
-    area_unit TEXT,
-    land_type TEXT,
-    primary_image TEXT,
-    similarity_score NUMERIC,
-    similarity_factors JSONB
-)
-LANGUAGE plpgsql
-AS $$
+-- Function 2: find_similar_residential_properties (UPDATED WITH COORDINATES)
+-- -----------------------------------------------------------------------------
+
+-- Drop existing function to update return type
+DROP FUNCTION IF EXISTS public.find_similar_residential_properties(uuid,jsonb,integer,numeric);
+
+CREATE OR REPLACE FUNCTION public.find_similar_residential_properties(p_property_id uuid, p_target_details jsonb, p_limit integer, p_min_similarity_score numeric)
+ RETURNS TABLE(id uuid, owner_id uuid, created_at timestamp with time zone, updated_at timestamp with time zone, property_type text, flow_type text, subtype text, title text, price numeric, city text, state text, area numeric, owner_email text, status text, bedrooms integer, bathrooms numeric, area_unit text, land_type text, primary_image text, similarity_score numeric, similarity_factors jsonb, latitude numeric, longitude numeric)
+ LANGUAGE plpgsql
+AS $function$
 DECLARE
     v_target_flow_type TEXT;
     v_target_city TEXT;
@@ -266,48 +224,28 @@ BEGIN
         NULL::TEXT as land_type,
         extract_residential_primary_image(sc.property_details)::TEXT as primary_image,
         ROUND(sc.calculated_similarity_score::NUMERIC, 3) as similarity_score,
-        sc.similarity_factors
+        sc.similarity_factors,
+        -- COORDINATE FIELDS (NEW)
+        extract_residential_latitude(sc.property_details) as latitude,
+        extract_residential_longitude(sc.property_details) as longitude
     FROM similarity_calc sc
     WHERE sc.calculated_similarity_score >= p_min_similarity_score
     ORDER BY sc.calculated_similarity_score DESC, sc.created_at DESC
     LIMIT p_limit;
 END;
-$$;
+$function$
+;
 
--- =============================================================================
--- HELPER FUNCTION: Find similar commercial properties
--- =============================================================================
-CREATE OR REPLACE FUNCTION find_similar_commercial_properties(
-    p_property_id UUID,
-    p_target_details JSONB,
-    p_limit INTEGER,
-    p_min_similarity_score NUMERIC
-)
-RETURNS TABLE(
-    id UUID,
-    owner_id UUID,
-    created_at TIMESTAMP WITH TIME ZONE,
-    updated_at TIMESTAMP WITH TIME ZONE,
-    property_type TEXT,
-    flow_type TEXT,
-    subtype TEXT,
-    title TEXT,
-    price NUMERIC,
-    city TEXT,
-    state TEXT,
-    area NUMERIC,
-    owner_email TEXT,
-    status TEXT,
-    bedrooms INTEGER,
-    bathrooms NUMERIC,
-    area_unit TEXT,
-    land_type TEXT,
-    primary_image TEXT,
-    similarity_score NUMERIC,
-    similarity_factors JSONB
-)
-LANGUAGE plpgsql
-AS $$
+-- Function 3: find_similar_commercial_properties (UPDATED WITH COORDINATES)
+-- -----------------------------------------------------------------------------
+
+-- Drop existing function to update return type
+DROP FUNCTION IF EXISTS public.find_similar_commercial_properties(uuid,jsonb,integer,numeric);
+
+CREATE OR REPLACE FUNCTION public.find_similar_commercial_properties(p_property_id uuid, p_target_details jsonb, p_limit integer, p_min_similarity_score numeric)
+ RETURNS TABLE(id uuid, owner_id uuid, created_at timestamp with time zone, updated_at timestamp with time zone, property_type text, flow_type text, subtype text, title text, price numeric, city text, state text, area numeric, owner_email text, status text, bedrooms integer, bathrooms numeric, area_unit text, land_type text, primary_image text, similarity_score numeric, similarity_factors jsonb, latitude numeric, longitude numeric)
+ LANGUAGE plpgsql
+AS $function$
 DECLARE
     v_target_flow_type TEXT;
     v_target_city TEXT;
@@ -408,48 +346,28 @@ BEGIN
         NULL::TEXT as land_type,
         extract_commercial_primary_image(sc.property_details)::TEXT as primary_image,
         ROUND(sc.calculated_similarity_score::NUMERIC, 3) as similarity_score,
-        sc.similarity_factors
+        sc.similarity_factors,
+        -- COORDINATE FIELDS (NEW)
+        extract_commercial_latitude(sc.property_details) as latitude,
+        extract_commercial_longitude(sc.property_details) as longitude
     FROM similarity_calc sc
     WHERE sc.calculated_similarity_score >= p_min_similarity_score
     ORDER BY sc.calculated_similarity_score DESC, sc.created_at DESC
     LIMIT p_limit;
 END;
-$$;
+$function$
+;
 
--- =============================================================================
--- HELPER FUNCTION: Find similar land properties
--- =============================================================================
-CREATE OR REPLACE FUNCTION find_similar_land_properties(
-    p_property_id UUID,
-    p_target_details JSONB,
-    p_limit INTEGER,
-    p_min_similarity_score NUMERIC
-)
-RETURNS TABLE(
-    id UUID,
-    owner_id UUID,
-    created_at TIMESTAMP WITH TIME ZONE,
-    updated_at TIMESTAMP WITH TIME ZONE,
-    property_type TEXT,
-    flow_type TEXT,
-    subtype TEXT,
-    title TEXT,
-    price NUMERIC,
-    city TEXT,
-    state TEXT,
-    area NUMERIC,
-    owner_email TEXT,
-    status TEXT,
-    bedrooms INTEGER,
-    bathrooms NUMERIC,
-    area_unit TEXT,
-    land_type TEXT,
-    primary_image TEXT,
-    similarity_score NUMERIC,
-    similarity_factors JSONB
-)
-LANGUAGE plpgsql
-AS $$
+-- Function 4: find_similar_land_properties (UPDATED WITH COORDINATES)
+-- -----------------------------------------------------------------------------
+
+-- Drop existing function to update return type
+DROP FUNCTION IF EXISTS public.find_similar_land_properties(uuid,jsonb,integer,numeric);
+
+CREATE OR REPLACE FUNCTION public.find_similar_land_properties(p_property_id uuid, p_target_details jsonb, p_limit integer, p_min_similarity_score numeric)
+ RETURNS TABLE(id uuid, owner_id uuid, created_at timestamp with time zone, updated_at timestamp with time zone, property_type text, flow_type text, subtype text, title text, price numeric, city text, state text, area numeric, owner_email text, status text, bedrooms integer, bathrooms numeric, area_unit text, land_type text, primary_image text, similarity_score numeric, similarity_factors jsonb, latitude numeric, longitude numeric)
+ LANGUAGE plpgsql
+AS $function$
 DECLARE
     v_target_flow_type TEXT;
     v_target_city TEXT;
@@ -552,10 +470,18 @@ BEGIN
         extract_land_type(sc.property_details)::TEXT as land_type,
         extract_land_primary_image(sc.property_details)::TEXT as primary_image,
         ROUND(sc.calculated_similarity_score::NUMERIC, 3) as similarity_score,
-        sc.similarity_factors
+        sc.similarity_factors,
+        -- COORDINATE FIELDS (NEW)
+        extract_land_latitude(sc.property_details) as latitude,
+        extract_land_longitude(sc.property_details) as longitude
     FROM similarity_calc sc
     WHERE sc.calculated_similarity_score >= p_min_similarity_score
     ORDER BY sc.calculated_similarity_score DESC, sc.created_at DESC
     LIMIT p_limit;
 END;
-$$;
+$function$
+;
+
+-- =============================================================================
+-- END OF FILE - 4 functions updated with coordinate support
+-- =============================================================================

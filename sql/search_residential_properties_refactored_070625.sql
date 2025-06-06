@@ -1,16 +1,19 @@
--- src/database/functions/search_residential_properties_refactored.sql
--- Version: 4.2.0
--- Last Modified: 01-06-2025 22:30 IST
--- Purpose: Refactored modular residential search with property type filtering and primary image
+-- /Users/wenceslausyesunesun/ActiveProjects/Bhoomitalli/bAdminV1/sql/search_residential_properties_refactored_070625.sql
+-- Last Modified: 07-06-2025 14:30 IST
+-- Purpose: Latest function definitions with coordinate extraction support
+-- Updated: Added latitude and longitude extraction for residential properties
 
 -- =============================================================================
--- HELPER FUNCTION 1: Extract BHK (Bedrooms) from property data
+-- EXTRACTED FUNCTION DEFINITIONS WITH COORDINATE SUPPORT
 -- =============================================================================
-CREATE OR REPLACE FUNCTION extract_residential_bedrooms(property_details JSONB)
-RETURNS INTEGER
-LANGUAGE plpgsql
-IMMUTABLE
-AS $$
+
+-- Function 1: extract_residential_bedrooms
+-- -----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.extract_residential_bedrooms(property_details jsonb)
+ RETURNS integer
+ LANGUAGE plpgsql
+ IMMUTABLE
+AS $function$
 BEGIN
    RETURN COALESCE(
        -- Extract from bhkType format (e.g., "2 BHK")
@@ -53,16 +56,16 @@ BEGIN
        safe_numeric(property_details->'basicDetails'->>'bedrooms')::integer
    );
 END;
-$$;
+$function$
+;
 
--- =============================================================================
--- HELPER FUNCTION 2: Extract area from property data
--- =============================================================================
-CREATE OR REPLACE FUNCTION extract_residential_area(property_details JSONB)
-RETURNS NUMERIC
-LANGUAGE plpgsql
-IMMUTABLE
-AS $$
+-- Function 2: extract_residential_area
+-- -----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.extract_residential_area(property_details jsonb)
+ RETURNS numeric
+ LANGUAGE plpgsql
+ IMMUTABLE
+AS $function$
 BEGIN
    RETURN COALESCE(
        safe_numeric(property_details->'steps'->'res_rent_basic_details'->>'squareFootage'),
@@ -76,16 +79,16 @@ BEGIN
        safe_numeric(property_details->'basicDetails'->>'squareFootage')
    );
 END;
-$$;
+$function$
+;
 
--- =============================================================================
--- HELPER FUNCTION 3: Extract bathrooms from property data
--- =============================================================================
-CREATE OR REPLACE FUNCTION extract_residential_bathrooms(property_details JSONB)
-RETURNS NUMERIC
-LANGUAGE plpgsql
-IMMUTABLE
-AS $$
+-- Function 3: extract_residential_bathrooms
+-- -----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.extract_residential_bathrooms(property_details jsonb)
+ RETURNS numeric
+ LANGUAGE plpgsql
+ IMMUTABLE
+AS $function$
 BEGIN
    RETURN COALESCE(
        safe_numeric(property_details->'steps'->'res_rent_basic_details'->>'bathrooms'),
@@ -95,16 +98,16 @@ BEGIN
        safe_numeric(property_details->'basicDetails'->>'bathrooms')
    );
 END;
-$$;
+$function$
+;
 
--- =============================================================================
--- HELPER FUNCTION 4: Extract price from property data
--- =============================================================================
-CREATE OR REPLACE FUNCTION extract_residential_price(property_details JSONB)
-RETURNS NUMERIC
-LANGUAGE plpgsql
-IMMUTABLE
-AS $$
+-- Function 4: extract_residential_price
+-- -----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.extract_residential_price(property_details jsonb)
+ RETURNS numeric
+ LANGUAGE plpgsql
+ IMMUTABLE
+AS $function$
 BEGIN
    RETURN COALESCE(
        safe_numeric(property_details->'flow'->>'price'),
@@ -121,16 +124,16 @@ BEGIN
        safe_numeric(property_details->>'price')
    );
 END;
-$$;
+$function$
+;
 
--- =============================================================================
--- HELPER FUNCTION 5: Extract title from property data
--- =============================================================================
-CREATE OR REPLACE FUNCTION extract_residential_title(property_details JSONB)
-RETURNS TEXT
-LANGUAGE plpgsql
-IMMUTABLE
-AS $$
+-- Function 5: extract_residential_title
+-- -----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.extract_residential_title(property_details jsonb)
+ RETURNS text
+ LANGUAGE plpgsql
+ IMMUTABLE
+AS $function$
 BEGIN
    RETURN COALESCE(
        property_details->'flow'->>'title',
@@ -142,16 +145,16 @@ BEGIN
        'Property'
    );
 END;
-$$;
+$function$
+;
 
--- =============================================================================
--- HELPER FUNCTION 6: Extract city from property data
--- =============================================================================
-CREATE OR REPLACE FUNCTION extract_residential_city(property_details JSONB)
-RETURNS TEXT
-LANGUAGE plpgsql
-IMMUTABLE
-AS $$
+-- Function 6: extract_residential_city
+-- -----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.extract_residential_city(property_details jsonb)
+ RETURNS text
+ LANGUAGE plpgsql
+ IMMUTABLE
+AS $function$
 BEGIN
    RETURN COALESCE(
        property_details->'steps'->'res_rent_location'->>'city',
@@ -161,16 +164,16 @@ BEGIN
        property_details->'location'->>'city'
    );
 END;
-$$;
+$function$
+;
 
--- =============================================================================
--- HELPER FUNCTION 7: Extract state from property data
--- =============================================================================
-CREATE OR REPLACE FUNCTION extract_residential_state(property_details JSONB)
-RETURNS TEXT
-LANGUAGE plpgsql
-IMMUTABLE
-AS $$
+-- Function 7: extract_residential_state
+-- -----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.extract_residential_state(property_details jsonb)
+ RETURNS text
+ LANGUAGE plpgsql
+ IMMUTABLE
+AS $function$
 BEGIN
    RETURN COALESCE(
        property_details->'steps'->'res_rent_location'->>'state',
@@ -180,16 +183,16 @@ BEGIN
        property_details->'location'->>'state'
    );
 END;
-$$;
+$function$
+;
 
--- =============================================================================
--- HELPER FUNCTION 8: Extract flow type from property data
--- =============================================================================
-CREATE OR REPLACE FUNCTION extract_residential_flow_type(property_details JSONB)
-RETURNS TEXT
-LANGUAGE plpgsql
-IMMUTABLE
-AS $$
+-- Function 8: extract_residential_flow_type
+-- -----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.extract_residential_flow_type(property_details jsonb)
+ RETURNS text
+ LANGUAGE plpgsql
+ IMMUTABLE
+AS $function$
 BEGIN
    RETURN COALESCE(
        property_details->'flow'->>'flowType',
@@ -197,16 +200,16 @@ BEGIN
        'residential_rent'
    );
 END;
-$$;
+$function$
+;
 
--- =============================================================================
--- HELPER FUNCTION 9: Extract property type from property data
--- =============================================================================
-CREATE OR REPLACE FUNCTION extract_residential_property_type(property_details JSONB)
-RETURNS TEXT
-LANGUAGE plpgsql
-IMMUTABLE
-AS $$
+-- Function 9: extract_residential_property_type
+-- -----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.extract_residential_property_type(property_details jsonb)
+ RETURNS text
+ LANGUAGE plpgsql
+ IMMUTABLE
+AS $function$
 BEGIN
    RETURN COALESCE(
        property_details->'steps'->'res_rent_basic_details'->>'propertyType',
@@ -216,16 +219,16 @@ BEGIN
        property_details->'basicDetails'->>'propertyType'
    );
 END;
-$$;
+$function$
+;
 
--- =============================================================================
--- HELPER FUNCTION 10: Extract primary image from property data (NEW)
--- =============================================================================
-CREATE OR REPLACE FUNCTION extract_residential_primary_image(property_details JSONB)
-RETURNS TEXT
-LANGUAGE plpgsql
-IMMUTABLE
-AS $$
+-- Function 10: extract_residential_primary_image
+-- -----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.extract_residential_primary_image(property_details jsonb)
+ RETURNS text
+ LANGUAGE plpgsql
+ IMMUTABLE
+AS $function$
 DECLARE
     image_file JSONB;
     primary_filename TEXT;
@@ -260,16 +263,60 @@ BEGIN
     
     RETURN primary_filename;
 END;
-$$;
+$function$
+;
 
--- =============================================================================
--- HELPER FUNCTION 11: Convert flow type to subtype
--- =============================================================================
-CREATE OR REPLACE FUNCTION flow_type_to_subtype(flow_type TEXT)
-RETURNS TEXT
-LANGUAGE plpgsql
-IMMUTABLE
-AS $$
+-- Function 11: extract_residential_latitude (NEW)
+-- -----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.extract_residential_latitude(property_details jsonb)
+ RETURNS numeric
+ LANGUAGE plpgsql
+ IMMUTABLE
+AS $function$
+BEGIN
+   RETURN COALESCE(
+       safe_numeric(property_details->'steps'->'res_rent_location'->>'latitude'),
+       safe_numeric(property_details->'steps'->'res_sale_location'->>'latitude'),
+       safe_numeric(property_details->'steps'->'res_flat_location'->>'latitude'),
+       safe_numeric(property_details->'steps'->'res_pg_location'->>'latitude'),
+       safe_numeric(property_details->'location'->>'latitude'),
+       safe_numeric(property_details->'coordinates'->>'lat'),
+       safe_numeric(property_details->'coordinates'->>'latitude'),
+       safe_numeric(property_details->>'latitude')
+   );
+END;
+$function$
+;
+
+-- Function 12: extract_residential_longitude (NEW)
+-- -----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.extract_residential_longitude(property_details jsonb)
+ RETURNS numeric
+ LANGUAGE plpgsql
+ IMMUTABLE
+AS $function$
+BEGIN
+   RETURN COALESCE(
+       safe_numeric(property_details->'steps'->'res_rent_location'->>'longitude'),
+       safe_numeric(property_details->'steps'->'res_sale_location'->>'longitude'),
+       safe_numeric(property_details->'steps'->'res_flat_location'->>'longitude'),
+       safe_numeric(property_details->'steps'->'res_pg_location'->>'longitude'),
+       safe_numeric(property_details->'location'->>'longitude'),
+       safe_numeric(property_details->'coordinates'->>'lng'),
+       safe_numeric(property_details->'coordinates'->>'longitude'),
+       safe_numeric(property_details->>'longitude')
+   );
+END;
+$function$
+;
+
+-- Function 13: flow_type_to_subtype
+-- -----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.flow_type_to_subtype(flow_type text)
+ RETURNS text
+ LANGUAGE plpgsql
+ IMMUTABLE
+AS $function$
 BEGIN
    RETURN CASE 
        WHEN flow_type = 'residential_rent' THEN 'rent'
@@ -279,16 +326,16 @@ BEGIN
        ELSE 'rent'
    END;
 END;
-$$;
+$function$
+;
 
--- =============================================================================
--- HELPER FUNCTION 12: Check if property matches subtype filter
--- =============================================================================
-CREATE OR REPLACE FUNCTION matches_residential_subtype(property_details JSONB, p_subtype TEXT)
-RETURNS BOOLEAN
-LANGUAGE plpgsql
-IMMUTABLE
-AS $$
+-- Function 14: matches_residential_subtype
+-- -----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.matches_residential_subtype(property_details jsonb, p_subtype text)
+ RETURNS boolean
+ LANGUAGE plpgsql
+ IMMUTABLE
+AS $function$
 DECLARE
    flow_type TEXT;
 BEGIN
@@ -306,53 +353,53 @@ BEGIN
        ELSE TRUE
    END;
 END;
-$$;
+$function$
+;
 
--- =============================================================================
--- MAIN FUNCTION: Search residential properties (enhanced with primary image)
--- =============================================================================
-DROP FUNCTION IF EXISTS search_residential_properties CASCADE;
-
-CREATE OR REPLACE FUNCTION search_residential_properties(
-   p_subtype TEXT DEFAULT NULL,
-   p_property_subtype TEXT DEFAULT NULL,
-   p_search_query TEXT DEFAULT NULL,
-   p_city TEXT DEFAULT NULL,
-   p_state TEXT DEFAULT NULL,
-   p_min_price NUMERIC DEFAULT NULL,
-   p_max_price NUMERIC DEFAULT NULL,
-   p_bedrooms INTEGER DEFAULT NULL,
-   p_bathrooms NUMERIC DEFAULT NULL,
-   p_area_min NUMERIC DEFAULT NULL,
-   p_area_max NUMERIC DEFAULT NULL,
-   p_limit INTEGER DEFAULT 50,
-   p_offset INTEGER DEFAULT 0
+-- Function 15: search_residential_properties (UPDATED WITH COORDINATES)
+-- -----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.search_residential_properties(
+    p_subtype text DEFAULT NULL::text, 
+    p_property_subtype text DEFAULT NULL::text, 
+    p_search_query text DEFAULT NULL::text, 
+    p_city text DEFAULT NULL::text, 
+    p_state text DEFAULT NULL::text, 
+    p_min_price numeric DEFAULT NULL::numeric, 
+    p_max_price numeric DEFAULT NULL::numeric, 
+    p_bedrooms integer DEFAULT NULL::integer, 
+    p_bathrooms numeric DEFAULT NULL::numeric, 
+    p_area_min numeric DEFAULT NULL::numeric, 
+    p_area_max numeric DEFAULT NULL::numeric, 
+    p_limit integer DEFAULT 50, 
+    p_offset integer DEFAULT 0
 )
-RETURNS TABLE(
-   id UUID,
-   owner_id UUID,
-   created_at TIMESTAMP WITH TIME ZONE,
-   updated_at TIMESTAMP WITH TIME ZONE,
-   property_type TEXT,
-   flow_type TEXT,
-   subtype TEXT,
-   total_count BIGINT,
-   title TEXT,
-   price NUMERIC,
-   city TEXT,
-   state TEXT,
-   area NUMERIC,
-   owner_email TEXT,
-   status TEXT,
-   bedrooms INTEGER,
-   bathrooms NUMERIC,
-   area_unit TEXT,
-   land_type TEXT,
-   primary_image TEXT
+ RETURNS TABLE(
+    id uuid, 
+    owner_id uuid, 
+    created_at timestamp with time zone, 
+    updated_at timestamp with time zone, 
+    property_type text, 
+    flow_type text, 
+    subtype text, 
+    total_count bigint, 
+    title text, 
+    price numeric, 
+    city text, 
+    state text, 
+    area numeric, 
+    owner_email text, 
+    status text, 
+    bedrooms integer, 
+    bathrooms numeric, 
+    area_unit text, 
+    land_type text, 
+    primary_image text,
+    latitude numeric,
+    longitude numeric
 )
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
 DECLARE
    v_total_count BIGINT;
 BEGIN
@@ -392,7 +439,7 @@ BEGIN
      AND (p_area_max IS NULL OR 
           extract_residential_area(p.property_details) <= p_area_max);
 
-   -- Return results using helper functions
+   -- Return results using helper functions (NOW INCLUDING COORDINATES)
    RETURN QUERY
    SELECT 
        -- MANDATORY CORE (8 fields)
@@ -420,8 +467,12 @@ BEGIN
        'sq_ft'::TEXT as area_unit,
        NULL::TEXT as land_type,
        
-       -- NEW FIELD: Primary image filename
-       extract_residential_primary_image(p.property_details)::TEXT as primary_image
+       -- IMAGE FIELD
+       extract_residential_primary_image(p.property_details)::TEXT as primary_image,
+       
+       -- COORDINATE FIELDS (NEW)
+       extract_residential_latitude(p.property_details) as latitude,
+       extract_residential_longitude(p.property_details) as longitude
        
    FROM properties_v2 p
    LEFT JOIN profiles prof ON p.owner_id = prof.id
@@ -452,4 +503,9 @@ BEGIN
    LIMIT p_limit OFFSET p_offset;
    
 END;
-$$;
+$function$
+;
+
+-- =============================================================================
+-- END OF FILE - 15 functions extracted (2 new coordinate functions added)
+-- =============================================================================
