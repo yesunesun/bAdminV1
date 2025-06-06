@@ -377,7 +377,7 @@ const MapPanel: React.FC<MapPanelProps> = ({
           }
           
           // Get custom marker icon based on property type
-          const markerIcon = getPropertyMarker(property, isHovered || isActive, 32);
+          const markerIcon = getPropertyMarker(property, isHovered || isActive, 20);
           
           const marker = new google.maps.Marker({
             position: { lat: coords.lat, lng: coords.lng },
