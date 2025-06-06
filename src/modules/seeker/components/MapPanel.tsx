@@ -1,7 +1,7 @@
 // src/modules/seeker/components/MapPanel.tsx
-// Version: 4.2.0
-// Last Modified: 07-06-2025 16:00 IST
-// Purpose: Enhanced map with all properties visible and improved coordinate handling
+// Version: 4.3.0
+// Last Modified: 08-01-2025 10:30 IST
+// Purpose: Fixed initial zoom level for better marker spread and dev-only property count indicator
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useGoogleMaps, DEFAULT_MAP_CENTER } from '../hooks/useGoogleMaps';
@@ -77,6 +77,9 @@ const MapPanel: React.FC<MapPanelProps> = ({
     commercial: 0,
     land: 0
   });
+  
+  // Check if we're in development mode
+  const isDevelopment = import.meta.env.DEV || process.env.NODE_ENV === 'development';
   
   // Ref to store marker instances for cleanup
   const markersRef = useRef<google.maps.Marker[]>([]);
@@ -264,10 +267,10 @@ const MapPanel: React.FC<MapPanelProps> = ({
         map.panTo(position);
         
         // Optional: Adjust zoom if too far out
-        const currentZoom = map.getZoom() || 11;
-        if (currentZoom < 12) {
+        const currentZoom = map.getZoom() || 14;
+        if (currentZoom < 13) {
           setTimeout(() => {
-            map.setZoom(13);
+            map.setZoom(14);
           }, 300);
         }
       }
@@ -315,14 +318,17 @@ const MapPanel: React.FC<MapPanelProps> = ({
               map.setZoom(16);
             } else if (validPoints <= 3) {
               map.fitBounds(bounds);
-              map.setZoom(Math.min(map.getZoom() || 14, 14));
+              // FIXED: Set minimum zoom to 14 for better spread
+              map.setZoom(Math.min(map.getZoom() || 14, 15));
             } else if (validPoints <= 10) {
               map.fitBounds(bounds);
-              map.setZoom(Math.min(map.getZoom() || 13, 13));
+              // FIXED: Set minimum zoom to 14 for better spread
+              map.setZoom(Math.min(map.getZoom() || 14, 14));
             } else {
               map.fitBounds(bounds);
-              const currentZoom = map.getZoom() || 11;
-              map.setZoom(Math.max(Math.min(currentZoom, 12), 10));
+              const currentZoom = map.getZoom() || 14;
+              // FIXED: Set minimum zoom to 13 instead of 10 for better marker visibility
+              map.setZoom(Math.max(Math.min(currentZoom, 14), 13));
             }
             
             // Update visible count after setting bounds
@@ -332,11 +338,13 @@ const MapPanel: React.FC<MapPanelProps> = ({
       } catch (e) {
         console.error('Error fitting bounds:', e);
         map.setCenter(DEFAULT_MAP_CENTER);
-        map.setZoom(11);
+        // FIXED: Set default zoom to 14 instead of 11 for better initial view
+        map.setZoom(14);
       }
     } else {
       map.setCenter(DEFAULT_MAP_CENTER);
-      map.setZoom(11);
+      // FIXED: Set default zoom to 14 instead of 11 for better initial view
+      map.setZoom(14);
     }
   }, [properties, updateVisiblePropertiesCount, extractCoordinates]);
 
@@ -472,44 +480,53 @@ const MapPanel: React.FC<MapPanelProps> = ({
 
   return (
     <div className="w-full h-full rounded-2xl overflow-hidden relative">
-      {/* Enhanced Property Count Indicator - Top Right Corner */}
-      <div className="absolute top-4 right-4 z-10 bg-white/95 backdrop-blur-sm rounded-2xl p-4 shadow-lg border border-border/20">
-        <div className="flex items-center gap-2 text-sm font-medium text-foreground mb-3">
-          <MapPin className="h-4 w-4 text-primary" />
-          <span>
-            {visiblePropertiesCount} of {properties.length} properties
-          </span>
-        </div>
-        
-        {/* Debug info */}
-        <div className="text-xs text-muted-foreground mb-2">
-          Markers: {totalMarkersCreated}/{properties.length}
-        </div>
-        
-        {/* Property Type Breakdown */}
-        <div className="space-y-2">
-          <div className="flex items-center gap-2 text-xs">
-            <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-            <Home className="h-3 w-3 text-blue-600" />
-            <span className="text-muted-foreground">Residential: {propertyTypeCounts.residential}</span>
+      {/* FIXED: Enhanced Property Count Indicator - Only visible in development mode */}
+      {isDevelopment && (
+        <div className="absolute top-4 right-4 z-10 bg-white/95 backdrop-blur-sm rounded-2xl p-4 shadow-lg border border-border/20">
+          <div className="flex items-center gap-2 text-sm font-medium text-foreground mb-3">
+            <MapPin className="h-4 w-4 text-primary" />
+            <span>
+              {visiblePropertiesCount} of {properties.length} properties
+            </span>
           </div>
-          <div className="flex items-center gap-2 text-xs">
-            <div className="w-3 h-3 rounded-full bg-green-500"></div>
-            <Building2 className="h-3 w-3 text-green-600" />
-            <span className="text-muted-foreground">Commercial: {propertyTypeCounts.commercial}</span>
+          
+          {/* Debug info */}
+          <div className="text-xs text-muted-foreground mb-2">
+            Markers: {totalMarkersCreated}/{properties.length}
           </div>
-          <div className="flex items-center gap-2 text-xs">
-            <div className="w-3 h-3 rounded-full bg-orange-500"></div>
-            <Trees className="h-3 w-3 text-orange-600" />
-            <span className="text-muted-foreground">Land: {propertyTypeCounts.land}</span>
+          
+          {/* Property Type Breakdown */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-xs">
+              <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+              <Home className="h-3 w-3 text-blue-600" />
+              <span className="text-muted-foreground">Residential: {propertyTypeCounts.residential}</span>
+            </div>
+            <div className="flex items-center gap-2 text-xs">
+              <div className="w-3 h-3 rounded-full bg-green-500"></div>
+              <Building2 className="h-3 w-3 text-green-600" />
+              <span className="text-muted-foreground">Commercial: {propertyTypeCounts.commercial}</span>
+            </div>
+            <div className="flex items-center gap-2 text-xs">
+              <div className="w-3 h-3 rounded-full bg-orange-500"></div>
+              <Trees className="h-3 w-3 text-orange-600" />
+              <span className="text-muted-foreground">Land: {propertyTypeCounts.land}</span>
+            </div>
+          </div>
+          
+          {/* Development mode indicator */}
+          <div className="mt-2 pt-2 border-t border-border/20">
+            <div className="text-xs text-orange-600 font-medium">
+              🔧 DEV MODE
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       <GoogleMap
         mapContainerStyle={mapContainerStyle}
         center={DEFAULT_MAP_CENTER}
-        zoom={11}
+        zoom={14} // FIXED: Changed from 11 to 14 for better initial marker spread
         options={mapOptions}
         onLoad={onMapLoad}
       >
