@@ -1,7 +1,7 @@
 // src/modules/admin/pages/PropertyMapView/components/MapContainer.tsx
-// Version: 2.1.0
-// Last Modified: 01-03-2025 22:00 IST
-// Purpose: Fixed inconsistent info window behavior on mouseover
+// Version: 3.0.0
+// Last Modified: 07-12-2024 17:45 IST
+// Purpose: Enhanced admin map with custom SVG markers for property types and improved behavior
 
 import React, { useEffect, useRef } from 'react';
 import { GoogleMap } from '@react-google-maps/api';
@@ -10,43 +10,16 @@ import { Card } from '@/components/ui/card';
 import { PropertyWithImages, getPropertyPosition } from '../services/propertyMapService';
 import { createInfoWindowContent } from './InfoWindowContent';
 import { defaultCenter } from '../hooks/useGoogleMaps';
+import { 
+  detectPropertyType, 
+  getPropertyMarker, 
+  markerIconCache 
+} from '@/utils/mapMarkers';
 
 // Map container style
 const containerStyle = {
   width: '100%',
   height: 'calc(100vh - 172px)'
-};
-
-// Simple colored marker URLs from Google Maps
-const markerPins = {
-  residential: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png',
-  apartment: 'https://maps.google.com/mapfiles/ms/icons/orange-dot.png',
-  commercial: 'https://maps.google.com/mapfiles/ms/icons/blue-dot.png',
-  land: 'https://maps.google.com/mapfiles/ms/icons/green-dot.png',
-  office: 'https://maps.google.com/mapfiles/ms/icons/purple-dot.png',
-  shop: 'https://maps.google.com/mapfiles/ms/icons/pink-dot.png',
-  default: 'https://maps.google.com/mapfiles/ms/icons/yellow-dot.png'
-};
-
-// Get marker pin URL based on property type
-const getMarkerPin = (property: PropertyWithImages) => {
-  const propertyType = property.property_details?.propertyType?.toLowerCase() || '';
-  
-  if (propertyType.includes('apartment')) {
-    return markerPins.apartment;
-  } else if (propertyType.includes('residential') || propertyType.includes('house')) {
-    return markerPins.residential;
-  } else if (propertyType.includes('office')) {
-    return markerPins.office;
-  } else if (propertyType.includes('shop') || propertyType.includes('retail')) {
-    return markerPins.shop;
-  } else if (propertyType.includes('commercial')) {
-    return markerPins.commercial;
-  } else if (propertyType.includes('land') || propertyType.includes('plot')) {
-    return markerPins.land;
-  }
-  
-  return markerPins.default;
 };
 
 interface MapContainerProps {
@@ -80,27 +53,26 @@ export const MapContainer: React.FC<MapContainerProps> = ({
     markersRef.current.forEach(marker => marker.setMap(null));
     markersRef.current = [];
     
-    // Create new markers
+    // Create new markers with custom SVG icons
     const newMarkers = properties.map(property => {
       const position = getPropertyPosition(property, defaultCenter);
-      const markerUrl = getMarkerPin(property);
       
-      // Create marker with colored pin
+      // Get custom marker icon based on property type (not highlighted by default)
+      const markerIcon = getPropertyMarker(property, false, 32);
+      
+      // Create marker with custom SVG icon
       const marker = new google.maps.Marker({
         position,
         map: mapInstance,
         title: property.title,
-        icon: {
-          url: markerUrl,
-          scaledSize: new google.maps.Size(32, 32)
-        },
+        icon: markerIcon,
         animation: google.maps.Animation.DROP
       });
       
       // Create info window content with property image and details
       const content = createInfoWindowContent(property);
       
-      // Add mouseover event listener to show info window
+      // Add mouseover event listener to show info window and highlight marker
       marker.addListener('mouseover', () => {
         if (infoWindowTimeoutRef.current) {
           clearTimeout(infoWindowTimeoutRef.current);
@@ -109,6 +81,10 @@ export const MapContainer: React.FC<MapContainerProps> = ({
         
         // Close any open info window first
         infoWindow.close();
+        
+        // Update marker to highlighted state
+        const highlightedIcon = getPropertyMarker(property, true, 32);
+        marker.setIcon(highlightedIcon);
         
         // Set this as the active marker
         activeMarkerRef.current = marker;
@@ -132,8 +108,12 @@ export const MapContainer: React.FC<MapContainerProps> = ({
         }, 50);
       });
       
-      // Add mouseout event listener to close info window
+      // Add mouseout event listener to remove highlight and close info window
       marker.addListener('mouseout', () => {
+        // Revert marker to normal state
+        const normalIcon = getPropertyMarker(property, false, 32);
+        marker.setIcon(normalIcon);
+        
         // Add a delay before closing to allow moving mouse to info window
         infoWindowTimeoutRef.current = window.setTimeout(() => {
           if (!mouseIsOverInfoWindowRef.current) {
@@ -171,6 +151,21 @@ export const MapContainer: React.FC<MapContainerProps> = ({
       // Mouse leaves info window
       infoWindowElement.addEventListener('mouseleave', () => {
         mouseIsOverInfoWindowRef.current = false;
+        
+        // Revert active marker to normal state if exists
+        if (activeMarkerRef.current) {
+          const property = properties.find(p => {
+            const markerPos = activeMarkerRef.current?.getPosition();
+            const propPos = getPropertyPosition(p, defaultCenter);
+            return markerPos?.lat() === propPos.lat && markerPos?.lng() === propPos.lng;
+          });
+          
+          if (property) {
+            const normalIcon = getPropertyMarker(property, false, 32);
+            activeMarkerRef.current.setIcon(normalIcon);
+          }
+        }
+        
         // Close the info window after a short delay
         infoWindowTimeoutRef.current = window.setTimeout(() => {
           if (activeMarkerRef.current) {
@@ -198,6 +193,15 @@ export const MapContainer: React.FC<MapContainerProps> = ({
       });
     }
     
+    // Log property type statistics
+    const typeStats = properties.reduce((stats, property) => {
+      const propertyInfo = detectPropertyType(property);
+      stats[propertyInfo.type] = (stats[propertyInfo.type] || 0) + 1;
+      return stats;
+    }, {} as Record<string, number>);
+    
+    console.log('Property type distribution:', typeStats);
+    
     // Cleanup function
     return () => {
       // Cleanup markers when component unmounts or properties change
@@ -213,8 +217,34 @@ export const MapContainer: React.FC<MapContainerProps> = ({
     };
   }, [isLoaded, mapInstance, infoWindow, properties, navigate]);
 
+  // Cleanup marker cache on unmount
+  useEffect(() => {
+    return () => {
+      markerIconCache.clear();
+    };
+  }, []);
+
   return (
     <Card className="overflow-hidden">
+      {/* Property Type Legend */}
+      <div className="absolute top-4 left-4 z-10 bg-white/95 backdrop-blur-sm rounded-xl p-3 shadow-lg border border-border/20">
+        <h3 className="text-sm font-semibold mb-2 text-foreground">Property Types</h3>
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 text-xs">
+            <div className="w-4 h-4 rounded-full bg-blue-500"></div>
+            <span className="text-muted-foreground">Residential</span>
+          </div>
+          <div className="flex items-center gap-2 text-xs">
+            <div className="w-4 h-4 rounded-full bg-green-500"></div>
+            <span className="text-muted-foreground">Commercial</span>
+          </div>
+          <div className="flex items-center gap-2 text-xs">
+            <div className="w-4 h-4 rounded-full bg-orange-500"></div>
+            <span className="text-muted-foreground">Land</span>
+          </div>
+        </div>
+      </div>
+
       <GoogleMap
         mapContainerStyle={containerStyle}
         center={defaultCenter}
