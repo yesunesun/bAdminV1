@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyItem.tsx
-// Version: 6.2.0
-// Last Modified: 02-06-2025 16:20 IST
-// Purpose: Implemented comprehensive conditional rendering for all fields
+// Version: 6.3.0
+// Last Modified: 07-06-2025 18:25 IST
+// Purpose: Fixed property type and subtype display to show "Residential" and proper transaction type
 
 import React, { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
@@ -179,23 +179,56 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
         }
       }
       
-      // Add property type icon
-      if (propertyData.propertyType || propertyData.subType) {
-        const propertyTypeIcon = propertyData.propertyType === 'commercial' ? Building : Home;
-        const typeText = propertyData.subType || propertyData.propertyType;
-        if (typeText) {
-          icons.push({ 
-            icon: React.createElement(propertyTypeIcon, { className: "h-3 w-3 mr-1" }), 
-            text: typeText 
-          });
+      // Add transaction type icon (this will show next to area)
+      const transactionIcon = propertyData.transactionType === 'buy' ? Building : Home;
+      const transactionText = propertyData.transactionType === 'buy' ? 'sale' : 'rent';
+      icons.push({ 
+        icon: React.createElement(transactionIcon, { className: "h-3 w-3 mr-1" }), 
+        text: transactionText 
+      });
+
+      // Determine main property category for first badge
+      let mainPropertyCategory = 'Property';
+      if (propertyData.propertyType) {
+        switch (propertyData.propertyType.toLowerCase()) {
+          case 'residential':
+            mainPropertyCategory = 'Residential';
+            break;
+          case 'commercial':
+            mainPropertyCategory = 'Commercial';
+            break;
+          case 'land':
+            mainPropertyCategory = 'Land';
+            break;
+          default:
+            // Capitalize first letter
+            mainPropertyCategory = propertyData.propertyType.charAt(0).toUpperCase() + 
+                                  propertyData.propertyType.slice(1).toLowerCase();
+        }
+      }
+
+      // Determine transaction type for second badge
+      let transactionDisplay = 'For Rent';
+      if (propertyData.transactionType) {
+        switch (propertyData.transactionType.toLowerCase()) {
+          case 'buy':
+          case 'sale':
+            transactionDisplay = 'For Sale';
+            break;
+          case 'rent':
+            transactionDisplay = 'For Rent';
+            break;
+          default:
+            transactionDisplay = 'For ' + propertyData.transactionType.charAt(0).toUpperCase() + 
+                               propertyData.transactionType.slice(1).toLowerCase();
         }
       }
 
       return {
         price: formattedPrice,
         icons,
-        propertyType: propertyData.subType || propertyData.propertyType || 'Property',
-        listingDisplay: propertyData.transactionType === 'buy' ? 'For Sale' : 'For Rent'
+        propertyType: mainPropertyCategory, // This will be "Residential", "Commercial", or "Land"
+        listingDisplay: transactionDisplay  // This will be "For Rent", "For Sale", etc.
       };
     } else {
       // Use existing logic for PropertyType
@@ -308,14 +341,14 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
             
             {/* Enhanced Property Type and Listing Type Badges with conditional rendering */}
             <div className="mt-3 flex flex-wrap gap-2">
-              {/* Enhanced Property Type Badge */}
+              {/* Enhanced Property Type Badge - Shows main category (Residential/Commercial/Land) */}
               {displayData.propertyType && (
                 <div className="inline-flex items-center text-xs text-white px-2.5 py-1 rounded-full bg-gradient-to-r from-gray-500 to-gray-600 font-medium shadow-sm">
                   {displayData.propertyType}
                 </div>
               )}
               
-              {/* Enhanced Listing Type Badge */}
+              {/* Enhanced Listing Type Badge - Shows transaction type (For Rent/For Sale) */}
               {displayData.listingDisplay && (
                 <div className={`
                   inline-flex items-center text-xs text-white px-2.5 py-1 rounded-full font-medium shadow-sm
@@ -357,8 +390,21 @@ function getFlowSpecificDisplayData(property: PropertyType, flowType: string, de
     price = formatPrice(property.price);
   }
   
-  if (isValidStringField(basicDetails.propertyType) || isValidStringField(property.property_type)) {
-    propertyType = basicDetails.propertyType || property.property_type;
+  // Determine main property category based on flow type
+  if (flowType.includes('residential')) {
+    propertyType = 'Residential';
+  } else if (flowType.includes('commercial')) {
+    propertyType = 'Commercial';
+  } else if (flowType.includes('land')) {
+    propertyType = 'Land';
+  } else {
+    // Fallback to property_type if available
+    if (isValidStringField(basicDetails.propertyType) || isValidStringField(property.property_type)) {
+      const rawType = basicDetails.propertyType || property.property_type;
+      propertyType = rawType.charAt(0).toUpperCase() + rawType.slice(1).toLowerCase();
+    } else {
+      propertyType = 'Property';
+    }
   }
   
   if (flowType) {
@@ -391,9 +437,8 @@ function getFlowSpecificDisplayData(property: PropertyType, flowType: string, de
         }
       }
       
-      if (isValidStringField(rentalInfo.furnishingStatus)) {
-        icons.push({ icon: <Home className="h-3 w-3 mr-1" />, text: rentalInfo.furnishingStatus });
-      }
+      // Add rent icon instead of furnishing status
+      icons.push({ icon: <Home className="h-3 w-3 mr-1" />, text: 'rent' });
       
       listingDisplay = "For Rent";
       break;
@@ -422,6 +467,9 @@ function getFlowSpecificDisplayData(property: PropertyType, flowType: string, de
         }
       }
       
+      // Add sale icon
+      icons.push({ icon: <Building className="h-3 w-3 mr-1" />, text: 'sale' });
+      
       listingDisplay = "For Sale";
       break;
       
@@ -443,6 +491,9 @@ function getFlowSpecificDisplayData(property: PropertyType, flowType: string, de
         icons.push({ icon: <Utensils className="h-3 w-3 mr-1" />, text: flatmateInfo.foodPreference });
       }
       
+      // Add flatmates icon
+      icons.push({ icon: <Users className="h-3 w-3 mr-1" />, text: 'flatmates' });
+      
       listingDisplay = "Flatmates";
       break;
       
@@ -463,6 +514,9 @@ function getFlowSpecificDisplayData(property: PropertyType, flowType: string, de
       if (pgInfo.foodIncluded !== undefined) {
         icons.push({ icon: <Utensils className="h-3 w-3 mr-1" />, text: pgInfo.foodIncluded ? 'Food Included' : 'No Food' });
       }
+      
+      // Add PG icon
+      icons.push({ icon: <Building className="h-3 w-3 mr-1" />, text: 'pghostel' });
       
       listingDisplay = "PG/Hostel";
       break;
@@ -488,6 +542,9 @@ function getFlowSpecificDisplayData(property: PropertyType, flowType: string, de
         icons.push({ icon: <Briefcase className="h-3 w-3 mr-1" />, text: commercialRentalInfo.suitableFor });
       }
       
+      // Add rent icon
+      icons.push({ icon: <Home className="h-3 w-3 mr-1" />, text: 'rent' });
+      
       listingDisplay = "For Rent";
       break;
       
@@ -511,6 +568,9 @@ function getFlowSpecificDisplayData(property: PropertyType, flowType: string, de
       if (isValidStringField(commercialSaleInfo.ownershipType)) {
         icons.push({ icon: <FileText className="h-3 w-3 mr-1" />, text: commercialSaleInfo.ownershipType });
       }
+      
+      // Add sale icon
+      icons.push({ icon: <Building className="h-3 w-3 mr-1" />, text: 'sale' });
       
       listingDisplay = "For Sale";
       break;
@@ -536,6 +596,9 @@ function getFlowSpecificDisplayData(property: PropertyType, flowType: string, de
         icons.push({ icon: <Building className="h-3 w-3 mr-1" />, text: coworkingInfo.workspaceType });
       }
       
+      // Add coworking icon
+      icons.push({ icon: <Coffee className="h-3 w-3 mr-1" />, text: 'coworking' });
+      
       listingDisplay = "Coworking";
       break;
       
@@ -560,20 +623,26 @@ function getFlowSpecificDisplayData(property: PropertyType, flowType: string, de
         icons.push({ icon: <Building className="h-3 w-3 mr-1" />, text: landInfo.ownershipType });
       }
       
+      // Add sale icon
+      icons.push({ icon: <Map className="h-3 w-3 mr-1" />, text: 'sale' });
+      
       listingDisplay = "Land for Sale";
       break;
       
     default:
       // Fallback for unknown flow types - only show if data exists
-      if (propertyType) {
-        icons.push({ icon: <Building className="h-3 w-3 mr-1" />, text: propertyType });
-      }
-      
       if (isValidNumberField(property.square_feet)) {
         const areaText = formatArea(property.square_feet);
         if (areaText) {
           icons.push({ icon: <Square className="h-3 w-3 mr-1" />, text: areaText });
         }
+      }
+      
+      // Add generic icon based on transaction type
+      if (flowType.includes('sale')) {
+        icons.push({ icon: <Building className="h-3 w-3 mr-1" />, text: 'sale' });
+      } else {
+        icons.push({ icon: <Home className="h-3 w-3 mr-1" />, text: 'rent' });
       }
       break;
   }
