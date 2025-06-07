@@ -1,7 +1,7 @@
 // src/components/Header.tsx
-// Version: 5.1.1
-// Last Modified: 02-01-2025 15:30 IST
-// Purpose: Fixed z-index issue for profile dropdown menu appearing behind search components
+// Version: 5.2.0
+// Last Modified: 08-06-2025 14:30 IST
+// Purpose: Added "List Your Property" button to header using same functionality as profile menu link
 
 import React, { useEffect, useState, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
@@ -14,7 +14,8 @@ import {
   Waves, 
   Sunset,
   LayoutGrid,
-  Sparkles
+  Sparkles,
+  Plus
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -32,16 +33,16 @@ const isDevelopmentMode = import.meta.env.DEV;
 
 // Logo component with fixed styling - single source of truth for logo appearance
 const BrandLogo = () => (
-  <Link to="/" className="flex-shrink-0">
+  <Link to="/" className="flex-shrink-0 focus:outline-none focus:ring-0">
     <img 
       src="/bhumitallilogo.png" 
       alt="Bhumitalli" 
       className="logo-image" 
       style={{
-        height: '64px',
+        height: '89.06px', // Increased by another 10% (80.96px * 1.10)
         width: 'auto',
         objectFit: 'contain',
-        maxWidth: '240px'
+        maxWidth: '333.96px' // Increased by another 10% (303.6px * 1.10)
       }}
     />
   </Link>
@@ -103,8 +104,10 @@ export function Header({ onFavoritesClick }: HeaderProps) {
   };
 
   // Function to handle List Property with a hard navigation
-  const handleListPropertyClick = (e: React.MouseEvent) => {
-    e.preventDefault();
+  const handleListPropertyClick = (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+    }
     
     // First, clear any stored wizard data
     const userId = localStorage.getItem('userId');
@@ -116,7 +119,7 @@ export function Header({ onFavoritesClick }: HeaderProps) {
     // Set a reset flag in localStorage
     localStorage.setItem('resetPropertyWizard', 'true');
     
-    // Close dropdown
+    // Close dropdown if open
     setIsProfileDropdownOpen(false);
     
     // Use window.location for a hard navigation that will fully reset React state
@@ -154,6 +157,18 @@ export function Header({ onFavoritesClick }: HeaderProps) {
         <BrandLogo />
 
         <div className="flex items-center space-x-4">
+          {/* List Your Property Button - visible to all users */}
+          <button
+            onClick={handleListPropertyClick}
+            className="hidden sm:flex items-center px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-all duration-200 shadow-sm relative mr-2"
+          >
+            <Plus className="h-4 w-4 mr-1.5" />
+            List Your Property
+            <span className="absolute -top-2 -right-2 px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-green-500 text-white shadow-sm whitespace-nowrap">
+              FREE
+            </span>
+          </button>
+
           {/* Theme Switcher - Only visible in development mode */}
           {isDevelopmentMode && (
             <div className="relative" ref={themeDropdownRef}>
