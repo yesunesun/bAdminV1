@@ -1,7 +1,7 @@
 // src/App.tsx 
-// Version: 9.7.0
-// Last Modified: 07-06-2025 10:45 IST
-// Purpose: Removed /search route and SearchPage import - functionality available via /find, /browse, /explore
+// Version: 9.8.1
+// Last Modified: 07-06-2025 16:45 IST
+// Purpose: Fixed import path for GharHomepage component
 
 import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
@@ -16,6 +16,7 @@ import Footer from '@/components/Footer';
 // Import components directly
 import HomePage from './pages/HomePage';
 import FindPage from './pages/FindPage';
+import GharHomepage from './pages/GharHomepage';
 import PropertyMapHome from './modules/seeker';
 import Dashboard from './modules/owner/pages/Dashboard';
 import Properties from './modules/owner/pages/Properties';
@@ -257,6 +258,16 @@ function App() {
                   );
                 })}
 
+                {/* New Ghar Homepage - Standalone route with no layout dependencies */}
+                <Route 
+                  path="/ghar" 
+                  element={
+                    <PublicOrProtectedRoute>
+                      <GharHomepage />
+                    </PublicOrProtectedRoute>
+                  } 
+                />
+
                 {/* SeekerLayout with proper property wizard routes */}
                 <Route element={<SeekerLayout />}>
                   <Route 
@@ -434,3 +445,5 @@ function App() {
 }
 
 export default App;
+
+// End of file
