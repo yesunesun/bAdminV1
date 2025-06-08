@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyItem.tsx
-// Version: 6.3.0
-// Last Modified: 07-06-2025 18:25 IST
-// Purpose: Fixed property type and subtype display to show "Residential" and proper transaction type
+// Version: 6.4.0
+// Last Modified: 08-06-2025 18:45 IST
+// Purpose: FIXED real-time favorites count update - now uses FavoritesContext directly
 
 import React, { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
@@ -26,18 +26,21 @@ import {
   detectPropertyFlowType
 } from '../utils/propertyTitleUtils';
 import { fastImageService } from './PropertyItem/services/fastImageService';
+import { useFavorites } from '@/contexts/FavoritesContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/components/ui/use-toast';
 
 // Union type to handle both formats
 type PropertyItemData = PropertyType | SearchResult;
 
 interface PropertyItemProps {
   property: PropertyItemData;
-  isLiked: boolean;
+  isLiked?: boolean; // Made optional since we'll get this from context
   isHovered: boolean;
   propertyImage?: string; // Legacy prop - ignored now
   onHover: (propertyId: string, isHovering: boolean) => void;
   onSelect: (property: PropertyItemData) => void;
-  onFavoriteToggle: (propertyId: string, isLiked: boolean) => Promise<boolean>;
+  onFavoriteToggle?: (propertyId: string, isLiked: boolean) => Promise<boolean>; // Made optional
   onShare: (e: React.MouseEvent, property: PropertyItemData) => void;
 }
 
@@ -48,14 +51,19 @@ const isSearchResult = (property: PropertyItemData): property is SearchResult =>
 
 const PropertyItem: React.FC<PropertyItemProps> = ({
   property,
-  isLiked,
+  isLiked, // Legacy prop - will be overridden by context
   isHovered,
   propertyImage, // Ignored - we generate our own
   onHover,
   onSelect,
-  onFavoriteToggle,
+  onFavoriteToggle, // Legacy prop - will be replaced by context
   onShare
 }) => {
+  // Get favorites context and auth
+  const { isFavorite, addFavorite, removeFavorite } = useFavorites();
+  const { user } = useAuth();
+  const { toast } = useToast();
+  
   // State for favorite button loading
   const [isFavoriteLoading, setIsFavoriteLoading] = useState(false);
 
@@ -101,6 +109,9 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
       };
     }
   }, [property]);
+
+  // Get real-time favorite status from context
+  const isCurrentlyFavorited = isFavorite(propertyData.id);
 
   // Generate image URL
   const imageUrl = useMemo(() => {
@@ -236,15 +247,71 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
     }
   }, [property, propertyData]);
   
-  // Handle favorite toggle with loading state
+  // UPDATED: Handle favorite toggle using FavoritesContext directly
   const handleFavoriteToggle = async (isLiked: boolean) => {
+    // Check if user is authenticated
+    if (!user) {
+      toast({
+        title: "Login required",
+        description: "Please log in to save favorites",
+        duration: 3000,
+      });
+      return false;
+    }
+
     setIsFavoriteLoading(true);
     
     try {
-      const success = await onFavoriteToggle(propertyData.id, isLiked);
-      return success;
+      console.log(`[PropertyItem] Toggling favorite for property ${propertyData.id} to ${isLiked ? 'liked' : 'not liked'}`);
+      
+      let success = false;
+      
+      if (isLiked) {
+        // Add to favorites using context
+        success = await addFavorite(propertyData.id);
+      } else {
+        // Remove from favorites using context
+        success = await removeFavorite(propertyData.id);
+      }
+      
+      if (success) {
+        // Show success toast
+        toast({
+          title: isLiked ? "Added to favorites" : "Removed from favorites",
+          description: isLiked 
+            ? "Property added to your favorites" 
+            : "Property removed from your favorites",
+          duration: 2000,
+        });
+        
+        console.log(`[PropertyItem] ✅ Favorite toggle successful for property ${propertyData.id}`);
+        
+        // Also call legacy onFavoriteToggle if provided for backward compatibility
+        if (onFavoriteToggle) {
+          await onFavoriteToggle(propertyData.id, isLiked);
+        }
+        
+        return true;
+      } else {
+        // Show error toast
+        toast({
+          title: "Action failed",
+          description: "There was a problem updating your favorites",
+          variant: "destructive",
+          duration: 3000,
+        });
+        
+        console.error(`[PropertyItem] ❌ Favorite toggle failed for property ${propertyData.id}`);
+        return false;
+      }
     } catch (error) {
-      console.error('Error toggling favorite:', error);
+      console.error(`[PropertyItem] Error toggling favorite for property ${propertyData.id}:`, error);
+      toast({
+        title: "Error",
+        description: "Something went wrong. Please try again.",
+        variant: "destructive",
+        duration: 3000,
+      });
       return false;
     } finally {
       setIsFavoriteLoading(false);
@@ -260,10 +327,10 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
         hover:shadow-lg rounded-xl mx-2 my-1
       `}
     >
-      {/* Enhanced Favorite Button - Top Right Corner */}
+      {/* Enhanced Favorite Button - Top Right Corner with real-time state */}
       <div className="absolute top-3 right-3 z-10">
         <FavoriteButton
-          initialIsLiked={isLiked}
+          initialIsLiked={isCurrentlyFavorited} // Use real-time state from context
           onToggle={handleFavoriteToggle}
           isLoading={isFavoriteLoading}
           className="w-8 h-8 bg-white/90 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-200"
@@ -665,3 +732,5 @@ function getFlowSpecificDisplayData(property: PropertyType, flowType: string, de
 }
 
 export default PropertyItem;
+
+// End of file
