@@ -1,6 +1,7 @@
 // src/contexts/AuthContext.tsx
-// Version: 3.5.0
-// Last Modified: 06-04-2025 16:30 IST
+// Version: 3.6.0
+// Last Modified: 08-06-2025 14:30 IST
+// Purpose: Fixed unnecessary OTP verification calls causing 403 errors
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
@@ -132,6 +133,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log('Verifying OTP for email:', email, 'with token length:', token.length);
       
+      // Check if user is already authenticated - if so, skip verification
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      if (currentSession?.user) {
+        console.log('User already authenticated, skipping OTP verification');
+        return { error: undefined };
+      }
+      
       if (!token || token.trim().length === 0) {
         throw new Error('Verification code cannot be empty');
       }
@@ -141,40 +149,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error('Verification code must contain only numbers');
       }
       
-      // Try all available verification types in case the token type has been misidentified
-      const typesToTry = ['signup', 'email', 'recovery', 'invite'];
-      let successfulVerification = false;
-      let lastError = null;
+      // Try the most common verification type first (email)
+      let verificationError = null;
       
-      // Try each verification type until one succeeds
-      for (const type of typesToTry) {
-        try {
-          console.log(`Attempting verification with type: ${type}`);
-          const { data, error } = await supabase.auth.verifyOtp({
-            email: email.trim(),
-            token: token.trim(),
-            type: type as any, // Type assertion needed for TypeScript
-          });
-          
-          if (!error) {
-            console.log(`OTP verification successful with type: ${type}. User data:`, data?.user ? 'User exists' : 'No user');
-            successfulVerification = true;
-            break;
-          } else {
-            lastError = error;
-            console.warn(`Verification failed with type ${type}:`, error.message);
-          }
-        } catch (e) {
-          console.warn(`Error trying verification type ${type}:`, e);
-          lastError = e;
-        }
-      }
+      console.log('Attempting verification with type: email');
+      const { data, error } = await supabase.auth.verifyOtp({
+        email: email.trim(),
+        token: token.trim(),
+        type: 'email',
+      });
       
-      if (successfulVerification) {
+      if (!error && data?.user) {
+        console.log('OTP verification successful with type: email');
         return { error: undefined };
-      } else {
-        throw lastError || new Error('Verification failed with all token types');
       }
+      
+      verificationError = error;
+      
+      // If email type fails, try signup type (for new registrations)
+      console.log('Attempting verification with type: signup');
+      const { data: signupData, error: signupError } = await supabase.auth.verifyOtp({
+        email: email.trim(),
+        token: token.trim(),
+        type: 'signup',
+      });
+      
+      if (!signupError && signupData?.user) {
+        console.log('OTP verification successful with type: signup');
+        return { error: undefined };
+      }
+      
+      // If both common types fail, throw the original error
+      throw verificationError || signupError || new Error('Verification failed');
+      
     } catch (err) {
       console.error('OTP verification error:', err);
       if (err instanceof Error) {
@@ -336,3 +343,5 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     </AuthContext.Provider>
   );
 }
+
+// End of file
