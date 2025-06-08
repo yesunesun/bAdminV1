@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyListingPanel.tsx
-// Version: 5.3.0
-// Last Modified: 02-06-2025 15:30 IST
-// Purpose: Fixed bottom content visibility and scroll behavior for proper display of all properties and load more button
+// Version: 5.4.0
+// Last Modified: 08-06-2025 18:45 IST
+// Purpose: Fixed property count display logic to prevent showing more properties than total available
 
 import React, { useState, useEffect } from 'react';
 import { PropertyType } from '@/modules/owner/components/property/types';
@@ -44,6 +44,11 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
   const { toast } = useToast();
   const [propertyLikeState, setPropertyLikeState] = useState<Record<string, boolean>>({});
 
+  // Calculate safe display counts - ensure we never show more than the total
+  const displayCount = Math.min(properties.length, totalCount);
+  const effectiveTotalCount = Math.max(totalCount, properties.length);
+  const remainingCount = Math.max(0, effectiveTotalCount - displayCount);
+
   // Setup initial like states when favorites or properties change
   useEffect(() => {
     const newLikeState: Record<string, boolean> = {};
@@ -54,6 +59,14 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
     
     setPropertyLikeState(newLikeState);
   }, [properties, favoriteProperties]);
+
+  // Debug logging for count issues
+  useEffect(() => {
+    if (properties.length > totalCount && totalCount > 0) {
+      console.warn(`⚠️ Property count mismatch: displaying ${properties.length} but total is ${totalCount}`);
+      console.warn('Properties:', properties.map(p => p.id));
+    }
+  }, [properties.length, totalCount]);
 
   // Handle favorite toggle with persistence
   const handleFavoriteToggle = async (propertyId: string, newLikedState: boolean) => {
@@ -244,11 +257,11 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
             ) : (
               <div className="flex items-center gap-2">
                 <span className="text-foreground">
-                  {properties.length === 0 ? 'No properties found' : `${properties.length} of ${totalCount} properties`}
+                  {properties.length === 0 ? 'No properties found' : `${displayCount} of ${effectiveTotalCount} properties`}
                 </span>
-                {properties.length > 0 && totalCount > properties.length && (
+                {properties.length > 0 && remainingCount > 0 && (
                   <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">
-                    +{totalCount - properties.length} more
+                    +{remainingCount} more
                   </span>
                 )}
               </div>
@@ -271,7 +284,7 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
           </div>
           
           {/* Load more button section - moved inside scrollable area with proper spacing */}
-          {properties.length > 0 && hasMore && (
+          {properties.length > 0 && hasMore && remainingCount > 0 && (
             <div className="p-4 bg-card/95 backdrop-blur-sm">
               <Button
                 variant="outline"
@@ -289,7 +302,7 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
                   <>
                     <span>Load more properties</span>
                     <span className="ml-2 text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">
-                      {totalCount - properties.length} remaining
+                      {remainingCount} remaining
                     </span>
                   </>
                 ) : (
@@ -308,3 +321,5 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
 };
 
 export default PropertyListingPanel;
+
+// End of file

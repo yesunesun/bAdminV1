@@ -1,9 +1,9 @@
 // src/modules/seeker/components/PropertyMapHomeView.tsx
-// Version: 6.0.0
-// Last Modified: 07-06-2025 16:30 IST
-// Purpose: FIXED map marker rendering - ensures SearchResult objects with coordinates flow properly to MapPanel
+// Version: 6.2.0
+// Last Modified: 08-06-2025 18:30 IST
+// Purpose: Updated to use configurable property list count from app-config.yml - Fixed infinite re-render
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useGoogleMaps } from '../hooks/useGoogleMaps';
 import { SearchContainer, SearchFilters, SearchResult } from '@/components/Search';
 import PropertyListingPanel from './PropertyListingPanel';
@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { getUserFavorites, togglePropertyLike } from '../services/seekerService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
+import { useAppConfig } from '@/config/hooks/useAppConfig';
 
 interface PropertyMapHomeViewProps {
   onFavoriteAction?: (propertyId: string) => boolean;
@@ -22,6 +23,12 @@ interface PropertyMapHomeViewProps {
 type PropertyData = SearchResult;
 
 const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAction }) => {
+  // Configuration hook for getting configurable values
+  const { getDefaultPropertyListCount } = useAppConfig();
+  
+  // Get the property count value once and memoize it
+  const propertyListCount = useMemo(() => getDefaultPropertyListCount, [getDefaultPropertyListCount]);
+  
   // Favorites state management
   const [favoriteProperties, setFavoriteProperties] = useState<Set<string>>(new Set());
   const [isLoadingFavorites, setIsLoadingFavorites] = useState<boolean>(false);
@@ -53,9 +60,12 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
         const { searchService } = await import('@/components/Search/services/searchService');
         console.log('✅ SearchService imported successfully');
         
-        // Get latest properties using the SQL function
-        console.log('🔍 Calling getLatestProperties...');
-        const response = await searchService.getLatestProperties(20); // Start with 20 items
+        // Use the memoized property count
+        console.log(`🔧 Using configurable property count: ${propertyListCount}`);
+        
+        // Get latest properties using the SQL function with configurable count
+        console.log(`🔍 Calling getLatestProperties with count: ${propertyListCount}...`);
+        const response = await searchService.getLatestProperties(propertyListCount);
         
         console.log('🏠 Latest properties loaded:', response);
         console.log('🗺️ First property coordinates check:', {
@@ -74,7 +84,7 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
         setCurrentPage(1);
         setCurrentFilters(null); // No filters for latest properties
         
-        console.log(`✅ Homepage initialized with ${response.results?.length || 0} latest properties`);
+        console.log(`✅ Homepage initialized with ${response.results?.length || 0} latest properties (config: ${propertyListCount})`);
         console.log(`🗺️ Properties with coordinates: ${response.results?.filter(p => p.latitude && p.longitude).length || 0}`);
         
       } catch (error) {
@@ -103,11 +113,12 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
       }
     };
     
-    // Add a small delay to ensure component is fully mounted
-    const timeoutId = setTimeout(loadLatestProperties, 100);
-    
-    return () => clearTimeout(timeoutId);
-  }, []); // Empty dependency array - only run on mount
+    // Only load if we have a valid property count (avoid loading during config initialization)
+    if (propertyListCount > 0) {
+      const timeoutId = setTimeout(loadLatestProperties, 100);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [propertyListCount, toast]); // Use memoized propertyListCount instead of function
   
   // Handle property hover
   const handlePropertyHover = useCallback((propertyId: string, isHovering: boolean) => {
@@ -238,14 +249,20 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
       
       if (filtersEmpty) {
         console.log('🏠 Empty filters detected - loading default latest properties...');
+        // Use the memoized property count for default load
+        console.log(`🔧 Using configurable property count for default load: ${propertyListCount}`);
+        
         // Load default latest properties when filters are empty (including when cleared)
-        response = await searchService.getLatestProperties(20);
+        response = await searchService.getLatestProperties(propertyListCount);
         setCurrentFilters(null); // No filters for latest properties
       } else {
         console.log('🔍 Performing filtered search...');
         
         // Store current filters for pagination
         setCurrentFilters(searchFilters);
+        
+        // Use the memoized property count for search results
+        console.log(`🔧 Using configurable property count for search: ${propertyListCount}`);
         
         // ADDED: Check if search query looks like a 6-character property code
         const query = searchFilters.searchQuery?.trim();
@@ -262,7 +279,7 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
           
           response = await searchService.smartSearch(backendFilters, {
             page: 1,
-            limit: 20
+            limit: propertyListCount
           });
         } else {
           console.log('🔍 Using regular search (not a 6-character property code)');
@@ -277,7 +294,7 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
           // Perform regular search using searchService
           response = await searchService.search(backendFilters, {
             page: 1,
-            limit: 20
+            limit: propertyListCount
           });
         }
       }
@@ -325,7 +342,7 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
     } finally {
       setSearchLoading(false);
     }
-  }, [toast]);
+  }, [toast, propertyListCount]); // Use memoized propertyListCount instead of function
 
   // NEW: Handle Load More functionality
   const handleLoadMore = useCallback(async () => {
@@ -340,12 +357,15 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
       const { searchService } = await import('@/components/Search/services/searchService');
       const nextPage = currentPage + 1;
       
+      // Use the memoized property count for load more
+      console.log(`🔧 Using configurable property count for load more: ${propertyListCount}`);
+      
       let response;
       
       if (!currentFilters) {
         // Loading more latest properties
         console.log('🏠 Loading more latest properties...');
-        response = await searchService.getLatestProperties(20, (nextPage - 1) * 20); // offset calculation
+        response = await searchService.getLatestProperties(propertyListCount, (nextPage - 1) * propertyListCount); // offset calculation
       } else {
         console.log('🔍 Loading more search results...');
         
@@ -361,7 +381,7 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
           
           response = await searchService.smartSearch(backendFilters, {
             page: nextPage,
-            limit: 20
+            limit: propertyListCount
           });
         } else {
           // Transform actionType to transactionType for backend compatibility
@@ -373,7 +393,7 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
           
           response = await searchService.search(backendFilters, {
             page: nextPage,
-            limit: 20
+            limit: propertyListCount
           });
         }
       }
@@ -413,7 +433,7 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
     } finally {
       setLoadingMore(false);
     }
-  }, [loadingMore, searchProperties.length, searchTotalCount, currentPage, currentFilters, toast, searchProperties]);
+  }, [loadingMore, searchProperties.length, searchTotalCount, currentPage, currentFilters, toast, searchProperties, propertyListCount]); // Use memoized propertyListCount
   
   // Preload fallback image with visual performance indicator
   useEffect(() => {
@@ -511,3 +531,5 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
 };
 
 export default PropertyMapHomeView;
+
+// End of file

@@ -1,6 +1,7 @@
 # config/app-config.yml
 # Application & Development Configuration
-# Last Modified: 08-06-2025 16:00 IST
+# Version: 1.1.0
+# Last Modified: 08-06-2025 18:15 IST
 
 # Pagination Settings (Application-wide)
 pagination:
@@ -32,6 +33,8 @@ listing:
   featured_properties_count: 6
   latest_properties_count: 20
   similar_properties_count: 8
+  # NEW: Default property list count for homepage - configurable
+  defaultPropertyListCount: 30
   
   # Property Card Settings
   image_lazy_loading: true
@@ -52,3 +55,5 @@ dev_features:
   enable_coordinate_sync: true
   show_performance_metrics: false
   enable_error_reporting: true
+
+# End of file

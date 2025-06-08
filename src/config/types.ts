@@ -1,7 +1,7 @@
 // src/config/types.ts
-// Version: 1.3.0
-// Last Modified: 08-06-2025 16:45 IST
-// Purpose: Added social media and footer links types
+// Version: 1.4.0
+// Last Modified: 08-06-2025 18:15 IST
+// Purpose: Added defaultPropertyListCount to ListingSettings
 
 export interface CompanyInfo {
   name: string;
@@ -98,6 +98,7 @@ export interface ListingSettings {
   featured_properties_count: number;
   latest_properties_count: number;
   similar_properties_count: number;
+  defaultPropertyListCount: number; // NEW: Configurable property list count
   image_lazy_loading: boolean;
   show_property_code: boolean;
   cache_images: boolean;

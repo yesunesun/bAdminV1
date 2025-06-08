@@ -1,11 +1,17 @@
 // src/modules/seeker/hooks/usePropertyMapData.ts
-// Version: 3.1.0
-// Last Modified: 09-05-2025 16:20 IST
-// Purpose: Updated to support properties_v2 table with improved debugging
+// Version: 3.3.0
+// Last Modified: 08-06-2025 18:30 IST
+// Purpose: Updated to use configurable property list count from app-config.yml - Fixed infinite re-render
+
+import { useState, useEffect, useCallback, useMemo } from 'react';// src/modules/seeker/hooks/usePropertyMapData.ts
+// Version: 3.2.0
+// Last Modified: 08-06-2025 18:15 IST
+// Purpose: Updated to use configurable property list count from app-config.yml
 
 import { useState, useEffect, useCallback } from 'react';
 import { PropertyType } from '@/modules/owner/components/property/types';
 import { fetchPropertiesForMap, PropertyFilters, debugTableSchema } from '../services/seekerService';
+import { useAppConfig } from '@/config/hooks/useAppConfig';
 
 // Popular locations for search suggestions
 const POPULAR_LOCATIONS = [
@@ -15,9 +21,6 @@ const POPULAR_LOCATIONS = [
 
 // Maximum number of recent searches to keep
 const MAX_RECENT_SEARCHES = 10;
-
-// Page size for pagination (changed from 10 to 9 to match initial view)
-const PAGE_SIZE = 25;
 
 // Helper to safely get nested property value
 const getNestedValue = (obj: any, path: string, defaultValue: any = null) => {
@@ -94,6 +97,12 @@ const hasValidCoordinates = (property: PropertyType): boolean => {
 };
 
 export const usePropertyMapData = () => {
+  // Configuration hook for getting configurable page size
+  const { getDefaultPropertyListCount } = useAppConfig();
+  
+  // Get the property count value once and memoize it
+  const PAGE_SIZE = useMemo(() => getDefaultPropertyListCount, [getDefaultPropertyListCount]);
+  
   const [properties, setProperties] = useState<PropertyType[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [loadingMore, setLoadingMore] = useState<boolean>(false);
@@ -160,6 +169,12 @@ export const usePropertyMapData = () => {
   // Initial load of properties
   useEffect(() => {
     const loadInitialProperties = async () => {
+      // Only proceed if we have a valid PAGE_SIZE
+      if (PAGE_SIZE <= 0) {
+        console.log('Waiting for valid PAGE_SIZE from config...');
+        return;
+      }
+      
       // Reset pagination and properties when filters change
       setCurrentPage(1);
       setProperties([]);
@@ -175,14 +190,14 @@ export const usePropertyMapData = () => {
           pageSize: PAGE_SIZE
         };
         
-        console.log('Initial load - applied filters:', appliedFilters);
+        console.log(`Initial load - applied filters (PAGE_SIZE: ${PAGE_SIZE}):`, appliedFilters);
         const result = await fetchPropertiesForMap(appliedFilters);
         
         // Ensure we're consistently handling the object return format
         const propertiesArray = result.properties || [];
         const totalCountValue = result.totalCount || 0;
         
-        console.log(`Initial load: Fetched ${propertiesArray.length} properties (before coordinate filtering). Total available: ${totalCountValue}`);
+        console.log(`Initial load: Fetched ${propertiesArray.length} properties (before coordinate filtering). Total available: ${totalCountValue}. Page size: ${PAGE_SIZE}`);
         
         // Filter valid properties - using relaxed validation initially
         const validProperties = propertiesArray;
@@ -230,7 +245,7 @@ export const usePropertyMapData = () => {
     };
     
     loadInitialProperties();
-  }, [filters, searchQuery, selectedPropertyType]);
+  }, [filters, searchQuery, selectedPropertyType, PAGE_SIZE]); // Added PAGE_SIZE to dependencies
   
   // Load more properties function
   const loadMoreProperties = useCallback(async () => {
@@ -241,7 +256,7 @@ export const usePropertyMapData = () => {
     }
     
     setLoadingMore(true);
-    console.log(`Loading more properties: page ${currentPage + 1} of ${totalPages}, loaded=${properties.length}, total=${totalCount}`);
+    console.log(`Loading more properties: page ${currentPage + 1} of ${totalPages}, loaded=${properties.length}, total=${totalCount}, PAGE_SIZE=${PAGE_SIZE}`);
     
     try {
       const nextPage = currentPage + 1;
@@ -254,14 +269,14 @@ export const usePropertyMapData = () => {
         pageSize: PAGE_SIZE
       };
       
-      console.log('Load More - applied filters:', appliedFilters);
+      console.log(`Load More - applied filters (PAGE_SIZE: ${PAGE_SIZE}):`, appliedFilters);
       const result = await fetchPropertiesForMap(appliedFilters);
       
       // Ensure we're consistently handling the object return format
       const propertiesArray = result.properties || [];
       const totalCountValue = result.totalCount || 0;
       
-      console.log(`Page ${nextPage}: Fetched ${propertiesArray.length} properties`);
+      console.log(`Page ${nextPage}: Fetched ${propertiesArray.length} properties (PAGE_SIZE: ${PAGE_SIZE})`);
       
       if (propertiesArray.length === 0) {
         console.log("No new properties found");
@@ -298,7 +313,8 @@ export const usePropertyMapData = () => {
     searchQuery,
     selectedPropertyType,
     totalCount,
-    totalPages
+    totalPages,
+    PAGE_SIZE // Added PAGE_SIZE to dependencies
   ]);
   
   // Reset all filters
@@ -348,3 +364,5 @@ export const usePropertyMapData = () => {
     }
   };
 };
+
+// End of file
