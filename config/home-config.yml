@@ -1,0 +1,57 @@
+# config/home-config.yml
+# Home Page Configuration
+# Last Modified: 08-06-2025 16:45 IST
+
+# Company Information
+company:
+  name: "Bhoomitalli"
+  tagline: "Connecting property owners and seekers across India"
+  copyright_year: 2025
+
+# Contact Information
+contact:
+  phone: "+91 91600 12360"
+  email: "info@bhoomitalli.com"
+  support_email: "support@bhoomitalli.com"
+  business_hours: "9:00 AM - 6:00 PM IST"
+
+# Social Media Links
+social_media:
+  facebook:
+    url: "https://facebook.com/bhoomitalli"
+    enabled: true
+  twitter:
+    url: "https://twitter.com/bhoomitalli"
+    enabled: true
+  instagram:
+    url: "https://instagram.com/bhoomitalli"
+    enabled: true
+  linkedin:
+    url: "https://linkedin.com/company/bhoomitalli"
+    enabled: false
+
+# Footer Links Configuration
+footer_links:
+  quick_links:
+    - name: "Home"
+      path: "/"
+      enabled: true
+    - name: "Browse Properties"
+      path: "/seeker"
+      enabled: true
+    - name: "List Property"
+      path: "/properties/list"
+      enabled: true
+    - name: "Login / Register"
+      path: "/login"
+      enabled: true
+  legal_links:
+    - name: "Privacy"
+      path: "/privacy"
+      enabled: true
+    - name: "Terms"
+      path: "/terms"
+      enabled: true
+    - name: "Sitemap"
+      path: "/sitemap"
+      enabled: true

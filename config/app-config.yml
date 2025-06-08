@@ -1,0 +1,54 @@
+# config/app-config.yml
+# Application & Development Configuration
+# Last Modified: 08-06-2025 16:00 IST
+
+# Pagination Settings (Application-wide)
+pagination:
+  properties:
+    default: 20
+    options: [10, 20, 50, 100]
+    max: 100
+  
+  users:
+    default: 15
+    options: [10, 15, 25, 50]
+    max: 50
+  
+  search_results:
+    default: 25
+    options: [10, 25, 50]
+    max: 100
+
+# Search Configuration (Application-wide)
+search:
+  debounce_delay: 300  # milliseconds
+  max_suggestions: 5
+  max_results: 1000
+  timeout: 5000  # 5 seconds
+
+# Property Listing Settings
+listing:
+  # Homepage Property Counts
+  featured_properties_count: 6
+  latest_properties_count: 20
+  similar_properties_count: 8
+  
+  # Property Card Settings
+  image_lazy_loading: true
+  show_property_code: true
+  cache_images: true
+  image_quality: "medium"  # low, medium, high
+  
+  # Map Settings
+  default_zoom_level: 12
+  cluster_properties: true
+  max_map_markers: 100
+
+# Development Feature Flags
+dev_features:
+  enable_debug_mode: true
+  enable_property_analytics: false
+  enable_video_upload: true
+  enable_coordinate_sync: true
+  show_performance_metrics: false
+  enable_error_reporting: true
