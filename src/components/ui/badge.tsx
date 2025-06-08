@@ -1,7 +1,3 @@
-// src/components/ui/badge.tsx
-// Version: 1.1.0
-// Last Modified: 2025-02-03T14:30:00+05:30 (IST)
-
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"

@@ -32,9 +32,11 @@ export default function Login() {
     }
   }, [searchParams]);
 
-  const handleSendCode = async (e: React.FormEvent) => {
+  const handleSignInSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    setError('');
+    setIsLoading(true);
+    
     try {
       if (usePasswordAuth) {
         const { error: signInError } = await signInWithPassword(email, password);
@@ -56,13 +58,15 @@ export default function Login() {
       setError('An unexpected error occurred. Please try again later.');
       console.error('Sign in error:', err);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
-  const handleVerifyCode = async (e: React.FormEvent) => {
+  const handleVerificationSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    setError('');
+    setIsLoading(true);
+
     try {
       const { error: verifyError } = await verifyOTP(email, token);
       if (verifyError) {
@@ -75,7 +79,7 @@ export default function Login() {
       setError('An unexpected error occurred. Please try again later.');
       console.error('Verification error:', err);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 

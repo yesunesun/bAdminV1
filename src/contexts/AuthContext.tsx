@@ -6,7 +6,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import type { User, AuthError, Session } from '@supabase/supabase-js';
 
-interface AuthState {
+interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
@@ -331,8 +331,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={contextValue}>
-      {children}
+    <AuthContext.Provider value={value}>
+      {!loading && children}
     </AuthContext.Provider>
   );
 }
