@@ -1,0 +1,291 @@
+btAdmin Dependencies
+==================================================
+
+
+File: src/App.tsx
+Dependencies:
+  - ./components/AuthDebug
+  - ./contexts/AuthContext
+  - @/components/Header
+  - react-router-dom
+
+File: src/components/AuthDebug.tsx
+Dependencies:
+  - ../contexts/AuthContext
+
+File: src/components/FormSection.tsx
+Dependencies:
+  - @/lib/utils
+
+File: src/components/Header.tsx
+Dependencies:
+  - @/contexts/AuthContext
+  - react-router-dom
+
+File: src/components/ImageUpload.tsx
+Dependencies:
+  - ../lib/supabase
+  - @/lib/utils
+
+File: src/components/property/PropertyCard.tsx
+Dependencies:
+  - ./types
+  - @/lib/utils
+  - react-router-dom
+
+File: src/components/property/PropertyList.tsx
+Dependencies:
+  - ./PropertyCard
+  - ./types
+  - @/components/ui/input
+  - @/components/ui/select
+
+File: src/components/property/wizard/PropertyForm.tsx
+Dependencies:
+  - ./components/FormNavigation
+  - ./constants
+  - ./hooks/usePropertyForm
+  - ./sections/AmenitiesSection
+  - ./sections/ImageUploadSection
+  - ./sections/LocationDetails
+  - ./sections/PropertyDetails
+  - ./sections/PropertySummary
+  - ./sections/RentalDetails
+  - ./types
+  - @/lib/utils
+  - react-router-dom
+
+File: src/components/property/wizard/components/FormNavigation.tsx
+Dependencies:
+  - ../constants
+  - @/lib/utils
+
+File: src/components/property/wizard/hooks/usePropertyForm.ts
+Dependencies:
+  - ../test-data
+  - ../types
+  - @/contexts/AuthContext
+  - @/lib/supabase
+  - react-hook-form
+  - react-router-dom
+
+File: src/components/property/wizard/navigation/PropertyFormNav.tsx
+Dependencies:
+  - ../../constants
+  - ../../types
+  - ../sections/ImageUploadSection
+  - ./AmenitiesSection
+  - ./LocationDetails
+  - ./PropertyDetails
+  - ./PropertySummary
+  - ./RentalDetails
+  - @/components/FormProgress
+  - @/contexts/AuthContext
+  - @/lib/supabase
+  - @/lib/utils
+  - react-hook-form
+  - react-router-dom
+
+File: src/components/property/wizard/sections/AmenitiesSection.tsx
+Dependencies:
+  - ../constants
+  - ../types
+  - @/components/FormSection
+  - @/components/ui/RequiredLabel
+  - @/components/ui/checkbox
+  - @/components/ui/input
+  - @/components/ui/select
+  - @/lib/utils
+
+File: src/components/property/wizard/sections/ImageUploadSection.tsx
+Dependencies:
+  - ./image-upload/components/UploadArea
+  - ./image-upload/hooks/useImageUpload
+  - @/components/FormSection
+  - @/lib/utils
+
+File: src/components/property/wizard/sections/LocationDetails.tsx
+Dependencies:
+  - ../constants
+  - ../types
+  - @/components/FormSection
+  - @/components/ui/RequiredLabel
+  - @/components/ui/input
+  - @/components/ui/select
+
+File: src/components/property/wizard/sections/PropertyDetails.tsx
+Dependencies:
+  - ../constants
+  - ../types
+  - @/components/FormSection
+  - @/components/ui/RequiredLabel
+  - @/components/ui/input
+  - @/components/ui/select
+
+File: src/components/property/wizard/sections/PropertySummary.tsx
+Dependencies:
+  - ../types
+  - @/components/FormSection
+  - @/lib/utils
+
+File: src/components/property/wizard/sections/RentalDetails.tsx
+Dependencies:
+  - ../constants
+  - ../types
+  - @/components/FormSection
+  - @/components/ui/RequiredLabel
+  - @/components/ui/checkbox
+  - @/components/ui/input
+  - @/components/ui/select
+  - @/lib/utils
+
+File: src/components/property/wizard/sections/image-upload/components/UploadArea.tsx
+Dependencies:
+  - @/lib/utils
+
+File: src/components/property/wizard/sections/image-upload/hooks/useImageUpload.ts
+Dependencies:
+  - @/lib/supabase
+
+File: src/components/property/wizard/test-data.ts
+Dependencies:
+  - ./types
+
+File: src/components/property/wizard/types.ts
+Dependencies:
+  - ./validationSchema
+  - react-hook-form
+  - react-hook-form
+
+File: src/components/property/wizard/validationSchemas.ts
+Dependencies:
+  - ./constants
+  - zod
+
+File: src/components/ui/FormProgress.tsx
+Dependencies:
+  - @/components/ui/progress
+  - @/lib/utils
+
+File: src/components/ui/RequiredLabel.tsx
+Dependencies:
+  - @/components/ui/label
+  - @/lib/utils
+
+File: src/components/ui/badge.tsx
+Dependencies:
+  - @/lib/utils
+  - class-variance-authority
+
+File: src/components/ui/card.tsx
+Dependencies:
+  - @/lib/utils
+
+File: src/components/ui/checkbox.tsx
+Dependencies:
+  - @/lib/utils
+  - @radix-ui/react-checkbox
+
+File: src/components/ui/input.tsx
+Dependencies:
+  - @/lib/utils
+
+File: src/components/ui/label.tsx
+Dependencies:
+  - @/lib/utils
+  - @radix-ui/react-label
+
+File: src/components/ui/progress.tsx
+Dependencies:
+  - @/lib/utils
+  - @radix-ui/react-progress
+
+File: src/components/ui/select.tsx
+Dependencies:
+  - @/lib/utils
+  - @radix-ui/react-select
+
+File: src/components/ui/skeleton.tsx
+Dependencies:
+  - @/lib/utils
+
+File: src/contexts/AuthContext.tsx
+Dependencies:
+  - ../lib/database.types
+  - ../lib/supabase
+  - @supabase/supabase-js
+
+File: src/lib/supabase.ts
+Dependencies:
+  - ./database.types
+  - @supabase/supabase-js
+
+File: src/lib/utils.ts
+Dependencies:
+  - clsx
+  - tailwind-merge
+
+File: src/main.tsx
+Dependencies:
+  - ./App.tsx
+  - ./index.css
+
+File: src/pages/AddProperty.tsx
+Dependencies:
+  - @/components/property/wizard/PropertyForm
+
+File: src/pages/AuthCallback.tsx
+Dependencies:
+  - ../lib/supabase
+  - react-router-dom
+
+File: src/pages/Dashboard.tsx
+Dependencies:
+  - @/contexts/AuthContext
+  - @/lib/supabase
+  - react-router-dom
+
+File: src/pages/EditProperty.tsx
+Dependencies:
+  - ../contexts/AuthContext
+  - ../lib/supabase
+  - @/components/property/wizard/PropertyForm
+  - react-router-dom
+
+File: src/pages/Login.tsx
+Dependencies:
+  - @/contexts/AuthContext
+  - react-router-dom
+
+File: src/pages/Properties.tsx
+Dependencies:
+  - @/components/property/PropertyList
+  - @/contexts/AuthContext
+  - @/lib/supabase
+  - react-router-dom
+
+File: src/pages/PropertyDetails.tsx
+Dependencies:
+  - ../contexts/AuthContext
+  - ../lib/supabase
+  - react-router-dom
+
+File: src/pages/PropertyPreview.tsx
+Dependencies:
+  - ../components/property/ImageGallery
+  - @/components/ui/badge
+  - @/components/ui/card
+  - @/components/ui/skeleton
+  - @/lib/supabase
+  - react-router-dom
+
+File: src/pages/Register.tsx
+Dependencies:
+  - ../contexts/AuthContext
+  - react-router-dom
+
+File: src/pages/SupervisorDashboard.tsx
+Dependencies:
+  - @/contexts/AuthContext
+  - @/lib/supabase
+  - react-router-dom
