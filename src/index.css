@@ -1,51 +1,134 @@
+/* src/index.css
+// Version: 1.1.0
+// Last Modified: 05-04-2025 14:45 IST
+// Purpose: Add vibrant theme color scheme */
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+  :root[data-theme="ocean"] {
+    /* Ocean Breeze Theme - Cool, calming blues - Enhanced for consistency */
+    --background: 210 50% 98%;
+    --foreground: 220 60% 20%;
+    
+    /* Deep ocean blue primary - Adjusted for better contrast */
+    --primary: 200 85% 45%;
+    --primary-foreground: 0 0% 100%;
+    
+    /* Lighter azure secondary - Refined for better pairing */
+    --secondary: 195 90% 90%;
+    --secondary-foreground: 200 85% 25%;
+    
+    /* Supporting colors - Enhanced for better visual harmony */
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 35% 45%;
+    --accent: 190 95% 85%;
+    --accent-foreground: 200 85% 25%;
+    
+    /* UI Elements - Improved for consistency */
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 220 60% 20%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
-    --radius: 0.5rem;
+    --popover-foreground: 220 60% 20%;
+    --border: 210 30% 85%;
+    --input: 210 30% 85%;
+    --ring: 200 85% 45%;
+    
+    /* Semantic Colors */
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    
+    /* Added success color for positive indicators */
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 100%;
   }
- 
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 48%;
+
+  :root[data-theme="sunset"] {
+    /* Sunset Glow Theme - Warm oranges and purples - Enhanced for consistency */
+    --background: 35 100% 98%;
+    --foreground: 280 50% 20%;
+    
+    /* Vibrant sunset orange primary - Adjusted for better contrast */
+    --primary: 25 95% 55%;
+    --primary-foreground: 0 0% 100%;
+    
+    /* Soft purple secondary - Refined for better pairing */
+    --secondary: 280 50% 90%;
+    --secondary-foreground: 280 50% 30%;
+    
+    /* Supporting colors - Enhanced for better visual harmony */
+    --muted: 35 30% 96%;
+    --muted-foreground: 280 20% 45%;
+    --accent: 300 70% 90%;
+    --accent-foreground: 280 50% 30%;
+    
+    /* UI Elements - Improved for consistency */
+    --card: 0 0% 100%;
+    --card-foreground: 280 50% 20%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 280 50% 20%;
+    --border: 35 30% 85%;
+    --input: 35 30% 85%;
+    --ring: 25 95% 55%;
+    
+    /* Semantic Colors */
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    
+    /* Added success color for positive indicators */
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 100%;
+  }
+
+  :root[data-theme="vibrant"] {
+    /* Vibrant Theme - Colorful, bright and energetic */
+    --background: 180 50% 98%;
+    --foreground: 260 50% 20%;
+    
+    /* Energetic magenta primary */
+    --primary: 320 90% 55%;
+    --primary-foreground: 0 0% 100%;
+    
+    /* Bright complementary secondary */
+    --secondary: 150 85% 60%;
+    --secondary-foreground: 155 90% 15%;
+    
+    /* Supporting colors - Rich and playful */
+    --muted: 180 30% 94%;
+    --muted-foreground: 260 30% 40%;
+    --accent: 260 85% 80%;
+    --accent-foreground: 260 90% 20%;
+    
+    /* UI Elements - Bright but not overwhelming */
+    --card: 0 0% 100%;
+    --card-foreground: 260 50% 20%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 260 50% 20%;
+    --border: 180 40% 85%;
+    --input: 180 40% 85%;
+    --ring: 320 90% 55%;
+    
+    /* Semantic Colors */
+    --destructive: 0 90% 60%;
+    --destructive-foreground: 0 0% 100%;
+    
+    /* Success color - Bright green */
+    --success: 142 80% 45%;
+    --success-foreground: 0 0% 100%;
+  }
+  
+  :root {
+    --radius: 0.75rem;
+    --space-1: 0.25rem;
+    --space-2: 0.5rem;
+    --space-3: 0.75rem;
+    --space-4: 1rem;
+    --space-6: 1.5rem;
+    --space-8: 2rem;
+    --space-12: 3rem;
+    --space-16: 4rem;
   }
 }
 
@@ -53,7 +136,179 @@
   * {
     @apply border-border;
   }
+  
+  html {
+    font-feature-settings: "rlig" 1, "calt" 1;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-y: scroll;
+  }
+  
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "ss01" on, "ss02" on, "cv01" on, "cv03" on;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold tracking-tight;
+  }
+
+  h1 {
+    @apply text-3xl md:text-4xl;
+  }
+
+  h2 {
+    @apply text-2xl md:text-3xl;
+  }
+
+  h3 {
+    @apply text-xl md:text-2xl;
+  }
+
+  h4 {
+    @apply text-lg md:text-xl;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-primary ring-offset-2 ring-offset-background;
+  }
+
+  ::selection {
+    @apply bg-primary/20 text-foreground;
+  }
+}
+
+@layer components {
+  .container-sm {
+    @apply max-w-screen-sm mx-auto px-4;
+  }
+  
+  .container-md {
+    @apply max-w-screen-md mx-auto px-4;
+  }
+  
+  .container-lg {
+    @apply max-w-screen-lg mx-auto px-4;
+  }
+  
+  .container-xl {
+    @apply max-w-screen-xl mx-auto px-4;
+  }
+
+  .section-padding {
+    @apply py-8 md:py-12 lg:py-16;
+  }
+  
+  .content-spacing {
+    @apply space-y-4 md:space-y-6;
+  }
+
+  /* Property card styles */
+  .property-card {
+    @apply overflow-hidden rounded-xl transition-all duration-300 hover:shadow-xl border border-border/40 h-full flex flex-col bg-card;
+  }
+
+  .property-card-image-container {
+    @apply relative block h-60 overflow-hidden;
+  }
+  
+  .property-card-image {
+    @apply w-full h-full object-cover transition-transform duration-500;
+  }
+
+  .property-card-badge {
+    @apply absolute bottom-3 left-3 z-20 bg-white/90 backdrop-blur-sm rounded-full px-3 py-1 text-xs font-medium shadow-sm text-primary;
+  }
+
+  .property-card-content {
+    @apply flex-grow p-5 flex flex-col;
+  }
+
+  .property-card-title {
+    @apply text-lg font-semibold line-clamp-2 transition-colors;
+  }
+
+  .property-card-feature {
+    @apply flex items-center gap-1.5 text-sm;
+  }
+
+  .property-card-price {
+    @apply text-xl font-bold flex items-center;
+  }
+
+  /* Icon with background utility */
+  .icon-with-bg {
+    @apply rounded-full bg-primary/10 flex items-center justify-center transition-colors;
+  }
+
+  /* Feature icon */
+  .feature-icon {
+    @apply text-primary;
+  }
+
+  /* Animations */
+  .hover-scale {
+    @apply transition-transform hover:scale-105;
+  }
+
+  .hover-lift {
+    @apply transition-all hover:-translate-y-1 hover:shadow-md;
+  }
+
+  .fade-in {
+    @apply opacity-0 animate-[fadeIn_0.3s_ease-in-out_forwards];
+  }
+
+  /* Add animation keyframes */
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes slideUp {
+    from { transform: translateY(10px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Add this to src/index.css */
+
+/* Seeker module standardized layout classes */
+.seeker-home-wrapper {
+  width: 100%;
+}
+
+/* Ensure that any map containers take full width */
+.google-map-container {
+  width: 100% !important;
+}
+
+/* Ensure property listing consistency */
+.property-listing-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+/* Property card grid consistency */
+.property-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.5rem;
+  width: 100%;
 }

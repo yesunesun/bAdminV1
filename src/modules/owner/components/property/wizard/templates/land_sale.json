@@ -1,0 +1,28 @@
+{
+    "meta": {
+      "_version": "v3.2",
+      "created_at": "",
+      "updated_at": "",
+      "status": "draft"
+    },
+    "flow": {
+      "category": "land",
+      "listingType": "sale",
+      "flowType": "land_sale",
+      "title": ""
+    },
+    "steps": {
+      "land_sale_basic_details": {},
+      "land_sale_location": {},
+      "land_sale_land_features": {},
+      "land_sale_review": {}
+    },
+    "media": {
+      "photos": {
+        "images": []
+      },
+      "videos": {
+        "urls": []
+      }
+    }
+  }

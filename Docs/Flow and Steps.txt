@@ -1,0 +1,23 @@
+Flow: Residential -> Rent
+Steps: details, location, rental, features, review
+
+Flow: Residential -> Sale
+Steps: details, location, sale, features, review
+
+Flow: Residential -> PGHostel
+Steps: room_details, location, pg_details, features, review
+
+Flow: Residential -> Flatmates
+Steps: room_details, location, flatmate_details, features, review
+  
+Flow: Commercial -> Rent
+Steps: commercial_basics, location, rental, features, review
+
+Flow: Commercial -> Sale
+Steps: commercial_basics, location, commercial_sale, features, review
+
+Flow: Commercial -> Co-working
+Steps: details, location, coworking, features, review
+
+Flow: Land/Plot -> Sale
+Steps: land_details, location, land_features, review

@@ -1,0 +1,8 @@
+.env file has the following keys:
+VITE_SUPABASE_URL
+VITE_SUPABASE_ANON_KEY
+SUPABASE_URL
+SUPABASE_SERVICE_ROLE_KEY
+VITE_GOOGLE_MAPS_KEY
+
+These keys are used for configuring Supabase and Google Maps services. The AI model should recognize these keys but must not generate or assume their values.

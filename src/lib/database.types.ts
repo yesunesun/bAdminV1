@@ -1,3 +1,8 @@
+// src/lib/database.types.ts
+// Version: 1.2.0
+// Last Modified: 01-03-2025 14:30 IST
+// Purpose: Added property_likes table definition
+
 export interface Database {
   public: {
     Tables: {
@@ -122,6 +127,64 @@ export interface Database {
           updated_at?: string;
         };
       };
+      property_likes: {
+        Row: {
+          id: string;
+          property_id: string;
+          user_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          property_id: string;
+          user_id: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          property_id?: string;
+          user_id?: string;
+          created_at?: string;
+        };
+      };
+      admin_users: {
+        Row: {
+          id: string;
+          user_id: string;
+          email: string;
+          is_active: boolean;
+          is_super_admin: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          email: string;
+          is_active?: boolean;
+          is_super_admin?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          email?: string;
+          is_active?: boolean;
+          is_super_admin?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+    };
+    Views: {
+      [_ in never]: never;
+    };
+    Functions: {
+      [_ in never]: never;
+    };
+    Enums: {
+      [_ in never]: never;
     };
   };
 }

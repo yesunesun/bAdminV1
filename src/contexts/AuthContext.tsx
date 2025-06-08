@@ -1,29 +1,24 @@
-import { createContext, useContext, useEffect, useState, ReactNode, useMemo } from 'react';
-import { supabase } from '../lib/supabase';
-import type { User } from '@supabase/supabase-js';
-import type { Database } from '../lib/database.types';
+// src/contexts/AuthContext.tsx
+// Version: 3.5.0
+// Last Modified: 06-04-2025 16:30 IST
 
-type UserProfile = Database['public']['Tables']['profiles']['Row'];
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { supabase } from '../lib/supabase';
+import type { User, AuthError, Session } from '@supabase/supabase-js';
 
 interface AuthState {
   user: User | null;
-  userProfile: UserProfile | null;
+  session: Session | null;
   loading: boolean;
-  error: string | null;
-}
-
-interface AuthContextType extends AuthState {
-  signInWithEmail: (email: string) => Promise<{ error?: any }>;
-  verifyOTP: (email: string, token: string) => Promise<{ error?: any }>;
+  signInAdmin: (email: string, password: string) => Promise<{ error?: AuthError }>;
+  signInWithOTP: (email: string) => Promise<{ error?: AuthError }>;
+  signInWithPassword: (email: string, password: string) => Promise<{ error?: AuthError }>;
+  verifyOTP: (email: string, token: string) => Promise<{ error?: AuthError }>;
   signOut: () => Promise<void>;
-  isAuthenticated: () => boolean;
-  isSuperAdmin: () => boolean;
-  isSupervisor: () => boolean;
-  isPropertyOwner: () => boolean;
-  clearError: () => void;
+  registerUser: (email: string, role: string) => Promise<{ error?: AuthError }>;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function useAuth() {
   const context = useContext(AuthContext);
@@ -33,259 +28,307 @@ export function useAuth() {
   return context;
 }
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [authState, setAuthState] = useState<AuthState>({
-    user: null,
-    userProfile: null,
-    loading: true,
-    error: null
-  });
-
-  const updateAuthState = (updates: Partial<AuthState>) => {
-    setAuthState(current => ({ ...current, ...updates }));
-  };
-
-  const clearError = () => {
-    updateAuthState({ error: null });
-  };
-
-  const fetchProfile = async (userId: string): Promise<UserProfile | null> => {
-    console.log('📥 Fetching profile for user:', userId);
-    try {
-      // Add delay to ensure Supabase session is properly initialized
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-
-      if (error) {
-        if (error.code === 'PGRST116') {
-          // Session expired or invalid, trigger sign out
-          console.error('❌ Invalid session during profile fetch');
-          await supabase.auth.signOut();
-          return null;
-        }
-        console.error('❌ Profile fetch error:', error);
-        return null;
-      }
-
-      if (!profile) {
-        console.log('⚠️ No profile found for user');
-        return null;
-      }
-
-      console.log('✅ Profile fetched successfully:', profile);
-      return profile;
-    } catch (err) {
-      console.error('❌ Error in fetchProfile:', err);
-      return null;
-    }
-  };
-
-  const handleAuthStateChange = async (currentUser: User | null) => {
-    console.log('🔄 Handling auth state change:', { 
-      hasUser: !!currentUser,
-      userId: currentUser?.id,
-      email: currentUser?.email 
-    });
-    
-    try {
-      if (!currentUser) {
-        console.log('👤 No user, clearing auth state');
-        updateAuthState({
-          user: null,
-          userProfile: null,
-          loading: false
-        });
-        return;
-      }
-
-      updateAuthState({ loading: true });
-      
-      const profile = await fetchProfile(currentUser.id);
-      
-      if (!profile) {
-        console.error('❌ No profile found after auth state change');
-        updateAuthState({
-          user: null,
-          userProfile: null,
-          loading: false,
-          error: 'Unable to load user profile'
-        });
-        await supabase.auth.signOut();
-        return;
-      }
-
-      console.log('✅ Auth state updated successfully:', {
-        userId: currentUser.id,
-        role: profile.role
-      });
-
-      updateAuthState({
-        user: currentUser,
-        userProfile: profile,
-        loading: false,
-        error: null
-      });
-    } catch (err) {
-      console.error('❌ Error in handleAuthStateChange:', err);
-      updateAuthState({
-        user: null,
-        userProfile: null,
-        loading: false,
-        error: 'Failed to update authentication state'
-      });
-      // Force sign out on error
-      await supabase.auth.signOut().catch(console.error);
-    }
-  };
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let mounted = true;
-    console.log('🔄 Auth Provider mounted');
-
     const initializeAuth = async () => {
       try {
-        console.log('📥 Getting initial session');
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        
-        if (sessionError) {
-          console.error('❌ Session error:', sessionError);
-          throw sessionError;
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) {
+          console.error('Session initialization error:', error);
         }
-
-        if (!mounted) return;
-
-        if (session?.user) {
-          console.log('✅ Found existing session');
-          await handleAuthStateChange(session.user);
-        } else {
-          console.log('⚠️ No session found');
-          updateAuthState({
-            user: null,
-            userProfile: null,
-            loading: false
-          });
-        }
+        setSession(session);
+        setUser(session?.user ?? null);
       } catch (err) {
-        console.error('❌ Auth initialization error:', err);
-        if (mounted) {
-          updateAuthState({
-            user: null,
-            userProfile: null,
-            loading: false,
-            error: 'Failed to initialize authentication'
-          });
-        }
+        console.error('Auth initialization error:', err);
+      } finally {
+        setLoading(false);
       }
     };
 
-    // Initialize auth state
     initializeAuth();
 
-    // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!mounted) {
-        console.log('⚠️ Skipping auth state change - component unmounted');
-        return;
-      }
-      
-      console.log('🔄 Auth state changed:', { event, userId: session?.user?.id });
-      
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        if (session?.user) {
-          await handleAuthStateChange(session.user);
-        }
-      } else if (event === 'SIGNED_OUT') {
-        updateAuthState({
-          user: null,
-          userProfile: null,
-          loading: false
-        });
-      }
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      setUser(session?.user ?? null);
     });
 
-    return () => {
-      console.log('♻️ Cleaning up Auth Provider');
-      mounted = false;
-      subscription.unsubscribe();
-    };
+    return () => subscription.unsubscribe();
   }, []);
 
-  const signInWithEmail = async (email: string) => {
-    console.log('🔑 Attempting email sign in');
-    updateAuthState({ error: null });
-    
+  const signInWithOTP = async (email: string) => {
     try {
+      console.log('Attempting OTP sign in for email:', email);
       const { error } = await supabase.auth.signInWithOtp({
-        email,
+        email: email.trim(),
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`
-        }
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        },
       });
-      
+
       if (error) throw error;
-      return { error: null };
-    } catch (error: any) {
-      console.error('❌ Sign in error:', error);
-      const errorMessage = error.message || 'Failed to sign in';
-      updateAuthState({ error: errorMessage });
-      return { error };
+      console.log('OTP sign in successful, email sent');
+      return { error: undefined };
+    } catch (err) {
+      console.error('OTP sign in error:', err);
+      if (err instanceof Error) {
+        return {
+          error: {
+            message: err.message,
+            name: 'AuthError'
+          } as AuthError
+        };
+      }
+      return {
+        error: {
+          message: 'An unexpected error occurred during OTP sign in',
+          name: 'AuthError'
+        } as AuthError
+      };
+    }
+  };
+
+  const registerUser = async (email: string, role: string) => {
+    try {
+      console.log('Registering user with email:', email, 'and role:', role);
+      
+      // Sign up with OTP (passwordless)
+      const { error } = await supabase.auth.signInWithOtp({
+        email: email.trim(),
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          data: {
+            role: role, // Store the user's role in the metadata
+          }
+        },
+      });
+
+      if (error) throw error;
+      console.log('Registration successful, verification email sent');
+      return { error: undefined };
+    } catch (err) {
+      console.error('Registration error:', err);
+      if (err instanceof Error) {
+        return {
+          error: {
+            message: err.message,
+            name: 'AuthError'
+          } as AuthError
+        };
+      }
+      return {
+        error: {
+          message: 'An unexpected error occurred during registration',
+          name: 'AuthError'
+        } as AuthError
+      };
     }
   };
 
   const verifyOTP = async (email: string, token: string) => {
-    console.log('🔐 Verifying OTP');
-    updateAuthState({ error: null });
-    
     try {
-      const { data, error } = await supabase.auth.verifyOtp({
-        email,
-        token,
-        type: 'magiclink'
+      console.log('Verifying OTP for email:', email, 'with token length:', token.length);
+      
+      if (!token || token.trim().length === 0) {
+        throw new Error('Verification code cannot be empty');
+      }
+      
+      // Ensure token contains only digits
+      if (!/^\d+$/.test(token.trim())) {
+        throw new Error('Verification code must contain only numbers');
+      }
+      
+      // Try all available verification types in case the token type has been misidentified
+      const typesToTry = ['signup', 'email', 'recovery', 'invite'];
+      let successfulVerification = false;
+      let lastError = null;
+      
+      // Try each verification type until one succeeds
+      for (const type of typesToTry) {
+        try {
+          console.log(`Attempting verification with type: ${type}`);
+          const { data, error } = await supabase.auth.verifyOtp({
+            email: email.trim(),
+            token: token.trim(),
+            type: type as any, // Type assertion needed for TypeScript
+          });
+          
+          if (!error) {
+            console.log(`OTP verification successful with type: ${type}. User data:`, data?.user ? 'User exists' : 'No user');
+            successfulVerification = true;
+            break;
+          } else {
+            lastError = error;
+            console.warn(`Verification failed with type ${type}:`, error.message);
+          }
+        } catch (e) {
+          console.warn(`Error trying verification type ${type}:`, e);
+          lastError = e;
+        }
+      }
+      
+      if (successfulVerification) {
+        return { error: undefined };
+      } else {
+        throw lastError || new Error('Verification failed with all token types');
+      }
+    } catch (err) {
+      console.error('OTP verification error:', err);
+      if (err instanceof Error) {
+        return {
+          error: {
+            message: err.message === 'Token has expired' 
+              ? 'Verification code has expired. Please request a new code or use the link in your email.' 
+              : err.message,
+            name: 'AuthError'
+          } as AuthError
+        };
+      }
+      return {
+        error: {
+          message: 'An unexpected error occurred during OTP verification',
+          name: 'AuthError'
+        } as AuthError
+      };
+    }
+  };
+
+  const signInAdmin = async (email: string, password: string) => {
+    try {
+      // Sign in the user
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: password.trim()
+      });
+
+      if (signInError) {
+        throw signInError;
+      }
+
+      if (!data.user) {
+        throw new Error('No user returned from sign in');
+      }
+
+      // Check email confirmation
+      if (!data.user.email_confirmed_at) {
+        return {
+          error: {
+            message: 'Please confirm your email first',
+            name: 'AuthError'
+          } as AuthError
+        };
+      }
+
+      // First check user metadata for admin status
+      const isAdminByMetadata = data.user.user_metadata?.is_admin === true || 
+                               data.user.user_metadata?.role === 'admin' ||
+                               data.user.user_metadata?.role === 'super_admin';
+
+      if (isAdminByMetadata) {
+        return { error: undefined };
+      }
+
+      // If not admin by metadata, check admin_users table as fallback
+      const { data: adminData, error: adminError } = await supabase
+        .from('admin_users')
+        .select('is_active')
+        .eq('user_id', data.user.id)
+        .single();
+
+      if (adminError || !adminData) {
+        await supabase.auth.signOut();
+        return {
+          error: {
+            message: 'Access denied: Not an admin user',
+            name: 'AuthError'
+          } as AuthError
+        };
+      }
+
+      if (!adminData.is_active) {
+        await supabase.auth.signOut();
+        return {
+          error: {
+            message: 'Your admin account is pending activation',
+            name: 'AuthError'
+          } as AuthError
+        };
+      }
+
+      return { error: undefined };
+
+    } catch (err) {
+      console.error('Sign in error:', err);
+      await supabase.auth.signOut();
+      if (err instanceof Error) {
+        return {
+          error: {
+            message: err.message,
+            name: 'AuthError'
+          } as AuthError
+        };
+      }
+      return {
+        error: {
+          message: 'An unexpected error occurred',
+          name: 'AuthError'
+        } as AuthError
+      };
+    }
+  };
+
+  const signInWithPassword = async (email: string, password: string) => {
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: password.trim()
       });
 
       if (error) throw error;
-      await handleAuthStateChange(data.user);
-      return { error: null };
-    } catch (error: any) {
-      console.error('❌ OTP verification error:', error);
-      const errorMessage = error.message || 'Failed to verify OTP';
-      updateAuthState({ error: errorMessage });
-      return { error };
+      return { error: undefined };
+    } catch (err) {
+      console.error('Password sign in error:', err);
+      if (err instanceof Error) {
+        return {
+          error: {
+            message: err.message,
+            name: 'AuthError'
+          } as AuthError
+        };
+      }
+      return {
+        error: {
+          message: 'An unexpected error occurred during sign in',
+          name: 'AuthError'
+        } as AuthError
+      };
     }
   };
 
   const signOut = async () => {
-    console.log('🚪 Signing out');
     try {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
-      
-      await handleAuthStateChange(null);
-    } catch (err: any) {
-      console.error('❌ Sign out error:', err);
-      updateAuthState({ error: 'Failed to sign out' });
+    } catch (err) {
+      console.error('Sign out error:', err);
+      throw err;
     }
   };
 
-  const contextValue = useMemo(
-    () => ({
-      ...authState,
-      signInWithEmail,
-      verifyOTP,
-      signOut,
-      clearError,
-      isAuthenticated: () => !!authState.user && !!authState.userProfile,
-      isSuperAdmin: () => authState.userProfile?.role === 'super_admin',
-      isSupervisor: () => ['super_admin', 'supervisor'].includes(authState.userProfile?.role || ''),
-      isPropertyOwner: () => authState.userProfile?.role === 'property_owner',
-    }),
-    [authState]
-  );
+  const value = {
+    user,
+    session,
+    loading,
+    signInAdmin,
+    signInWithOTP,
+    signInWithPassword,
+    registerUser,
+    verifyOTP,
+    signOut,
+  };
 
   return (
     <AuthContext.Provider value={contextValue}>

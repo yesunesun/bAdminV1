@@ -1,24 +1,60 @@
 // src/pages/Login.tsx
-import { useState } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
+// Version: 1.8.1
+// Last Modified: 13-04-2025 17:45 IST
+// Purpose: Fix syntax error in Login.tsx and redirect to root path
+
+import React, { useState, useEffect } from 'react';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { Mail, Building2, Home, Key } from 'lucide-react';
 
 export default function Login() {
   const navigate = useNavigate();
-  const { signInWithEmail, verifyOTP, error } = useAuth();
+  const [searchParams] = useSearchParams();
   const [email, setEmail] = useState('');
-  const [verificationCode, setVerificationCode] = useState('');
-  const [isCodeSent, setIsCodeSent] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [password, setPassword] = useState('');
+  const [token, setToken] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [showVerification, setShowVerification] = useState(false);
+  const [usePasswordAuth, setUsePasswordAuth] = useState(false);
+  const { signInWithOTP, verifyOTP, signInWithPassword } = useAuth();
+
+  // Check if user came from invitation flow
+  useEffect(() => {
+    const isInvited = searchParams.get('invite') === 'true';
+    if (isInvited) {
+      setUsePasswordAuth(true);
+      const invitedEmail = searchParams.get('email');
+      if (invitedEmail) {
+        setEmail(invitedEmail);
+      }
+    }
+  }, [searchParams]);
 
   const handleSendCode = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const { error } = await signInWithEmail(email);
-      if (!error) {
-        setIsCodeSent(true);
+      if (usePasswordAuth) {
+        const { error: signInError } = await signInWithPassword(email, password);
+        if (signInError) {
+          setError(signInError.message);
+          return;
+        }
+        // Navigate to root path instead of dashboard
+        navigate('/');
+      } else {
+        const { error: signInError } = await signInWithOTP(email);
+        if (signInError) {
+          setError(signInError.message);
+          return;
+        }
+        setShowVerification(true);
       }
+    } catch (err) {
+      setError('An unexpected error occurred. Please try again later.');
+      console.error('Sign in error:', err);
     } finally {
       setLoading(false);
     }
@@ -28,101 +64,200 @@ export default function Login() {
     e.preventDefault();
     setLoading(true);
     try {
-      const { error } = await verifyOTP(email, verificationCode);
-      if (!error) {
-        navigate('/dashboard');
+      const { error: verifyError } = await verifyOTP(email, token);
+      if (verifyError) {
+        setError(verifyError.message);
+        return;
       }
+      // Navigate to root path instead of dashboard
+      navigate('/');
+    } catch (err) {
+      setError('An unexpected error occurred. Please try again later.');
+      console.error('Verification error:', err);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Sign in to your account
-          </h2>
-        </div>
-
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-md p-4 mt-4">
-            <p className="text-red-600">{error}</p>
+    <div className="min-h-screen flex">
+      {/* Left side - Branding */}
+      <div className="hidden lg:flex lg:w-1/2 bg-sky-50 items-center justify-center p-12">
+        <div className="max-w-md space-y-8">
+          <div className="text-center">
+            <img 
+              src="/bhumitallilogo.png" 
+              alt="Bhoomitalli" 
+              className="h-16 mx-auto mb-8"
+            />
+            <h1 className="mt-6 text-4xl font-bold text-sky-900">Bhoomitalli</h1>
+            <p className="mt-2 text-xl text-sky-700">Transform Your Real Estate Journey</p>
           </div>
-        )}
-
-        {!isCodeSent ? (
-          <form className="mt-8 space-y-6" onSubmit={handleSendCode}>
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                Email address
-              </label>
-              <div className="mt-1">
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                />
-              </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="p-4 bg-white rounded-lg shadow-md">
+              <Home className="h-6 w-6 text-sky-600 mb-2" />
+              <h3 className="font-semibold text-sky-900">Property Management</h3>
+              <p className="text-sm text-sky-600">Effortless listing and management</p>
             </div>
+            <div className="p-4 bg-white rounded-lg shadow-md">
+              <Building2 className="h-6 w-6 text-sky-600 mb-2" />
+              <h3 className="font-semibold text-sky-900">Portfolio Growth</h3>
+              <p className="text-sm text-sky-600">Scale your property business</p>
+            </div>
+          </div>
+        </div>
+      </div>
 
-            <div>
+      {/* Right side - Login Form */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center bg-gradient-to-br from-sky-400/20 to-sky-100">
+        <div className="max-w-md w-full space-y-8 p-8 bg-white/80 backdrop-blur rounded-xl shadow-lg mx-4">
+          <div className="text-center">
+            <div className="mx-auto h-14 w-14 flex items-center justify-center rounded-full bg-sky-100">
+              {usePasswordAuth ? (
+                <Key className="h-7 w-7 text-sky-600" />
+              ) : (
+                <Mail className="h-7 w-7 text-sky-600" />
+              )}
+            </div>
+            <h2 className="mt-6 text-3xl font-bold text-sky-900">
+              {showVerification ? 'Verify Your Email' : 'Welcome Back'}
+            </h2>
+            <p className="mt-2 text-sm text-sky-600">
+              {showVerification 
+                ? 'Check your email for the verification code'
+                : 'Sign in to access your account'}
+            </p>
+          </div>
+
+          {error && (
+            <div className="bg-red-50 border border-red-200 p-4 rounded-lg">
+              <p className="text-sm text-red-700">{error}</p>
+            </div>
+          )}
+
+          {showVerification ? (
+            <form className="mt-8 space-y-6" onSubmit={handleVerificationSubmit}>
+              <div>
+                <label htmlFor="token" className="block text-sm font-medium text-sky-900">
+                  Verification Code
+                </label>
+                <div className="mt-1">
+                  <input
+                    id="token"
+                    name="token"
+                    type="text"
+                    required
+                    className="appearance-none block w-full px-3 py-2 border border-sky-200 rounded-lg shadow-sm placeholder-sky-400 focus:outline-none focus:ring-sky-500 focus:border-sky-500 bg-white/50 backdrop-blur sm:text-sm"
+                    placeholder="Enter verification code"
+                    value={token}
+                    onChange={(e) => setToken(e.target.value)}
+                    disabled={isLoading}
+                  />
+                </div>
+              </div>
+
               <button
                 type="submit"
-                disabled={loading}
-                className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${
-                  loading ? 'opacity-50 cursor-not-allowed' : ''
-                }`}
+                disabled={isLoading}
+                className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 disabled:opacity-50 transition-colors duration-200"
               >
-                {loading ? 'Sending...' : 'Send Verification Code'}
+                {isLoading ? 'Verifying...' : 'Verify Code'}
               </button>
-            </div>
-          </form>
-        ) : (
-          <form className="mt-8 space-y-6" onSubmit={handleVerifyCode}>
-            <div>
-              <label htmlFor="code" className="block text-sm font-medium text-gray-700">
-                Verification Code
-              </label>
-              <div className="mt-1">
-                <input
-                  id="code"
-                  name="code"
-                  type="text"
-                  required
-                  value={verificationCode}
-                  onChange={(e) => setVerificationCode(e.target.value)}
-                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                />
-              </div>
-            </div>
 
-            <div className="flex flex-col space-y-4">
+              <div className="text-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowVerification(false);
+                    setToken('');
+                    setError('');
+                  }}
+                  className="text-sm text-sky-600 hover:text-sky-700"
+                >
+                  Use a different email
+                </button>
+              </div>
+            </form>
+          ) : (
+            <form className="mt-8 space-y-6" onSubmit={handleSignInSubmit}>
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium text-sky-900">
+                  Email address
+                </label>
+                <div className="mt-1">
+                  <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    autoComplete="email"
+                    required
+                    className="appearance-none block w-full px-3 py-2 border border-sky-200 rounded-lg shadow-sm placeholder-sky-400 focus:outline-none focus:ring-sky-500 focus:border-sky-500 bg-white/50 backdrop-blur sm:text-sm"
+                    placeholder="you@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    disabled={isLoading}
+                  />
+                </div>
+              </div>
+
+              {usePasswordAuth && (
+                <div>
+                  <label htmlFor="password" className="block text-sm font-medium text-sky-900">
+                    Password
+                  </label>
+                  <div className="mt-1">
+                    <input
+                      id="password"
+                      name="password"
+                      type="password"
+                      autoComplete="current-password"
+                      required
+                      className="appearance-none block w-full px-3 py-2 border border-sky-200 rounded-lg shadow-sm placeholder-sky-400 focus:outline-none focus:ring-sky-500 focus:border-sky-500 bg-white/50 backdrop-blur sm:text-sm"
+                      placeholder="Enter your password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      disabled={isLoading}
+                    />
+                  </div>
+                </div>
+              )}
+
               <button
                 type="submit"
-                disabled={loading}
-                className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${
-                  loading ? 'opacity-50 cursor-not-allowed' : ''
-                }`}
+                disabled={isLoading}
+                className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 disabled:opacity-50 transition-colors duration-200"
               >
-                {loading ? 'Verifying...' : 'Verify Code'}
+                {isLoading 
+                  ? (usePasswordAuth ? 'Signing in...' : 'Sending code...') 
+                  : (usePasswordAuth ? 'Sign in' : 'Send verification code')}
               </button>
 
-              <button
-                type="button"
-                onClick={() => setIsCodeSent(false)}
-                className="text-indigo-600 hover:text-indigo-500 text-sm font-medium focus:outline-none"
-              >
-                Use a different email
-              </button>
-            </div>
-          </form>
-        )}
+              <div className="text-center space-y-2">
+                {!searchParams.get('invite') && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUsePasswordAuth(!usePasswordAuth);
+                      setError('');
+                      setPassword('');
+                    }}
+                    className="text-sm text-sky-600 hover:text-sky-700"
+                  >
+                    {usePasswordAuth 
+                      ? 'Sign in with email verification instead' 
+                      : 'Sign in with password instead'}
+                  </button>
+                )}
+                <p className="text-sm text-sky-600">
+                  Don't have an account?{' '}
+                  <Link to="/register" className="font-medium text-sky-700 hover:text-sky-800">
+                    Register here
+                  </Link>
+                </p>
+              </div>
+            </form>
+          )}
+        </div>
       </div>
     </div>
   );

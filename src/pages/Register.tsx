@@ -1,11 +1,11 @@
 // src/pages/Register.tsx
-// Version: 1.2.0
-// Last Modified: 30-01-2025 14:45 IST
+// Version: 1.4.0
+// Last Modified: 01-04-2025 12:45 IST
 
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Building2, Home, Phone, Mail } from 'lucide-react';
+import { Building2, Home } from 'lucide-react';
 
 type UserRole = 'property_owner' | 'property_seeker';
 
@@ -35,12 +35,11 @@ export default function Register() {
   const navigate = useNavigate();
   const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
   const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
   const [token, setToken] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [showVerification, setShowVerification] = useState(false);
-  const { registerUser, verifyOtp } = useAuth();
+  const { registerUser, verifyOTP } = useAuth();
 
   const handleRegistrationSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,24 +52,20 @@ export default function Register() {
     setIsLoading(true);
     
     try {
-      const formattedPhone = phone.replace(/\D/g, '');
-      if (formattedPhone.length !== 10) {
-        setError('Please enter a valid 10-digit phone number');
-        setIsLoading(false);
-        return;
-      }
-
-      const { error: registerError } = await registerUser(email, formattedPhone, selectedRole);
+      console.log(`Registering ${selectedRole} with email: ${email}`);
+      const { error: registerError } = await registerUser(email, selectedRole);
       
       if (registerError) {
+        console.error('Registration API error:', registerError);
         setError(registerError.message);
         return;
       }
       
+      console.log('Registration successful, proceeding to verification');
       setShowVerification(true);
     } catch (err) {
-      setError('An unexpected error occurred. Please try again later.');
       console.error('Registration error:', err);
+      setError('An unexpected error occurred. Please try again later.');
     } finally {
       setIsLoading(false);
     }
@@ -82,20 +77,37 @@ export default function Register() {
     setIsLoading(true);
 
     try {
-      const { error: verifyError } = await verifyOtp(phone, token);
+      // Basic validation
+      if (!token.trim()) {
+        setError('Please enter the verification code');
+        setIsLoading(false);
+        return;
+      }
+      
+      console.log(`Verifying OTP for ${email} with code: ${token}`);
+      const { error: verifyError } = await verifyOTP(email, token);
 
       if (verifyError) {
+        console.error('Verification API error:', verifyError);
         setError(verifyError.message);
+        setIsLoading(false);
         return;
       }
 
+      console.log('Verification successful, redirecting to dashboard');
       navigate('/dashboard');
     } catch (err) {
-      setError('An unexpected error occurred. Please try again later.');
       console.error('Verification error:', err);
+      setError('An unexpected error occurred. Please try again later.');
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleStartOver = () => {
+    setShowVerification(false);
+    setToken('');
+    setError('');
   };
 
   return (
@@ -103,12 +115,12 @@ export default function Register() {
       <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-lg shadow">
         <div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            {showVerification ? 'Verify your phone number' : 'Create your account'}
+            {showVerification ? 'Verify your email' : 'Create your account'}
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
             {showVerification 
-              ? 'Enter the verification code sent to your phone'
-              : 'Choose your role and enter your details'}
+              ? 'Enter the verification code sent to your email'
+              : 'Choose your role and enter your email'}
           </p>
         </div>
 
@@ -130,13 +142,23 @@ export default function Register() {
                   name="token"
                   type="text"
                   required
+                  pattern="[0-9]*"
+                  inputMode="numeric"
                   className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                   placeholder="Enter 6-digit code"
                   value={token}
-                  onChange={(e) => setToken(e.target.value)}
+                  onChange={(e) => {
+                    // Only allow digits
+                    const value = e.target.value.replace(/\D/g, '');
+                    setToken(value);
+                  }}
                   disabled={isLoading}
+                  maxLength={6}
                 />
               </div>
+              <p className="mt-1 text-xs text-gray-500">
+                Enter the 6-digit code sent to {email}
+              </p>
             </div>
 
             <div>
@@ -152,11 +174,7 @@ export default function Register() {
             <div className="text-center">
               <button
                 type="button"
-                onClick={() => {
-                  setShowVerification(false);
-                  setToken('');
-                  setError('');
-                }}
+                onClick={handleStartOver}
                 className="text-sm text-indigo-600 hover:text-indigo-500"
               >
                 Start over
@@ -206,31 +224,6 @@ export default function Register() {
                   placeholder="you@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  disabled={isLoading}
-                />
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
-                Phone number
-              </label>
-              <div className="mt-1 relative">
-                <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">
-                  +91
-                </span>
-                <input
-                  id="phone"
-                  name="phone"
-                  type="tel"
-                  autoComplete="tel"
-                  required
-                  className="appearance-none block w-full pl-12 pr-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                  placeholder="9876543210"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
-                  maxLength={10}
-                  pattern="[0-9]{10}"
                   disabled={isLoading}
                 />
               </div>

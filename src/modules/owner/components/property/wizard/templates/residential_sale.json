@@ -1,0 +1,29 @@
+{
+    "meta": {
+      "_version": "v3.2",
+      "created_at": "",
+      "updated_at": "",
+      "status": "draft"
+    },
+    "flow": {
+      "category": "residential",
+      "listingType": "sale",
+      "flowType": "residential_sale",
+      "title": ""
+    },
+    "steps": {
+      "res_sale_basic_details": {},
+      "res_sale_location": {},
+      "res_sale_sale_details": {},
+      "res_sale_features": {},
+      "res_sale_review": {}
+    },
+    "media": {
+      "photos": {
+        "images": []
+      },
+      "videos": {
+        "urls": []
+      }
+    }
+  }
