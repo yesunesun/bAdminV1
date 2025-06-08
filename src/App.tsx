@@ -15,6 +15,7 @@ import Footer from '@/components/Footer';
 
 // Import components directly
 import HomePage from './pages/HomePage';
+import Home1 from './pages/Home1'; // New Home1 page
 import FindPage from './pages/FindPage';
 import PropertyMapHome from './modules/seeker';
 import Dashboard from './modules/owner/pages/Dashboard';
@@ -273,6 +274,16 @@ function App() {
                     element={
                       <PublicOrProtectedRoute>
                         <HomePage />
+                      </PublicOrProtectedRoute>
+                    } 
+                  />
+                  
+                  {/* NEW: Home1 route with Google Maps */}
+                  <Route 
+                    path="/home1" 
+                    element={
+                      <PublicOrProtectedRoute>
+                        <Home1 />
                       </PublicOrProtectedRoute>
                     } 
                   />
