@@ -1,0 +1,84 @@
+You're absolutely correct! I made an error in my categorization. Let me correct that:
+
+## **🟢 CURRENT & RELEVANT TABLES** 
+*These are actively used and should be considered for all operations*
+
+### **Primary Property Tables**
+- **`properties_v2`** - Main property storage (JSONB-based, current standard)
+- **`temp_property_listing`** - Property creation wizard/draft storage
+- **`property_coordinates`** - Geographical data for properties
+
+### **User & Authentication**
+- **`profiles`** - User profile data (linked to auth.users)
+- **`auth.users`** - Supabase authentication (system table)
+- **`auth.sessions`** - User sessions (system table)
+
+### **Admin & Access Control**
+- **`admin_users`** - Admin user assignments
+- **`admin_roles`** - Admin role definitions
+
+### **Property Interactions**
+- **`properties_v2_likes`** - **CURRENT favorites system for properties_v2** ✅
+- **`owner_notifications`** - Notifications for property owners
+
+---
+
+## **🔴 LEGACY/DEPRECATED TABLES**
+*These exist for backward compatibility but should be avoided in new development*
+
+### **Legacy Property Storage**
+- **`properties`** - Old relational property table (replaced by properties_v2)
+- **`properties_temp`** - Temporary/test property table
+
+### **Legacy Media & Interactions**
+- **`property_images`** - Legacy image storage (images now in JSONB)
+- **`property_likes`** - Old favorites system (replaced by properties_v2_likes)
+- **`v2_favorites`** - Alternative/transitional favorites table (use properties_v2_likes instead)
+
+### **Legacy Activity Tracking**
+- **`property_visits`** - Visit tracking (linked to old properties table)
+
+---
+
+## **📋 CORRECTED AI BOT INSTRUCTIONS**
+
+### **✅ ALWAYS CONSIDER (Current & Relevant)**
+```
+When working with properties:
+- Use `properties_v2` as the primary table
+- Use `temp_property_listing` for wizard/draft operations
+- Use `property_coordinates` for location data
+- Use `properties_v2_likes` for favorites functionality ✅
+- Use `profiles` for user data
+- Use `admin_users` and `admin_roles` for admin operations
+- Use `owner_notifications` for notification features
+```
+
+### **❌ AVOID/IGNORE (Legacy/Deprecated)**
+```
+Do NOT use these tables in new development:
+- `properties` (use properties_v2 instead)
+- `properties_temp` (temporary table)
+- `property_images` (images stored in JSONB now)
+- `property_likes` (use properties_v2_likes instead)
+- `v2_favorites` (transitional, use properties_v2_likes instead) ✅
+- `property_visits` (legacy visit tracking)
+```
+
+## **🔍 EVIDENCE FROM DATABASE**
+
+Looking at the database structure, I can see:
+
+1. **`properties_v2_likes`** has proper RLS policies:
+   - "Users can view their own likes"
+   - "Users can add their own likes" 
+   - "Users can delete their own likes"
+
+2. **Database functions reference `properties_v2_likes`**:
+   - `create_properties_v2_likes_table_if_not_exists()`
+   - `add_property_v2_to_likes()`
+
+3. **Foreign key relationship**:
+   - `properties_v2_likes.property_id` → `properties_v2.id`
+
+Thank you for the correction! **`properties_v2_likes`** is indeed the **current and active** favorites table that should be used for all favorites functionality with the `properties_v2` table.

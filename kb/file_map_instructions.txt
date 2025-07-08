@@ -1,0 +1,11 @@
+btadmin_all_files.txt:
+Refer to this file for understanding the complete folder structure and file structure.
+When requesting a file, give the full path of the file as listed in this file.
+Always ensure the full path of the file is provided, and always double-check the path.
+If a file doesn’t exist in this file, it means the project does not have that file.
+
+btadmin_dependencies.txt:
+Refer to this file to understand the import relationships and dependencies between files.
+Use this to trace which files a component depends on and what files depend on it.
+Always match the dependency file path with the structure from btadmin_all_files.txt.
+If a file is not listed here, it has no recorded dependencies or is not referenced by others.
