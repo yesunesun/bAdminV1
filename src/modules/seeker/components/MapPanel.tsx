@@ -1,7 +1,7 @@
 // src/modules/seeker/components/MapPanel.tsx
-// Version: 4.3.0
-// Last Modified: 08-01-2025 10:30 IST
-// Purpose: Fixed initial zoom level for better marker spread and dev-only property count indicator
+// Version: 5.0.0
+// Last Modified: 08-01-2025 22:15 IST
+// Purpose: Simplified coordinate handling - relies only on get_latest_properties output
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useGoogleMaps, DEFAULT_MAP_CENTER } from '../hooks/useGoogleMaps';
@@ -84,168 +84,85 @@ const MapPanel: React.FC<MapPanelProps> = ({
   // Ref to store marker instances for cleanup
   const markersRef = useRef<google.maps.Marker[]>([]);
 
-  // Enhanced coordinate extraction with multiple fallback strategies
-  const extractCoordinates = useCallback((property: Property) => {
+  // Simplified coordinate extraction - uses only database output
+  const getPropertyCoordinates = useCallback((property: Property) => {
     try {
-      console.log(`🔍 Extracting coordinates for property ${property.id}`);
+      console.log(`🔍 Getting coordinates for property ${property.id}`);
       
-      // Strategy 1: Check direct coordinates field (from property_coordinates table)
-      if (property.coordinates) {
-        const lat = parseFloat(String(property.coordinates.latitude));
-        const lng = parseFloat(String(property.coordinates.longitude));
+      // Use latitude and longitude directly from get_latest_properties output
+      const lat = property.latitude;
+      const lng = property.longitude;
+      
+      if (lat !== null && lng !== null && lat !== undefined && lng !== undefined) {
+        const latitude = parseFloat(String(lat));
+        const longitude = parseFloat(String(lng));
         
-        if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0 && 
-            lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
-          console.log(`✅ Found coordinates from coordinates table: ${lat}, ${lng}`);
-          return { lat, lng, source: 'coordinates_table' };
+        if (!isNaN(latitude) && !isNaN(longitude) && 
+            latitude >= -90 && latitude <= 90 && 
+            longitude >= -180 && longitude <= 180 &&
+            latitude !== 0 && longitude !== 0) {
+          
+          console.log(`✅ Valid coordinates from database: ${latitude}, ${longitude}`);
+          return { lat: latitude, lng: longitude };
         }
       }
       
-      // Strategy 2: Check property_details.coordinates
-      if (property.property_details?.coordinates) {
-        const coords = property.property_details.coordinates;
-        if (typeof coords === 'object' && coords !== null) {
-          if ('lat' in coords && 'lng' in coords) {
-            const lat = parseFloat(String(coords.lat));
-            const lng = parseFloat(String(coords.lng));
-            
-            if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0 && 
-                lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
-              console.log(`✅ Found coordinates from property_details.coordinates: ${lat}, ${lng}`);
-              return { lat, lng, source: 'property_details_coords' };
-            }
-          }
-          if ('latitude' in coords && 'longitude' in coords) {
-            const lat = parseFloat(String(coords.latitude));
-            const lng = parseFloat(String(coords.longitude));
-            
-            if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0 && 
-                lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
-              console.log(`✅ Found coordinates from property_details.coordinates (lat/lng): ${lat}, ${lng}`);
-              return { lat, lng, source: 'property_details_coords_alt' };
-            }
-          }
-        }
-      }
-      
-      // Strategy 3: Check property_details.mapCoordinates
-      if (property.property_details?.mapCoordinates) {
-        const coords = property.property_details.mapCoordinates;
-        if (typeof coords === 'object' && coords !== null) {
-          if ('lat' in coords && 'lng' in coords) {
-            const lat = parseFloat(String(coords.lat));
-            const lng = parseFloat(String(coords.lng));
-            
-            if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0 && 
-                lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
-              console.log(`✅ Found coordinates from property_details.mapCoordinates: ${lat}, ${lng}`);
-              return { lat, lng, source: 'map_coordinates' };
-            }
-          }
-        }
-      }
-      
-      // Strategy 4: Check nested steps data for location information
-      if (property.property_details?.steps) {
-        const steps = property.property_details.steps;
-        
-        for (const [stepKey, stepData] of Object.entries(steps)) {
-          if (typeof stepData === 'object' && stepData !== null && 
-              (stepKey.includes('location') || stepKey.includes('Location'))) {
-            
-            if ('latitude' in stepData && 'longitude' in stepData) {
-              const lat = parseFloat(String(stepData.latitude));
-              const lng = parseFloat(String(stepData.longitude));
-              
-              if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0 && 
-                  lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
-                console.log(`✅ Found coordinates from steps.${stepKey}: ${lat}, ${lng}`);
-                return { lat, lng, source: `steps_${stepKey}` };
-              }
-            }
-          }
-        }
-      }
-      
-      // Strategy 5: Generate predictable coordinates for Hyderabad area (ALWAYS CREATE MARKER)
-      console.log(`⚠️ No valid coordinates found for property ${property.id}, generating fallback coordinates`);
-      
-      const hash = property.id.split('').reduce((acc, char) => {
-        return acc + char.charCodeAt(0);
-      }, 0);
-      
-      const latOffset = (hash % 200) / 10000;
-      const lngOffset = ((hash * 3) % 200) / 10000;
-      
-      const fallbackLat = DEFAULT_MAP_CENTER.lat + latOffset - 0.01;
-      const fallbackLng = DEFAULT_MAP_CENTER.lng + lngOffset - 0.01;
-      
-      console.log(`🔧 Generated fallback coordinates for ${property.id}: ${fallbackLat}, ${fallbackLng}`);
-      
-      return {
-        lat: fallbackLat,
-        lng: fallbackLng,
-        source: 'fallback'
-      };
-      
+      console.log(`❌ No valid coordinates for property ${property.id} - skipping marker creation`);
+      return null;
     } catch (error) {
-      console.error(`❌ Error extracting coordinates for property ${property.id}:`, error);
-      
-      // Even in error case, generate fallback coordinates
-      const hash = property.id.split('').reduce((acc, char) => {
-        return acc + char.charCodeAt(0);
-      }, 0);
-      
-      const latOffset = (hash % 200) / 10000;
-      const lngOffset = ((hash * 3) % 200) / 10000;
-      
-      return {
-        lat: DEFAULT_MAP_CENTER.lat + latOffset - 0.01,
-        lng: DEFAULT_MAP_CENTER.lng + lngOffset - 0.01,
-        source: 'error_fallback'
-      };
+      console.error(`❌ Error getting coordinates for property ${property.id}:`, error);
+      return null;
     }
   }, []);
+
+  // Filter properties that have valid coordinates
+  const propertiesWithCoordinates = useCallback(() => {
+    return properties.filter(property => {
+      const coords = getPropertyCoordinates(property);
+      return coords !== null;
+    });
+  }, [properties, getPropertyCoordinates]);
 
   // Navigate to property detail page
   const handlePropertyClick = useCallback((property: Property) => {
     navigate(`/properties/${property.id}`);
   }, [navigate]);
 
-  // Update visible properties count - SHOW ALL PROPERTIES, not just visible ones
+  // Update visible properties count
   const updateVisiblePropertiesCount = useCallback(() => {
     if (!map || !isLoaded) return;
 
     try {
       const bounds = map.getBounds();
       if (!bounds) {
-        // If no bounds available, count all properties
-        setVisiblePropertiesCount(properties.length);
+        setVisiblePropertiesCount(propertiesWithCoordinates().length);
         return;
       }
 
       let visibleCount = 0;
       const typeCounts = { residential: 0, commercial: 0, land: 0 };
       
-      properties.forEach(property => {
-        const coords = extractCoordinates(property);
-        const position = new google.maps.LatLng(coords.lat, coords.lng);
-        
-        if (bounds.contains(position)) {
-          visibleCount++;
-          const propertyInfo = detectPropertyType(property);
-          typeCounts[propertyInfo.type]++;
+      propertiesWithCoordinates().forEach(property => {
+        const coords = getPropertyCoordinates(property);
+        if (coords) {
+          const position = new google.maps.LatLng(coords.lat, coords.lng);
+          
+          if (bounds.contains(position)) {
+            visibleCount++;
+            const propertyInfo = detectPropertyType(property);
+            typeCounts[propertyInfo.type]++;
+          }
         }
       });
 
       setVisiblePropertiesCount(visibleCount);
       setPropertyTypeCounts(typeCounts);
-      console.log(`📊 Visible properties in viewport: ${visibleCount} of ${properties.length}`, typeCounts);
+      console.log(`📊 Visible properties in viewport: ${visibleCount} of ${propertiesWithCoordinates().length}`, typeCounts);
     } catch (error) {
       console.error('Error updating visible properties count:', error);
-      setVisiblePropertiesCount(properties.length);
+      setVisiblePropertiesCount(propertiesWithCoordinates().length);
     }
-  }, [map, isLoaded, properties, extractCoordinates]);
+  }, [map, isLoaded, propertiesWithCoordinates, getPropertyCoordinates]);
 
   // Auto-pan map to show hovered property marker
   const panToPropertyIfNeeded = useCallback((propertyId: string) => {
@@ -255,7 +172,9 @@ const MapPanel: React.FC<MapPanelProps> = ({
       const property = properties.find(p => p.id === propertyId);
       if (!property) return;
 
-      const coords = extractCoordinates(property);
+      const coords = getPropertyCoordinates(property);
+      if (!coords) return;
+
       const position = new google.maps.LatLng(coords.lat, coords.lng);
       const bounds = map.getBounds();
 
@@ -277,7 +196,7 @@ const MapPanel: React.FC<MapPanelProps> = ({
     } catch (error) {
       console.error('Error panning to property:', error);
     }
-  }, [map, isLoaded, properties, extractCoordinates]);
+  }, [map, isLoaded, properties, getPropertyCoordinates]);
 
   // Watch for hoveredPropertyId changes and pan to marker if needed
   useEffect(() => {
@@ -296,38 +215,41 @@ const MapPanel: React.FC<MapPanelProps> = ({
     map.addListener('bounds_changed', updateVisiblePropertiesCount);
     map.addListener('zoom_changed', updateVisiblePropertiesCount);
     
-    // Add bounds if we have properties
-    if (properties.length > 0) {
+    // Add bounds if we have properties with coordinates
+    const validProperties = propertiesWithCoordinates();
+    
+    if (validProperties.length > 0) {
       try {
         const bounds = new google.maps.LatLngBounds();
         let validPoints = 0;
         
-        properties.forEach(property => {
-          const coords = extractCoordinates(property);
-          bounds.extend({ lat: coords.lat, lng: coords.lng });
-          validPoints++;
+        validProperties.forEach(property => {
+          const coords = getPropertyCoordinates(property);
+          if (coords) {
+            bounds.extend({ lat: coords.lat, lng: coords.lng });
+            validPoints++;
+          }
         });
         
-        console.log(`🎯 Setting map bounds for ${validPoints} properties`);
+        console.log(`🎯 Setting map bounds for ${validPoints} properties with valid coordinates`);
         
         if (validPoints > 0) {
           setTimeout(() => {
             if (validPoints === 1) {
-              const coords = extractCoordinates(properties[0]);
-              map.setCenter({ lat: coords.lat, lng: coords.lng });
-              map.setZoom(16);
+              const coords = getPropertyCoordinates(validProperties[0]);
+              if (coords) {
+                map.setCenter({ lat: coords.lat, lng: coords.lng });
+                map.setZoom(16);
+              }
             } else if (validPoints <= 3) {
               map.fitBounds(bounds);
-              // FIXED: Set minimum zoom to 14 for better spread
               map.setZoom(Math.min(map.getZoom() || 14, 15));
             } else if (validPoints <= 10) {
               map.fitBounds(bounds);
-              // FIXED: Set minimum zoom to 14 for better spread
               map.setZoom(Math.min(map.getZoom() || 14, 14));
             } else {
               map.fitBounds(bounds);
               const currentZoom = map.getZoom() || 14;
-              // FIXED: Set minimum zoom to 13 instead of 10 for better marker visibility
               map.setZoom(Math.max(Math.min(currentZoom, 14), 13));
             }
             
@@ -338,20 +260,20 @@ const MapPanel: React.FC<MapPanelProps> = ({
       } catch (e) {
         console.error('Error fitting bounds:', e);
         map.setCenter(DEFAULT_MAP_CENTER);
-        // FIXED: Set default zoom to 14 instead of 11 for better initial view
         map.setZoom(14);
       }
     } else {
+      console.log('No properties with valid coordinates found, using default center');
       map.setCenter(DEFAULT_MAP_CENTER);
-      // FIXED: Set default zoom to 14 instead of 11 for better initial view
       map.setZoom(14);
     }
-  }, [properties, updateVisiblePropertiesCount, extractCoordinates]);
+  }, [propertiesWithCoordinates, updateVisiblePropertiesCount, getPropertyCoordinates]);
 
-  // Update visible count when properties change and create markers - ENSURE ALL PROPERTIES GET MARKERS
+  // Create markers only for properties with valid coordinates
   useEffect(() => {
     if (isLoaded && mapReady && map) {
-      console.log(`🚀 Creating markers for ${properties.length} properties`);
+      const validProperties = propertiesWithCoordinates();
+      console.log(`🚀 Creating markers for ${validProperties.length} properties with valid coordinates out of ${properties.length} total`);
       
       // Clean up existing markers
       markersRef.current.forEach(marker => {
@@ -359,22 +281,16 @@ const MapPanel: React.FC<MapPanelProps> = ({
       });
       markersRef.current = [];
       
-      // Create new markers - FORCE CREATE FOR ALL PROPERTIES
+      // Create new markers only for properties with coordinates
       const newMarkers: google.maps.Marker[] = [];
-      const coordinateStats = { real: 0, fallback: 0, error: 0 };
       
-      properties.forEach((property, index) => {
+      validProperties.forEach((property, index) => {
         try {
-          const coords = extractCoordinates(property);
+          const coords = getPropertyCoordinates(property);
+          if (!coords) return; // Skip if no valid coordinates
+          
           const isHovered = hoveredPropertyId === property.id;
           const isActive = activeProperty?.id === property.id;
-          
-          // Track coordinate sources
-          if (coords.source?.includes('fallback') || coords.source?.includes('error')) {
-            coordinateStats.fallback++;
-          } else {
-            coordinateStats.real++;
-          }
           
           // Get custom marker icon based on property type
           const markerIcon = getPropertyMarker(property, isHovered || isActive, 20);
@@ -394,11 +310,10 @@ const MapPanel: React.FC<MapPanelProps> = ({
           });
           
           newMarkers.push(marker);
-          console.log(`✅ Created marker ${index + 1}/${properties.length} for property ${property.id} at ${coords.lat}, ${coords.lng} (${coords.source})`);
+          console.log(`✅ Created marker ${index + 1}/${validProperties.length} for property ${property.id} at ${coords.lat}, ${coords.lng}`);
           
         } catch (error) {
           console.error(`❌ Failed to create marker for property ${property.id}:`, error);
-          coordinateStats.error++;
         }
       });
       
@@ -410,10 +325,8 @@ const MapPanel: React.FC<MapPanelProps> = ({
       
       console.log(`📊 Marker creation complete:`);
       console.log(`   - Total properties: ${properties.length}`);
+      console.log(`   - Properties with valid coordinates: ${validProperties.length}`);
       console.log(`   - Markers created: ${newMarkers.length}`);
-      console.log(`   - Real coordinates: ${coordinateStats.real}`);
-      console.log(`   - Fallback coordinates: ${coordinateStats.fallback}`);
-      console.log(`   - Errors: ${coordinateStats.error}`);
     }
     
     // Cleanup function
@@ -423,7 +336,7 @@ const MapPanel: React.FC<MapPanelProps> = ({
       });
       markersRef.current = [];
     };
-  }, [properties, isLoaded, mapReady, map, hoveredPropertyId, activeProperty, updateVisiblePropertiesCount, extractCoordinates]);
+  }, [properties, isLoaded, mapReady, map, hoveredPropertyId, activeProperty, updateVisiblePropertiesCount, propertiesWithCoordinates, getPropertyCoordinates]);
 
   // Cleanup marker cache on unmount
   useEffect(() => {
@@ -480,19 +393,27 @@ const MapPanel: React.FC<MapPanelProps> = ({
 
   return (
     <div className="w-full h-full rounded-2xl overflow-hidden relative">
-      {/* FIXED: Enhanced Property Count Indicator - Only visible in development mode */}
+      {/* Enhanced Property Count Indicator - Only visible in development mode */}
       {isDevelopment && (
         <div className="absolute top-4 right-4 z-10 bg-white/95 backdrop-blur-sm rounded-2xl p-4 shadow-lg border border-border/20">
           <div className="flex items-center gap-2 text-sm font-medium text-foreground mb-3">
             <MapPin className="h-4 w-4 text-primary" />
             <span>
-              {visiblePropertiesCount} of {properties.length} properties
+              {visiblePropertiesCount} of {propertiesWithCoordinates().length} properties
             </span>
           </div>
           
           {/* Debug info */}
           <div className="text-xs text-muted-foreground mb-2">
-            Markers: {totalMarkersCreated}/{properties.length}
+            Markers: {totalMarkersCreated}/{propertiesWithCoordinates().length}
+          </div>
+          
+          <div className="text-xs text-muted-foreground mb-2">
+            Total properties: {properties.length}
+          </div>
+          
+          <div className="text-xs text-muted-foreground mb-2">
+            With coordinates: {propertiesWithCoordinates().length}
           </div>
           
           {/* Property Type Breakdown */}
@@ -526,77 +447,80 @@ const MapPanel: React.FC<MapPanelProps> = ({
       <GoogleMap
         mapContainerStyle={mapContainerStyle}
         center={DEFAULT_MAP_CENTER}
-        zoom={14} // FIXED: Changed from 11 to 14 for better initial marker spread
+        zoom={14}
         options={mapOptions}
         onLoad={onMapLoad}
       >
         {/* Info Window for Active Property */}
-        {activeProperty && (
-          <InfoWindow
-            position={(() => {
-              const coords = extractCoordinates(activeProperty);
-              return { lat: coords.lat, lng: coords.lng };
-            })()}
-            onCloseClick={() => setActiveProperty(null)}
-          >
-            <div className="p-3 max-w-xs">
-              <div className="flex items-start gap-3 mb-3">
-                {/* Property Type Icon */}
-                <div className="flex-shrink-0">
-                  {(() => {
-                    const propertyInfo = detectPropertyType(activeProperty);
-                    switch (propertyInfo.type) {
-                      case 'residential':
-                        return <Home className="h-5 w-5 text-blue-600" />;
-                      case 'commercial':
-                        return <Building2 className="h-5 w-5 text-green-600" />;
-                      case 'land':
-                        return <Trees className="h-5 w-5 text-orange-600" />;
-                      default:
-                        return <Home className="h-5 w-5 text-blue-600" />;
-                    }
-                  })()}
-                </div>
-                
-                <div className="flex-1">
-                  <h3 className="font-semibold text-sm mb-1 text-foreground line-clamp-2">
-                    {activeProperty.title || 'Property'}
-                  </h3>
-                  <div className="text-xs text-muted-foreground capitalize">
+        {activeProperty && (() => {
+          const coords = getPropertyCoordinates(activeProperty);
+          if (!coords) return null;
+          
+          return (
+            <InfoWindow
+              position={{ lat: coords.lat, lng: coords.lng }}
+              onCloseClick={() => setActiveProperty(null)}
+            >
+              <div className="p-3 max-w-xs">
+                <div className="flex items-start gap-3 mb-3">
+                  {/* Property Type Icon */}
+                  <div className="flex-shrink-0">
                     {(() => {
                       const propertyInfo = detectPropertyType(activeProperty);
-                      return `${propertyInfo.type} • ${propertyInfo.subtype}`;
+                      switch (propertyInfo.type) {
+                        case 'residential':
+                          return <Home className="h-5 w-5 text-blue-600" />;
+                        case 'commercial':
+                          return <Building2 className="h-5 w-5 text-green-600" />;
+                        case 'land':
+                          return <Trees className="h-5 w-5 text-orange-600" />;
+                        default:
+                          return <Home className="h-5 w-5 text-blue-600" />;
+                      }
                     })()}
                   </div>
-                </div>
-              </div>
-              
-              <div className="mb-3 text-xs text-muted-foreground">
-                {activeProperty.property_details?.price && (
-                  <span className="font-bold text-primary text-sm">
-                    ₹{activeProperty.property_details.price}
-                  </span>
-                )}
-                {activeProperty.property_details?.location && (
-                  <div className="mt-1 flex items-center">
-                    <span className="truncate">{activeProperty.property_details.location}</span>
+                  
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-sm mb-1 text-foreground line-clamp-2">
+                      {activeProperty.title || 'Property'}
+                    </h3>
+                    <div className="text-xs text-muted-foreground capitalize">
+                      {(() => {
+                        const propertyInfo = detectPropertyType(activeProperty);
+                        return `${propertyInfo.type} • ${propertyInfo.subtype}`;
+                      })()}
+                    </div>
                   </div>
-                )}
+                </div>
+                
+                <div className="mb-3 text-xs text-muted-foreground">
+                  {activeProperty.property_details?.price && (
+                    <span className="font-bold text-primary text-sm">
+                      ₹{activeProperty.property_details.price}
+                    </span>
+                  )}
+                  {activeProperty.property_details?.location && (
+                    <div className="mt-1 flex items-center">
+                      <span className="truncate">{activeProperty.property_details.location}</span>
+                    </div>
+                  )}
+                </div>
+                
+                <Button 
+                  size="sm" 
+                  className="text-xs h-8 w-full rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground"
+                  onClick={() => handlePropertyClick(activeProperty)}
+                >
+                  View Details
+                </Button>
               </div>
-              
-              <Button 
-                size="sm" 
-                className="text-xs h-8 w-full rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground"
-                onClick={() => handlePropertyClick(activeProperty)}
-              >
-                View Details
-              </Button>
-            </div>
-          </InfoWindow>
-        )}
+            </InfoWindow>
+          );
+        })()}
       </GoogleMap>
     </div>
   );
 };
 
 export default MapPanel;
+// End of file
