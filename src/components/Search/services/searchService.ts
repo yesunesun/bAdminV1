@@ -386,7 +386,7 @@ export class SearchService {
         propertyType,
         transactionType,
         selectedPropertyType: filters.selectedPropertyType,
-        transactionType: (filters as any).transactionType
+        filtersTransactionType: (filters as any).transactionType
       });
       
       let searchResults: DatabaseSearchResult[] = [];
@@ -479,6 +479,25 @@ export class SearchService {
           p_max_price: searchParams.p_max_price,
           p_city: searchParams.p_city,
           p_state: searchParams.p_state,
+          p_area_min: searchParams.p_area_min,
+          p_area_max: searchParams.p_area_max,
+          p_limit: searchParams.p_limit,
+          p_offset: searchParams.p_offset
+        });
+        
+      // Handle flatmates and pghostel as residential properties with specific subtypes
+      case 'flatmates':
+      case 'pghostel':
+        return await supabase.rpc('search_residential_properties', {
+          p_subtype: searchParams.p_subtype, // This will be 'flatmates' or 'pghostel'
+          p_property_subtype: searchParams.p_property_subtype,
+          p_search_query: searchParams.p_search_query,
+          p_city: searchParams.p_city,
+          p_state: searchParams.p_state,
+          p_min_price: searchParams.p_min_price,
+          p_max_price: searchParams.p_max_price,
+          p_bedrooms: searchParams.p_bedrooms,
+          p_bathrooms: searchParams.p_bathrooms,
           p_area_min: searchParams.p_area_min,
           p_area_max: searchParams.p_area_max,
           p_limit: searchParams.p_limit,
