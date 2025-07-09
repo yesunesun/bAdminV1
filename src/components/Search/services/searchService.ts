@@ -125,13 +125,18 @@ export class SearchService {
         ? 'search_property_by_code_insensitive' 
         : 'search_property_by_code';
       
+      console.log(`🔍 Calling database function: ${functionName} with code: ${trimmedCode}`);
+      
       const { data, error } = await supabase.rpc(functionName, {
         p_code: trimmedCode
       });
       
       if (error) {
+        console.error(`❌ Database function error for ${functionName}:`, error);
         throw new Error(`Failed to search property by code: ${error.message}`);
       }
+      
+      console.log(`✅ Database function returned ${data?.length || 0} results`);
       
       const searchResults = data || [];
       const totalCount = searchResults[0]?.total_count || searchResults.length;
@@ -189,15 +194,20 @@ export class SearchService {
     
     // If query is exactly a 6-character alphanumeric code, try code search first
     if (query && this.isPropertyCode(query)) {
+      console.log(`🎯 Detected valid property code: ${query}, trying code search first`);
       try {
         const codeResults = await this.searchByCode(query, true);
         
         // If we found results, return them
         if (codeResults.results.length > 0) {
+          console.log(`✅ Code search found ${codeResults.results.length} results, returning them`);
           return codeResults;
+        } else {
+          console.log(`⚠️  Code search returned no results for ${query}, falling back to regular search`);
         }
       } catch (error) {
-        // Fall back to regular search on error
+        console.error(`❌ Code search failed for ${query}:`, error);
+        console.log('🔄 Falling back to regular search...');
       }
     }
     

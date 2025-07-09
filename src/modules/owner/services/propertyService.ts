@@ -1,12 +1,13 @@
 // src/modules/owner/services/propertyService.ts
-// Version: 9.2.0
-// Last Modified: 18-05-2025 17:50 IST
-// Purpose: Enhanced flow detection and improved flatmate data handling
+// Version: 9.3.0
+// Last Modified: 09-07-2025 17:50 IST
+// Purpose: Enhanced flow detection, improved flatmate data handling, and automatic property code generation
 
 import { supabase } from '@/lib/supabase';
 import { FormData } from '../components/property/wizard/types';
 import { FLOW_STEPS } from '../components/property/wizard/constants/flows';
 import { FlowServiceFactory } from '../components/property/wizard/services/flows/FlowServiceFactory';
+import { generatePropertyCode } from '@/lib/utils';
 
 // Cache for properties
 const propertiesCache = new Map<string, {data: any[], timestamp: number}>();
@@ -355,7 +356,17 @@ export const propertyService = {
       // Update the ID in the property details
       organizedData.meta.id = data[0].id;
       
-      // Update the property details to include the ID
+      // Generate property code automatically during creation
+      try {
+        const propertyCode = await generatePropertyCode(data[0].id, { property_details: organizedData });
+        organizedData.meta.code = propertyCode;
+        organizedData.meta.codeGeneratedAt = new Date().toISOString();
+        console.log(`✅ Generated property code for new property ${data[0].id}: ${propertyCode}`);
+      } catch (error) {
+        console.error('❌ Error generating property code during creation:', error);
+      }
+      
+      // Update the property details to include the ID and code
       await supabase
         .from('properties_v2')
         .update({
@@ -524,5 +535,112 @@ export const propertyService = {
     }
     
     return result;
+  },
+
+  /**
+   * Generates property codes for existing properties that don't have codes
+   * This is a utility function to backfill property codes
+   */
+  async generateCodesForExistingProperties(userId?: string): Promise<{success: number, errors: number, total: number}> {
+    try {
+      console.log('🔄 Starting property code generation...');
+      
+      // Build query to get properties without codes
+      let query = supabase
+        .from('properties_v2')
+        .select('id, property_details')
+        .or('property_details->meta->code.is.null,property_details->meta->code.eq.""');
+      
+      // Filter by user if specified
+      if (userId) {
+        query = query.eq('owner_id', userId);
+      }
+      
+      const { data: properties, error } = await query.order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('❌ Error fetching properties:', error);
+        throw error;
+      }
+      
+      if (!properties || properties.length === 0) {
+        console.log('✅ No properties found without codes.');
+        return { success: 0, errors: 0, total: 0 };
+      }
+      
+      console.log(`📊 Found ${properties.length} properties without codes. Generating codes...`);
+      
+      let successCount = 0;
+      let errorCount = 0;
+      
+      // Process properties in batches
+      const batchSize = 5;
+      for (let i = 0; i < properties.length; i += batchSize) {
+        const batch = properties.slice(i, i + batchSize);
+        
+        console.log(`🔄 Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(properties.length / batchSize)}...`);
+        
+        const promises = batch.map(async (property) => {
+          try {
+            // Generate code for this property
+            const propertyCode = await generatePropertyCode(property.id, property);
+            
+            // Update the property details with the generated code
+            const updatedPropertyDetails = {
+              ...property.property_details,
+              meta: {
+                ...property.property_details.meta,
+                code: propertyCode,
+                codeGeneratedAt: new Date().toISOString()
+              }
+            };
+            
+            // Update the property in the database
+            const { error: updateError } = await supabase
+              .from('properties_v2')
+              .update({
+                property_details: updatedPropertyDetails,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', property.id);
+            
+            if (updateError) {
+              console.error(`❌ Error updating property ${property.id}:`, updateError);
+              errorCount++;
+            } else {
+              console.log(`✅ Generated code for property ${property.id}: ${propertyCode}`);
+              successCount++;
+            }
+          } catch (error) {
+            console.error(`❌ Error processing property ${property.id}:`, error);
+            errorCount++;
+          }
+        });
+        
+        await Promise.all(promises);
+        
+        // Brief pause between batches
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      
+      console.log(`\n📊 Property code generation complete!`);
+      console.log(`✅ Successfully generated codes for ${successCount} properties`);
+      console.log(`❌ Failed to generate codes for ${errorCount} properties`);
+      
+      // Clear cache if user-specific
+      if (userId) {
+        propertiesCache.delete(userId);
+      }
+      
+      return {
+        success: successCount,
+        errors: errorCount,
+        total: properties.length
+      };
+      
+    } catch (error) {
+      console.error('❌ Error in generateCodesForExistingProperties:', error);
+      throw error;
+    }
   }
 };
