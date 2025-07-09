@@ -7,7 +7,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useGoogleMaps, DEFAULT_MAP_CENTER } from '../hooks/useGoogleMaps';
 import { GoogleMap, InfoWindow } from '@react-google-maps/api';
 import { Button } from '@/components/ui/button';
-import { Property } from '@/modules/owner/components/property/types';
+import { SearchResult } from '@/components/Search/types/search.types';
 import { useNavigate } from 'react-router-dom';
 import { MapPin, Home, Building2, Trees } from 'lucide-react';
 import { 
@@ -51,11 +51,11 @@ const mapOptions = {
 };
 
 interface MapPanelProps {
-  properties: Property[];
+  properties: SearchResult[];
   isLoaded: boolean;
   loadError: Error | null;
-  activeProperty: Property | null;
-  setActiveProperty: (property: Property | null) => void;
+  activeProperty: SearchResult | null;
+  setActiveProperty: (property: SearchResult | null) => void;
   hoveredPropertyId: string | null;
 }
 
@@ -85,7 +85,7 @@ const MapPanel: React.FC<MapPanelProps> = ({
   const markersRef = useRef<google.maps.Marker[]>([]);
 
   // Simplified coordinate extraction - uses only database output
-  const getPropertyCoordinates = useCallback((property: Property) => {
+  const getPropertyCoordinates = useCallback((property: SearchResult) => {
     try {
       console.log(`🔍 Getting coordinates for property ${property.id}`);
       
@@ -124,7 +124,7 @@ const MapPanel: React.FC<MapPanelProps> = ({
   }, [properties, getPropertyCoordinates]);
 
   // Navigate to property detail page
-  const handlePropertyClick = useCallback((property: Property) => {
+  const handlePropertyClick = useCallback((property: SearchResult) => {
     navigate(`/properties/${property.id}`);
   }, [navigate]);
 

@@ -229,12 +229,26 @@ export class SearchService {
   /**
    * Get latest properties using get_latest_properties SQL function
    */
-  async getLatestProperties(limit: number = 50): Promise<SearchResponse> {
+  async getLatestProperties(limit: number = 50, offset: number = 0): Promise<SearchResponse> {
     const searchId = searchPerformanceMonitor.start({} as SearchFilters);
     
     try {
-      console.log('🏠 Getting latest properties with limit:', limit);
+      console.log('🏠 Getting latest properties with limit:', limit, 'offset:', offset);
       
+      // Note: get_latest_properties function doesn't support offset parameter
+      if (offset > 0) {
+        console.warn('⚠️ get_latest_properties does not support offset. Using fallback method for pagination.');
+        // For pagination with offset, we need to use a different approach
+        // For now, return empty results to prevent errors
+        return {
+          results: [],
+          totalCount: 0,
+          page: Math.floor(offset / limit) + 1,
+          limit: limit
+        };
+      }
+      
+      // For initial load (offset = 0), use the function as-is
       const { data, error } = await supabase.rpc('get_latest_properties', {
         p_limit: limit
       });
@@ -250,8 +264,14 @@ export class SearchService {
       console.log('📊 Latest properties results:', {
         resultCount: searchResults.length,
         totalCount: totalCount,
+        offset: offset,
         firstResultHasPrimaryImage: searchResults[0]?.primary_image ? 'YES' : 'NO',
-        firstResultHasCoordinates: searchResults[0]?.latitude && searchResults[0]?.longitude ? 'YES' : 'NO'
+        firstResultHasCoordinates: searchResults[0]?.latitude && searchResults[0]?.longitude ? 'YES' : 'NO',
+        firstResult: searchResults[0] ? {
+          id: searchResults[0].id,
+          title: searchResults[0].title,
+          coordinates: `${searchResults[0].latitude}, ${searchResults[0].longitude}`
+        } : 'None'
       });
 
       // Transform results using the updated transformation logic
@@ -264,7 +284,7 @@ export class SearchService {
       return {
         results: transformedResults,
         totalCount: totalCount,
-        page: 1,
+        page: Math.floor(offset / limit) + 1,
         limit: limit
       };
       

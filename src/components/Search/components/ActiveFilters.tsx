@@ -25,7 +25,7 @@ const ActiveFilters: React.FC<ActiveFiltersComponentProps> = ({
   onClearFilter,
   onClearAll,
   hasActiveFilters,
-  getFilterDisplayValue,
+  getFilterDisplayValue: _getFilterDisplayValue,
   getSubTypes
 }) => {
   const filterTags = [];
@@ -101,15 +101,22 @@ const ActiveFilters: React.FC<ActiveFiltersComponentProps> = ({
 
   return (
     <div className="flex items-center justify-end gap-2 flex-wrap min-h-[40px] lg:min-w-[200px]">
+      {/* Show "Active Filters" label when filters are present */}
+      {filterTags.length > 0 && (
+        <span className="text-xs text-gray-500 font-medium mr-2">
+          Active Filters:
+        </span>
+      )}
+      
       {filterTags.map((tag) => (
         <div 
           key={tag.id}
-          className={`flex items-center gap-1 px-3 py-1 rounded-full text-sm ${getTagClasses(tag.color)}`}
+          className={`flex items-center gap-1 px-3 py-1 rounded-full text-sm transition-colors ${getTagClasses(tag.color)}`}
         >
           {tag.label}
           <button 
             onClick={tag.onClear}
-            className="ml-1 rounded-full p-0.5 transition-colors"
+            className="ml-1 rounded-full p-0.5 transition-colors hover:bg-white/50"
             aria-label={`Remove ${tag.label} filter`}
           >
             <X className="h-3 w-3" />
@@ -123,12 +130,20 @@ const ActiveFilters: React.FC<ActiveFiltersComponentProps> = ({
           onClick={onClearAll}
           variant="ghost"
           size="sm"
-          className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8 p-0"
+          className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 px-2 flex items-center gap-1"
           title="Clear All Filters"
           aria-label="Clear all filters"
         >
-          <XCircle className="h-5 w-5" />
+          <XCircle className="h-4 w-4" />
+          <span className="text-xs">Clear All</span>
         </Button>
+      )}
+      
+      {/* Empty state message */}
+      {filterTags.length === 0 && (
+        <span className="text-xs text-gray-400 italic">
+          No filters applied
+        </span>
       )}
     </div>
   );

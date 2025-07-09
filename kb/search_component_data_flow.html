@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Homepage Search Component Data Flow</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding-bottom: 20px;
+            border-bottom: 3px solid #667eea;
+        }
+        
+        .header h1 {
+            color: #2d3748;
+            font-size: 2.5rem;
+            margin: 0;
+            font-weight: 700;
+        }
+        
+        .header p {
+            color: #718096;
+            font-size: 1.1rem;
+            margin: 10px 0 0 0;
+        }
+        
+        .flow-diagram {
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+        
+        .layer {
+            position: relative;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .layer:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.15);
+        }
+        
+        .ui-layer {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+        }
+        
+        .logic-layer {
+            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+            color: white;
+        }
+        
+        .service-layer {
+            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+            color: white;
+        }
+        
+        .database-layer {
+            background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+            color: #2d3748;
+        }
+        
+        .layer-title {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 20px;
+            text-align: center;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .components {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+        }
+        
+        .component {
+            background: rgba(255,255,255,0.2);
+            padding: 20px;
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.3);
+            transition: all 0.3s ease;
+        }
+        
+        .database-layer .component {
+            background: rgba(0,0,0,0.05);
+            border: 1px solid rgba(0,0,0,0.1);
+        }
+        
+        .component:hover {
+            transform: scale(1.02);
+            background: rgba(255,255,255,0.3);
+        }
+        
+        .component-name {
+            font-weight: 600;
+            font-size: 1.1rem;
+            margin-bottom: 10px;
+            color: inherit;
+        }
+        
+        .component-desc {
+            font-size: 0.9rem;
+            opacity: 0.9;
+            line-height: 1.4;
+        }
+        
+        .flow-arrow {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 40px;
+            position: relative;
+        }
+        
+        .flow-arrow::before {
+            content: '';
+            width: 4px;
+            height: 40px;
+            background: linear-gradient(to bottom, #667eea, #764ba2);
+            border-radius: 2px;
+            position: relative;
+            animation: pulse 2s infinite;
+        }
+        
+        .flow-arrow::after {
+            content: '▼';
+            position: absolute;
+            bottom: -5px;
+            font-size: 1.5rem;
+            color: #764ba2;
+            animation: bounce 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 0.6; }
+            50% { opacity: 1; }
+        }
+        
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+            40% { transform: translateY(-10px); }
+            60% { transform: translateY(-5px); }
+        }
+        
+        .special-features {
+            margin-top: 40px;
+            padding: 25px;
+            background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+            border-radius: 15px;
+            color: #2d3748;
+        }
+        
+        .features-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        
+        .features-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+        }
+        
+        .feature {
+            background: rgba(255,255,255,0.7);
+            padding: 15px;
+            border-radius: 10px;
+            font-weight: 500;
+        }
+        
+        .feature-highlight {
+            color: #e53e3e;
+            font-weight: 700;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+                margin: 10px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .components {
+                grid-template-columns: 1fr;
+            }
+            
+            .features-list {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏠 Homepage Search Component Data Flow</h1>
+            <p>Complete architecture analysis of the Bhoomitalli search system</p>
+        </div>
+        
+        <div class="flow-diagram">
+            <!-- UI Layer -->
+            <div class="layer ui-layer">
+                <div class="layer-title">🎨 UI Layer - User Interface Components</div>
+                <div class="components">
+                    <div class="component">
+                        <div class="component-name">SearchContainer.tsx</div>
+                        <div class="component-desc">Main search orchestrator with gradient header background. Integrates all search sub-components and handles view details/contact owner actions.</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-name">SearchHeader.tsx</div>
+                        <div class="component-desc">Primary search input with location selection. Features property code detection (6-char alphanumeric), real-time suggestions, and responsive design.</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-name">SearchFilters.tsx</div>
+                        <div class="component-desc">Property type, BHK, and price range filters with dropdown interfaces for refined search criteria.</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-name">PropertyMapHomeView.tsx</div>
+                        <div class="component-desc">Homepage integration point containing search interface and map/listing panels with responsive split layout.</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flow-arrow"></div>
+            
+            <!-- Logic Layer -->
+            <div class="layer logic-layer">
+                <div class="layer-title">⚡ Logic Layer - Hooks & State Management</div>
+                <div class="components">
+                    <div class="component">
+                        <div class="component-name">useSearch.ts</div>
+                        <div class="component-desc">Central search state management with smart search detection (6-char property codes), filter management, and auto-search triggers when filters are cleared.</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-name">useSearchFilters.ts</div>
+                        <div class="component-desc">Filter state management handling search query, location, and filter updates with backend compatibility transformations.</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-name">usePropertyMapData.ts</div>
+                        <div class="component-desc">Homepage-specific data management for property listings and map integration with automatic loading of latest properties on mount.</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flow-arrow"></div>
+            
+            <!-- Service Layer -->
+            <div class="layer service-layer">
+                <div class="layer-title">🔧 Service Layer - Business Logic & API</div>
+                <div class="components">
+                    <div class="component">
+                        <div class="component-name">searchService.ts</div>
+                        <div class="component-desc">Primary search service with property code validation, database integration, and performance monitoring. Handles smart search strategy selection.</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-name">realSearchService.ts</div>
+                        <div class="component-desc">Real search implementation with direct Supabase integration for live property data retrieval and filtering.</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-name">searchDataAdapter.ts</div>
+                        <div class="component-desc">Data transformation layer converting database results to frontend format with property type mapping and result normalization.</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-name">searchFallbackService.ts</div>
+                        <div class="component-desc">Fallback service ensuring search functionality continues even when primary services encounter issues.</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flow-arrow"></div>
+            
+            <!-- Database Layer -->
+            <div class="layer database-layer">
+                <div class="layer-title">🗄️ Database Layer - Supabase Functions & Queries</div>
+                <div class="components">
+                    <div class="component">
+                        <div class="component-name">search_residential_properties()</div>
+                        <div class="component-desc">Searches residential properties with comprehensive filtering (price, bedrooms, bathrooms, area) and pagination support.</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-name">search_commercial_properties()</div>
+                        <div class="component-desc">Handles commercial property searches including rent, sale, and coworking spaces with area and price filtering.</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-name">search_land_properties()</div>
+                        <div class="component-desc">Specialized land property search with land type, area, and location-based filtering capabilities.</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-name">search_property_by_code()</div>
+                        <div class="component-desc">Direct property lookup using 6-character alphanumeric codes with case-insensitive matching.</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-name">get_latest_properties()</div>
+                        <div class="component-desc">Loads default 50 properties for homepage display when no search filters are active.</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-name">CodeSearchDb.ts</div>
+                        <div class="component-desc">Database adapter for property code searches with validation and error handling.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="special-features">
+            <div class="features-title">🌟 Key Search Features & Flow Logic</div>
+            <div class="features-list">
+                <div class="feature">
+                    <span class="feature-highlight">Smart Search Detection:</span> Automatically detects 6-character alphanumeric property codes and uses dedicated search strategy
+                </div>
+                <div class="feature">
+                    <span class="feature-highlight">Real-time Suggestions:</span> 300ms debounced search suggestions with code-aware recommendations (max 5 results)
+                </div>
+                <div class="feature">
+                    <span class="feature-highlight">Multi-Property Type Support:</span> Handles residential, commercial, and land properties with flow-specific filtering
+                </div>
+                <div class="feature">
+                    <span class="feature-highlight">Auto-Clear Behavior:</span> Automatically loads latest properties when filters are cleared
+                </div>
+                <div class="feature">
+                    <span class="feature-highlight">Responsive Design:</span> Mobile: stacked layout | Desktop: horizontal layout with location, search bar, and button
+                </div>
+                <div class="feature">
+                    <span class="feature-highlight">Performance Optimized:</span> Built-in search performance tracking and efficient database queries with pagination
+                </div>
+                <div class="feature">
+                    <span class="feature-highlight">Map Integration:</span> Synchronizes search results with map display and property markers
+                </div>
+                <div class="feature">
+                    <span class="feature-highlight">Visual Feedback:</span> Property codes get special styling (orange border, "CODE" badge)
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

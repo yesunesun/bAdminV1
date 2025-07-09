@@ -12,7 +12,6 @@ import { SearchContainerProps } from './types/search.types';
 import { useSearch } from './hooks/useSearch';
 import { TELANGANA_LOCATIONS, ACTION_TYPES, getAvailablePropertyTypes, getSubtypesForProperty, BHK_TYPES, PRICE_RANGES, shouldShowBHK } from './constants/searchConstants';
 import { searchService } from './services/searchService';
-import ActiveFilters from './components/ActiveFilters';
 import SearchResultsView from './components/SearchResultsView';
 
 const SearchContainer: React.FC<SearchContainerProps> = ({
@@ -319,115 +318,101 @@ const SearchContainer: React.FC<SearchContainerProps> = ({
 
           {/* Bottom Section - Filter Row */}
           <div className="bg-white p-4 border-t border-gray-100">
-            <div className="flex flex-col lg:flex-row gap-4">
-              {/* Filter Dropdowns */}
-              <div className="flex-1 flex items-center gap-2 flex-wrap">
-                {/* Action Type Filter (Buy/Sell/Any) */}
+            {/* Filter Dropdowns */}
+            <div className="flex items-center gap-3 flex-wrap">
+              {/* Action Type Filter (Buy/Rent/Any) */}
+              <Select 
+                value={search.filters.actionType} 
+                onValueChange={handleActionTypeChange}
+              >
+                <SelectTrigger className="w-auto min-w-[140px] h-11 border-gray-200 bg-gray-50 hover:bg-gray-100 rounded-lg shadow-sm transition-all duration-200 hover:shadow-md focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
+                  <SelectValue placeholder="All Transaction Type" />
+                </SelectTrigger>
+                <SelectContent className="border-gray-200 shadow-lg">
+                  {Object.entries(ACTION_TYPES).map(([key, label]) => (
+                    <SelectItem key={key} value={key} className="hover:bg-gray-50">
+                      {key === 'any' ? 'All Transaction Type' : `${label} Properties`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* Property Type Filter */}
+              <Select 
+                value={search.filters.selectedPropertyType} 
+                onValueChange={handlePropertyTypeChange}
+              >
+                <SelectTrigger className="w-auto min-w-[130px] h-11 border-gray-200 bg-gray-50 hover:bg-gray-100 rounded-lg shadow-sm transition-all duration-200 hover:shadow-md focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
+                  <SelectValue placeholder="All Property Types" />
+                </SelectTrigger>
+                <SelectContent className="border-gray-200 shadow-lg">
+                  <SelectItem value="any" className="hover:bg-gray-50">All Property Types</SelectItem>
+                  {Object.entries(availablePropertyTypes).map(([key, type]) => (
+                    <SelectItem key={key} value={key} className="hover:bg-gray-50">
+                      {type.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* Subtype Filter */}
+              <Select 
+                value={search.filters.selectedSubType} 
+                onValueChange={handleSubTypeChange}
+                disabled={!search.filters.selectedPropertyType || 
+                         search.filters.selectedPropertyType === 'any' ||
+                         Object.keys(availableSubtypes).length === 0}
+              >
+                <SelectTrigger className="w-auto min-w-[150px] h-11 border-gray-200 bg-gray-50 hover:bg-gray-100 rounded-lg shadow-sm transition-all duration-200 hover:shadow-md focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-50">
+                  <SelectValue placeholder={search.filters.selectedPropertyType === 'any' ? 'Select Property Type First' : `All ${search.getSubtypeLabel()}s`} />
+                </SelectTrigger>
+                <SelectContent className="border-gray-200 shadow-lg">
+                  <SelectItem value="any" className="hover:bg-gray-50">All {search.getSubtypeLabel()}s</SelectItem>
+                  {Object.entries(availableSubtypes).map(([key, label]) => (
+                    <SelectItem key={key} value={key} className="hover:bg-gray-50">
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* BHK Filter - Only for Residential */}
+              {showBHK && (
                 <Select 
-                  value={search.filters.actionType} 
-                  onValueChange={handleActionTypeChange}
+                  value={search.filters.selectedBHK} 
+                  onValueChange={handleBHKChange}
                 >
                   <SelectTrigger className="w-auto min-w-[100px] h-11 border-gray-200 bg-gray-50 hover:bg-gray-100 rounded-lg shadow-sm transition-all duration-200 hover:shadow-md focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
-                    <SelectValue placeholder="Any" />
+                    <SelectValue placeholder="All BHK Types" />
                   </SelectTrigger>
                   <SelectContent className="border-gray-200 shadow-lg">
-                    {Object.entries(ACTION_TYPES).map(([key, label]) => (
+                    <SelectItem value="any" className="hover:bg-gray-50">All BHK Types</SelectItem>
+                    {Object.entries(BHK_TYPES).map(([key, label]) => (
                       <SelectItem key={key} value={key} className="hover:bg-gray-50">
                         {label}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+              )}
 
-                {/* Property Type Filter */}
-                <Select 
-                  value={search.filters.selectedPropertyType} 
-                  onValueChange={handlePropertyTypeChange}
-                >
-                  <SelectTrigger className="w-auto min-w-[130px] h-11 border-gray-200 bg-gray-50 hover:bg-gray-100 rounded-lg shadow-sm transition-all duration-200 hover:shadow-md focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
-                    <SelectValue placeholder="Any" />
-                  </SelectTrigger>
-                  <SelectContent className="border-gray-200 shadow-lg">
-                    <SelectItem value="any" className="hover:bg-gray-50">Any</SelectItem>
-                    {Object.entries(availablePropertyTypes).map(([key, type]) => (
-                      <SelectItem key={key} value={key} className="hover:bg-gray-50">
-                        {type.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                {/* Subtype Filter */}
-                <Select 
-                  value={search.filters.selectedSubType} 
-                  onValueChange={handleSubTypeChange}
-                  disabled={!search.filters.selectedPropertyType || 
-                           search.filters.selectedPropertyType === 'any' ||
-                           Object.keys(availableSubtypes).length === 0}
-                >
-                  <SelectTrigger className="w-auto min-w-[120px] h-11 border-gray-200 bg-gray-50 hover:bg-gray-100 rounded-lg shadow-sm transition-all duration-200 hover:shadow-md focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-50">
-                    <SelectValue placeholder={search.getSubtypeLabel()} />
-                  </SelectTrigger>
-                  <SelectContent className="border-gray-200 shadow-lg">
-                    <SelectItem value="any" className="hover:bg-gray-50">Any</SelectItem>
-                    {Object.entries(availableSubtypes).map(([key, label]) => (
-                      <SelectItem key={key} value={key} className="hover:bg-gray-50">
-                        {label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                {/* BHK Filter - Only for Residential */}
-                {showBHK && (
-                  <Select 
-                    value={search.filters.selectedBHK} 
-                    onValueChange={handleBHKChange}
-                  >
-                    <SelectTrigger className="w-auto min-w-[100px] h-11 border-gray-200 bg-gray-50 hover:bg-gray-100 rounded-lg shadow-sm transition-all duration-200 hover:shadow-md focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
-                      <SelectValue placeholder="Any" />
-                    </SelectTrigger>
-                    <SelectContent className="border-gray-200 shadow-lg">
-                      <SelectItem value="any" className="hover:bg-gray-50">Any</SelectItem>
-                      {Object.entries(BHK_TYPES).map(([key, label]) => (
-                        <SelectItem key={key} value={key} className="hover:bg-gray-50">
-                          {label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-
-                {/* Price Range Filter */}
-                <Select 
-                  value={search.filters.selectedPriceRange} 
-                  onValueChange={handlePriceRangeChange}
-                >
-                  <SelectTrigger className="w-auto min-w-[130px] h-11 border-gray-200 bg-gray-50 hover:bg-gray-100 rounded-lg shadow-sm transition-all duration-200 hover:shadow-md focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
-                    <SelectValue placeholder="Any" />
-                  </SelectTrigger>
-                  <SelectContent className="border-gray-200 shadow-lg">
-                    <SelectItem value="any" className="hover:bg-gray-50">Any</SelectItem>
-                    {Object.entries(PRICE_RANGES).map(([key, label]) => (
-                      <SelectItem key={key} value={key} className="hover:bg-gray-50">
-                        {label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Active Filter Tags and Clear All */}
-              <div className="lg:flex-shrink-0">
-                <ActiveFilters
-                  filters={search.filters}
-                  onClearFilter={search.clearFilter}
-                  onClearAll={search.clearAllFilters}
-                  hasActiveFilters={search.hasActiveFilters}
-                  getFilterDisplayValue={search.getFilterDisplayValue}
-                  getSubTypes={search.getSubTypes}
-                />
-              </div>
+              {/* Price Range Filter */}
+              <Select 
+                value={search.filters.selectedPriceRange} 
+                onValueChange={handlePriceRangeChange}
+              >
+                <SelectTrigger className="w-auto min-w-[130px] h-11 border-gray-200 bg-gray-50 hover:bg-gray-100 rounded-lg shadow-sm transition-all duration-200 hover:shadow-md focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
+                  <SelectValue placeholder="All Price Ranges" />
+                </SelectTrigger>
+                <SelectContent className="border-gray-200 shadow-lg">
+                  <SelectItem value="any" className="hover:bg-gray-50">All Price Ranges</SelectItem>
+                  {Object.entries(PRICE_RANGES).map(([key, label]) => (
+                    <SelectItem key={key} value={key} className="hover:bg-gray-50">
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </div>

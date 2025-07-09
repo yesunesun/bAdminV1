@@ -19,15 +19,12 @@ interface PropertyMapHomeViewProps {
   onFavoriteAction?: (propertyId: string) => boolean;
 }
 
-// Updated to use SearchResult consistently for map rendering
-type PropertyData = SearchResult;
-
 const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAction }) => {
   // Configuration hook for getting configurable values
-  const { getDefaultPropertyListCount } = useAppConfig();
+  const { getDefaultPropertyListCount, loading: configLoading } = useAppConfig();
   
-  // Get the property count value once and memoize it
-  const propertyListCount = useMemo(() => getDefaultPropertyListCount, [getDefaultPropertyListCount]);
+  // Use the property count value directly (it's already memoized in useAppConfig)
+  const propertyListCount = getDefaultPropertyListCount;
   
   // Favorites state management
   const [favoriteProperties, setFavoriteProperties] = useState<Set<string>>(new Set());
@@ -42,7 +39,7 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
   const [searchTotalCount, setSearchTotalCount] = useState<number>(0);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [currentFilters, setCurrentFilters] = useState<SearchFilters | null>(null);
-  const [activeProperty, setActiveProperty] = useState<PropertyData | null>(null);
+  const [activeProperty, setActiveProperty] = useState<SearchResult | null>(null);
   const [hoveredProperty, setHoveredProperty] = useState<string | null>(null);
 
   // Use the centralized Google Maps loading hook
@@ -52,6 +49,12 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
   useEffect(() => {
     const loadLatestProperties = async () => {
       console.log('🏠 Loading latest properties on homepage mount...');
+      console.log('🔧 Property count check:', { 
+        propertyListCount, 
+        isValid: propertyListCount > 0, 
+        configLoading,
+        shouldLoad: !configLoading && propertyListCount > 0 
+      });
       setSearchLoading(true);
       
       try {
@@ -66,6 +69,14 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
         // Get latest properties using the SQL function with configurable count
         console.log(`🔍 Calling getLatestProperties with count: ${propertyListCount}...`);
         const response = await searchService.getLatestProperties(propertyListCount);
+        
+        console.log('📊 Raw response from getLatestProperties:', {
+          hasResults: !!response.results,
+          resultCount: response.results?.length || 0,
+          totalCount: response.totalCount,
+          page: response.page,
+          limit: response.limit
+        });
         
         console.log('🏠 Latest properties loaded:', response);
         console.log('🗺️ First property coordinates check:', {
@@ -113,12 +124,24 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
       }
     };
     
-    // Only load if we have a valid property count (avoid loading during config initialization)
-    if (propertyListCount > 0) {
+    console.log('🔄 useEffect triggered - checking loading conditions:', {
+      configLoading,
+      propertyListCount,
+      shouldLoad: !configLoading && propertyListCount > 0
+    });
+
+    // Only load if config is ready and we have a valid property count
+    if (!configLoading && propertyListCount > 0) {
+      console.log('✅ Conditions met - scheduling property load in 100ms');
       const timeoutId = setTimeout(loadLatestProperties, 100);
       return () => clearTimeout(timeoutId);
+    } else if (!configLoading && propertyListCount <= 0) {
+      console.warn('⚠️ Config loaded but propertyListCount is invalid:', propertyListCount);
+      setSearchLoading(false); // Stop loading spinner if config is invalid
+    } else if (configLoading) {
+      console.log('⏳ Config still loading, waiting...');
     }
-  }, [propertyListCount, toast]); // Use memoized propertyListCount instead of function
+  }, [propertyListCount, configLoading, toast]); // Include configLoading in dependencies
   
   // Handle property hover
   const handlePropertyHover = useCallback((propertyId: string, isHovering: boolean) => {
@@ -506,7 +529,7 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
               <div className="h-full rounded-2xl overflow-hidden shadow-lg border border-border/50 bg-card">
                 {mapsLoaded ? (
                   <MapPanel
-                    properties={searchProperties} // CRITICAL: Passing SearchResult[] with coordinates
+                    properties={searchProperties} // CRITICAL: Passing SearchResult[] with coordinates (latitude, longitude)
                     isLoaded={mapsLoaded}
                     loadError={loadError}
                     activeProperty={activeProperty}
