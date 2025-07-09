@@ -497,14 +497,19 @@ export class SearchService {
   }
 
   /**
-   * FIXED: Search all property types with proper p_subtype filtering for Buy/Rent
-   * This method now ensures that when "Rent + Any" is selected, only rental properties are returned
+   * FIXED: Search all property types with proper pagination support
+   * This method now ensures proper pagination works for combined search results
    */
   private async searchAllPropertyTypes(filters: SearchFilters, options: SearchOptions): Promise<DatabaseSearchResult[]> {
     const searchParams = this.buildSearchParams(filters, options);
-    const limit = Math.floor((searchParams.p_limit || 50) / 3);
+    const requestedLimit = searchParams.p_limit || 50;
+    const requestedOffset = searchParams.p_offset || 0;
     
     try {
+      // For pagination to work correctly with combined results, we need to fetch enough data
+      // to have sufficient results after combining and sorting
+      const fetchLimit = Math.max(requestedLimit * 2, 100); // Fetch extra data to ensure we have enough for pagination
+      
       // FIXED: Pass p_subtype to all three searches to ensure Buy/Rent filtering works for "Any" property type
       const [residentialResult, commercialResult, landResult] = await Promise.allSettled([
         supabase.rpc('search_residential_properties', {
@@ -519,8 +524,8 @@ export class SearchService {
           p_bathrooms: searchParams.p_bathrooms,
           p_area_min: searchParams.p_area_min,
           p_area_max: searchParams.p_area_max,
-          p_limit: limit,
-          p_offset: 0
+          p_limit: fetchLimit,
+          p_offset: 0 // Always start from 0 and apply pagination after combining
         }),
         supabase.rpc('search_commercial_properties', {
           p_subtype: searchParams.p_subtype, // CRITICAL: Pass rent/sale filter
@@ -532,8 +537,8 @@ export class SearchService {
           p_state: searchParams.p_state,
           p_area_min: searchParams.p_area_min,
           p_area_max: searchParams.p_area_max,
-          p_limit: limit,
-          p_offset: 0
+          p_limit: fetchLimit,
+          p_offset: 0 // Always start from 0 and apply pagination after combining
         }),
         // CONDITIONAL: Only search land properties if Buy is selected (land is only for sale)
         ...(searchParams.p_subtype === 'sale' || !searchParams.p_subtype ? [
@@ -546,8 +551,8 @@ export class SearchService {
             p_state: searchParams.p_state,
             p_area_min: searchParams.p_area_min,
             p_area_max: searchParams.p_area_max,
-            p_limit: limit,
-            p_offset: 0
+            p_limit: fetchLimit,
+            p_offset: 0 // Always start from 0 and apply pagination after combining
           })
         ] : [])
       ]);
@@ -574,15 +579,18 @@ export class SearchService {
         totalCount += landData[0]?.total_count || 0;
       }
 
-      // Sort by created_at desc
+      // Sort by created_at desc to ensure consistent ordering
       combinedResults.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
+      // CRITICAL FIX: Apply pagination to the combined and sorted results
+      const paginatedResults = combinedResults.slice(requestedOffset, requestedOffset + requestedLimit);
+
       // Set total count on first result for consistency
-      if (combinedResults.length > 0) {
-        combinedResults[0].total_count = totalCount;
+      if (paginatedResults.length > 0) {
+        paginatedResults[0].total_count = totalCount;
       }
       
-      return combinedResults;
+      return paginatedResults;
       
     } catch (error) {
       throw error;
