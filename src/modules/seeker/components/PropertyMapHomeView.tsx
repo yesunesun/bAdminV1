@@ -187,17 +187,27 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
 
   // Helper function to check if all filters are empty/default
   const areFiltersEmpty = (searchFilters: SearchFilters): boolean => {
-    return !searchFilters.searchQuery && 
+    const isEmpty = !searchFilters.searchQuery && 
            (!searchFilters.selectedLocation || searchFilters.selectedLocation === 'any') &&
            (!searchFilters.actionType || searchFilters.actionType === 'any') && 
            (!searchFilters.selectedPropertyType || searchFilters.selectedPropertyType === 'any') && 
            (!searchFilters.selectedSubType || searchFilters.selectedSubType === 'any') && 
            (!searchFilters.selectedBHK || searchFilters.selectedBHK === 'any') && 
            (!searchFilters.selectedPriceRange || searchFilters.selectedPriceRange === 'any');
+    
+    console.log('🔍 areFiltersEmpty check:', {
+      searchFilters,
+      isEmpty,
+      actionType: searchFilters.actionType,
+      selectedPropertyType: searchFilters.selectedPropertyType
+    });
+    
+    return isEmpty;
   };
 
   // ENHANCED: Handle search from SearchContainer with 6-character property code detection
   const handleSearchFromContainer = useCallback(async (searchFilters: SearchFilters) => {
+    console.log('🚀 handleSearchFromContainer called with filters:', searchFilters);
     setSearchLoading(true);
     setCurrentPage(1); // Reset to first page for new search
     

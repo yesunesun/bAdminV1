@@ -379,13 +379,21 @@ export class SearchService {
     const searchId = searchPerformanceMonitor.start(filters);
     
     try {
-      const propertyType = filters.selectedPropertyType || 'residential';
-      const transactionType = (filters as any).transactionType; // Get the mapped transaction type
+      const propertyType = filters.selectedPropertyType || 'any';
+      const transactionType = (filters as any).transactionType; // Get the transaction type (buy/rent)
+      
+      console.log('🔍 SearchService.search called with:', {
+        propertyType,
+        transactionType,
+        selectedPropertyType: filters.selectedPropertyType,
+        transactionType: (filters as any).transactionType
+      });
       
       let searchResults: DatabaseSearchResult[] = [];
       let totalCount = 0;
       
       if (propertyType === 'any' || !propertyType) {
+        console.log('🌐 Calling searchAllPropertyTypes with filters:', filters);
         searchResults = await this.searchAllPropertyTypes(filters, options);
         totalCount = searchResults[0]?.total_count || 0;
       } else {
@@ -505,78 +513,122 @@ export class SearchService {
     const requestedLimit = searchParams.p_limit || 50;
     const requestedOffset = searchParams.p_offset || 0;
     
+    console.log('🔍 searchAllPropertyTypes called with searchParams:', {
+      p_subtype: searchParams.p_subtype,
+      transactionType: (filters as any).transactionType,
+      selectedPropertyType: filters.selectedPropertyType
+    });
+    
     try {
       // For pagination to work correctly with combined results, we need to fetch enough data
       // to have sufficient results after combining and sorting
       const fetchLimit = Math.max(requestedLimit * 2, 100); // Fetch extra data to ensure we have enough for pagination
       
       // FIXED: Pass p_subtype to all three searches to ensure Buy/Rent filtering works for "Any" property type
-      const [residentialResult, commercialResult, landResult] = await Promise.allSettled([
-        supabase.rpc('search_residential_properties', {
-          p_subtype: searchParams.p_subtype, // CRITICAL: Pass rent/sale filter
+      console.log('🔍 About to search property types with params:', {
+        p_subtype: searchParams.p_subtype,
+        willSearchLand: searchParams.p_subtype === 'sale' || !searchParams.p_subtype
+      });
+      
+      const residentialParams = {
+        p_subtype: searchParams.p_subtype, // CRITICAL: Pass rent/sale filter
+        p_property_subtype: searchParams.p_property_subtype,
+        p_search_query: searchParams.p_search_query,
+        p_city: searchParams.p_city,
+        p_state: searchParams.p_state,
+        p_min_price: searchParams.p_min_price,
+        p_max_price: searchParams.p_max_price,
+        p_bedrooms: searchParams.p_bedrooms,
+        p_bathrooms: searchParams.p_bathrooms,
+        p_area_min: searchParams.p_area_min,
+        p_area_max: searchParams.p_area_max,
+        p_limit: fetchLimit,
+        p_offset: 0 // Always start from 0 and apply pagination after combining
+      };
+
+      const commercialParams = {
+        p_subtype: searchParams.p_subtype, // CRITICAL: Pass rent/sale filter
+        p_property_subtype: searchParams.p_property_subtype,
+        p_search_query: searchParams.p_search_query,
+        p_min_price: searchParams.p_min_price,
+        p_max_price: searchParams.p_max_price,
+        p_city: searchParams.p_city,
+        p_state: searchParams.p_state,
+        p_area_min: searchParams.p_area_min,
+        p_area_max: searchParams.p_area_max,
+        p_limit: fetchLimit,
+        p_offset: 0 // Always start from 0 and apply pagination after combining
+      };
+
+      console.log('🏠 Residential search params:', residentialParams);
+      console.log('🏢 Commercial search params:', commercialParams);
+
+      const searches = [
+        supabase.rpc('search_residential_properties', residentialParams),
+        supabase.rpc('search_commercial_properties', commercialParams)
+      ];
+      
+      // CONDITIONAL: Only search land properties if Buy is selected (land is only for sale)
+      if (searchParams.p_subtype === 'sale' || !searchParams.p_subtype) {
+        console.log('🌍 Adding land search to query');
+        
+        const landParams = {
           p_property_subtype: searchParams.p_property_subtype,
           p_search_query: searchParams.p_search_query,
-          p_city: searchParams.p_city,
-          p_state: searchParams.p_state,
           p_min_price: searchParams.p_min_price,
           p_max_price: searchParams.p_max_price,
-          p_bedrooms: searchParams.p_bedrooms,
-          p_bathrooms: searchParams.p_bathrooms,
+          p_city: searchParams.p_city,
+          p_state: searchParams.p_state,
           p_area_min: searchParams.p_area_min,
           p_area_max: searchParams.p_area_max,
           p_limit: fetchLimit,
           p_offset: 0 // Always start from 0 and apply pagination after combining
-        }),
-        supabase.rpc('search_commercial_properties', {
-          p_subtype: searchParams.p_subtype, // CRITICAL: Pass rent/sale filter
-          p_property_subtype: searchParams.p_property_subtype,
-          p_search_query: searchParams.p_search_query,
-          p_min_price: searchParams.p_min_price,
-          p_max_price: searchParams.p_max_price,
-          p_city: searchParams.p_city,
-          p_state: searchParams.p_state,
-          p_area_min: searchParams.p_area_min,
-          p_area_max: searchParams.p_area_max,
-          p_limit: fetchLimit,
-          p_offset: 0 // Always start from 0 and apply pagination after combining
-        }),
-        // CONDITIONAL: Only search land properties if Buy is selected (land is only for sale)
-        ...(searchParams.p_subtype === 'sale' || !searchParams.p_subtype ? [
-          supabase.rpc('search_land_properties', {
-            p_property_subtype: searchParams.p_property_subtype,
-            p_search_query: searchParams.p_search_query,
-            p_min_price: searchParams.p_min_price,
-            p_max_price: searchParams.p_max_price,
-            p_city: searchParams.p_city,
-            p_state: searchParams.p_state,
-            p_area_min: searchParams.p_area_min,
-            p_area_max: searchParams.p_area_max,
-            p_limit: fetchLimit,
-            p_offset: 0 // Always start from 0 and apply pagination after combining
-          })
-        ] : [])
-      ]);
+        };
+        
+        console.log('🌍 Land search params:', landParams);
+        
+        searches.push(
+          supabase.rpc('search_land_properties', landParams)
+        );
+      } else {
+        console.log('🌍 Skipping land search (not for sale)');
+      }
+      
+      const [residentialResult, commercialResult, landResult] = await Promise.allSettled(searches);
 
       let combinedResults: DatabaseSearchResult[] = [];
       let totalCount = 0;
 
       if (residentialResult.status === 'fulfilled' && residentialResult.value.data) {
         const resData = residentialResult.value.data;
+        console.log('🏠 Residential search results:', resData.length, 'properties');
         combinedResults.push(...resData);
         totalCount += resData[0]?.total_count || 0;
+      } else if (residentialResult.status === 'rejected') {
+        console.log('❌ Residential search failed:', residentialResult.reason);
       }
 
-      if (commercialResult.status === 'fulfilled' && commercialResult.value.data) {
+      if (commercialResult && commercialResult.status === 'fulfilled' && commercialResult.value.data) {
         const comData = commercialResult.value.data;
+        console.log('🏢 Commercial search results:', comData.length, 'properties');
         combinedResults.push(...comData);
         totalCount += comData[0]?.total_count || 0;
+      } else if (commercialResult && commercialResult.status === 'rejected') {
+        console.log('❌ Commercial search failed:', commercialResult.reason);
+      } else if (commercialResult && commercialResult.status === 'fulfilled' && !commercialResult.value.data) {
+        console.log('🏢 Commercial search returned no data');
       }
 
       // Only process land results if they were searched (Buy or Any)
       if (landResult && landResult.status === 'fulfilled' && landResult.value.data) {
         const landData = landResult.value.data;
+        console.log('🌍 Land search results:', landData.length, 'properties');
         combinedResults.push(...landData);
         totalCount += landData[0]?.total_count || 0;
+      } else if (landResult && landResult.status === 'rejected') {
+        console.log('❌ Land search failed:', landResult.reason);
+      } else if (landResult && landResult.status === 'fulfilled' && !landResult.value.data) {
+        console.log('🌍 Land search returned no data');
       }
 
       // Sort by created_at desc to ensure consistent ordering
