@@ -48,44 +48,14 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
   // Load latest properties on component mount (DEFAULT BEHAVIOR)
   useEffect(() => {
     const loadLatestProperties = async () => {
-      console.log('🏠 Loading latest properties on homepage mount...');
-      console.log('🔧 Property count check:', { 
-        propertyListCount, 
-        isValid: propertyListCount > 0, 
-        configLoading,
-        shouldLoad: !configLoading && propertyListCount > 0 
-      });
       setSearchLoading(true);
       
       try {
         // Import searchService dynamically to avoid circular imports
-        console.log('📦 Importing searchService...');
         const { searchService } = await import('@/components/Search/services/searchService');
-        console.log('✅ SearchService imported successfully');
-        
-        // Use the memoized property count
-        console.log(`🔧 Using configurable property count: ${propertyListCount}`);
         
         // Get latest properties using the SQL function with configurable count
-        console.log(`🔍 Calling getLatestProperties with count: ${propertyListCount}...`);
         const response = await searchService.getLatestProperties(propertyListCount);
-        
-        console.log('📊 Raw response from getLatestProperties:', {
-          hasResults: !!response.results,
-          resultCount: response.results?.length || 0,
-          totalCount: response.totalCount,
-          page: response.page,
-          limit: response.limit
-        });
-        
-        console.log('🏠 Latest properties loaded:', response);
-        console.log('🗺️ First property coordinates check:', {
-          firstPropertyId: response.results?.[0]?.id,
-          hasLatitude: response.results?.[0]?.latitude !== undefined,
-          hasLongitude: response.results?.[0]?.longitude !== undefined,
-          latitude: response.results?.[0]?.latitude,
-          longitude: response.results?.[0]?.longitude
-        });
         
         // Update search state with latest properties
         setSearchProperties(response.results || []);
@@ -95,17 +65,7 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
         setCurrentPage(1);
         setCurrentFilters(null); // No filters for latest properties
         
-        console.log(`✅ Homepage initialized with ${response.results?.length || 0} latest properties (config: ${propertyListCount})`);
-        console.log(`🗺️ Properties with coordinates: ${response.results?.filter(p => p.latitude && p.longitude).length || 0}`);
-        
       } catch (error) {
-        console.error('❌ Failed to load latest properties:', error);
-        console.error('❌ Error details:', {
-          message: error.message,
-          stack: error.stack,
-          name: error.name
-        });
-        
         // Set empty state on error but don't show error toast immediately
         setSearchProperties([]);
         setSearchTotalCount(0);
@@ -123,23 +83,12 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
         setSearchLoading(false);
       }
     };
-    
-    console.log('🔄 useEffect triggered - checking loading conditions:', {
-      configLoading,
-      propertyListCount,
-      shouldLoad: !configLoading && propertyListCount > 0
-    });
-
     // Only load if config is ready and we have a valid property count
     if (!configLoading && propertyListCount > 0) {
-      console.log('✅ Conditions met - scheduling property load in 100ms');
       const timeoutId = setTimeout(loadLatestProperties, 100);
       return () => clearTimeout(timeoutId);
     } else if (!configLoading && propertyListCount <= 0) {
-      console.warn('⚠️ Config loaded but propertyListCount is invalid:', propertyListCount);
       setSearchLoading(false); // Stop loading spinner if config is invalid
-    } else if (configLoading) {
-      console.log('⏳ Config still loading, waiting...');
     }
   }, [propertyListCount, configLoading, toast]); // Include configLoading in dependencies
   
@@ -159,15 +108,11 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
       setIsLoadingFavorites(true);
       try {
         const favorites = await getUserFavorites();
-        console.log('Loaded favorites:', favorites);
         
         // Extract IDs into a Set for efficient lookup
         const favoriteIds = new Set(favorites.map(property => property.id));
         setFavoriteProperties(favoriteIds);
-        
-        console.log('Favorite IDs:', Array.from(favoriteIds));
       } catch (error) {
-        console.error('Error fetching user favorites:', error);
         toast({
           title: "Couldn't load favorites",
           description: "There was a problem loading your favorites",
@@ -194,8 +139,6 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
     }
     
     try {
-      console.log(`Toggling property ${propertyId} to ${isLiked ? 'liked' : 'not liked'}`);
-      
       // Toggle the favorite in the database
       const result = await togglePropertyLike(propertyId, isLiked);
       
@@ -232,7 +175,6 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
         return false;
       }
     } catch (error) {
-      console.error('Error toggling favorite:', error);
       toast({
         title: "Error",
         description: "Something went wrong. Please try again.",
@@ -256,8 +198,6 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
 
   // ENHANCED: Handle search from SearchContainer with 6-character property code detection
   const handleSearchFromContainer = useCallback(async (searchFilters: SearchFilters) => {
-    console.log('PropertyMapHomeView: Search initiated from SearchContainer with filters:', searchFilters);
-    
     setSearchLoading(true);
     setCurrentPage(1); // Reset to first page for new search
     
@@ -271,26 +211,16 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
       let response;
       
       if (filtersEmpty) {
-        console.log('🏠 Empty filters detected - loading default latest properties...');
-        // Use the memoized property count for default load
-        console.log(`🔧 Using configurable property count for default load: ${propertyListCount}`);
-        
         // Load default latest properties when filters are empty (including when cleared)
         response = await searchService.getLatestProperties(propertyListCount);
         setCurrentFilters(null); // No filters for latest properties
       } else {
-        console.log('🔍 Performing filtered search...');
-        
         // Store current filters for pagination
         setCurrentFilters(searchFilters);
-        
-        // Use the memoized property count for search results
-        console.log(`🔧 Using configurable property count for search: ${propertyListCount}`);
         
         // ADDED: Check if search query looks like a 6-character property code
         const query = searchFilters.searchQuery?.trim();
         if (query && searchService.isPropertyCode(query)) {
-          console.log('🎯 Detected 6-character property code, using smart search');
           // Use smart search which tries code search first, then falls back to regular search
           
           // Transform actionType to transactionType for backend compatibility
@@ -305,8 +235,6 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
             limit: propertyListCount
           });
         } else {
-          console.log('🔍 Using regular search (not a 6-character property code)');
-          
           // Transform actionType to transactionType for backend compatibility
           const backendFilters = {
             ...searchFilters,
@@ -321,18 +249,6 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
           });
         }
       }
-      
-      console.log('PropertyMapHomeView: Search response:', response);
-      console.log('🗺️ Search results coordinates check:', {
-        totalResults: response.results?.length || 0,
-        resultsWithCoordinates: response.results?.filter(p => p.latitude && p.longitude).length || 0,
-        firstResultCoords: response.results?.[0] ? {
-          id: response.results[0].id,
-          lat: response.results[0].latitude,
-          lng: response.results[0].longitude
-        } : 'None'
-      });
-      
       // Update search state
       setSearchProperties(response.results || []);
       setSearchTotalCount(response.totalCount || 0);
@@ -345,14 +261,9 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
           description: filtersEmpty ? "No properties available" : "Try adjusting your search filters",
           duration: 3000,
         });
-      } else {
-        const resultType = filtersEmpty ? 'latest properties' : 'search results';
-        const coordCount = response.results?.filter(p => p.latitude && p.longitude).length || 0;
-        console.log(`✅ ${resultType} loaded: ${response.results?.length || 0} properties found (${coordCount} with coordinates)`);
       }
       
     } catch (error) {
-      console.error('PropertyMapHomeView: Search failed:', error);
       setSearchProperties([]);
       setSearchTotalCount(0);
       
@@ -373,24 +284,18 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
       return; // Already loading or no more items
     }
 
-    console.log('🔄 Loading more properties...');
     setLoadingMore(true);
     
     try {
       const { searchService } = await import('@/components/Search/services/searchService');
       const nextPage = currentPage + 1;
       
-      // Use the memoized property count for load more
-      console.log(`🔧 Using configurable property count for load more: ${propertyListCount}`);
-      
       let response;
       
       if (!currentFilters) {
         // Loading more latest properties
-        console.log('🏠 Loading more latest properties...');
         response = await searchService.getLatestProperties(propertyListCount, (nextPage - 1) * propertyListCount); // offset calculation
       } else {
-        console.log('🔍 Loading more search results...');
         
         // Check if search query looks like a 6-character property code
         const query = currentFilters.searchQuery?.trim();
@@ -420,9 +325,6 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
           });
         }
       }
-      
-      console.log('🏠 Load more response:', response);
-      
       if (response.results && response.results.length > 0) {
         // Append new properties to existing list
         setSearchProperties(prev => [...prev, ...response.results]);
@@ -435,8 +337,6 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
           description: `${response.results.length} more properties loaded (${coordCount} with coordinates)`,
           duration: 2000,
         });
-        
-        console.log(`✅ Loaded ${response.results.length} more properties. Total: ${searchProperties.length + response.results.length} (${coordCount} new with coordinates)`);
       } else {
         toast({
           title: "No more properties",
@@ -446,7 +346,6 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
       }
       
     } catch (error) {
-      console.error('❌ Failed to load more properties:', error);
       toast({
         title: "Load More Failed",
         description: "Unable to load more properties. Please try again.",

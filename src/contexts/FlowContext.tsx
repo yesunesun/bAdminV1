@@ -28,12 +28,7 @@ export const FlowProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }
   const [isValidFlow, setIsValidFlow] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Enhanced logging for debugging
-  console.log('[FlowContext] Provider rendered with:', {
-    'useParams()': params,
-    'pathname': location.pathname,
-    'search': location.search
-  });
+  // Provider initialization
 
   // Mapping for URL-friendly types to display names
   const URL_TYPE_MAPPINGS: Record<string, string> = {
@@ -51,19 +46,15 @@ export const FlowProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }
 
   // Function to extract category and type from URL path directly
   const extractParamsFromPath = (pathname: string): { category: string | null, type: string | null } => {
-    console.log('[FlowContext] Extracting params from path:', pathname);
-    
     // Match pattern: /properties/list/{category}/{type}[/{step}]
     const pathRegex = /\/properties\/list\/([^\/]+)\/([^\/]+)(?:\/([^\/]+))?/;
     const match = pathname.match(pathRegex);
     
     if (match) {
       const [, category, type] = match;
-      console.log('[FlowContext] ✅ Extracted from URL:', { category, type });
       return { category, type };
     }
     
-    console.log('[FlowContext] ❌ No match found in path');
     return { category: null, type: null };
   };
 
@@ -71,8 +62,6 @@ export const FlowProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }
   const getFlowTypeFromParams = (category: string, listingType: string): string | null => {
     const normalizedCategory = category.toLowerCase();
     const normalizedType = listingType.toLowerCase();
-
-    console.log('[FlowContext] getFlowTypeFromParams:', { category, listingType, normalizedCategory, normalizedType });
 
     // Direct mapping based on category and listing type
     if (normalizedCategory === 'residential') {
@@ -86,7 +75,6 @@ export const FlowProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }
         case 'flatmates':
           return FLOW_TYPES.RESIDENTIAL_FLATMATES;
         default:
-          console.warn('[FlowContext] Unknown residential type:', normalizedType);
           return null;
       }
     } else if (normalizedCategory === 'commercial') {
@@ -98,7 +86,6 @@ export const FlowProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }
         case 'coworking':
           return FLOW_TYPES.COMMERCIAL_COWORKING;
         default:
-          console.warn('[FlowContext] Unknown commercial type:', normalizedType);
           return null;
       }
     } else if (normalizedCategory === 'land') {
@@ -106,61 +93,39 @@ export const FlowProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }
         case 'sale':
           return FLOW_TYPES.LAND_SALE;
         default:
-          console.warn('[FlowContext] Unknown land type:', normalizedType);
           return null;
       }
     }
 
-    console.warn('[FlowContext] Unknown category:', normalizedCategory);
     return null;
   };
 
   // Update flow type when URL parameters change
   useEffect(() => {
-    console.log('[FlowContext] useEffect triggered - URL changed:', location.pathname);
-    
     setIsLoading(true);
 
     // Try to get parameters from useParams first
     let category = params.category;
     let type = params.type;
-    
-    console.log('[FlowContext] useParams result:', { category, type });
 
     // If useParams doesn't work, parse URL directly
     if (!category || !type) {
-      console.log('[FlowContext] useParams failed, parsing URL directly...');
       const extracted = extractParamsFromPath(location.pathname);
       category = extracted.category;
       type = extracted.type;
-      console.log('[FlowContext] Direct parsing result:', { category, type });
     }
 
     if (category && type) {
       const detectedFlowType = getFlowTypeFromParams(category, type);
       
-      console.log('[FlowContext] Flow detection result:', {
-        category,
-        type,
-        detectedFlowType,
-        availableFlowTypes: Object.values(FLOW_TYPES)
-      });
-      
       if (detectedFlowType) {
         setFlowType(detectedFlowType);
         setIsValidFlow(true);
-        console.log('[FlowContext] ✅ Valid flow detected:', {
-          category,
-          type,
-          flowType: detectedFlowType
-        });
       } else {
-        console.warn('[FlowContext] ❌ Invalid flow combination:', { category, type });
         setFlowType('');
         setIsValidFlow(false);
       }
     } else {
-      console.log('[FlowContext] ⚠️ Missing URL parameters - showing type selection');
       setFlowType('');
       setIsValidFlow(false);
     }
@@ -170,38 +135,20 @@ export const FlowProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }
 
   // Function to set flow and navigate
   const setFlow = (newCategory: string, newListingType: string) => {
-    console.log('[FlowContext] setFlow called:', { newCategory, newListingType });
-    
     // Convert display names to URL-friendly names if needed
     const urlFriendlyType = DISPLAY_TO_URL_MAPPINGS[newListingType] || newListingType.toLowerCase();
-    
-    console.log('[FlowContext] URL-friendly type conversion:', {
-      original: newListingType,
-      urlFriendly: urlFriendlyType
-    });
     
     // Validate the combination before navigating
     const testFlowType = getFlowTypeFromParams(newCategory, urlFriendlyType);
     
     if (testFlowType) {
       const newPath = `/properties/list/${newCategory.toLowerCase()}/${urlFriendlyType}/details`;
-      console.log('[FlowContext] 🚀 Navigating to:', newPath);
-      console.log('[FlowContext] Current location before navigation:', location.pathname);
-      
       navigate(newPath);
-      
-      // Log after navigation attempt
-      setTimeout(() => {
-        console.log('[FlowContext] Location after navigation attempt:', window.location.pathname);
-      }, 100);
-    } else {
-      console.error('[FlowContext] ❌ Invalid flow combination, cannot navigate:', { newCategory, newListingType });
     }
   };
 
   // Function to redirect to property selection
   const redirectToPropertySelection = () => {
-    console.log('[FlowContext] Redirecting to property selection');
     navigate('/properties/list');
   };
 
@@ -239,8 +186,6 @@ export const FlowProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }
     isLoading,
     redirectToPropertySelection
   };
-
-  console.log('[FlowContext] Providing context value:', contextValue);
 
   return (
     <FlowContext.Provider value={contextValue}>

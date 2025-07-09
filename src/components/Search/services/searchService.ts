@@ -113,8 +113,6 @@ export class SearchService {
     const searchId = searchPerformanceMonitor.start({} as SearchFilters);
     
     try {
-      console.log('🔍 Searching property by code:', code, 'insensitive:', useInsensitiveSearch);
-      
       // Validate input
       if (!code || code.trim() === '') {
         throw new Error('Property code cannot be empty');
@@ -132,20 +130,11 @@ export class SearchService {
       });
       
       if (error) {
-        console.error('❌ search_property_by_code error:', error);
         throw new Error(`Failed to search property by code: ${error.message}`);
       }
       
       const searchResults = data || [];
       const totalCount = searchResults[0]?.total_count || searchResults.length;
-      
-      console.log('📊 Property code search results:', {
-        code: trimmedCode,
-        resultCount: searchResults.length,
-        totalCount: totalCount,
-        foundProperty: searchResults.length > 0 ? searchResults[0].title : 'None',
-        hasCoordinates: searchResults.length > 0 && searchResults[0].latitude && searchResults[0].longitude ? 'YES' : 'NO'
-      });
 
       // Transform results using the updated transformation logic
       let transformedResults = this.transformDatabaseResults(searchResults);
@@ -181,15 +170,12 @@ export class SearchService {
     
     // Must be exactly 6 characters
     if (trimmedQuery.length !== 6) {
-      console.log(`🔍 Query "${trimmedQuery}" is ${trimmedQuery.length} chars, not 6 - not a property code`);
       return false;
     }
     
     // Must be alphanumeric only (letters and numbers, no special characters)
     const alphanumericPattern = /^[A-Za-z0-9]{6}$/;
     const isValidCode = alphanumericPattern.test(trimmedQuery);
-    
-    console.log(`🔍 Query "${trimmedQuery}" alphanumeric check: ${isValidCode ? 'PASS' : 'FAIL'} - ${isValidCode ? 'IS' : 'NOT'} a property code`);
     
     return isValidCode;
   }
@@ -203,23 +189,16 @@ export class SearchService {
     
     // If query is exactly a 6-character alphanumeric code, try code search first
     if (query && this.isPropertyCode(query)) {
-      console.log('🎯 Detected 6-character property code, trying code search first:', query);
-      
       try {
         const codeResults = await this.searchByCode(query, true);
         
         // If we found results, return them
         if (codeResults.results.length > 0) {
-          console.log('✅ Found property by code, returning results');
           return codeResults;
         }
-        
-        console.log('ℹ️ No results by code, falling back to regular search');
       } catch (error) {
-        console.log('⚠️ Code search failed, falling back to regular search:', error);
+        // Fall back to regular search on error
       }
-    } else if (query) {
-      console.log(`🔍 Query "${query}" does not match 6-character property code pattern, using regular search`);
     }
     
     // Fall back to regular search
@@ -233,11 +212,8 @@ export class SearchService {
     const searchId = searchPerformanceMonitor.start({} as SearchFilters);
     
     try {
-      console.log('🏠 Getting latest properties with limit:', limit, 'offset:', offset);
-      
       // Note: get_latest_properties function doesn't support offset parameter
       if (offset > 0) {
-        console.warn('⚠️ get_latest_properties does not support offset. Using fallback method for pagination.');
         // For pagination with offset, we need to use a different approach
         // For now, return empty results to prevent errors
         return {
@@ -254,25 +230,11 @@ export class SearchService {
       });
       
       if (error) {
-        console.error('❌ get_latest_properties error:', error);
         throw new Error(`Failed to get latest properties: ${error.message}`);
       }
       
       const searchResults = data || [];
       const totalCount = searchResults[0]?.total_count || searchResults.length;
-      
-      console.log('📊 Latest properties results:', {
-        resultCount: searchResults.length,
-        totalCount: totalCount,
-        offset: offset,
-        firstResultHasPrimaryImage: searchResults[0]?.primary_image ? 'YES' : 'NO',
-        firstResultHasCoordinates: searchResults[0]?.latitude && searchResults[0]?.longitude ? 'YES' : 'NO',
-        firstResult: searchResults[0] ? {
-          id: searchResults[0].id,
-          title: searchResults[0].title,
-          coordinates: `${searchResults[0].latitude}, ${searchResults[0].longitude}`
-        } : 'None'
-      });
 
       // Transform results using the updated transformation logic
       let transformedResults = this.transformDatabaseResults(searchResults);
@@ -300,59 +262,47 @@ export class SearchService {
    * This ensures Buy shows only Sale properties and Rent shows only Rental properties
    */
   private getFlowTypeFromTransactionAndProperty(transactionType: string | null, propertyType: string, subType?: string): string | null {
-    console.log('🔄 Mapping transaction and property to flow type:', { transactionType, propertyType, subType });
-    
     // Handle special subtypes first
     if (subType === 'pghostel' || subType === 'pg') {
-      console.log('✅ PG/Hostel subtype → residential_pghostel');
       return 'residential_pghostel';
     }
     
     if (subType === 'flatmates') {
-      console.log('✅ Flatmates subtype → residential_flatmates');
       return 'residential_flatmates';
     }
     
     if (subType === 'coworking') {
-      console.log('✅ Coworking subtype → commercial_coworking');
       return 'commercial_coworking';
     }
     
     // If no transaction type specified, return null to search all
     if (!transactionType) {
-      console.log('ℹ️ No transaction type specified → search all flow types');
       return null;
     }
     
     // Map transaction type + property type to specific flow types
     if (propertyType === 'residential' || !propertyType || propertyType === 'any') {
       if (transactionType === 'buy') {
-        console.log('✅ Buy + Residential → residential_sale');
         return 'residential_sale';
       } else if (transactionType === 'rent') {
-        console.log('✅ Rent + Residential → residential_rent');
         return 'residential_rent';
       }
     }
     
     if (propertyType === 'commercial') {
       if (transactionType === 'buy') {
-        console.log('✅ Buy + Commercial → commercial_sale');
         return 'commercial_sale';
       } else if (transactionType === 'rent') {
-        console.log('✅ Rent + Commercial → commercial_rent');
         return 'commercial_rent';
       }
     }
     
     if (propertyType === 'land') {
       // Land is always for sale (buy)
-      console.log('✅ Land property → land_sale');
       return 'land_sale';
     }
     
     // Default fallback
-    console.log('⚠️ No specific mapping found, using default');
     return transactionType === 'buy' ? 'residential_sale' : 'residential_rent';
   }
 
@@ -399,13 +349,8 @@ export class SearchService {
     const searchId = searchPerformanceMonitor.start(filters);
     
     try {
-      console.log('🔍 Starting search with filters:', filters);
-      console.log('🔧 Search options:', options);
-      
       const propertyType = filters.selectedPropertyType || 'residential';
       const transactionType = (filters as any).transactionType; // Get the mapped transaction type
-      
-      console.log('💡 Transaction type for filtering:', transactionType);
       
       let searchResults: DatabaseSearchResult[] = [];
       let totalCount = 0;
@@ -417,23 +362,12 @@ export class SearchService {
         const { data, error } = await this.callPropertySpecificSearch(propertyType, filters, options);
         
         if (error) {
-          console.error('❌ Database search error:', error);
           throw new Error(`Database search failed: ${error.message}`);
         }
         
         searchResults = data || [];
         totalCount = searchResults[0]?.total_count || 0;
       }
-
-      console.log('📊 Raw database results:', {
-        resultCount: searchResults.length,
-        totalCount: totalCount,
-        propertyType: propertyType,
-        transactionType: transactionType,
-        firstResultFlowType: searchResults[0]?.flow_type,
-        firstResultHasPrimaryImage: searchResults[0]?.primary_image ? 'YES' : 'NO',
-        firstResultHasCoordinates: searchResults[0]?.latitude && searchResults[0]?.longitude ? 'YES' : 'NO'
-      });
 
       // Transform results using the updated transformation logic
       let transformedResults = this.transformDatabaseResults(searchResults);
@@ -466,11 +400,8 @@ export class SearchService {
   ) {
     const searchParams = this.buildSearchParams(filters, options);
     
-    console.log('📡 Calling database search with params:', searchParams);
-    
     switch (propertyType) {
       case 'residential':
-        console.log('🏠 Calling search_residential_properties with params:', searchParams);
         return await supabase.rpc('search_residential_properties', {
           p_subtype: searchParams.p_subtype,
           p_property_subtype: searchParams.p_property_subtype,
@@ -488,7 +419,6 @@ export class SearchService {
         });
         
       case 'commercial':
-        console.log('🏢 Calling search_commercial_properties with params:', searchParams);
         return await supabase.rpc('search_commercial_properties', {
           p_subtype: searchParams.p_subtype,
           p_property_subtype: searchParams.p_property_subtype,
@@ -504,7 +434,6 @@ export class SearchService {
         });
         
       case 'land':
-        console.log('🌍 Calling search_land_properties with params:', searchParams);
         return await supabase.rpc('search_land_properties', {
           p_property_subtype: searchParams.p_property_subtype,
           p_search_query: searchParams.p_search_query,
@@ -519,7 +448,6 @@ export class SearchService {
         });
         
       default:
-        console.log('🏠 Defaulting to search_residential_properties');
         return await supabase.rpc('search_residential_properties', {
           p_subtype: searchParams.p_subtype,
           p_property_subtype: searchParams.p_property_subtype,
@@ -545,11 +473,6 @@ export class SearchService {
   private async searchAllPropertyTypes(filters: SearchFilters, options: SearchOptions): Promise<DatabaseSearchResult[]> {
     const searchParams = this.buildSearchParams(filters, options);
     const limit = Math.floor((searchParams.p_limit || 50) / 3);
-    
-    console.log('🌐 Searching all property types with CRITICAL p_subtype filter:', { 
-      p_subtype: searchParams.p_subtype,
-      note: 'This p_subtype will be passed to ALL property searches to ensure Buy/Rent filtering works'
-    });
     
     try {
       // FIXED: Pass p_subtype to all three searches to ensure Buy/Rent filtering works for "Any" property type
@@ -606,14 +529,12 @@ export class SearchService {
         const resData = residentialResult.value.data;
         combinedResults.push(...resData);
         totalCount += resData[0]?.total_count || 0;
-        console.log(`🏠 Residential results: ${resData.length} (with p_subtype: ${searchParams.p_subtype})`);
       }
 
       if (commercialResult.status === 'fulfilled' && commercialResult.value.data) {
         const comData = commercialResult.value.data;
         combinedResults.push(...comData);
         totalCount += comData[0]?.total_count || 0;
-        console.log(`🏢 Commercial results: ${comData.length} (with p_subtype: ${searchParams.p_subtype})`);
       }
 
       // Only process land results if they were searched (Buy or Any)
@@ -621,9 +542,6 @@ export class SearchService {
         const landData = landResult.value.data;
         combinedResults.push(...landData);
         totalCount += landData[0]?.total_count || 0;
-        console.log(`🌍 Land results: ${landData.length} (only searched for Buy/Any)`);
-      } else if (searchParams.p_subtype === 'rent') {
-        console.log(`🌍 Land results: 0 (skipped for Rent filter - land is only for sale)`);
       }
 
       // Sort by created_at desc
@@ -633,13 +551,10 @@ export class SearchService {
       if (combinedResults.length > 0) {
         combinedResults[0].total_count = totalCount;
       }
-
-      console.log(`📊 FINAL searchAllPropertyTypes results: ${combinedResults.length} total properties (p_subtype: ${searchParams.p_subtype})`);
       
       return combinedResults;
       
     } catch (error) {
-      console.error('Error in searchAllPropertyTypes:', error);
       throw error;
     }
   }
@@ -685,18 +600,14 @@ export class SearchService {
     // Handle special property types first (they override transaction type)
     if (filters.selectedPropertyType === 'pghostel' || filters.selectedSubType === 'pghostel') {
       params.p_subtype = 'pghostel';
-      console.log('✅ PG/Hostel property → p_subtype = "pghostel"');
     } else if (filters.selectedPropertyType === 'flatmates' || filters.selectedSubType === 'flatmates') {
       params.p_subtype = 'flatmates';
-      console.log('✅ Flatmates property → p_subtype = "flatmates"');
     } else if (transactionType) {
       // Handle regular Buy/Rent for other property types
       if (transactionType === 'buy') {
         params.p_subtype = 'sale';  // Buy = Sale properties
-        console.log('✅ Buy filter → p_subtype = "sale"');
       } else if (transactionType === 'rent') {
         params.p_subtype = 'rent';  // Rent = Rental properties
-        console.log('✅ Rent filter → p_subtype = "rent"');
       }
       // If transactionType is null (Any), don't set p_subtype to search all
     }
@@ -705,10 +616,8 @@ export class SearchService {
     if (filters.selectedSubType && filters.selectedSubType !== 'any') {
       if (filters.selectedSubType === 'pghostel') {
         params.p_subtype = 'pghostel';
-        console.log('✅ PG/Hostel subtype → p_subtype = "pghostel"');
       } else if (filters.selectedSubType === 'flatmates') {
         params.p_subtype = 'flatmates';
-        console.log('✅ Flatmates subtype → p_subtype = "flatmates"');
       }
     }
 
@@ -717,7 +626,6 @@ export class SearchService {
       const propertySubtype = this.getPropertySubtype(filters.selectedSubType);
       if (propertySubtype) {
         params.p_property_subtype = propertySubtype;
-        console.log('🔍 Property subtype parameter:', propertySubtype);
       }
     }
 
@@ -726,7 +634,6 @@ export class SearchService {
       const bhkNumber = this.extractBHKNumber(filters.selectedBHK);
       if (bhkNumber) {
         params.p_bedrooms = bhkNumber;
-        console.log('🏠 BHK filter applied:', bhkNumber);
       }
     }
 
@@ -736,11 +643,9 @@ export class SearchService {
       if (priceRange) {
         params.p_min_price = priceRange.min;
         params.p_max_price = priceRange.max;
-        console.log('💰 Price range filter applied:', priceRange);
       }
     }
 
-    console.log('🔧 Final search parameters:', params);
     return params;
   }
 
@@ -769,8 +674,6 @@ export class SearchService {
       // CRITICAL FIX: Extract and propagate coordinate data from database
       const latitude = dbResult.latitude || null;
       const longitude = dbResult.longitude || null;
-      
-      console.log(`🗺️ Transforming property ${dbResult.id}: flow_type = ${dbResult.flow_type}, transaction = ${transactionType}, coordinates = ${latitude && longitude ? `(${latitude}, ${longitude})` : 'NONE'}, primary_image = ${primaryImage}, code = ${propertyCode}`);
       
       return {
         id: dbResult.id,
@@ -940,7 +843,6 @@ export class SearchService {
       return suggestions.slice(0, 5);
         
     } catch (error) {
-      console.error('Error in getSearchSuggestions:', error);
       return [];
     }
   }
@@ -962,7 +864,7 @@ export class SearchService {
    * Save search for user history (future implementation)
    */
   async saveSearch(filters: SearchFilters): Promise<void> {
-    console.log('📝 Search saved for future implementation:', filters);
+    // Future implementation
   }
 }
 

@@ -24,7 +24,6 @@ const FavoritesContext = createContext<FavoritesContextType | undefined>(undefin
 const processPropertyData = (property: any) => {
   try {
     if (!property) {
-      console.warn('Received null or undefined property in processPropertyData');
       return null;
     }
     
@@ -35,10 +34,9 @@ const processPropertyData = (property: any) => {
       try {
         // Try to parse if it's a JSON string
         const parsedDetails = JSON.parse(details);
-        console.log('Successfully parsed property_details from string to object');
         property.property_details = parsedDetails;
       } catch (e) {
-        console.error('Failed to parse property_details string:', e);
+        // Skip parsing on error
       }
     }
     
@@ -76,7 +74,6 @@ const processPropertyData = (property: any) => {
       property_details: details
     };
   } catch (error) {
-    console.error('Error in processPropertyData:', error);
     return property; // Return original on error
   }
 };
@@ -106,7 +103,6 @@ const extractPrimaryImage = (property: any) => {
     // No images found
     return '/noimage.png';
   } catch (error) {
-    console.error('Error extracting primary image:', error);
     return '/noimage.png';
   }
 };
@@ -128,8 +124,6 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setIsLoading(true);
     
     try {
-      console.log(`Fetching favorites for user: ${user.id}`);
-      
       // Use properties_v2_likes table instead of property_likes
       const { data: likeData, error: likeError, count: likeCount } = await supabase
         .from('properties_v2_likes')
@@ -137,16 +131,13 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         .eq('user_id', user.id);
         
       if (likeError) {
-        console.error('Error fetching liked property IDs:', likeError);
         throw likeError;
       }
       
       // Update the favorite count immediately
-      console.log(`Found ${likeCount || 0} favorited properties`);
       setFavoriteCount(likeCount || 0);
       
       if (!likeData || likeData.length === 0) {
-        console.log('No favorites found for user');
         setFavorites([]);
         return;
       }
@@ -161,7 +152,6 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         .in('id', propertyIds);
         
       if (propertiesError) {
-        console.error('Error fetching properties:', propertiesError);
         throw propertiesError;
       }
       
@@ -177,7 +167,6 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           const processedProperty = processPropertyData(property);
           
           if (!processedProperty) {
-            console.warn(`Failed to process property ${property.id}`);
             return null;
           }
           
@@ -193,15 +182,13 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             }
           };
         } catch (error) {
-          console.error(`Error processing property ${property.id}:`, error);
           return null;
         }
       }).filter(Boolean); // Remove any null entries
 
-      console.log(`Processed ${processedProperties.length} valid favorite properties`);
       setFavorites(processedProperties);
     } catch (error) {
-      console.error('Error in fetchFavorites:', error);
+      // Handle error silently
     } finally {
       setIsLoading(false);
     }
@@ -210,8 +197,8 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   // Initialize favorites when user changes
   useEffect(() => {
     if (user) {
-      fetchFavorites().catch(err => {
-        console.error('Initial favorites load failed:', err);
+      fetchFavorites().catch(() => {
+        // Handle error silently
       });
     } else {
       setFavorites([]);
@@ -237,7 +224,6 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         .eq('user_id', user.id);
         
       if (checkError) {
-        console.error('Error checking existing favorite:', checkError);
         return false;
       }
       
@@ -255,7 +241,6 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         });
         
       if (error) {
-        console.error('Error adding favorite:', error);
         return false;
       }
 
@@ -264,7 +249,6 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       await fetchFavorites();
       return true;
     } catch (error) {
-      console.error('Error adding favorite:', error);
       return false;
     }
   };
@@ -282,7 +266,6 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         .eq('user_id', user.id);
 
       if (error) {
-        console.error('Error removing favorite:', error);
         return false;
       }
 
@@ -291,7 +274,6 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setFavoriteCount(prevCount => Math.max(0, prevCount - 1));
       return true;
     } catch (error) {
-      console.error('Error removing favorite:', error);
       return false;
     }
   };
@@ -319,7 +301,7 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       // Then fetch the full data
       await fetchFavorites();
     } catch (error) {
-      console.error('Error refreshing favorites:', error);
+      // Handle error silently
     }
   };
 

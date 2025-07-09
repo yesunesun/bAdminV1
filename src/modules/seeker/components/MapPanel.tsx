@@ -87,8 +87,6 @@ const MapPanel: React.FC<MapPanelProps> = ({
   // Simplified coordinate extraction - uses only database output
   const getPropertyCoordinates = useCallback((property: SearchResult) => {
     try {
-      console.log(`🔍 Getting coordinates for property ${property.id}`);
-      
       // Use latitude and longitude directly from get_latest_properties output
       const lat = property.latitude;
       const lng = property.longitude;
@@ -102,15 +100,12 @@ const MapPanel: React.FC<MapPanelProps> = ({
             longitude >= -180 && longitude <= 180 &&
             latitude !== 0 && longitude !== 0) {
           
-          console.log(`✅ Valid coordinates from database: ${latitude}, ${longitude}`);
           return { lat: latitude, lng: longitude };
         }
       }
       
-      console.log(`❌ No valid coordinates for property ${property.id} - skipping marker creation`);
       return null;
     } catch (error) {
-      console.error(`❌ Error getting coordinates for property ${property.id}:`, error);
       return null;
     }
   }, []);
@@ -157,9 +152,7 @@ const MapPanel: React.FC<MapPanelProps> = ({
 
       setVisiblePropertiesCount(visibleCount);
       setPropertyTypeCounts(typeCounts);
-      console.log(`📊 Visible properties in viewport: ${visibleCount} of ${propertiesWithCoordinates().length}`, typeCounts);
     } catch (error) {
-      console.error('Error updating visible properties count:', error);
       setVisiblePropertiesCount(propertiesWithCoordinates().length);
     }
   }, [map, isLoaded, propertiesWithCoordinates, getPropertyCoordinates]);
@@ -180,8 +173,6 @@ const MapPanel: React.FC<MapPanelProps> = ({
 
       // Check if marker is visible in current viewport
       if (!bounds || !bounds.contains(position)) {
-        console.log(`📍 Panning to property ${propertyId} at ${coords.lat}, ${coords.lng}`);
-        
         // Smoothly pan to the marker position
         map.panTo(position);
         
@@ -194,7 +185,7 @@ const MapPanel: React.FC<MapPanelProps> = ({
         }
       }
     } catch (error) {
-      console.error('Error panning to property:', error);
+      // Skip panning on error
     }
   }, [map, isLoaded, properties, getPropertyCoordinates]);
 
@@ -207,7 +198,6 @@ const MapPanel: React.FC<MapPanelProps> = ({
 
   // Handle map load with enhanced styling and better zoom management
   const onMapLoad = useCallback((map: google.maps.Map) => {
-    console.log('🗺️ Map loaded successfully');
     setMap(map);
     setMapReady(true);
     
@@ -230,8 +220,6 @@ const MapPanel: React.FC<MapPanelProps> = ({
             validPoints++;
           }
         });
-        
-        console.log(`🎯 Setting map bounds for ${validPoints} properties with valid coordinates`);
         
         if (validPoints > 0) {
           setTimeout(() => {
@@ -258,12 +246,10 @@ const MapPanel: React.FC<MapPanelProps> = ({
           }, 100);
         }
       } catch (e) {
-        console.error('Error fitting bounds:', e);
         map.setCenter(DEFAULT_MAP_CENTER);
         map.setZoom(14);
       }
     } else {
-      console.log('No properties with valid coordinates found, using default center');
       map.setCenter(DEFAULT_MAP_CENTER);
       map.setZoom(14);
     }
@@ -273,7 +259,6 @@ const MapPanel: React.FC<MapPanelProps> = ({
   useEffect(() => {
     if (isLoaded && mapReady && map) {
       const validProperties = propertiesWithCoordinates();
-      console.log(`🚀 Creating markers for ${validProperties.length} properties with valid coordinates out of ${properties.length} total`);
       
       // Clean up existing markers
       markersRef.current.forEach(marker => {
@@ -310,10 +295,9 @@ const MapPanel: React.FC<MapPanelProps> = ({
           });
           
           newMarkers.push(marker);
-          console.log(`✅ Created marker ${index + 1}/${validProperties.length} for property ${property.id} at ${coords.lat}, ${coords.lng}`);
           
         } catch (error) {
-          console.error(`❌ Failed to create marker for property ${property.id}:`, error);
+          // Skip marker creation on error
         }
       });
       
@@ -322,11 +306,6 @@ const MapPanel: React.FC<MapPanelProps> = ({
       
       // Update visible count after a short delay to ensure map is ready
       setTimeout(updateVisiblePropertiesCount, 300);
-      
-      console.log(`📊 Marker creation complete:`);
-      console.log(`   - Total properties: ${properties.length}`);
-      console.log(`   - Properties with valid coordinates: ${validProperties.length}`);
-      console.log(`   - Markers created: ${newMarkers.length}`);
     }
     
     // Cleanup function

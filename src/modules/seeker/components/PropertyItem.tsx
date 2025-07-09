@@ -116,29 +116,23 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
   // Generate image URL
   const imageUrl = useMemo(() => {
     try {
-      console.log(`[PropertyItem] Processing image for property ${propertyData.id}`);
-      
       // Method 1: Use primary_image field if available
       if (propertyData.primary_image && propertyData.primary_image.trim()) {
         const constructedUrl = fastImageService.getPublicImageUrl(propertyData.id, propertyData.primary_image);
-        console.log(`[PropertyItem] ✓ Using primary_image '${propertyData.primary_image}' -> ${constructedUrl}`);
         return constructedUrl;
       }
       
       // Method 2: Check if it's PropertyType and has property_images
       if (!isSearchResult(property) && property.property_images && Array.isArray(property.property_images) && property.property_images.length > 0) {
-        console.log(`[PropertyItem] ✓ Found property_images array with ${property.property_images.length} images`);
         const primaryImage = property.property_images.find(img => img.is_primary);
         const imageToUse = primaryImage || property.property_images[0];
         
         if (imageToUse.url && imageToUse.url.startsWith('http')) {
-          console.log(`[PropertyItem] ✓ Using full URL:`, imageToUse.url);
           return imageToUse.url;
         }
         
         if (imageToUse.fileName) {
           const constructedUrl = fastImageService.getPublicImageUrl(propertyData.id, imageToUse.fileName);
-          console.log(`[PropertyItem] ✓ Constructed URL from fileName '${imageToUse.fileName}':`, constructedUrl);
           return constructedUrl;
         }
       }
@@ -147,7 +141,6 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
       if (!isSearchResult(property)) {
         const details = property.property_details || {};
         if (details.primaryImage) {
-          console.log(`[PropertyItem] ✓ Found details.primaryImage:`, details.primaryImage);
           if (details.primaryImage.startsWith('http') || details.primaryImage.startsWith('/')) {
             return details.primaryImage;
           }
@@ -155,10 +148,8 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
         }
       }
       
-      console.log(`[PropertyItem] ❌ No image found, using fallback`);
       return '/noimage.png';
     } catch (error) {
-      console.error(`[PropertyItem] Error getting image for property ${propertyData.id}:`, error);
       return '/noimage.png';
     }
   }, [propertyData.id, propertyData.primary_image, property]);
@@ -262,8 +253,6 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
     setIsFavoriteLoading(true);
     
     try {
-      console.log(`[PropertyItem] Toggling favorite for property ${propertyData.id} to ${isLiked ? 'liked' : 'not liked'}`);
-      
       let success = false;
       
       if (isLiked) {
@@ -284,8 +273,6 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
           duration: 2000,
         });
         
-        console.log(`[PropertyItem] ✅ Favorite toggle successful for property ${propertyData.id}`);
-        
         // Also call legacy onFavoriteToggle if provided for backward compatibility
         if (onFavoriteToggle) {
           await onFavoriteToggle(propertyData.id, isLiked);
@@ -301,11 +288,9 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
           duration: 3000,
         });
         
-        console.error(`[PropertyItem] ❌ Favorite toggle failed for property ${propertyData.id}`);
         return false;
       }
     } catch (error) {
-      console.error(`[PropertyItem] Error toggling favorite for property ${propertyData.id}:`, error);
       toast({
         title: "Error",
         description: "Something went wrong. Please try again.",
