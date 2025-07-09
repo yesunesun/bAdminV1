@@ -1,0 +1,395 @@
+# config/nlp-config.yml
+# Natural Language Processing Configuration for Search
+# Version: 1.0.0
+# Last Modified: 09-07-2025 10:00 IST
+
+# NLP Core Settings
+nlp:
+  enabled: true
+  confidence_threshold: 0.6  # Minimum confidence to apply NLP parsing
+  fallback_timeout: 100      # ms - Max time for NLP processing before fallback
+  debug_mode: false          # Show NLP parsing details in console
+
+# Intent Recognition Patterns
+intent_patterns:
+  search_intents:
+    - "find"
+    - "looking for"
+    - "search"
+    - "show me"
+    - "I want"
+    - "need"
+    - "get me"
+    - "help me find"
+  
+  location_indicators:
+    - "in"
+    - "at"
+    - "near"
+    - "around"
+    - "close to"
+    - "nearby"
+  
+  price_indicators:
+    - "under"
+    - "above"
+    - "below"
+    - "between"
+    - "costing"
+    - "priced"
+    - "budget"
+    - "around"
+    - "up to"
+    - "starting from"
+
+# Property Type Patterns
+property_patterns:
+  residential:
+    primary_keywords:
+      - "apartment"
+      - "flat"
+      - "house"
+      - "villa"
+      - "home"
+      - "residence"
+    
+    subtypes:
+      - "independent house"
+      - "penthouse"
+      - "studio"
+      - "studio apartment"
+      - "service apartment"
+      - "duplex"
+      - "triplex"
+    
+    bhk_patterns:
+      - "1bhk"
+      - "2bhk"
+      - "3bhk"
+      - "4bhk"
+      - "4plus"
+      - "1 bhk"
+      - "2 bhk"
+      - "3 bhk"
+      - "4 bhk"
+      - "4+ bhk"
+      - "one bedroom"
+      - "two bedroom"
+      - "three bedroom"
+      - "four bedroom"
+  
+  commercial:
+    primary_keywords:
+      - "office"
+      - "shop"
+      - "showroom"
+      - "commercial"
+      - "business"
+      - "retail"
+    
+    subtypes:
+      - "office space"
+      - "godown"
+      - "warehouse"
+      - "industrial"
+      - "industrial shed"
+      - "industrial building"
+      - "commercial space"
+      - "retail space"
+  
+  land:
+    primary_keywords:
+      - "land"
+      - "plot"
+      - "site"
+      - "ground"
+    
+    subtypes:
+      - "agricultural"
+      - "residential plot"
+      - "commercial land"
+      - "industrial land"
+      - "mixed use"
+      - "farm land"
+      - "agricultural land"
+  
+  special:
+    pghostel:
+      - "pg"
+      - "hostel"
+      - "paying guest"
+      - "accommodation"
+      - "stay"
+    
+    flatmates:
+      - "flatmate"
+      - "roommate"
+      - "sharing"
+      - "shared"
+      - "room sharing"
+    
+    coworking:
+      - "coworking"
+      - "co-working"
+      - "shared office"
+      - "workspace"
+      - "desk space"
+
+# Location Mapping (Telangana focus)
+location_mapping:
+  # Major Cities
+  hyderabad:
+    - "hyderabad"
+    - "hyd"
+    - "secunderabad"
+    - "sec bad"
+    - "secbad"
+    - "cyberabad"
+  
+  # Popular Areas
+  mudfort:
+    - "mudfort"
+    - "mud fort"
+    - "mudford"
+    - "mudfort area"
+  
+  hitech_city:
+    - "hitech"
+    - "hitec"
+    - "hi-tech"
+    - "hi tech"
+    - "hitech city"
+    - "hitec city"
+  
+  gachibowli:
+    - "gachibowli"
+    - "gachi bowli"
+    - "gachi"
+    - "gachibowli area"
+  
+  kondapur:
+    - "kondapur"
+    - "konda pur"
+    - "kondapur area"
+  
+  madhapur:
+    - "madhapur"
+    - "madha pur"
+    - "madhapur area"
+  
+  jubilee_hills:
+    - "jubilee hills"
+    - "jubilee"
+    - "jh"
+    - "jubilee hill"
+  
+  banjara_hills:
+    - "banjara hills"
+    - "banjara"
+    - "bh"
+    - "banjara hill"
+  
+  kukatpally:
+    - "kukatpally"
+    - "kphb"
+    - "kukat pally"
+  
+  miyapur:
+    - "miyapur"
+    - "miya pur"
+    - "miyapur area"
+  
+  # Other Cities
+  warangal:
+    - "warangal"
+    - "warangal city"
+  
+  karimnagar:
+    - "karimnagar"
+    - "kareem nagar"
+  
+  nizamabad:
+    - "nizamabad"
+    - "nizam abad"
+  
+  khammam:
+    - "khammam"
+    - "kham mam"
+
+# Price Pattern Recognition
+price_patterns:
+  # Units
+  units:
+    lakhs:
+      - "l"
+      - "lakh"
+      - "lakhs"
+      - "lac"
+      - "lacs"
+      - "L"
+      - "Lakh"
+      - "Lakhs"
+    
+    crores:
+      - "cr"
+      - "crore"
+      - "crores"
+      - "CR"
+      - "Crore"
+      - "Crores"
+  
+  # Range Indicators
+  range_indicators:
+    under:
+      - "under"
+      - "below"
+      - "less than"
+      - "upto"
+      - "up to"
+      - "maximum"
+      - "max"
+    
+    above:
+      - "above"
+      - "over"
+      - "more than"
+      - "starting from"
+      - "minimum"
+      - "min"
+    
+    between:
+      - "between"
+      - "from"
+      - "to"
+      - "-"
+      - "and"
+      - "range"
+  
+  # Standard Price Ranges (matching existing SearchFilters)
+  standard_ranges:
+    under_10l:
+      min: 0
+      max: 10
+      unit: "lakh"
+      display: "under-10l"
+    
+    10l_25l:
+      min: 10
+      max: 25
+      unit: "lakh"
+      display: "10l-25l"
+    
+    25l_50l:
+      min: 25
+      max: 50
+      unit: "lakh"
+      display: "25l-50l"
+    
+    50l_75l:
+      min: 50
+      max: 75
+      unit: "lakh"
+      display: "50l-75l"
+    
+    75l_1cr:
+      min: 75
+      max: 100
+      unit: "lakh"
+      display: "75l-1cr"
+    
+    1cr_2cr:
+      min: 1
+      max: 2
+      unit: "crore"
+      display: "1cr-2cr"
+    
+    2cr_5cr:
+      min: 2
+      max: 5
+      unit: "crore"
+      display: "2cr-5cr"
+    
+    5cr_10cr:
+      min: 5
+      max: 10
+      unit: "crore"
+      display: "5cr-10cr"
+    
+    above_10cr:
+      min: 10
+      max: null
+      unit: "crore"
+      display: "above-10cr"
+
+# Action Type Patterns
+action_patterns:
+  buy:
+    - "buy"
+    - "purchase"
+    - "sale"
+    - "for sale"
+    - "buying"
+    - "own"
+    - "invest"
+  
+  rent:
+    - "rent"
+    - "rental"
+    - "lease"
+    - "for rent"
+    - "renting"
+    - "hire"
+    - "tenant"
+
+# Common Variations and Typos
+typo_corrections:
+  common_typos:
+    "appartment": "apartment"
+    "appartments": "apartment"
+    "aprtment": "apartment"
+    "lond": "land"
+    "plat": "plot"
+    "comercial": "commercial"
+    "commecial": "commercial"
+    "residental": "residential"
+    "residencial": "residential"
+    "secunderabad": "secunderabad"
+    "secundrabad": "secunderabad"
+    "gachbowli": "gachibowli"
+    "gachibowly": "gachibowli"
+    "mudfor": "mudfort"
+    "madehapur": "madhapur"
+    "kondpur": "kondapur"
+
+# Processing Configuration
+processing:
+  # Pattern matching settings
+  case_sensitive: false
+  fuzzy_matching: true
+  fuzzy_threshold: 0.8
+  
+  # Performance settings
+  max_processing_time: 200  # milliseconds
+  enable_caching: true
+  cache_size: 1000
+  
+  # Validation settings
+  min_query_length: 3
+  max_query_length: 200
+  
+  # Debug and logging
+  log_parsing_attempts: false
+  log_confidence_scores: false
+  log_entity_extraction: false
+
+# Feature Flags
+features:
+  enable_typo_correction: true
+  enable_fuzzy_location_matching: true
+  enable_price_range_inference: true
+  enable_context_awareness: false  # Future feature
+  enable_learning_from_usage: false  # Future feature
+  enable_synonym_expansion: true
+  enable_multi_language: false  # Future feature
+
+# End of file

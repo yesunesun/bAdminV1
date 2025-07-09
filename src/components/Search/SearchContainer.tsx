@@ -1,17 +1,16 @@
 // src/components/Search/SearchContainer.tsx
-// Version: 4.1.0
-// Last Modified: 02-06-2025 18:45 IST
-// Purpose: Fixed hook ordering issue and React rules violations
+// Version: 5.0.0
+// Last Modified: 09-07-2025 13:00 IST
+// Purpose: Enhanced with NLP search integration
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { MapPin, Search } from 'lucide-react';
+import { MapPin, Search, Brain, Zap } from 'lucide-react';
 import { SearchContainerProps } from './types/search.types';
-import { useSearch } from './hooks/useSearch';
+import { useEnhancedSearch } from './hooks/useEnhancedSearch';
 import { TELANGANA_LOCATIONS, ACTION_TYPES, getAvailablePropertyTypes, getSubtypesForProperty, BHK_TYPES, PRICE_RANGES, shouldShowBHK } from './constants/searchConstants';
-import { searchService } from './services/searchService';
 import SearchResultsView from './components/SearchResultsView';
 
 const SearchContainer: React.FC<SearchContainerProps> = ({
@@ -23,9 +22,10 @@ const SearchContainer: React.FC<SearchContainerProps> = ({
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isPropertyCode, setIsPropertyCode] = useState(false);
+  const [nlpFeedback, setNlpFeedback] = useState<string>('');
 
   // ✅ Custom hooks AFTER useState hooks
-  const search = useSearch(onSearch);
+  const search = useEnhancedSearch(onSearch);
 
   // ✅ ALL useCallback hooks AFTER useState and custom hooks
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -41,24 +41,48 @@ const SearchContainer: React.FC<SearchContainerProps> = ({
       search.updateSearchQuery(suggestion);
     }
     setShowSuggestions(false);
-    search.handleSearch();
-  }, [search]);
+    
+    console.log('🔍 Suggestion clicked:', suggestion);
+    
+    try {
+      if (onSearch) {
+        console.log('🔄 Using onSearch callback (suggestion)');
+        // Use the updated filters after setting the query
+        setTimeout(() => onSearch(search.filters), 0);
+      } else {
+        console.log('🔄 Using internal handleSearch (suggestion)');
+        search.handleSearch();
+      }
+    } catch (error) {
+      console.error('🚨 Error calling search (suggestion):', error);
+    }
+  }, [search, onSearch]);
+
 
   const handleKeyPress = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       setShowSuggestions(false);
-      search.handleSearch();
+      console.log('⌨️  Enter key pressed');
+      
+      try {
+        handleSearchWithNLP();
+      } catch (error) {
+        console.error('🚨 Error calling search (Enter):', error);
+      }
     } else if (e.key === 'Escape') {
       setShowSuggestions(false);
     }
-  }, [search]);
+  }, [search, onSearch]);
 
   const getPlaceholderText = useCallback(() => {
     if (isPropertyCode) {
       return `Property code: ${search.filters.searchQuery.toUpperCase()}`;
     }
+    if (search.isNLPEnabled()) {
+      return 'Try: "3bhk apartment in mudfort" or "land under 50l"';
+    }
     return 'Search by property name, location, or code…';
-  }, [isPropertyCode, search.filters.searchQuery]);
+  }, [isPropertyCode, search.filters.searchQuery, search]);
 
   const handleViewDetails = useCallback((propertyId: string) => {
     console.log('Viewing property details for:', propertyId);
@@ -99,22 +123,61 @@ const SearchContainer: React.FC<SearchContainerProps> = ({
   }, []);
 
   // ✅ ALL useEffect hooks AFTER all other hooks
-  // Check if query looks like a property code
+  // Check if query looks like a property code and get NLP feedback
   useEffect(() => {
-    const isCode = searchService.isPropertyCode(search.filters.searchQuery);
-    setIsPropertyCode(isCode);
+    const analyzeQuery = async () => {
+      const query = search.filters.searchQuery;
+      console.log('🔍 Analyzing query:', query);
+      console.log('🔍 NLP Enabled:', search.isNLPEnabled());
+      
+      // Check property code
+      const isCode = /^[A-Za-z0-9]{6}$/.test(query.trim());
+      setIsPropertyCode(isCode);
+      
+      if (isCode) {
+        console.log('🎯 Property code detected in enhanced search:', query);
+        setNlpFeedback('Property code detected');
+      } else if (query.length >= 3) {
+        console.log('🧠 Attempting NLP parsing for query:', query);
+        
+        if (search.isNLPEnabled()) {
+          console.log('✅ NLP is enabled, parsing query...');
+          // Get NLP parsing feedback
+          try {
+            const nlpResult = await search.parseCurrentQuery();
+            console.log('🧠 NLP Result:', nlpResult);
+            
+            if (nlpResult && nlpResult.confidence > 0.3) {
+              const entities = Object.keys(nlpResult.entities).filter(key => nlpResult.entities[key as keyof typeof nlpResult.entities]);
+              console.log('🎯 Detected entities:', entities);
+              setNlpFeedback(`Natural language detected: ${entities.join(', ')}`);
+            } else {
+              console.log('⚠️  NLP confidence too low or no result:', nlpResult?.confidence);
+              setNlpFeedback('');
+            }
+          } catch (error) {
+            console.error('🚨 Error parsing query:', error);
+            setNlpFeedback('');
+          }
+        } else {
+          console.log('❌ NLP is disabled');
+          setNlpFeedback('');
+        }
+      } else {
+        console.log('📝 Query too short for NLP');
+        setNlpFeedback('');
+      }
+    };
     
-    if (isCode) {
-      console.log('🎯 Property code detected in unified search:', search.filters.searchQuery);
-    }
-  }, [search.filters.searchQuery]);
+    analyzeQuery();
+  }, [search.filters.searchQuery, search]);
 
-  // Get search suggestions
+  // Get enhanced search suggestions
   useEffect(() => {
     const getSuggestions = async () => {
       if (search.filters.searchQuery.length >= 2) {
         try {
-          const results = await searchService.getSearchSuggestions(search.filters.searchQuery);
+          const results = await search.getSearchSuggestions(search.filters.searchQuery);
           setSuggestions(results);
           setShowSuggestions(true);
         } catch (error) {
@@ -201,6 +264,14 @@ const SearchContainer: React.FC<SearchContainerProps> = ({
                       </span>
                     </div>
                   )}
+                  {!isPropertyCode && search.isUsingNLP && (
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                      <span className="text-xs bg-[#6543D2] text-white px-2 py-1 rounded-full flex items-center gap-1">
+                        <Brain className="h-3 w-3" />
+                        NLP
+                      </span>
+                    </div>
+                  )}
                   
                   {/* Search Suggestions Dropdown */}
                   {showSuggestions && suggestions.length > 0 && (
@@ -227,8 +298,40 @@ const SearchContainer: React.FC<SearchContainerProps> = ({
                   )}
                 </div>
                 
+                {/* NLP Feedback */}
+                {nlpFeedback && (
+                  <div className="mt-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-center gap-2 text-sm text-blue-700">
+                      <Brain className="h-4 w-4" />
+                      <span>{nlpFeedback}</span>
+                      {search.nlpConfidence && (
+                        <span className="text-xs bg-blue-100 px-2 py-1 rounded-full">
+                          {Math.round(search.nlpConfidence * 100)}% confidence
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+                
                 <Button 
-                  onClick={search.handleSearch}
+                  onClick={() => {
+                    console.log('🔍 Mobile search button clicked');
+                    console.log('🔍 Search object:', search);
+                    console.log('🔍 Current filters:', search.filters);
+                    console.log('🔍 onSearch prop:', onSearch);
+                    
+                    try {
+                      if (onSearch) {
+                        console.log('🔄 Using onSearch callback');
+                        onSearch(search.filters);
+                      } else {
+                        console.log('🔄 Using internal handleSearch');
+                        search.handleSearch();
+                      }
+                    } catch (error) {
+                      console.error('🚨 Error calling search:', error);
+                    }
+                  }}
                   className="h-12 px-6 bg-[#FF6A00] hover:bg-[#e85c00] text-white font-semibold rounded-lg whitespace-nowrap transition-colors"
                 >
                   <Search className="h-4 w-4 mr-2" />
@@ -279,6 +382,14 @@ const SearchContainer: React.FC<SearchContainerProps> = ({
                     </span>
                   </div>
                 )}
+                {!isPropertyCode && search.isUsingNLP && (
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                    <span className="text-xs bg-[#6543D2] text-white px-2 py-1 rounded-full flex items-center gap-1">
+                      <Brain className="h-3 w-3" />
+                      NLP
+                    </span>
+                  </div>
+                )}
                 
                 {/* Search Suggestions Dropdown */}
                 {showSuggestions && suggestions.length > 0 && (
@@ -307,13 +418,61 @@ const SearchContainer: React.FC<SearchContainerProps> = ({
 
               {/* Search Button */}
               <Button 
-                onClick={search.handleSearch}
+                onClick={() => {
+                  console.log('🔍 Desktop search button clicked');
+                  console.log('🔍 Search object:', search);
+                  console.log('🔍 Current filters:', search.filters);
+                  console.log('🔍 onSearch prop:', onSearch);
+                  
+                  try {
+                    if (onSearch) {
+                      console.log('🔄 Using onSearch callback');
+                      onSearch(search.filters);
+                    } else {
+                      console.log('🔄 Using internal handleSearch');
+                      search.handleSearch();
+                    }
+                  } catch (error) {
+                    console.error('🚨 Error calling search:', error);
+                  }
+                }}
                 className="h-12 px-8 bg-[#FF6A00] hover:bg-[#e85c00] text-white font-semibold rounded-lg transition-colors"
               >
                 <Search className="h-4 w-4 mr-2" />
                 Search
               </Button>
             </div>
+            
+            {/* NLP Feedback - Desktop */}
+            {nlpFeedback && (
+              <div className="mt-4 px-4 py-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-center gap-2 text-sm text-blue-700">
+                  <Brain className="h-4 w-4" />
+                  <span>{nlpFeedback}</span>
+                  {search.nlpConfidence && (
+                    <span className="text-xs bg-blue-100 px-2 py-1 rounded-full">
+                      {Math.round(search.nlpConfidence * 100)}% confidence
+                    </span>
+                  )}
+                  {search.processingTime && (
+                    <span className="text-xs text-blue-600">
+                      {search.processingTime}ms
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+            
+            {/* Debug: Always show NLP feedback state */}
+            {process.env.NODE_ENV === 'development' && (
+              <div className="mt-2 px-4 py-2 bg-gray-100 border border-gray-300 rounded-lg">
+                <div className="text-xs text-gray-600">
+                  <strong>DEBUG:</strong> nlpFeedback="{nlpFeedback}" | 
+                  isUsingNLP={search.isUsingNLP ? 'true' : 'false'} | 
+                  nlpEnabled={search.isNLPEnabled() ? 'true' : 'false'}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Bottom Section - Filter Row */}

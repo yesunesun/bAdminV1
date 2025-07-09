@@ -18,6 +18,7 @@ export { default as SearchResultsTabs } from './components/SearchResultsTabs';
 
 // Hooks
 export { useSearch } from './hooks/useSearch';
+export { useEnhancedSearch } from './hooks/useEnhancedSearch';
 export { useSearchFilters } from './hooks/useSearchFilters';
 
 // Services

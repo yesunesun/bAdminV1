@@ -51,11 +51,11 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
       setSearchLoading(true);
       
       try {
-        // Import searchService dynamically to avoid circular imports
-        const { searchService } = await import('@/components/Search/services/searchService');
+        // Import enhanced search service for consistency
+        const { enhancedSearchService } = await import('@/services/search/enhancedSearchService');
         
-        // Get latest properties using the SQL function with configurable count
-        const response = await searchService.getLatestProperties(propertyListCount);
+        // Get latest properties using the enhanced search service
+        const response = await enhancedSearchService.getLatestProperties(propertyListCount);
         
         // Update search state with latest properties
         setSearchProperties(response.results || []);
@@ -212,8 +212,8 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
     setCurrentPage(1); // Reset to first page for new search
     
     try {
-      // Import searchService dynamically to avoid circular imports
-      const { searchService } = await import('@/components/Search/services/searchService');
+      // Import enhanced search service for NLP processing
+      const { enhancedSearchService } = await import('@/services/search/enhancedSearchService');
       
       // Check if all filters are empty/default - if so, load latest properties instead of searching
       const filtersEmpty = areFiltersEmpty(searchFilters);
@@ -222,44 +222,40 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
       
       if (filtersEmpty) {
         // Load default latest properties when filters are empty (including when cleared)
-        response = await searchService.getLatestProperties(propertyListCount);
+        response = await enhancedSearchService.getLatestProperties(propertyListCount);
         setCurrentFilters(null); // No filters for latest properties
       } else {
         // Store current filters for pagination
         setCurrentFilters(searchFilters);
         
-        // ADDED: Check if search query looks like a 6-character property code
-        const query = searchFilters.searchQuery?.trim();
-        if (query && searchService.isPropertyCode(query)) {
-          // Use smart search which tries code search first, then falls back to regular search
-          
-          // Transform actionType to transactionType for backend compatibility
-          const backendFilters = {
-            ...searchFilters,
-            transactionType: searchFilters.actionType === 'sell' ? 'buy' : 
-                            searchFilters.actionType === 'buy' ? 'buy' : 'rent'
-          };
-          
-          response = await searchService.smartSearch(backendFilters, {
-            page: 1,
-            limit: propertyListCount
-          });
-        } else {
-          // Transform actionType to transactionType for backend compatibility
-          const backendFilters = {
-            ...searchFilters,
-            transactionType: searchFilters.actionType === 'sell' ? 'buy' : 
-                            searchFilters.actionType === 'buy' ? 'buy' : 'rent'
-          };
-          
-          // Perform regular search using searchService
-          response = await searchService.search(backendFilters, {
-            page: 1,
-            limit: propertyListCount
-          });
-        }
+        // Use enhanced search service with NLP processing
+        console.log('🧠 Using enhanced search service with NLP for filters:', searchFilters);
+        const enhancedResponse = await enhancedSearchService.search(searchFilters, {
+          enableNLP: true,
+          debugMode: process.env.NODE_ENV === 'development'
+        });
+        
+        // Transform enhanced response to match expected format
+        response = {
+          results: enhancedResponse.results,
+          totalCount: enhancedResponse.totalCount,
+          page: enhancedResponse.page || 1,
+          limit: enhancedResponse.limit || propertyListCount
+        };
+        
+        console.log('🧠 Enhanced search response:', {
+          resultsCount: response.results?.length || 0,
+          totalCount: response.totalCount,
+          searchMethod: enhancedResponse.searchMethod,
+          nlpUsed: enhancedResponse.searchMethod === 'nlp'
+        });
       }
       // Update search state
+      console.log('🏠 Setting search properties:', {
+        resultsCount: response.results?.length || 0,
+        totalCount: response.totalCount || 0,
+        sampleResult: response.results?.[0]
+      });
       setSearchProperties(response.results || []);
       setSearchTotalCount(response.totalCount || 0);
       setActiveProperty(null);
@@ -274,6 +270,7 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
       }
       
     } catch (error) {
+      console.error('🚨 Search error:', error);
       setSearchProperties([]);
       setSearchTotalCount(0);
       
@@ -297,43 +294,38 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
     setLoadingMore(true);
     
     try {
-      const { searchService } = await import('@/components/Search/services/searchService');
+      const { enhancedSearchService } = await import('@/services/search/enhancedSearchService');
       const nextPage = currentPage + 1;
       
       let response;
       
       if (!currentFilters) {
         // Loading more latest properties
-        response = await searchService.getLatestProperties(propertyListCount, (nextPage - 1) * propertyListCount); // offset calculation
+        response = await enhancedSearchService.getLatestProperties(propertyListCount, (nextPage - 1) * propertyListCount); // offset calculation
       } else {
+        // Use enhanced search service with NLP processing for pagination
+        console.log('🧠 Using enhanced search service for load more with filters:', currentFilters);
+        const enhancedResponse = await enhancedSearchService.search(currentFilters, {
+          enableNLP: true,
+          debugMode: process.env.NODE_ENV === 'development',
+          page: nextPage,
+          limit: propertyListCount
+        });
         
-        // Check if search query looks like a 6-character property code
-        const query = currentFilters.searchQuery?.trim();
-        if (query && searchService.isPropertyCode(query)) {
-          // Transform actionType to transactionType for backend compatibility
-          const backendFilters = {
-            ...currentFilters,
-            transactionType: currentFilters.actionType === 'sell' ? 'buy' : 
-                            currentFilters.actionType === 'buy' ? 'buy' : 'rent'
-          };
-          
-          response = await searchService.smartSearch(backendFilters, {
-            page: nextPage,
-            limit: propertyListCount
-          });
-        } else {
-          // Transform actionType to transactionType for backend compatibility
-          const backendFilters = {
-            ...currentFilters,
-            transactionType: currentFilters.actionType === 'sell' ? 'buy' : 
-                            currentFilters.actionType === 'buy' ? 'buy' : 'rent'
-          };
-          
-          response = await searchService.search(backendFilters, {
-            page: nextPage,
-            limit: propertyListCount
-          });
-        }
+        // Transform enhanced response to match expected format
+        response = {
+          results: enhancedResponse.results,
+          totalCount: enhancedResponse.totalCount,
+          page: enhancedResponse.page || nextPage,
+          limit: enhancedResponse.limit || propertyListCount
+        };
+        
+        console.log('🧠 Enhanced search load more response:', {
+          resultsCount: response.results?.length || 0,
+          totalCount: response.totalCount,
+          searchMethod: enhancedResponse.searchMethod,
+          nlpUsed: enhancedResponse.searchMethod === 'nlp'
+        });
       }
       if (response.results && response.results.length > 0) {
         // Filter out duplicate properties based on ID to prevent duplicate key warnings

@@ -59,6 +59,13 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
   onFavoriteToggle, // Legacy prop - will be replaced by context
   onShare
 }) => {
+  console.log('🏠 PropertyItem rendering:', {
+    propertyId: property.id,
+    propertyTitle: property.title,
+    isSearchResult: isSearchResult(property),
+    hasValidData: !!property.title
+  });
+  
   // Get favorites context and auth
   const { isFavorite, addFavorite, removeFavorite } = useFavorites();
   const { user } = useAuth();
@@ -303,6 +310,10 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
     }
   };
   
+  console.log('🏠 PropertyItem about to return JSX for:', propertyData.id);
+  console.log('🏠 PropertyItem propertyData:', propertyData);
+  console.log('🏠 PropertyItem displayData:', displayData);
+  
   return (
     <div 
       key={`property-${propertyData.id}`}
@@ -328,16 +339,14 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
         onClick={() => onSelect(property)}
       >
         {/* Enhanced Property Name with conditional rendering */}
-        {propertyData.title && (
-          <div className="mb-3">
-            <Link
-              to={`/seeker/property/${propertyData.id}`}
-              className="text-sm font-semibold text-blue-600 hover:text-blue-700 hover:underline truncate block transition-colors duration-200"
-            >
-              {propertyData.title}
-            </Link>
-          </div>
-        )}
+        <div className="mb-3">
+          <Link
+            to={`/seeker/property/${propertyData.id}`}
+            className="text-sm font-semibold text-blue-600 hover:text-blue-700 hover:underline truncate block transition-colors duration-200"
+          >
+            {propertyData.title || 'Property Listing'}
+          </Link>
+        </div>
         
         <Link 
           to={`/seeker/property/${propertyData.id}`} 
@@ -363,55 +372,49 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
           {/* Enhanced Property details with improved spacing */}
           <div className="flex-1 min-w-0 space-y-2">
             {/* Enhanced Location with conditional rendering */}
-            {propertyData.location && (
-              <div className="flex items-center text-xs text-muted-foreground">
-                <MapPin className="h-3 w-3 mr-1.5 flex-shrink-0 text-blue-500" />
-                <span className="truncate font-medium">
-                  {propertyData.location}
-                </span>
-              </div>
-            )}
+            <div className="flex items-center text-xs text-muted-foreground">
+              <MapPin className="h-3 w-3 mr-1.5 flex-shrink-0 text-blue-500" />
+              <span className="truncate font-medium">
+                {propertyData.location || 'Location not specified'}
+              </span>
+            </div>
             
             {/* Enhanced Price with conditional rendering */}
-            {displayData.price && (
-              <p className="text-sm font-bold text-foreground">
-                {displayData.price}
-              </p>
-            )}
+            <p className="text-sm font-bold text-foreground">
+              {displayData.price || 'Price on request'}
+            </p>
             
             {/* Enhanced Property specs with conditional rendering */}
-            {displayData.icons.length > 0 && (
-              <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                {displayData.icons.map((icon, index) => (
+            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+              {displayData.icons.length > 0 ? (
+                displayData.icons.map((icon, index) => (
                   <span key={index} className="flex items-center hover:text-foreground transition-colors duration-200">
                     <span className="text-blue-500">{icon.icon}</span>
                     <span className="whitespace-nowrap font-medium">{icon.text}</span>
                   </span>
-                ))}
-              </div>
-            )}
+                ))
+              ) : (
+                <span className="text-muted-foreground">Property details</span>
+              )}
+            </div>
             
             {/* Enhanced Property Type and Listing Type Badges with conditional rendering */}
             <div className="mt-3 flex flex-wrap gap-2">
               {/* Enhanced Property Type Badge - Shows main category (Residential/Commercial/Land) */}
-              {displayData.propertyType && (
-                <div className="inline-flex items-center text-xs text-white px-2.5 py-1 rounded-full bg-gradient-to-r from-gray-500 to-gray-600 font-medium shadow-sm">
-                  {displayData.propertyType}
-                </div>
-              )}
+              <div className="inline-flex items-center text-xs text-white px-2.5 py-1 rounded-full bg-gradient-to-r from-gray-500 to-gray-600 font-medium shadow-sm">
+                {displayData.propertyType || 'Property'}
+              </div>
               
               {/* Enhanced Listing Type Badge - Shows transaction type (For Rent/For Sale) */}
-              {displayData.listingDisplay && (
-                <div className={`
-                  inline-flex items-center text-xs text-white px-2.5 py-1 rounded-full font-medium shadow-sm
-                  ${displayData.listingDisplay.toLowerCase().includes('rent') 
-                    ? 'bg-gradient-to-r from-blue-500 to-blue-600' 
-                    : 'bg-gradient-to-r from-green-500 to-green-600'
-                  }
-                `}>
-                  {displayData.listingDisplay}
-                </div>
-              )}
+              <div className={`
+                inline-flex items-center text-xs text-white px-2.5 py-1 rounded-full font-medium shadow-sm
+                ${(displayData.listingDisplay || '').toLowerCase().includes('rent') 
+                  ? 'bg-gradient-to-r from-blue-500 to-blue-600' 
+                  : 'bg-gradient-to-r from-green-500 to-green-600'
+                }
+              `}>
+                {displayData.listingDisplay || 'For Sale'}
+              </div>
             </div>
           </div>
           

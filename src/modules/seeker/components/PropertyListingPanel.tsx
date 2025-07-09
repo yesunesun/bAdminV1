@@ -40,6 +40,13 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
   favoriteProperties = new Set(),
   isLoadingFavorites = false
 }) => {
+  console.log('🏠 PropertyListingPanel received props:', {
+    propertiesCount: properties.length,
+    loading,
+    totalCount,
+    hasMore,
+    sampleProperty: properties[0]
+  });
   const { user } = useAuth();
   const { toast } = useToast();
   const [propertyLikeState, setPropertyLikeState] = useState<Record<string, boolean>>({});
@@ -151,7 +158,16 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
 
   // Render content
   const renderContent = () => {
+    console.log('🏠 PropertyListingPanel renderContent check:', {
+      loading,
+      propertiesLength: properties.length,
+      condition1: loading && properties.length === 0,
+      condition2: properties.length === 0,
+      willRenderProperties: !loading && properties.length > 0
+    });
+    
     if (loading && properties.length === 0) {
+      console.log('🔄 Rendering loading state');
       // Enhanced loading placeholders with better visual hierarchy
       return (
         <div className="divide-y divide-border/50">
@@ -197,6 +213,7 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
         </div>
       );
     } else if (properties.length === 0) {
+      console.log('❌ Rendering empty state');
       // Enhanced empty state with better visual appeal
       return (
         <div className="flex flex-col items-center justify-center p-12 text-center">
@@ -211,6 +228,7 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
         </div>
       );
     } else {
+      console.log('✅ Rendering properties:', properties.length);
       // Enhanced property cards with improved spacing
       return (
         <div className="divide-y divide-border/30">
