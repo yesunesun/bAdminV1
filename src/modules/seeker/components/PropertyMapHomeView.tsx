@@ -326,17 +326,31 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
         }
       }
       if (response.results && response.results.length > 0) {
-        // Append new properties to existing list
-        setSearchProperties(prev => [...prev, ...response.results]);
-        setCurrentPage(nextPage);
+        // Filter out duplicate properties based on ID to prevent duplicate key warnings
+        const existingIds = new Set(searchProperties.map(p => p.id));
+        const newUniqueProperties = response.results.filter(p => !existingIds.has(p.id));
         
-        const coordCount = response.results.filter(p => p.latitude && p.longitude).length;
+        // Only append truly new properties to existing list
+        if (newUniqueProperties.length > 0) {
+          setSearchProperties(prev => [...prev, ...newUniqueProperties]);
+          setCurrentPage(nextPage);
+        }
         
-        toast({
-          title: "Loaded more properties",
-          description: `${response.results.length} more properties loaded (${coordCount} with coordinates)`,
-          duration: 2000,
-        });
+        const coordCount = newUniqueProperties.filter(p => p.latitude && p.longitude).length;
+        
+        if (newUniqueProperties.length > 0) {
+          toast({
+            title: "Loaded more properties",
+            description: `${newUniqueProperties.length} more properties loaded (${coordCount} with coordinates)`,
+            duration: 2000,
+          });
+        } else {
+          toast({
+            title: "No new properties",
+            description: "All returned properties are already displayed",
+            duration: 2000,
+          });
+        }
       } else {
         toast({
           title: "No more properties",

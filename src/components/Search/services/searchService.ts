@@ -206,28 +206,52 @@ export class SearchService {
   }
 
   /**
-   * Get latest properties using get_latest_properties SQL function
+   * Get latest properties using get_latest_properties SQL function with pagination support
    */
   async getLatestProperties(limit: number = 50, offset: number = 0): Promise<SearchResponse> {
     const searchId = searchPerformanceMonitor.start({} as SearchFilters);
     
     try {
-      // Note: get_latest_properties function doesn't support offset parameter
+      // Check if the database function supports offset parameter
+      let rpcFunction = 'get_latest_properties';
+      let rpcParams: any = { p_limit: limit };
+      
+      // Try to use offset-enabled function if available
       if (offset > 0) {
-        // For pagination with offset, we need to use a different approach
-        // For now, return empty results to prevent errors
-        return {
-          results: [],
-          totalCount: 0,
-          page: Math.floor(offset / limit) + 1,
-          limit: limit
-        };
+        // Check if we have an offset-enabled function
+        const { data: offsetData, error: offsetError } = await supabase.rpc('get_latest_properties_with_offset', {
+          p_limit: limit,
+          p_offset: offset
+        });
+        
+        if (!offsetError && offsetData) {
+          // Success with offset function
+          const searchResults = offsetData || [];
+          const totalCount = searchResults[0]?.total_count || 0;
+
+          // Transform results using the updated transformation logic
+          let transformedResults = this.transformDatabaseResults(searchResults);
+          transformedResults = SearchFallbackService.enhanceSearchResults(transformedResults);
+          
+          const duration = searchPerformanceMonitor.end(transformedResults.length, totalCount);
+          logSearchResults(transformedResults, totalCount, duration);
+          
+          return {
+            results: transformedResults,
+            totalCount: totalCount,
+            page: Math.floor(offset / limit) + 1,
+            limit: limit
+          };
+        }
+        
+        // If offset function doesn't exist or fails, fall back to manual pagination
+        // Get more properties than needed and slice the results
+        const enlargedLimit = limit + offset;
+        rpcParams = { p_limit: enlargedLimit };
       }
       
-      // For initial load (offset = 0), use the function as-is
-      const { data, error } = await supabase.rpc('get_latest_properties', {
-        p_limit: limit
-      });
+      // Execute the RPC call
+      const { data, error } = await supabase.rpc(rpcFunction, rpcParams);
       
       if (error) {
         throw new Error(`Failed to get latest properties: ${error.message}`);
@@ -236,8 +260,14 @@ export class SearchService {
       const searchResults = data || [];
       const totalCount = searchResults[0]?.total_count || searchResults.length;
 
+      // Apply manual pagination if offset is used
+      let paginatedResults = searchResults;
+      if (offset > 0) {
+        paginatedResults = searchResults.slice(offset, offset + limit);
+      }
+
       // Transform results using the updated transformation logic
-      let transformedResults = this.transformDatabaseResults(searchResults);
+      let transformedResults = this.transformDatabaseResults(paginatedResults);
       transformedResults = SearchFallbackService.enhanceSearchResults(transformedResults);
       
       const duration = searchPerformanceMonitor.end(transformedResults.length, totalCount);
