@@ -3,7 +3,7 @@
 // Last Modified: 02-06-2025 18:45 IST
 // Purpose: Fixed hook ordering issue and React rules violations
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
@@ -23,6 +23,9 @@ const SearchContainer: React.FC<SearchContainerProps> = ({
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isPropertyCode, setIsPropertyCode] = useState(false);
+  
+  // ✅ useRef hooks
+  const isFirstRender = useRef(true);
 
   // ✅ Custom hooks AFTER useState hooks
   const search = useSearch(onSearch);
@@ -69,6 +72,7 @@ const SearchContainer: React.FC<SearchContainerProps> = ({
   }, []);
 
   const handleActionTypeChange = useCallback((value: string) => {
+    console.log('🎯 SearchContainer: Action type changing to:', value);
     search.updateFilter('actionType', value);
   }, [search]);
 
@@ -118,6 +122,51 @@ const SearchContainer: React.FC<SearchContainerProps> = ({
       console.log('🎯 Property code detected in unified search:', search.filters.searchQuery);
     }
   }, [search.filters.searchQuery]);
+
+  // Auto-trigger search when filters (except searchQuery) change
+  useEffect(() => {
+    // Skip the first render to avoid triggering search on component mount
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      console.log('🚀 SearchContainer: Skipping first render, filters initialized:', search.filters);
+      return;
+    }
+
+    const {
+      selectedLocation,
+      actionType,
+      selectedPropertyType,
+      selectedSubType,
+      selectedBHK,
+      selectedPriceRange
+    } = search.filters;
+
+    console.log('🔍 SearchContainer: Filter change detected:', {
+      selectedLocation,
+      actionType,
+      selectedPropertyType,
+      selectedSubType,
+      selectedBHK,
+      selectedPriceRange
+    });
+
+    // Trigger search automatically when any filter changes
+    // We exclude searchQuery from this effect because it has its own trigger mechanism
+    const timeoutId = setTimeout(() => {
+      console.log('🔄 SearchContainer: Auto-triggering search after filter change...');
+      search.handleSearch();
+    }, 300); // 300ms debounce
+
+    return () => clearTimeout(timeoutId);
+  }, [
+    search.filters.selectedLocation,
+    search.filters.actionType,
+    search.filters.selectedPropertyType,
+    search.filters.selectedSubType,
+    search.filters.selectedBHK,
+    search.filters.selectedPriceRange,
+    search.handleSearch
+  ]);
 
   // Get search suggestions
   useEffect(() => {

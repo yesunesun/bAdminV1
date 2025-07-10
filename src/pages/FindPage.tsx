@@ -4,7 +4,7 @@
 // Purpose: Fixed z-index conflict with header dropdown menu
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { SearchContainer, SearchFilters, searchService } from '@/components/Search';
+import { SearchContainer, SearchFilters, searchService, SearchResult } from '@/components/Search';
 import PropertyGridPanel from '@/modules/seeker/components/PropertyGridPanel';
 import { PropertyType } from '@/modules/owner/components/property/types';
 import { useAuth } from '@/contexts/AuthContext';
@@ -15,7 +15,7 @@ const FindPage: React.FC = () => {
   const { toast } = useToast();
 
   // Search and property state
-  const [properties, setProperties] = useState<PropertyType[]>([]);
+  const [properties, setProperties] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
@@ -25,7 +25,7 @@ const FindPage: React.FC = () => {
   
   // Property interaction state
   const [hoveredProperty, setHoveredProperty] = useState<string | null>(null);
-  const [activeProperty, setActiveProperty] = useState<PropertyType | null>(null);
+  const [activeProperty, setActiveProperty] = useState<SearchResult | PropertyType | null>(null);
   const [favoriteProperties, setFavoriteProperties] = useState<Set<string>>(new Set());
   const [isLoadingFavorites, setIsLoadingFavorites] = useState(false);
 
@@ -100,7 +100,8 @@ const FindPage: React.FC = () => {
 
   // Handle search from SearchContainer
   const handleSearch = useCallback(async (filters: SearchFilters) => {
-    console.log('FindPage: Search initiated with filters:', filters);
+    console.log('🎯 FindPage.handleSearch: Search initiated with filters:', filters);
+    console.log('🎯 FindPage.handleSearch: ActionType is:', filters.actionType);
     
     // Check if filters are essentially empty (reset to defaults)
     const isEmptySearch = (
@@ -130,8 +131,21 @@ const FindPage: React.FC = () => {
     setLoading(true);
     
     try {
+      // Transform actionType to transactionType for backend compatibility
+      const transformedFilters = {
+        ...filters,
+        transactionType: filters.actionType === 'buy' ? 'buy' : 
+                        filters.actionType === 'rent' ? 'rent' : 
+                        filters.actionType === 'sell' ? 'buy' : null
+      };
+      
+      // Remove actionType since backend uses transactionType
+      delete (transformedFilters as any).actionType;
+      
+      console.log('🔧 FindPage: Transformed filters for backend:', transformedFilters);
+      
       // Use the actual search service with page size 24
-      const response = await searchService.search(filters, {
+      const response = await searchService.search(transformedFilters, {
         page: 1,
         limit: 24
       });
@@ -185,7 +199,18 @@ const FindPage: React.FC = () => {
     console.log('FindPage: Loading more properties - page', nextPage);
     
     try {
-      const response = await searchService.search(currentFilters, {
+      // Transform actionType to transactionType for backend compatibility  
+      const transformedFilters = {
+        ...currentFilters,
+        transactionType: currentFilters.actionType === 'buy' ? 'buy' : 
+                        currentFilters.actionType === 'rent' ? 'rent' : 
+                        currentFilters.actionType === 'sell' ? 'buy' : null
+      };
+      
+      // Remove actionType since backend uses transactionType
+      delete (transformedFilters as any).actionType;
+      
+      const response = await searchService.search(transformedFilters, {
         page: nextPage,
         limit: 24
       });

@@ -100,12 +100,15 @@ export const useSearch = (onSearchCallback?: (filters: SearchFilters) => void) =
    * Now with improved Buy/Rent filter handling
    */
   const handleSearch = useCallback(async () => {
-    console.log('🔍 Search initiated with actionType:', searchFilters.filters.actionType);
-    console.log('📋 Full search filters:', searchFilters.filters);
+    console.log('🔍 useSearch.handleSearch: Search initiated with actionType:', searchFilters.filters.actionType);
+    console.log('📋 useSearch.handleSearch: Full search filters:', searchFilters.filters);
     
     // Call external callback if provided
     if (onSearchCallback) {
+      console.log('🔄 useSearch.handleSearch: Calling external onSearchCallback...');
       onSearchCallback(searchFilters.filters);
+    } else {
+      console.log('⚠️ useSearch.handleSearch: No external onSearchCallback provided');
     }
     
     try {

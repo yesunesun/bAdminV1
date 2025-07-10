@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { PropertyType } from '@/modules/owner/components/property/types';
+import { SearchResult } from '@/components/Search/types/search.types';
 import { Button } from '@/components/ui/button';
 import { Loader2, Info } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -12,8 +13,11 @@ import { useToast } from '@/components/ui/use-toast';
 import { Card } from '@/components/ui/card';
 import PropertyItem from './PropertyItem';
 
+// Union type to handle both formats
+type PropertyData = PropertyType | SearchResult;
+
 interface PropertyGridPanelProps {
-  properties: PropertyType[];
+  properties: PropertyData[];
   loading: boolean;
   loadingMore: boolean;
   hasMore: boolean;
@@ -22,7 +26,7 @@ interface PropertyGridPanelProps {
   onFavoriteAction: (propertyId: string, isLiked: boolean) => Promise<boolean>;
   handlePropertyHover: (propertyId: string, isHovering: boolean) => void;
   hoveredProperty: string | null;
-  setActiveProperty: (property: PropertyType | null) => void;
+  setActiveProperty: (property: PropertyData | null) => void;
   favoriteProperties?: Set<string>;
   isLoadingFavorites?: boolean;
 }
