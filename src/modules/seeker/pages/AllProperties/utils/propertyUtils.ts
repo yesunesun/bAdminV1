@@ -242,6 +242,10 @@ export function getFlowLabel(flowType: string): string {
  * @returns The property type
  */
 export function getPropertyTypeFromFlow(flowType: string): string {
+  // Special case: For PG/Hostel and Flatmates, show their specific type instead of "Residential"
+  if (flowType === FLOW_TYPES.RESIDENTIAL_PGHOSTEL) return 'PG/Hostel';
+  if (flowType === FLOW_TYPES.RESIDENTIAL_FLATMATES) return 'Flatmates';
+  
   if (flowType.startsWith('residential_')) return 'Residential';
   if (flowType.startsWith('commercial_')) return 'Commercial';
   if (flowType.startsWith('land_')) return 'Land';

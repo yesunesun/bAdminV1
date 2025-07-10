@@ -204,13 +204,26 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
       if (propertyData.propertyType) {
         switch (propertyData.propertyType.toLowerCase()) {
           case 'residential':
-            mainPropertyCategory = 'Residential';
+            // Check subType for special residential categories
+            if (propertyData.subType && propertyData.subType.toLowerCase() === 'pghostel') {
+              mainPropertyCategory = 'PG/Hostel';
+            } else if (propertyData.subType && propertyData.subType.toLowerCase() === 'flatmates') {
+              mainPropertyCategory = 'Flatmates';
+            } else {
+              mainPropertyCategory = 'Residential';
+            }
             break;
           case 'commercial':
             mainPropertyCategory = 'Commercial';
             break;
           case 'land':
             mainPropertyCategory = 'Land';
+            break;
+          case 'pg/hostel':
+            mainPropertyCategory = 'PG/Hostel';
+            break;
+          case 'flatmates':
+            mainPropertyCategory = 'Flatmates';
             break;
           default:
             // Capitalize first letter
@@ -454,7 +467,14 @@ function getFlowSpecificDisplayData(property: PropertyType, flowType: string, de
   
   // Determine main property category based on flow type
   if (flowType.includes('residential')) {
-    propertyType = 'Residential';
+    // Special case: For PG/Hostel and Flatmates, show their specific type instead of "Residential"
+    if (flowType === FLOW_TYPES.RESIDENTIAL_PGHOSTEL) {
+      propertyType = 'PG/Hostel';
+    } else if (flowType === FLOW_TYPES.RESIDENTIAL_FLATMATES) {
+      propertyType = 'Flatmates';
+    } else {
+      propertyType = 'Residential';
+    }
   } else if (flowType.includes('commercial')) {
     propertyType = 'Commercial';
   } else if (flowType.includes('land')) {
