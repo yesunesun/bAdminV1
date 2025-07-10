@@ -7,7 +7,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { MapPin, Search } from 'lucide-react';
+import { MapPin, Search, X, RotateCcw } from 'lucide-react';
 import { SearchContainerProps } from './types/search.types';
 import { useSearch } from './hooks/useSearch';
 import { TELANGANA_LOCATIONS, ACTION_TYPES, getAvailablePropertyTypes, getSubtypesForProperty, BHK_TYPES, PRICE_RANGES, shouldShowBHK } from './constants/searchConstants';
@@ -97,6 +97,16 @@ const SearchContainer: React.FC<SearchContainerProps> = ({
   const handleSuggestionBlur = useCallback(() => {
     setTimeout(() => setShowSuggestions(false), 200);
   }, []);
+
+  const handleClearSearch = useCallback(() => {
+    search.updateSearchQuery('');
+    setShowSuggestions(false);
+  }, [search]);
+
+  const handleResetFilters = useCallback(() => {
+    search.clearAllFilters();
+    setShowSuggestions(false);
+  }, [search]);
 
   // ✅ ALL useEffect hooks AFTER all other hooks
   // Check if query looks like a property code
@@ -190,12 +200,20 @@ const SearchContainer: React.FC<SearchContainerProps> = ({
                     onFocus={handleSuggestionFocus}
                     onBlur={handleSuggestionBlur}
                     className={`
-                      h-12 pl-4 pr-4 text-slate-900 bg-white border-0 rounded-lg focus:ring-2 focus:ring-white/50 shadow-sm
+                      h-12 pl-4 ${search.filters.searchQuery ? (isPropertyCode ? 'pr-20' : 'pr-10') : 'pr-4'} text-slate-900 bg-white border-0 rounded-lg focus:ring-2 focus:ring-white/50 shadow-sm
                       ${isPropertyCode ? 'border-2 border-orange-300 bg-orange-50' : ''}
                     `}
                   />
+                  {search.filters.searchQuery && (
+                    <button
+                      onClick={handleClearSearch}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
                   {isPropertyCode && (
-                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                    <div className="absolute right-10 top-1/2 transform -translate-y-1/2">
                       <span className="text-xs bg-[#FF6A00] text-white px-2 py-1 rounded-full">
                         CODE
                       </span>
@@ -268,12 +286,20 @@ const SearchContainer: React.FC<SearchContainerProps> = ({
                   onFocus={handleSuggestionFocus}
                   onBlur={handleSuggestionBlur}
                   className={`
-                    w-full h-12 pl-4 pr-12 text-slate-900 bg-white border-0 rounded-lg focus:ring-2 focus:ring-white/50 shadow-sm
+                    w-full h-12 pl-4 ${search.filters.searchQuery ? (isPropertyCode ? 'pr-20' : 'pr-10') : 'pr-4'} text-slate-900 bg-white border-0 rounded-lg focus:ring-2 focus:ring-white/50 shadow-sm
                     ${isPropertyCode ? 'border-2 border-orange-300 bg-orange-50' : ''}
                   `}
                 />
+                {search.filters.searchQuery && (
+                  <button
+                    onClick={handleClearSearch}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
                 {isPropertyCode && (
-                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                  <div className="absolute right-10 top-1/2 transform -translate-y-1/2">
                     <span className="text-xs bg-[#FF6A00] text-white px-2 py-1 rounded-full">
                       CODE
                     </span>
@@ -320,6 +346,17 @@ const SearchContainer: React.FC<SearchContainerProps> = ({
           <div className="bg-white p-4 border-t border-gray-100">
             {/* Filter Dropdowns */}
             <div className="flex items-center gap-3 flex-wrap">
+              {/* Reset Button */}
+              {search.hasActiveFilters && (
+                <Button
+                  onClick={handleResetFilters}
+                  variant="outline"
+                  className="h-11 px-4 border-gray-200 bg-white hover:bg-gray-50 text-gray-700 transition-colors"
+                >
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  Reset
+                </Button>
+              )}
               {/* Action Type Filter (Buy/Rent/Any) */}
               <Select 
                 value={search.filters.actionType} 
