@@ -14,6 +14,7 @@ import { Loader2, Heart, X, AlertCircle } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import PropertyItem from './PropertyItem'; // Import the new PropertyItem component
+import { fastImageService } from './PropertyItem/services/fastImageService';
 
 interface FavoritesDrawerProps {
   open: boolean;
@@ -31,10 +32,6 @@ const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({ open, onClose }) => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [hoveredProperty, setHoveredProperty] = useState<string | null>(null);
-  const [propertyImageCache, setPropertyImageCache] = useState<Record<string, string>>({});
-  
-  // Constants
-  const STORAGE_BUCKET = 'property-images-v2';
 
   // Load favorite properties when the drawer opens
   useEffect(() => {
@@ -52,91 +49,88 @@ const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({ open, onClose }) => {
     
     try {
       const favorites = await getUserFavorites();
+      console.log(`🔍 [FavoritesDrawer] Loaded ${favorites.length} favorite properties:`, favorites);
       setFavoriteProperties(favorites);
-      
-      // Preload images for favorites
-      preloadPropertyImages(favorites);
     } catch (err) {
-      console.error('Error loading favorites:', err);
+      console.error('❌ [FavoritesDrawer] Error loading favorites:', err);
       setError('Unable to load your favorite properties. Please try again later.');
     } finally {
       setLoading(false);
     }
   };
 
-  // Preload property images
-  const preloadPropertyImages = async (properties: any[]) => {
-    const newImageCache = { ...propertyImageCache };
-    
-    for (const property of properties) {
-      if (propertyImageCache[property.id]) continue;
-      
-      try {
-        // First check if property has imageFiles in property_details
-        const details = property.property_details || {};
-        
-        if (details.imageFiles && Array.isArray(details.imageFiles) && details.imageFiles.length > 0) {
-          // Look for primary image first
-          const primaryImage = details.imageFiles.find((img: any) => img.isPrimary || img.is_primary);
-          const imageToUse = primaryImage || details.imageFiles[0];
-          
-          if (imageToUse && imageToUse.fileName) {
-            // Get image from Supabase storage
-            const { data, error } = await supabase
-              .storage
-              .from(STORAGE_BUCKET)
-              .createSignedUrl(`${property.id}/${imageToUse.fileName}`, 3600);
-              
-            if (!error && data.signedUrl) {
-              newImageCache[property.id] = data.signedUrl;
-              continue; // Skip to next property if we found an image
-            }
-          }
-        }
-        
-        // If imageFiles didn't work, try listing files in storage
-        const { data: files, error: listError } = await supabase
-          .storage
-          .from(STORAGE_BUCKET)
-          .list(`${property.id}/`, {
-            limit: 1,
-            sortBy: { column: 'name', order: 'asc' }
-          });
-          
-        if (!listError && files && files.length > 0) {
-          // Filter out folders
-          const imageFiles = files.filter(file => !file.metadata?.contentType?.includes('folder'));
-          
-          if (imageFiles.length > 0) {
-            // Get signed URL for first image
-            const { data: urlData, error: urlError } = await supabase
-              .storage
-              .from(STORAGE_BUCKET)
-              .createSignedUrl(`${property.id}/${imageFiles[0].name}`, 3600);
-              
-            if (!urlError && urlData?.signedUrl) {
-              newImageCache[property.id] = urlData.signedUrl;
-              continue;
-            }
-          }
-        }
-        
-        // If no image found in storage, set default image
-        newImageCache[property.id] = '/noimage.png';
-        
-      } catch (error) {
-        console.error(`Error loading image for property ${property.id}:`, error);
-        newImageCache[property.id] = '/noimage.png';
-      }
-    }
-    
-    // Update cache with all new images
-    setPropertyImageCache(newImageCache);
-  };
 
-  // Get property image using cache
+  // Get property image using the same logic as PropertyItem component
   const getPropertyImage = (property: any): string => {
-    return propertyImageCache[property.id] || '/noimage.png';
+    console.log(`🔍 [FavoritesDrawer] Getting image for property ${property.id}:`, {
+      property_id: property.id,
+      primary_image: property.primary_image,
+      property_images: property.property_images,
+      property_details: property.property_details
+    });
+    
+    try {
+      // Method 1: Use primary_image field if available
+      if (property.primary_image && property.primary_image.trim()) {
+        const imageUrl = fastImageService.getPublicImageUrl(property.id, property.primary_image);
+        console.log(`✅ [FavoritesDrawer] Method 1 - Using primary_image: ${property.primary_image} -> ${imageUrl}`);
+        return imageUrl;
+      }
+      
+      // Method 2: Check if it has property_images array
+      if (property.property_images && Array.isArray(property.property_images) && property.property_images.length > 0) {
+        const primaryImage = property.property_images.find(img => img.is_primary);
+        const imageToUse = primaryImage || property.property_images[0];
+        
+        console.log(`🔍 [FavoritesDrawer] Method 2 - Found property_images:`, property.property_images);
+        console.log(`🔍 [FavoritesDrawer] Method 2 - Using image:`, imageToUse);
+        
+        if (imageToUse.url && imageToUse.url.startsWith('http')) {
+          console.log(`✅ [FavoritesDrawer] Method 2 - Using direct URL: ${imageToUse.url}`);
+          return imageToUse.url;
+        }
+        
+        if (imageToUse.fileName) {
+          const imageUrl = fastImageService.getPublicImageUrl(property.id, imageToUse.fileName);
+          console.log(`✅ [FavoritesDrawer] Method 2 - Using fileName: ${imageToUse.fileName} -> ${imageUrl}`);
+          return imageUrl;
+        }
+      }
+      
+      // Method 3: Legacy property_details support
+      const details = property.property_details || {};
+      if (details.primaryImage) {
+        console.log(`🔍 [FavoritesDrawer] Method 3 - Found primaryImage: ${details.primaryImage}`);
+        if (details.primaryImage.startsWith('http') || details.primaryImage.startsWith('/')) {
+          console.log(`✅ [FavoritesDrawer] Method 3 - Using direct primaryImage: ${details.primaryImage}`);
+          return details.primaryImage;
+        }
+        const imageUrl = fastImageService.getPublicImageUrl(property.id, details.primaryImage);
+        console.log(`✅ [FavoritesDrawer] Method 3 - Using primaryImage with fastImageService: ${details.primaryImage} -> ${imageUrl}`);
+        return imageUrl;
+      }
+      
+      // Method 4: Check for imageFiles in property_details
+      if (details.imageFiles && Array.isArray(details.imageFiles) && details.imageFiles.length > 0) {
+        const primaryImage = details.imageFiles.find((img: any) => img.isPrimary || img.is_primary);
+        const imageToUse = primaryImage || details.imageFiles[0];
+        
+        console.log(`🔍 [FavoritesDrawer] Method 4 - Found imageFiles:`, details.imageFiles);
+        console.log(`🔍 [FavoritesDrawer] Method 4 - Using image:`, imageToUse);
+        
+        if (imageToUse && imageToUse.fileName) {
+          const imageUrl = fastImageService.getPublicImageUrl(property.id, imageToUse.fileName);
+          console.log(`✅ [FavoritesDrawer] Method 4 - Using fileName: ${imageToUse.fileName} -> ${imageUrl}`);
+          return imageUrl;
+        }
+      }
+      
+      console.log(`❌ [FavoritesDrawer] No image found for property ${property.id}, using default`);
+      return '/noimage.png';
+    } catch (error) {
+      console.error(`❌ [FavoritesDrawer] Error getting image for property ${property.id}:`, error);
+      return '/noimage.png';
+    }
   };
 
   // Handle removing a property from favorites

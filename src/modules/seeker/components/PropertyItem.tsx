@@ -115,10 +115,18 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
 
   // Generate image URL
   const imageUrl = useMemo(() => {
+    console.log(`🔍 [PropertyItem] Generating image for property ${propertyData.id}:`, {
+      propertyData_primary_image: propertyData.primary_image,
+      property_primary_image: property.primary_image,
+      property_property_images: property.property_images,
+      property_details: property.property_details
+    });
+    
     try {
       // Method 1: Use primary_image field if available
       if (propertyData.primary_image && propertyData.primary_image.trim()) {
         const constructedUrl = fastImageService.getPublicImageUrl(propertyData.id, propertyData.primary_image);
+        console.log(`✅ [PropertyItem] Method 1 - Using primary_image: ${propertyData.primary_image} -> ${constructedUrl}`);
         return constructedUrl;
       }
       
@@ -148,8 +156,10 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
         }
       }
       
+      console.log(`❌ [PropertyItem] No image found for property ${propertyData.id}, using default`);
       return '/noimage.png';
     } catch (error) {
+      console.error(`❌ [PropertyItem] Error generating image for property ${propertyData.id}:`, error);
       return '/noimage.png';
     }
   }, [propertyData.id, propertyData.primary_image, property]);

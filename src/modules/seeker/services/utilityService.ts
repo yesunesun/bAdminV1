@@ -685,6 +685,7 @@ export const extractImagesFromProperty = (property: any) => {
     let images: any[] = [];
     
     if (!property || !property.property_details) {
+      console.log(`🔍 [extractImagesFromProperty] Property ${property?.id || 'unknown'} - No property_details found`);
       return [];
     }
     
@@ -696,11 +697,24 @@ export const extractImagesFromProperty = (property: any) => {
     const hasSteps = !!getNestedValue(details, 'steps', null);
     const isNewStructure = hasMeta && hasFlow && hasSteps;
     
+    console.log(`🔍 [extractImagesFromProperty] Property ${property.id} - isNewStructure: ${isNewStructure}`);
+    console.log(`🔍 [extractImagesFromProperty] Property ${property.id} - Available paths:`, {
+      'details.media.photos.images': getNestedValue(details, 'media.photos.images', null),
+      'details.imageFiles': details.imageFiles,
+      'details.images': details.images,
+      'details.photos.images': details.photos?.images,
+      'details.media.images': details.media?.images
+    });
+    
     if (isNewStructure) {
       // First try to get images from the media section (new structure)
       const mediaImages = getNestedValue(details, 'media.photos.images', []);
       if (mediaImages && Array.isArray(mediaImages) && mediaImages.length > 0) {
         images = mediaImages;
+      }
+      // Also check for imageFiles in new structure (this is where favorites images are stored)
+      else if (details.imageFiles && Array.isArray(details.imageFiles)) {
+        images = details.imageFiles;
       }
     } else {
       // Try various paths where images might be stored in property_details (legacy structure)
@@ -717,15 +731,20 @@ export const extractImagesFromProperty = (property: any) => {
    
    // If images were found, process them to have consistent properties
    if (images.length > 0) {
-     return images.map((img, idx) => ({
+     console.log(`✅ [extractImagesFromProperty] Property ${property.id} - Found ${images.length} images:`, images);
+     const processedImages = images.map((img, idx) => ({
        id: img.id || `img-${idx}`,
        url: img.dataUrl || img.url || '',
+       fileName: img.fileName || null,
        is_primary: !!img.isPrimary || !!img.is_primary,
        display_order: img.display_order || idx
      }));
+     console.log(`✅ [extractImagesFromProperty] Property ${property.id} - Processed images:`, processedImages);
+     return processedImages;
    }
    
    // No images found
+   console.log(`❌ [extractImagesFromProperty] Property ${property.id} - No images found`);
    return [];
  } catch (error) {
    console.error('Error extracting images:', error);

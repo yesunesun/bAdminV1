@@ -199,24 +199,49 @@ export const getUserFavorites = async () => {
           return null;
         }
         
-        // Extract and process images
+        // Extract and process images to find primary_image filename
         const propertyImages = extractImagesFromProperty(processedProperty);
         
-        // Find primary image or use first available
-        let primaryImage = '/noimage.png';
+        console.log(`🔍 [getUserFavorites] Property ${property.id} - extracted images:`, propertyImages);
+        
+        // Find primary image filename for fastImageService
+        let primaryImageFilename = null;
         if (propertyImages.length > 0) {
           const primary = propertyImages.find(img => img.is_primary);
-          primaryImage = primary ? primary.url : propertyImages[0].url;
+          const imageToUse = primary || propertyImages[0];
+          
+          console.log(`🔍 [getUserFavorites] Property ${property.id} - using image:`, imageToUse);
+          
+          // Extract filename from the image URL or use the fileName property
+          if (imageToUse.fileName) {
+            primaryImageFilename = imageToUse.fileName;
+          } else if (imageToUse.url && imageToUse.url.includes('/')) {
+            // Try to extract filename from URL
+            const urlParts = imageToUse.url.split('/');
+            primaryImageFilename = urlParts[urlParts.length - 1];
+          }
         }
         
-        // Add primary image to property_details
-        return {
+        console.log(`🔍 [getUserFavorites] Property ${property.id} - final primaryImageFilename:`, primaryImageFilename);
+        
+        // Set primary_image field for fastImageService (this is what the image service expects)
+        const finalProperty = {
           ...processedProperty,
+          primary_image: primaryImageFilename, // This is the key field that fastImageService uses
           property_details: {
             ...(processedProperty.property_details || {}),
-            primaryImage
+            primaryImage: primaryImageFilename // Keep legacy support
           }
         };
+        
+        console.log(`🔍 [getUserFavorites] Property ${property.id} - final property object:`, {
+          id: finalProperty.id,
+          primary_image: finalProperty.primary_image,
+          property_images: finalProperty.property_images,
+          property_details_primaryImage: finalProperty.property_details?.primaryImage
+        });
+        
+        return finalProperty;
       } catch (error) {
         console.error(`Error processing property ${property.id}:`, error);
         return null;
