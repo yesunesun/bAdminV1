@@ -21,7 +21,7 @@ export { useSearch } from './hooks/useSearch';
 export { useSearchFilters } from './hooks/useSearchFilters';
 
 // Services
-export { searchService, type SearchResponse, type SearchOptions } from './services/searchService';
+export { searchService } from './services/searchService';
 
 // Types
 export type {
@@ -29,6 +29,8 @@ export type {
   PropertyType,
   SearchResult,
   SearchState,
+  SearchResponse,
+  SearchPaginationOptions,
   FilterType,
   SearchContainerProps,
   SearchHeaderProps,

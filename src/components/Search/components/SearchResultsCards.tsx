@@ -16,6 +16,9 @@ interface SearchResultsCardsProps {
   totalCount: number;
   onViewDetails?: (propertyId: string) => void;
   onContactOwner?: (propertyId: string) => void;
+  onLoadMore?: () => void;
+  canLoadMore?: boolean;
+  isLoadingMore?: boolean;
 }
 
 const SearchResultsCards: React.FC<SearchResultsCardsProps> = ({
@@ -23,7 +26,10 @@ const SearchResultsCards: React.FC<SearchResultsCardsProps> = ({
   loading,
   totalCount,
   onViewDetails,
-  onContactOwner
+  onContactOwner,
+  onLoadMore,
+  canLoadMore = false,
+  isLoadingMore = false
 }) => {
   // State for managing hover and favorite states
   const [hoveredProperty, setHoveredProperty] = useState<string | null>(null);
@@ -132,18 +138,26 @@ const SearchResultsCards: React.FC<SearchResultsCardsProps> = ({
         ))}
       </div>
 
-      {/* Load More Button (for future pagination) */}
-      {results.length > 0 && results.length < totalCount && (
+      {/* Load More Button */}
+      {results.length > 0 && canLoadMore && (
         <div className="text-center py-6">
           <Card className="p-4 bg-slate-50">
             <p className="text-sm text-slate-600 mb-3">
               Showing {results.length} of {totalCount} properties
             </p>
             <button 
-              className="text-blue-600 hover:underline font-medium"
-              onClick={() => console.log('Load more properties')}
+              className="text-blue-600 hover:underline font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mx-auto"
+              onClick={onLoadMore}
+              disabled={isLoadingMore}
             >
-              Load More Properties
+              {isLoadingMore ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                  Loading More...
+                </>
+              ) : (
+                'Load More Properties'
+              )}
             </button>
           </Card>
         </div>

@@ -174,9 +174,10 @@ export class BtServiceClient {
   /**
    * Get latest properties
    */
-  async getLatestProperties(limit: number = 50): Promise<SearchResponse> {
+  async getLatestProperties(limit: number = 50, offset: number = 0): Promise<SearchResponse> {
     const queryParams = new URLSearchParams({
-      limit: limit.toString()
+      limit: limit.toString(),
+      offset: offset.toString()
     });
 
     const endpoint = `/api/search/latest?${queryParams.toString()}`;
@@ -213,8 +214,20 @@ export class BtServiceClient {
 }
 
 // Default configuration
+const btServiceUrl = import.meta.env.VITE_BTSERVICE_URL || 'http://localhost:3001';
+console.log('🔧 btServiceClient config:', {
+  VITE_BTSERVICE_URL: import.meta.env.VITE_BTSERVICE_URL,
+  finalUrl: btServiceUrl,
+  mode: import.meta.env.MODE,
+  dev: import.meta.env.DEV
+});
+
+// TEMPORARY FIX: Force localhost for development
+const finalUrl = import.meta.env.DEV ? 'http://localhost:3001' : btServiceUrl;
+console.log('🔧 FORCED URL:', finalUrl);
+
 const defaultConfig: BtServiceConfig = {
-  baseUrl: import.meta.env.VITE_BTSERVICE_URL || 'http://localhost:3001',
+  baseUrl: finalUrl,
   timeout: 30000,
   retryAttempts: 3,
   retryDelay: 1000,

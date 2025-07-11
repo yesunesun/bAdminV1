@@ -516,6 +516,9 @@ const SearchContainer: React.FC<SearchContainerProps> = ({
           error={search.error}
           onViewDetails={handleViewDetails}
           onContactOwner={handleContactOwner}
+          onLoadMore={search.loadMoreResults}
+          canLoadMore={search.canLoadMore()}
+          isLoadingMore={search.isLoadingMore}
         />
       )}
     </div>

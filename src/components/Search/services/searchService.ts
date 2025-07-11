@@ -13,7 +13,7 @@ export interface SearchService {
   search(filters: SearchFilters, pagination?: SearchPaginationOptions): Promise<SearchResponse>;
   smartSearch(filters: SearchFilters, pagination?: SearchPaginationOptions): Promise<SearchResponse>;
   searchByCode(code: string, exact?: boolean): Promise<SearchResponse>;
-  getLatestProperties(limit?: number): Promise<SearchResponse>;
+  getLatestProperties(limit?: number, offset?: number): Promise<SearchResponse>;
   getSearchSuggestions(query: string): Promise<string[]>;
   isPropertyCode(query: string): boolean;
 }
@@ -89,11 +89,11 @@ class BtSearchService implements SearchService {
   /**
    * Get latest properties
    */
-  async getLatestProperties(limit: number = 50): Promise<SearchResponse> {
-    console.log('📋 SearchService.getLatestProperties called with limit:', limit);
+  async getLatestProperties(limit: number = 50, offset: number = 0): Promise<SearchResponse> {
+    console.log('📋 SearchService.getLatestProperties called with:', { limit, offset });
     
     try {
-      const response = await btServiceClient.getLatestProperties(limit);
+      const response = await btServiceClient.getLatestProperties(limit, offset);
       console.log('✅ SearchService.getLatestProperties completed:', {
         resultCount: response.results.length,
         totalCount: response.totalCount

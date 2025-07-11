@@ -18,6 +18,11 @@ export const useSearch = (onSearchCallback?: (filters: SearchFilters) => void) =
     totalCount: 0
   });
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const pageSize = 10; // Reduced for testing pagination
+
   // Track if filters were just cleared to trigger default search
   const [wasCleared, setWasCleared] = useState(false);
 
@@ -132,18 +137,18 @@ export const useSearch = (onSearchCallback?: (filters: SearchFilters) => void) =
         // Use smart search which tries code search first, then falls back to regular search
         response = await searchService.smartSearch(backendFilters, {
           page: 1,
-          limit: 50
+          limit: pageSize
         });
       } else {
         // ENHANCED: Handle 'any' action type by searching across all property types if no specific transaction type
         if (!backendFilters.transactionType && (!backendFilters.selectedPropertyType || backendFilters.selectedPropertyType === 'any')) {
           console.log('🌐 Action type is "any" and no specific property type - using getLatestProperties');
-          response = await searchService.getLatestProperties(50);
+          response = await searchService.getLatestProperties(pageSize, 0);
         } else {
           console.log('🔍 Using regular search with specific filters');
           response = await searchService.search(backendFilters, {
             page: 1,
-            limit: 50
+            limit: pageSize
           });
         }
       }
@@ -160,6 +165,9 @@ export const useSearch = (onSearchCallback?: (filters: SearchFilters) => void) =
         results: response.results,
         totalCount: response.totalCount
       }));
+
+      // Reset pagination when doing a new search
+      setCurrentPage(1);
       
     } catch (error) {
       console.error('❌ Search error:', error);
@@ -235,6 +243,7 @@ export const useSearch = (onSearchCallback?: (filters: SearchFilters) => void) =
     console.log('🧹 Clearing all filters...');
     searchFilters.clearAllFilters();
     setWasCleared(true); // Flag that filters were cleared
+    setCurrentPage(1); // Reset pagination when filters are cleared
   }, [searchFilters]);
 
   const clearResults = useCallback(() => {
@@ -244,6 +253,7 @@ export const useSearch = (onSearchCallback?: (filters: SearchFilters) => void) =
       totalCount: 0,
       error: null
     }));
+    setCurrentPage(1); // Reset pagination when results are cleared
   }, []);
 
   /**
@@ -265,6 +275,75 @@ export const useSearch = (onSearchCallback?: (filters: SearchFilters) => void) =
     return searchService.isPropertyCode(query);
   }, []);
 
+  /**
+   * Load more results for pagination
+   */
+  const loadMoreResults = useCallback(async () => {
+    if (isLoadingMore || searchState.results.length >= searchState.totalCount) {
+      return;
+    }
+
+    console.log('📄 Loading more results, current page:', currentPage);
+    
+    try {
+      setIsLoadingMore(true);
+      
+      const nextPage = currentPage + 1;
+      const query = searchFilters.filters.searchQuery?.trim();
+      const backendFilters = transformFiltersForBackend(searchFilters.filters);
+      
+      let response;
+      
+      // Use the same logic as handleSearch for consistency
+      if (query && searchService.isPropertyCode(query)) {
+        console.log('🎯 Loading more with property code search');
+        response = await searchService.smartSearch(backendFilters, {
+          page: nextPage,
+          limit: pageSize
+        });
+      } else {
+        if (!backendFilters.transactionType && (!backendFilters.selectedPropertyType || backendFilters.selectedPropertyType === 'any')) {
+          console.log('🌐 Loading more with getLatestProperties');
+          // For latest properties, use offset-based pagination
+          const offset = currentPage * pageSize;
+          response = await searchService.getLatestProperties(pageSize, offset);
+        } else {
+          console.log('🔍 Loading more with regular search');
+          response = await searchService.search(backendFilters, {
+            page: nextPage,
+            limit: pageSize
+          });
+        }
+      }
+      
+      console.log('📊 Load more completed:', {
+        newResultCount: response.results.length,
+        totalResults: searchState.results.length + response.results.length,
+        totalCount: response.totalCount
+      });
+      
+      setSearchState(prev => ({
+        ...prev,
+        results: [...prev.results, ...response.results],
+        totalCount: response.totalCount
+      }));
+      
+      setCurrentPage(nextPage);
+      
+    } catch (error) {
+      console.error('❌ Load more error:', error);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [currentPage, isLoadingMore, searchState.results.length, searchState.totalCount, searchFilters.filters, pageSize]);
+
+  /**
+   * Check if more results can be loaded
+   */
+  const canLoadMore = useCallback(() => {
+    return searchState.results.length < searchState.totalCount && !isLoadingMore;
+  }, [searchState.results.length, searchState.totalCount, isLoadingMore]);
+
   return {
     // Search filters (override clearAllFilters with enhanced version)
     ...searchFilters,
@@ -281,6 +360,12 @@ export const useSearch = (onSearchCallback?: (filters: SearchFilters) => void) =
     clearResults,
     getSearchSuggestions, // Enhanced suggestions with code support
     isValidPropertyCode, // NEW: Utility to check if query is valid property code
+    
+    // Pagination actions
+    loadMoreResults,
+    canLoadMore,
+    isLoadingMore,
+    currentPage,
     
     // Combined state for convenience
     searchState: {

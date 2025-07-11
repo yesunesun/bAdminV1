@@ -47,6 +47,18 @@ export interface SearchState {
   totalCount: number;
 }
 
+export interface SearchResponse {
+  results: SearchResult[];
+  totalCount: number;
+  page?: number;
+  limit?: number;
+}
+
+export interface SearchPaginationOptions {
+  page?: number;
+  limit?: number;
+}
+
 export type FilterType = 'actionType' | 'propertyType' | 'subType' | 'bhkType' | 'priceRange' | 'location'; // FIXED: Changed transactionType to actionType
 
 export interface SearchContainerProps {

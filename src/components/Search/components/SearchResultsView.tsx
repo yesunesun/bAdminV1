@@ -27,6 +27,9 @@ interface SearchResultsViewProps {
   className?: string;
   onViewDetails?: (propertyId: string) => void;
   onContactOwner?: (propertyId: string) => void;
+  onLoadMore?: () => void;
+  canLoadMore?: boolean;
+  isLoadingMore?: boolean;
 }
 
 const SearchResultsView: React.FC<SearchResultsViewProps> = ({
@@ -39,7 +42,10 @@ const SearchResultsView: React.FC<SearchResultsViewProps> = ({
   error = null,
   className = '',
   onViewDetails,
-  onContactOwner
+  onContactOwner,
+  onLoadMore,
+  canLoadMore = false,
+  isLoadingMore = false
 }) => {
   // State for managing view mode
   const [viewMode, setViewMode] = useState<ViewMode>('table');
@@ -142,6 +148,9 @@ const SearchResultsView: React.FC<SearchResultsViewProps> = ({
                 totalCount={totalCount}
                 onViewDetails={handleViewDetails}
                 onContactOwner={handleContactOwner}
+                onLoadMore={onLoadMore}
+                canLoadMore={canLoadMore}
+                isLoadingMore={isLoadingMore}
               />
             </div>
           )}
