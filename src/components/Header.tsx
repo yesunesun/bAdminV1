@@ -172,7 +172,8 @@ export function Header({ onFavoritesClick }: HeaderProps) {
       `}</style>
       
       <header className="w-full bg-card sticky top-0 z-50 shadow-sm">
-        <div className="flex h-20 items-center justify-between">
+        <div className="container-xl">
+          <div className="flex h-20 items-center justify-between">
           {/* Logo - using the centralized BrandLogo component */}
           <BrandLogo />
 
@@ -358,6 +359,7 @@ export function Header({ onFavoritesClick }: HeaderProps) {
               </div>
             )}
           </div>
+        </div>
         </div>
       </header>
     </>

@@ -11,7 +11,6 @@ import {
   IndianRupee, 
   MapPin, 
   Loader2, 
-  Pencil, 
   Trash2, 
   Globe, 
   Archive,
@@ -491,16 +490,6 @@ export function PropertyCard({
             )}
           </button>
           
-          {/* Edit Button - Only visible in development mode */}
-          {isDevMode && (
-            <Link 
-              to={`/properties/${property.id}/edit`}
-              className="flex items-center justify-center h-10 w-10 rounded-full bg-card border border-border hover:bg-muted/50 text-card-foreground transition-colors"
-              title="Edit Property"
-            >
-              <Pencil className="h-4.5 w-4.5" />
-            </Link>
-          )}
           
           {/* Delete Button - Only visible in development mode */}
           {isDevMode && (

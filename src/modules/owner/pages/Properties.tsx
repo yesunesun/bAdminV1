@@ -4,8 +4,6 @@
 // Purpose: Added confirmation dialog for property deletion
 
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Plus } from 'lucide-react';
 import { usePropertyOwner } from '../hooks/usePropertyOwner';
 import { PropertyList } from '../components/property/PropertyList';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
@@ -75,14 +73,8 @@ export default function Properties() {
   return (
     <div className="section-padding">
       <div className="container-xl">
-        <div className="flex justify-between items-center mb-6">
+        <div className="mb-6">
           <h1 className="text-3xl font-bold">My Properties</h1>
-          <Link to="/properties/list">
-            <Button className="flex items-center gap-2">
-              <Plus className="h-4 w-4" />
-              List New Property
-            </Button>
-          </Link>
         </div>
 
       <PropertyList 
