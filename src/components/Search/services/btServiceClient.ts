@@ -214,20 +214,8 @@ export class BtServiceClient {
 }
 
 // Default configuration
-const btServiceUrl = import.meta.env.VITE_BTSERVICE_URL || 'http://localhost:3001';
-console.log('🔧 btServiceClient config:', {
-  VITE_BTSERVICE_URL: import.meta.env.VITE_BTSERVICE_URL,
-  finalUrl: btServiceUrl,
-  mode: import.meta.env.MODE,
-  dev: import.meta.env.DEV
-});
-
-// TEMPORARY FIX: Force localhost for development
-const finalUrl = import.meta.env.DEV ? 'http://localhost:3001' : btServiceUrl;
-console.log('🔧 FORCED URL:', finalUrl);
-
 const defaultConfig: BtServiceConfig = {
-  baseUrl: finalUrl,
+  baseUrl: import.meta.env.VITE_BTSERVICE_URL || 'http://localhost:3001',
   timeout: 30000,
   retryAttempts: 3,
   retryDelay: 1000,
