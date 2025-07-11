@@ -20,9 +20,9 @@ export class BtServiceClient {
 
   constructor(config: BtServiceConfig) {
     this.baseUrl = config.baseUrl.replace(/\/$/, ''); // Remove trailing slash
-    this.timeout = config.timeout || 30000; // 30 seconds
+    this.timeout = config.timeout || 60000; // 60 seconds - increased for better reliability
     this.retryAttempts = config.retryAttempts || 3;
-    this.retryDelay = config.retryDelay || 1000; // 1 second
+    this.retryDelay = config.retryDelay || 2000; // 2 seconds - increased delay between retries
   }
 
   /**
@@ -50,6 +50,7 @@ export class BtServiceClient {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
+          'Accept-Encoding': 'identity', // Disable compression to fix ERR_CONTENT_DECODING_FAILED
           ...options.headers,
         },
       });
@@ -78,14 +79,22 @@ export class BtServiceClient {
     } catch (error) {
       clearTimeout(timeoutId);
       
+      const isNetworkError = error instanceof Error && 
+        (error.message.includes('Failed to fetch') || 
+         error.message.includes('Network request failed') ||
+         error.message.includes('AbortError'));
+      
       console.error(`❌ btService API Error [Attempt ${attempt}]:`, {
         url,
         error: error instanceof Error ? error.message : 'Unknown error',
+        isNetworkError,
         willRetry: attempt < this.retryAttempts
       });
 
       if (attempt < this.retryAttempts) {
-        await new Promise(resolve => setTimeout(resolve, this.retryDelay));
+        // Longer delay for network errors
+        const delay = isNetworkError ? this.retryDelay * 2 : this.retryDelay;
+        await new Promise(resolve => setTimeout(resolve, delay));
         return this.makeRequest<T>(endpoint, options, attempt + 1);
       }
 

@@ -85,7 +85,8 @@ export const useSearch = (onSearchCallback?: (filters: SearchFilters) => void) =
       original_actionType: filters.actionType,
       mapped_transactionType: transactionType,
       selectedPropertyType: filters.selectedPropertyType,
-      selectedSubType: filters.selectedSubType
+      selectedSubType: filters.selectedSubType,
+      fullFilters: filters
     });
     
     // Create a compatible filter object for the backend
@@ -96,6 +97,8 @@ export const useSearch = (onSearchCallback?: (filters: SearchFilters) => void) =
     
     // FIXED: Remove actionType from backend filters since backend uses transactionType
     delete (backendFilters as any).actionType;
+    
+    console.log('🔧 Backend filters after transformation:', backendFilters);
     
     return backendFilters;
   };
@@ -141,16 +144,34 @@ export const useSearch = (onSearchCallback?: (filters: SearchFilters) => void) =
         });
       } else {
         // ENHANCED: Handle 'any' action type by searching across all property types if no specific transaction type
-        if (!backendFilters.transactionType && (!backendFilters.selectedPropertyType || backendFilters.selectedPropertyType === 'any')) {
-          console.log('🌐 Action type is "any" and no specific property type - using getLatestProperties');
-          response = await searchService.getLatestProperties(pageSize, 0);
-        } else {
-          console.log('🔍 Using regular search with specific filters');
-          response = await searchService.search(backendFilters, {
-            page: 1,
-            limit: pageSize
-          });
-        }
+        console.log('🔍 DEBUG: Checking search path conditions:', {
+          hasTransactionType: !!backendFilters.transactionType,
+          transactionType: backendFilters.transactionType,
+          hasPropertyType: !!backendFilters.selectedPropertyType,
+          selectedPropertyType: backendFilters.selectedPropertyType,
+          condition1: !backendFilters.transactionType,
+          condition2: (!backendFilters.selectedPropertyType || backendFilters.selectedPropertyType === 'any'),
+          overallCondition: !backendFilters.transactionType && (!backendFilters.selectedPropertyType || backendFilters.selectedPropertyType === 'any')
+        });
+        
+        // SIMPLIFIED: Always use regular search when we have filters
+        console.log('🔍 Using regular search with specific filters');
+        response = await searchService.search(backendFilters, {
+          page: 1,
+          limit: pageSize
+        });
+        
+        // OLD LOGIC - commenting out for debugging
+        // if (!backendFilters.transactionType && (!backendFilters.selectedPropertyType || backendFilters.selectedPropertyType === 'any')) {
+        //   console.log('🌐 Action type is "any" and no specific property type - using getLatestProperties');
+        //   response = await searchService.getLatestProperties(pageSize, 0);
+        // } else {
+        //   console.log('🔍 Using regular search with specific filters');
+        //   response = await searchService.search(backendFilters, {
+        //     page: 1,
+        //     limit: pageSize
+        //   });
+        // }
       }
       
       console.log('📊 Search completed:', {

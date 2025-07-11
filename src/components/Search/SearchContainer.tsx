@@ -73,7 +73,9 @@ const SearchContainer: React.FC<SearchContainerProps> = ({
 
   const handleActionTypeChange = useCallback((value: string) => {
     console.log('🎯 SearchContainer: Action type changing to:', value);
+    console.log('🎯 SearchContainer: Current filters before change:', search.filters);
     search.updateFilter('actionType', value);
+    console.log('🎯 SearchContainer: This should trigger search in useEffect...');
   }, [search]);
 
   const handlePropertyTypeChange = useCallback((value: string) => {
@@ -154,6 +156,7 @@ const SearchContainer: React.FC<SearchContainerProps> = ({
     // We exclude searchQuery from this effect because it has its own trigger mechanism
     const timeoutId = setTimeout(() => {
       console.log('🔄 SearchContainer: Auto-triggering search after filter change...');
+      console.log('🔄 SearchContainer: Current filters during auto-trigger:', search.filters);
       search.handleSearch();
     }, 300); // 300ms debounce
 
