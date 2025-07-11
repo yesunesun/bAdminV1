@@ -148,7 +148,7 @@ export function PropertyList({
     const flow = property.property_details?.flow;
     const steps = property.property_details?.steps;
     
-    if (!flow || !steps) return 'Untitled Property';
+    if (!flow || !steps) return generateFallbackTitle(property);
     
     const { category, listingType } = flow;
     let stepId = '';
@@ -161,8 +161,88 @@ export function PropertyList({
       stepId = 'land_sale_basic_details';
     }
     
-    const title = steps[stepId]?.title || steps[stepId]?.propertyTitle || 'Untitled Property';
-    return title || 'Untitled Property';
+    const stepData = steps[stepId] || {};
+    const title = stepData.title || stepData.propertyTitle || stepData.name;
+    
+    if (title && title.trim()) {
+      return title;
+    }
+    
+    // Generate a descriptive title based on property details
+    return generateFallbackTitle(property);
+  };
+
+  // Helper function to generate a fallback title based on property details
+  const generateFallbackTitle = (property: Property): string => {
+    try {
+      const flow = property.property_details?.flow;
+      const steps = property.property_details?.steps;
+      
+      if (!flow || !steps) return 'Property Listing';
+      
+      const { category, listingType } = flow;
+      let stepId = '';
+      
+      if (category === 'residential') {
+        stepId = `res_${listingType}_basic_details`;
+      } else if (category === 'commercial') {
+        stepId = `com_${listingType}_basic_details`;
+      } else if (category === 'land') {
+        stepId = 'land_sale_basic_details';
+      }
+      
+      const stepData = steps[stepId] || {};
+      const bhkType = stepData.bhkType || '';
+      const propertyType = stepData.propertyType || '';
+      
+      // Get location data
+      let locationStepId = '';
+      if (category === 'residential') {
+        locationStepId = `res_${listingType}_location`;
+      } else if (category === 'commercial') {
+        locationStepId = `com_${listingType}_location`;
+      } else if (category === 'land') {
+        locationStepId = 'land_sale_location';
+      }
+      
+      const locationData = steps[locationStepId] || {};
+      const locality = locationData.locality || locationData.zone || '';
+      
+      // Build descriptive title
+      let title = '';
+      
+      if (bhkType && propertyType) {
+        title = `${bhkType} ${propertyType}`;
+      } else if (propertyType) {
+        title = propertyType;
+      } else if (category === 'land') {
+        title = 'Land';
+      } else {
+        title = 'Property';
+      }
+      
+      if (locality) {
+        title += ` in ${locality}`;
+      }
+      
+      // Add listing type context
+      if (listingType === 'rent') {
+        title += ' for Rent';
+      } else if (listingType === 'sale') {
+        title += ' for Sale';
+      } else if (listingType === 'pghostel') {
+        title += ' PG/Hostel';
+      } else if (listingType === 'flatmates') {
+        title += ' Flatmates';
+      } else if (listingType === 'coworking') {
+        title += ' Coworking';
+      }
+      
+      return title || 'Property Listing';
+    } catch (error) {
+      console.error('Error generating fallback title:', error);
+      return 'Property Listing';
+    }
   };
 
   const getPropertyAddress = (property: Property): string => {

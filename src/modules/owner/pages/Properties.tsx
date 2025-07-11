@@ -73,16 +73,17 @@ export default function Properties() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto p-4">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">My Properties</h1>
-        <Link to="/properties/list">
-          <Button className="flex items-center gap-2">
-            <Plus className="h-4 w-4" />
-            List New Property
-          </Button>
-        </Link>
-      </div>
+    <div className="section-padding">
+      <div className="container-xl">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-3xl font-bold">My Properties</h1>
+          <Link to="/properties/list">
+            <Button className="flex items-center gap-2">
+              <Plus className="h-4 w-4" />
+              List New Property
+            </Button>
+          </Link>
+        </div>
 
       <PropertyList 
         properties={properties}
@@ -118,6 +119,7 @@ export default function Properties() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   );
 }

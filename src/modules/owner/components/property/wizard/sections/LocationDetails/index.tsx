@@ -398,11 +398,8 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
 
   // NEW: Auto-fetch coordinates when Continue is clicked without coordinates
   const autoFetchCoordinates = useCallback(async () => {
-    console.log('[autoFetchCoordinates] Starting automatic coordinate fetching...');
-    
     // If coordinates already exist, no need to fetch
     if (hasValidCoordinates()) {
-      console.log('[autoFetchCoordinates] Valid coordinates already exist, skipping auto-fetch');
       return Promise.resolve(true);
     }
 
@@ -411,11 +408,8 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
 
     // Strategy 1: Try geocoding the address first (same as "Find on Map")
     if (values.address && values.address.trim()) {
-      console.log('[autoFetchCoordinates] Trying to geocode address:', values.address);
-      
       return new Promise<boolean>((resolve) => {
         if (!mapLoaded || !window.google || !window.google.maps) {
-          console.log('[autoFetchCoordinates] Google Maps not loaded, cannot geocode');
           setIsAutoFetchingCoordinates(false);
           resolve(false);
           return;
@@ -430,7 +424,6 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
           if (status === 'OK' && results && results.length > 0) {
             const location = results[0].geometry.location;
             
-            console.log('[autoFetchCoordinates] Geocoding successful:', location.lat(), location.lng());
             
             updateFormAndState('latitude', location.lat());
             updateFormAndState('longitude', location.lng());
@@ -447,7 +440,6 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
             setIsAutoFetchingCoordinates(false);
             resolve(true);
           } else {
-            console.log('[autoFetchCoordinates] Geocoding failed, trying current location...');
             setIsAutoFetchingCoordinates(false);
             resolve(false);
           }
@@ -456,11 +448,9 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
     }
 
     // Strategy 2: If no address or geocoding fails, try current location
-    console.log('[autoFetchCoordinates] No address available, trying current location...');
     
     return new Promise<boolean>((resolve) => {
       if (!navigator.geolocation) {
-        console.log('[autoFetchCoordinates] Geolocation not supported');
         setLocationError('Unable to get coordinates. Please use "Find on Map" or "Use My Location" buttons.');
         setIsAutoFetchingCoordinates(false);
         resolve(false);
@@ -471,7 +461,6 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
         (position) => {
           const { latitude, longitude } = position.coords;
           
-          console.log('[autoFetchCoordinates] Current location obtained:', latitude, longitude);
           
           updateFormAndState('latitude', latitude);
           updateFormAndState('longitude', longitude);
@@ -491,7 +480,6 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
           resolve(true);
         },
         (error) => {
-          console.log('[autoFetchCoordinates] Geolocation failed:', error.message);
           setLocationError('Unable to get coordinates automatically. Please use "Find on Map" or "Use My Location" buttons to set the location.');
           setIsAutoFetchingCoordinates(false);
           resolve(false);
@@ -526,13 +514,11 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
       event.preventDefault();
       event.stopPropagation();
 
-      console.log('[NavigationInterceptor] Coordinates missing, attempting auto-fetch...');
 
       try {
         const success = await autoFetchCoordinates();
         
         if (success) {
-          console.log('[NavigationInterceptor] Auto-fetch successful, coordinates obtained');
           // Allow navigation to proceed by re-triggering the navigation
           // Find the navigation button and trigger it again
           setTimeout(() => {
@@ -542,7 +528,6 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
             }
           }, 100);
         } else {
-          console.log('[NavigationInterceptor] Auto-fetch failed, showing error message');
           setLocationError('Coordinates are required to proceed. Please use "Find on Map" or "Use My Location" buttons to set the location.');
         }
       } catch (error) {

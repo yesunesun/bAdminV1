@@ -268,13 +268,6 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
             )}
           </div>
           
-          <div className="text-xs text-muted-foreground hidden sm:block">
-            {!loading && properties.length > 0 && (
-              <span className="bg-muted/50 px-3 py-1 rounded-full">
-                Click to view details
-              </span>
-            )}
-          </div>
         </div>
         
         {/* Property listing with proper scrolling and bottom spacing */}

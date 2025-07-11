@@ -23,7 +23,6 @@ import LoginPrompt from './components/LoginPrompt';
 import PropertyTypeSelection from '../components/PropertyTypeSelection';
 import WizardBreadcrumbs from '../components/WizardBreadcrumbs';
 import { FormNavigation } from '../components/FormNavigation';
-import FormDataDebug from '../components/FormDataDebug';
 
 // Hooks
 import { useStepNavigation } from './hooks/useStepNavigation';
@@ -504,16 +503,6 @@ export function PropertyForm({
         </div>
       </div>
 
-      {/* FormDataDebug component - only visible in development */}
-      {process.env.NODE_ENV === 'development' && (
-        <FormDataDebug 
-          form={form} 
-          currentStepId={flowSteps[formStep - 1]?.id}
-          currentStepNumber={formStep}
-          flowType={flowType}
-          position="right"
-        />
-      )}
     </div>
   );
 }
