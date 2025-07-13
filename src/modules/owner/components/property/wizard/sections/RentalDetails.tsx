@@ -20,6 +20,8 @@ import { RequiredLabel } from '@/components/ui/RequiredLabel';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useStepValidation } from '../hooks/useStepValidation';
+import { StepCompletionIndicator } from '../components/StepCompletionIndicator';
+import { useStepCompletion, DEFAULT_FIELD_LABELS } from '../hooks/useStepCompletion';
 import { cn } from '@/lib/utils';
 
 export const RentalDetails: React.FC<FormSectionProps> = ({ 
@@ -257,6 +259,26 @@ export const RentalDetails: React.FC<FormSectionProps> = ({
   // Get minimum date (today)
   const today = new Date().toISOString().split('T')[0];
 
+  // Calculate step completion
+  const stepCompletion = useStepCompletion({
+    requiredFields: [
+      'rentAmount', 'securityDeposit', 'maintenanceCharges', 
+      'availableFrom', 'furnishingStatus', 'preferredTenants'
+    ],
+    fieldLabels: {
+      ...DEFAULT_FIELD_LABELS,
+      rentAmount: 'Monthly Rent',
+      securityDeposit: 'Security Deposit',
+      maintenanceCharges: 'Maintenance Charges',
+      availableFrom: 'Available From',
+      furnishingStatus: 'Furnishing Status',
+      preferredTenants: 'Preferred Tenants'
+    },
+    form,
+    stepId,
+    values
+  });
+
   // ✅ NEW: Radio button component for preferences
   const PreferenceRadioGroup = ({ 
     name, 
@@ -296,25 +318,13 @@ export const RentalDetails: React.FC<FormSectionProps> = ({
       title="Rental Details"
       description="Specify your rental terms and preferences"
     >
-      {/* Validation Progress */}
-      {requiredFields.length > 0 && (
-        <div className="mb-6 p-3 bg-blue-50 rounded-lg border border-blue-200">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-blue-900">
-              Step Completion: {completionPercentage}%
-            </span>
-            <span className="text-xs text-blue-700">
-              {stepIsValid ? '✓ Ready to proceed' : 'Please complete required fields'}
-            </span>
-          </div>
-          <div className="w-full bg-blue-200 rounded-full h-2">
-            <div 
-              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-              style={{ width: `${completionPercentage}%` }}
-            />
-          </div>
-        </div>
-      )}
+      {/* Step Completion Progress Bar */}
+      <StepCompletionIndicator
+        completionPercentage={stepCompletion.completionPercentage}
+        unfilledFields={stepCompletion.unfilledFields}
+        isStepValid={stepCompletion.isStepValid}
+        variant="blue"
+      />
 
       <div className="space-y-6">
         {/* ✅ UPDATED: Rent Amount and Security Deposit with new Monthly Rent Amount design */}

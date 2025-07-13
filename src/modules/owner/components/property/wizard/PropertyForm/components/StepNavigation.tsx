@@ -99,67 +99,16 @@ const StepNavigation: React.FC<StepNavigationProps> = ({
   const isNextDisabled = !canProceed || isValidating;
   const isPrevDisabled = formStep === 1 || disablePrevious || isValidating;
 
-  // Progress indicator component
+  // Progress indicator component - REMOVED: Now handled by UnifiedStepIndicator
   const ProgressIndicator = () => {
-    if (!showProgress || variant === 'minimal') return null;
-
-    return (
-      <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400">
-        <div className="flex items-center gap-1">
-          {canProceed ? (
-            <CheckCircle2 className={cn(config.icon, 'text-green-500')} />
-          ) : (
-            <AlertCircle className={cn(config.icon, 'text-amber-500')} />
-          )}
-          <span className={config.text}>
-            {canProceed ? 'Ready to continue' : `${requiredFieldsRemaining} required field${requiredFieldsRemaining !== 1 ? 's' : ''} remaining`}
-          </span>
-        </div>
-        
-        {completionPercentage > 0 && (
-          <div className="flex items-center gap-1">
-            <div className="w-16 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-blue-500 transition-all duration-300 ease-out"
-                style={{ width: `${completionPercentage}%` }}
-              />
-            </div>
-            <span className={cn(config.text, 'text-slate-500 dark:text-slate-400 min-w-[3ch]')}>
-              {completionPercentage}%
-            </span>
-          </div>
-        )}
-      </div>
-    );
+    // Always return null - progress is now handled by UnifiedStepIndicator
+    return null;
   };
 
-  // Validation summary component
+  // Validation summary component - REMOVED: Now handled by UnifiedStepIndicator
   const ValidationSummary = () => {
-    if (!showValidationSummary || variant === 'minimal' || validationErrors.length === 0) return null;
-
-    return (
-      <div className="flex items-start gap-2 p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-md">
-        <AlertCircle className={cn(config.icon, 'text-red-500 mt-0.5 flex-shrink-0')} />
-        <div className="flex-1">
-          <p className={cn(config.text, 'text-red-700 dark:text-red-300 font-medium mb-1')}>
-            Please fix the following issues:
-          </p>
-          <ul className={cn(config.text, 'text-red-600 dark:text-red-400 space-y-0.5')}>
-            {validationErrors.slice(0, 3).map((error, index) => (
-              <li key={index} className="flex items-start gap-1">
-                <span className="text-red-400 select-none">•</span>
-                <span>{error}</span>
-              </li>
-            ))}
-            {validationErrors.length > 3 && (
-              <li className="text-red-500 font-medium">
-                + {validationErrors.length - 3} more issue{validationErrors.length - 3 !== 1 ? 's' : ''}
-              </li>
-            )}
-          </ul>
-        </div>
-      </div>
-    );
+    // Always return null - validation summary is now handled by UnifiedStepIndicator
+    return null;
   };
 
   if (variant === 'minimal') {

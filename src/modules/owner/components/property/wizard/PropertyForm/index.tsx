@@ -23,6 +23,8 @@ import LoginPrompt from './components/LoginPrompt';
 import PropertyTypeSelection from '../components/PropertyTypeSelection';
 import WizardBreadcrumbs from '../components/WizardBreadcrumbs';
 import { FormNavigation } from '../components/FormNavigation';
+import UnifiedStepIndicator from '../components/UnifiedStepIndicator';
+import { updateMandatoryFieldsStatus, calculateCompletionStats } from '../utils/mandatoryFieldsUtils';
 
 // Hooks
 import { useStepNavigation } from './hooks/useStepNavigation';
@@ -398,13 +400,19 @@ export function PropertyForm({
   const validationSummary = getValidationSummary();
   const validationErrors = validationSummary ? validationSummary.invalidFields.map(f => f.label) : [];
 
+  // Get mandatory fields for current step
+  const mandatoryFields = updateMandatoryFieldsStatus(form, currentStepId);
+  const completionStats = calculateCompletionStats(mandatoryFields);
+
   console.log('[PropertyForm] Rendering with validation:', {
     currentStepId,
     stepIsValid,
     canProceed: canProceedToNextStep(),
     completionPercentage,
     validationErrors,
-    stepValidationStatus
+    stepValidationStatus,
+    mandatoryFields,
+    completionStats
   });
 
   return (
@@ -424,7 +432,7 @@ export function PropertyForm({
           />
         </div>
 
-        {/* FIXED: Pass stepValidationStatus to FormNavigation */}
+        {/* Simplified FormNavigation without duplicate progress indicators */}
         <FormNavigation 
           currentStep={formStep} 
           onStepChange={(newStep) => {
@@ -442,6 +450,7 @@ export function PropertyForm({
         />
 
         <div className="p-6">
+
           {/* Error message - only show if NOT on review step */}
           {error && !isReviewStep && (
             <div className="mb-4 bg-destructive/10 border border-destructive/20 p-3 rounded-xl">
@@ -476,27 +485,23 @@ export function PropertyForm({
                 handleImageUploadComplete={handleImageUploadComplete}
               />
               
-              {/* Enhanced Step Navigation with Validation */}
+              {/* Simplified Step Navigation - only Previous/Next buttons */}
               <StepNavigation 
                 formStep={formStep}
                 STEPS={flowSteps}
                 handlePreviousStep={handlePreviousStepWithNavigation}
-                handleNextStep={handleNextStepWithValidation} // Use validation-enabled handler
+                handleNextStep={handleNextStepWithValidation}
                 isLastStep={isReviewStep}
                 disablePrevious={saving || saveInProgress}
-                
-                // Validation props
                 canProceed={canProceedToNextStep()}
-                isValidating={false}
-                validationErrors={validationErrors}
-                completionPercentage={completionPercentage}
-                requiredFieldsRemaining={validationSummary?.totalRequiredFields - validationSummary?.completedFields || 0}
-                
-                // UI props
-                showProgress={true}
-                showValidationSummary={true}
+                isValidating={saving || saveInProgress}
+                validationErrors={[]}
+                completionPercentage={0}
+                requiredFieldsRemaining={0}
+                showProgress={false}
+                showValidationSummary={false}
                 size="md"
-                variant="default"
+                variant="minimal"
               />
             </div>
           </div>

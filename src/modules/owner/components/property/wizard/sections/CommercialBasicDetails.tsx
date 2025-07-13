@@ -10,6 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { FormSectionProps } from '../types';
 import { RequiredLabel } from '@/components/ui/RequiredLabel';
 import { useStepValidation } from '../hooks/useStepValidation';
+import { StepCompletionIndicator } from '../components/StepCompletionIndicator';
+import { useStepCompletion, DEFAULT_FIELD_LABELS } from '../hooks/useStepCompletion';
 import {
   COMMERCIAL_PROPERTY_TYPES,
   PROPERTY_TO_BUILDING_TYPES,
@@ -315,31 +317,39 @@ export function CommercialBasicDetails({ form, mode = 'create', category, adType
     setFieldValue('commercialPropertyType', value, false);
   };
 
+  // Calculate step completion
+  const stepCompletion = useStepCompletion({
+    requiredFields: [
+      'propertyType', 'buildingType', 'ageOfProperty', 
+      'builtUpArea', 'floor', 'totalFloors'
+    ],
+    fieldLabels: {
+      ...DEFAULT_FIELD_LABELS,
+      propertyType: 'Property Type',
+      buildingType: 'Building Type',
+      ageOfProperty: 'Age of Property',
+      builtUpArea: 'Super Built Up Area',
+      floor: 'Floor',
+      totalFloors: 'Total Floors'
+    },
+    form,
+    stepId,
+    values
+  });
+
   return (
     <FormSection
       title="Commercial Property Details"
       description="Tell us about your commercial property"
       className="text-base"
     >
-      {/* Validation Progress */}
-      {requiredFields.length > 0 && (
-        <div className="mb-6 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
-              Step Completion: {completionPercentage}%
-            </span>
-            <span className="text-xs text-blue-700 dark:text-blue-300">
-              {stepIsValid ? '✓ Ready to proceed' : 'Please complete required fields'}
-            </span>
-          </div>
-          <div className="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-2">
-            <div 
-              className="bg-blue-600 dark:bg-blue-400 h-2 rounded-full transition-all duration-300"
-              style={{ width: `${completionPercentage}%` }}
-            />
-          </div>
-        </div>
-      )}
+      {/* Step Completion Progress Bar */}
+      <StepCompletionIndicator
+        completionPercentage={stepCompletion.completionPercentage}
+        unfilledFields={stepCompletion.unfilledFields}
+        isStepValid={stepCompletion.isStepValid}
+        variant="blue"
+      />
 
       <div className="space-y-4">
         {/* Commercial Property Type & Building Type */}

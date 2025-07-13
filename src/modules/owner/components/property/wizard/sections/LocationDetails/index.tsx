@@ -13,6 +13,8 @@ import { Button } from '@/components/ui/button';
 import { MapPin, Navigation } from 'lucide-react';
 import ErrorBoundary from '@/components/ui/ErrorBoundary';
 import { useStepValidation } from '../../hooks/useStepValidation';
+import { StepCompletionIndicator } from '../../components/StepCompletionIndicator';
+import { useStepCompletion, DEFAULT_FIELD_LABELS } from '../../hooks/useStepCompletion';
 
 export function LocationDetails({ form, stepId }: FormSectionProps) {
   // Initialize validation system
@@ -706,30 +708,35 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
     updateFormAndState('pinCode', numericValue);
   };
 
+  // Calculate step completion
+  const stepCompletion = useStepCompletion({
+    requiredFields: [
+      'address', 'locality', 'city', 'pinCode'
+    ],
+    fieldLabels: {
+      ...DEFAULT_FIELD_LABELS,
+      address: 'Address',
+      locality: 'Locality',
+      city: 'City',
+      pinCode: 'PIN Code'
+    },
+    form,
+    stepId: effectiveStepId,
+    values
+  });
+
   return (
     <FormSection
       title="Location Details"
       description="Where is your property located?"
     >
-      {/* Validation Progress */}
-      {requiredFields.length > 0 && (
-        <div className="mb-6 p-3 bg-blue-50 rounded-lg border border-blue-200">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-blue-900">
-              Step Completion: {completionPercentage}%
-            </span>
-            <span className="text-xs text-blue-700">
-              {stepIsValid ? '✓ Ready to proceed' : 'Please complete required fields'}
-            </span>
-          </div>
-          <div className="w-full bg-blue-200 rounded-full h-2">
-            <div 
-              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-              style={{ width: `${completionPercentage}%` }}
-            />
-          </div>
-        </div>
-      )}
+      {/* Step Completion Progress Bar */}
+      <StepCompletionIndicator
+        completionPercentage={stepCompletion.completionPercentage}
+        unfilledFields={stepCompletion.unfilledFields}
+        isStepValid={stepCompletion.isStepValid}
+        variant="blue"
+      />
 
       {/* AUTO-FETCH STATUS: Show when automatically fetching coordinates */}
       {isAutoFetchingCoordinates && (

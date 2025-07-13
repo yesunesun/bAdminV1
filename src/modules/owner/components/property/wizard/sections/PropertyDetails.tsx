@@ -9,6 +9,8 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FormSectionProps } from '../types';
 import { RequiredLabel } from '@/components/ui/RequiredLabel';
+import { StepCompletionIndicator } from '../components/StepCompletionIndicator';
+import { useStepCompletion, DEFAULT_FIELD_LABELS } from '../hooks/useStepCompletion';
 import {
   PROPERTY_TYPES,
   BHK_TYPES,
@@ -291,55 +293,38 @@ export function PropertyDetails({
     updateFormAndState(fieldName, numValue.toString());
   };
 
-  // Calculate completion percentage properly - only count fields that actually have values
-  const completionPercentage = () => {
-    const completedFields = requiredFields.filter(field => {
-      const value = values[field as keyof typeof values];
-      // Only count non-empty values
-      return value && value !== '' && value.toString().trim() !== '';
-    }).length;
-    
-    // Return 0 if no fields are completed, otherwise calculate percentage
-    if (completedFields === 0) return 0;
-    return Math.round((completedFields / requiredFields.length) * 100);
-  };
+  // Use reusable step completion hook
+  const stepCompletion = useStepCompletion({
+    requiredFields,
+    fieldLabels: {
+      ...DEFAULT_FIELD_LABELS,
+      bhkType: 'BHK',
+      propertyAge: 'Age',
+      facing: 'Facing',
+      builtUpArea: 'Built-up Area'
+    },
+    form,
+    stepId,
+    values
+  });
 
   // Get tomorrow's date for min date
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   const minDate = tomorrow.toISOString().split('T')[0];
 
-  const currentCompletion = completionPercentage();
-  const isStepValid = currentCompletion === 100;
-
   return (
     <FormSection
       title="Property Details"
       description="Tell us about your property"
     >
-      {/* Progress Indicator */}
-      <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-sm font-medium text-blue-900">
-            Step Completion: {currentCompletion}%
-          </span>
-          <span className="text-xs text-blue-700">
-            {isStepValid ? '✅ Ready to proceed' : '⚠️ Please complete required fields'}
-          </span>
-        </div>
-        <div className="w-full bg-blue-200 rounded-full h-2">
-          <div 
-            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-            style={{ width: `${currentCompletion}%` }}
-          />
-        </div>
-        {!isStepValid && (
-          <p className="text-xs text-blue-600 mt-2">
-            {/* ✅ UPDATED: Removed Bathrooms from required fields text */}
-            Required fields: Property Type, BHK, Floor, Total Floors, Age, Facing, Built-up Area, Available From
-          </p>
-        )}
-      </div>
+      {/* Step Completion Progress Bar */}
+      <StepCompletionIndicator
+        completionPercentage={stepCompletion.completionPercentage}
+        unfilledFields={stepCompletion.unfilledFields}
+        isStepValid={stepCompletion.isStepValid}
+        variant="blue"
+      />
 
       <div className="space-y-6">
         {/* Property Title (Edit mode only) */}

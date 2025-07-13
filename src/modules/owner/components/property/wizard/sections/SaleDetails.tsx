@@ -14,6 +14,8 @@ import { RequiredLabel } from '@/components/ui/RequiredLabel';
 import { ValidatedInput } from '@/components/ui/ValidatedInput';
 import { supabase } from '@/lib/supabase';
 import { useStepValidation } from '../hooks/useStepValidation';
+import { StepCompletionIndicator } from '../components/StepCompletionIndicator';
+import { useStepCompletion, DEFAULT_FIELD_LABELS } from '../hooks/useStepCompletion';
 import {
   FURNISHING_OPTIONS,
   PARKING_OPTIONS,
@@ -302,30 +304,35 @@ export function SaleDetails({ form, adType, stepId: providedStepId }: SaleDetail
     }
   };
 
+  // Calculate step completion
+  const stepCompletion = useStepCompletion({
+    requiredFields: [
+      'expectedPrice', 'furnishingStatus', 'kitchenType', 'parking'
+    ],
+    fieldLabels: {
+      ...DEFAULT_FIELD_LABELS,
+      expectedPrice: 'Expected Price',
+      furnishingStatus: 'Furnishing Status',
+      kitchenType: 'Kitchen Type',
+      parking: 'Parking'
+    },
+    form,
+    stepId: effectiveStepId,
+    values
+  });
+
   return (
     <FormSection
       title="Sale Details"
       description="Specify your property sale details"
     >
-      {/* FIXED: Added validation progress indicator like LocationDetails */}
-      {requiredFields.length > 0 && (
-        <div className="mb-6 p-3 bg-blue-50 rounded-lg border border-blue-200">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-blue-900">
-              Step Completion: {completionPercentage}%
-            </span>
-            <span className="text-xs text-blue-700">
-              {stepIsValid ? '✓ Ready to proceed' : 'Please complete required fields'}
-            </span>
-          </div>
-          <div className="w-full bg-blue-200 rounded-full h-2">
-            <div 
-              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-              style={{ width: `${completionPercentage}%` }}
-            />
-          </div>
-        </div>
-      )}
+      {/* Step Completion Progress Bar */}
+      <StepCompletionIndicator
+        completionPercentage={stepCompletion.completionPercentage}
+        unfilledFields={stepCompletion.unfilledFields}
+        isStepValid={stepCompletion.isStepValid}
+        variant="blue"
+      />
 
       <div className="space-y-4">
         {/* Expected Price and Maintenance Cost - Two Column */}

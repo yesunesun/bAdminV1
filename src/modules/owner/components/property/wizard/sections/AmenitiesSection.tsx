@@ -12,6 +12,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { FormSectionProps } from '../types';
 import { useStepValidation } from '../hooks/useStepValidation';
+import { StepCompletionIndicator } from '../components/StepCompletionIndicator';
+import { useStepCompletion, DEFAULT_FIELD_LABELS } from '../hooks/useStepCompletion';
 import { cn } from '@/lib/utils';
 import {
   Minus,
@@ -304,57 +306,35 @@ export function AmenitiesSection({ form, stepId = 'res_rent_features' }: FormSec
   // ✅ ENHANCED: Calculate if step is truly valid (including phone validation)
   const isStepCompletelyValid = stepIsValid && !isFormBlocked;
 
+  // Calculate step completion
+  const stepCompletion = useStepCompletion({
+    requiredFields: [
+      'bathrooms', 'propertyShowOption', 'propertyCondition', 'amenities'
+    ],
+    fieldLabels: {
+      ...DEFAULT_FIELD_LABELS,
+      bathrooms: 'Bathrooms',
+      propertyShowOption: 'Who Shows Property',
+      propertyCondition: 'Property Condition',
+      amenities: 'Amenities'
+    },
+    form,
+    stepId,
+    values
+  });
+
   return (
     <FormSection
       title="Amenities & Features"
       description="What does your property offer?"
     >
-      {/* Validation Progress - Enhanced with form blocking indicator */}
-      {requiredFields.length > 0 && (
-        <div className={`mb-6 p-3 rounded-lg border ${
-          isFormBlocked 
-            ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
-            : 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
-        }`}>
-          <div className="flex items-center justify-between mb-2">
-            <span className={`text-sm font-medium ${
-              isFormBlocked 
-                ? 'text-red-900 dark:text-red-100' 
-                : 'text-blue-900 dark:text-blue-100'
-            }`}>
-              Step Completion: {completionPercentage}%
-            </span>
-            <span className={`text-xs ${
-              isFormBlocked 
-                ? 'text-red-700 dark:text-red-300' 
-                : isStepCompletelyValid 
-                  ? 'text-green-700 dark:text-green-300' 
-                  : 'text-blue-700 dark:text-blue-300'
-            }`}>
-              {isFormBlocked 
-                ? '⚠️ Fix validation errors to proceed' 
-                : isStepCompletelyValid 
-                  ? '✓ Ready to proceed' 
-                  : 'Please complete required fields'
-              }
-            </span>
-          </div>
-          <div className={`w-full rounded-full h-2 ${
-            isFormBlocked 
-              ? 'bg-red-200 dark:bg-red-800' 
-              : 'bg-blue-200 dark:bg-blue-800'
-          }`}>
-            <div 
-              className={`h-2 rounded-full transition-all duration-300 ${
-                isFormBlocked 
-                  ? 'bg-red-600 dark:bg-red-400' 
-                  : 'bg-blue-600 dark:bg-blue-400'
-              }`}
-              style={{ width: `${completionPercentage}%` }}
-            />
-          </div>
-        </div>
-      )}
+      {/* Step Completion Progress Bar */}
+      <StepCompletionIndicator
+        completionPercentage={stepCompletion.completionPercentage}
+        unfilledFields={stepCompletion.unfilledFields}
+        isStepValid={stepCompletion.isStepValid && !isFormBlocked}
+        variant="blue"
+      />
 
       <div className="space-y-6">
         {/* Bathrooms and Balconies Counter */}

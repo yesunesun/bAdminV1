@@ -493,18 +493,12 @@ const NavigationComponent = (props: FormNavigationProps) => {
             const stepNumber = index + 1;
             const isActive = currentStep === stepNumber;
             const isPassed = currentStep > stepNumber;
-            const stepValidation = stepValidationStatus[stepNumber];
             
-            // ✅ ENHANCED: Improved clickable logic with proper validation checking
+            // Simple clickable logic - allow navigation to previous steps and current step
             const isClickable = 
               stepNumber < currentStep || // Previous steps are always clickable
               stepNumber === currentStep || // Current step is clickable (refresh)
               (stepNumber === currentStep + 1 && stepValidationStatus[currentStep]?.isValid); // Next step only if current is valid
-            
-            // ✅ ENHANCED: Better visual indicators for validation status
-            const hasValidationInfo = stepValidation !== undefined;
-            const isValid = stepValidation?.isValid ?? true;
-            const completionPercentage = stepValidation?.completionPercentage ?? 100;
             
             return (
               <button
@@ -512,61 +506,24 @@ const NavigationComponent = (props: FormNavigationProps) => {
                 type="button"
                 disabled={!isClickable}
                 onClick={() => handleStepClick(index, step.id)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  padding: '0.5rem 0.75rem',
-                  fontSize: '0.875rem',
-                  borderRadius: '0.5rem',
-                  transition: 'all 0.2s',
-                  backgroundColor: isActive 
-                    ? (isValid ? '#0ea5e9' : '#ef4444') 
-                    : isPassed 
-                    ? '#e0f2fe' 
-                    : '#f1f5f9',
-                  color: isActive 
-                    ? 'white' 
-                    : isPassed 
-                    ? '#0ea5e9' 
-                    : '#334155',
-                  opacity: isClickable ? 1 : 0.6,
-                  cursor: isClickable ? 'pointer' : 'not-allowed',
-                  border: hasValidationInfo && !isValid && isActive ? '2px solid #fbbf24' : 'none',
-                  outline: 'none',
-                  position: 'relative'
-                }}
                 className={cn(
-                  "flex items-center px-3 py-2 text-sm rounded-lg transition-colors relative",
+                  "flex items-center px-3 py-2 text-sm rounded-lg transition-colors",
                   "focus:outline-none focus:ring-2 focus:ring-ring/30",
                   isActive 
-                    ? (isValid ? "bg-primary text-primary-foreground" : "bg-destructive text-destructive-foreground")
+                    ? "bg-primary text-primary-foreground"
                     : isPassed
                     ? "bg-primary/10 text-primary hover:bg-primary/20"
                     : "bg-secondary text-secondary-foreground hover:bg-secondary/90",
                   !isClickable && "opacity-60 cursor-not-allowed"
                 )}
-                title={
-                  hasValidationInfo 
-                    ? `${step.title} - ${completionPercentage}% complete ${isValid ? '✓' : '⚠️'}`
-                    : step.title
-                }
+                title={step.title}
               >
                 <IconComponent className="w-4 h-4 mr-1.5" style={{ marginRight: '0.375rem' }} />
                 <span>{step.title}</span>
                 
-                {/* ✅ ENHANCED: Better validation indicator */}
-                {hasValidationInfo && isActive && (
-                  <div 
-                    className="absolute -bottom-1 left-0 h-1 bg-current rounded-b-lg transition-all duration-300"
-                    style={{ width: `${completionPercentage}%` }}
-                  />
-                )}
-                
-                {/* ✅ ENHANCED: Status icon */}
-                {hasValidationInfo && isActive && (
-                  <span className="ml-1 text-xs">
-                    {isValid ? '✓' : '⚠️'}
-                  </span>
+                {/* Simple completion indicator */}
+                {isPassed && (
+                  <span className="ml-1 text-xs opacity-75">✓</span>
                 )}
               </button>
             );

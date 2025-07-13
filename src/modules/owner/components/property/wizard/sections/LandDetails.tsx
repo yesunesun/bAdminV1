@@ -10,6 +10,8 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useStepValidation } from '../hooks/useStepValidation';
+import { StepCompletionIndicator } from '../components/StepCompletionIndicator';
+import { useStepCompletion, DEFAULT_FIELD_LABELS } from '../hooks/useStepCompletion';
 import { cn } from '@/lib/utils';
 import { FormSectionProps } from '../types';
 import { 
@@ -138,31 +140,36 @@ const LandDetails: React.FC<FormSectionProps> = ({
   };
 
   const isAgricultural = localState.propertyType === 'Agricultural Land';
+
+  // Calculate step completion
+  const stepCompletion = useStepCompletion({
+    requiredFields: [
+      'propertyType', 'builtUpArea', 'expectedPrice', 'plotFacing'
+    ],
+    fieldLabels: {
+      ...DEFAULT_FIELD_LABELS,
+      propertyType: 'Land/Plot Type',
+      builtUpArea: 'Total Area',
+      expectedPrice: 'Expected Price',
+      plotFacing: 'Plot Facing'
+    },
+    form,
+    stepId,
+    values: localState
+  });
   
   return (
     <FormSection
       title="Land/Plot Details"
       description="Provide details about your land or plot for sale"
     >
-      {/* ✅ Progress indicator */}
-      {requiredFields.length > 0 && (
-        <div className="mb-6 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
-              Step Completion: {completionPercentage}%
-            </span>
-            <span className="text-xs text-blue-700 dark:text-blue-300">
-              {stepIsValid ? '✓ Ready to proceed' : 'Please complete required fields'}
-            </span>
-          </div>
-          <div className="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-2">
-            <div 
-              className="bg-blue-600 dark:bg-blue-400 h-2 rounded-full transition-all duration-300"
-              style={{ width: `${completionPercentage}%` }}
-            />
-          </div>
-        </div>
-      )}
+      {/* Step Completion Progress Bar */}
+      <StepCompletionIndicator
+        completionPercentage={stepCompletion.completionPercentage}
+        unfilledFields={stepCompletion.unfilledFields}
+        isStepValid={stepCompletion.isStepValid}
+        variant="blue"
+      />
 
       <div className="space-y-6">
         {/* Land Type - ✅ FIXED: Now uses propertyType and has required=true */}
