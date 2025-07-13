@@ -177,10 +177,10 @@ export function PropertyDetails({
     return touchedFields.has(fieldName) && validationErrors[fieldName];
   };
 
-  // ✅ UPDATED: State for form values - removed bathrooms
+  // ✅ UPDATED: State for form values - removed bathrooms and removed auto-default propertyType
   const [values, setValues] = useState({
     title: getField('title', ''),
-    propertyType: getField('propertyType', '') || category || 'Apartment',
+    propertyType: getField('propertyType', ''),
     bhkType: getField('bhkType', ''),
     floor: getField('floor', ''),
     totalFloors: getField('totalFloors', ''),
@@ -198,19 +198,13 @@ export function PropertyDetails({
     };
   }, []);
 
-  // ✅ UPDATED: Initialize and migrate data - removed bathrooms handling
+  // ✅ UPDATED: Initialize and migrate data - removed bathrooms handling and removed auto-default propertyType
   useEffect(() => {
     if (initialProcessDone.current) return;
     
     initialProcessDone.current = true;
     
-    // Set default property type if none exists
-    if (!getField('propertyType')) {
-      const defaultPropertyType = category || 'Apartment';
-      saveField('propertyType', defaultPropertyType);
-    }
-    
-    // Ensure default area unit
+    // Ensure default area unit only (removed auto-setting of propertyType)
     if (!getField('builtUpAreaUnit')) {
       saveField('builtUpAreaUnit', 'sqft');
     }
@@ -261,7 +255,7 @@ export function PropertyDetails({
     
     const newValues = {
       title: stepData.title || formValues.title || '',
-      propertyType: stepData.propertyType || formValues.propertyType || category || 'Apartment',
+      propertyType: stepData.propertyType || formValues.propertyType || '',
       bhkType: stepData.bhkType || formValues.bhkType || '',
       floor: stepData.floor?.toString() || formValues.floor || '',
       totalFloors: stepData.totalFloors?.toString() || formValues.totalFloors || '',

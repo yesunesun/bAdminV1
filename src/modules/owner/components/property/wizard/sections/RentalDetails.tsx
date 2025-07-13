@@ -324,6 +324,7 @@ export const RentalDetails: React.FC<FormSectionProps> = ({
             <RequiredLabel htmlFor="rentAmount" required>
               Monthly Rent Amount (₹)
             </RequiredLabel>
+            <p className="text-sm text-muted-foreground">Expected monthly rent amount</p>
             <div className="relative">
               <Input
                 id="rentAmount"

@@ -574,28 +574,25 @@ export function AmenitiesSection({ form, stepId = 'res_rent_features' }: FormSec
               const isSelected = (values.amenities || []).includes(amenity);
               
               return (
-                <div
+                <label
                   key={amenity}
+                  htmlFor={`amenity-${amenity}`}
                   className={`flex items-center gap-3 p-3 rounded-lg border transition-colors cursor-pointer ${
                     isSelected 
                       ? 'border-blue-300 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30' 
                       : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800'
                   }`}
-                  onClick={() => handleAmenityToggle(amenity, !isSelected)}
                 >
                   <Checkbox
                     id={`amenity-${amenity}`}
                     checked={isSelected}
                     onCheckedChange={(checked) => handleAmenityToggle(amenity, !!checked)}
                   />
-                  <label
-                    htmlFor={`amenity-${amenity}`}
-                    className="flex items-center gap-2 text-gray-700 dark:text-gray-300 cursor-pointer flex-1"
-                  >
+                  <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300 flex-1">
                     {Icon && <Icon className="h-4 w-4 text-gray-500 dark:text-gray-400" />}
                     <span className="text-sm font-medium">{amenity}</span>
-                  </label>
-                </div>
+                  </div>
+                </label>
               );
             })}
           </div>
