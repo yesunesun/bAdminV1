@@ -7,7 +7,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { X, ImageIcon, Upload, AlertCircle, Video, Play, Trash2, CheckCircle } from 'lucide-react';
+import { X, ImageIcon, Upload, AlertCircle, Video, Play, Trash2, CheckCircle, Zap } from 'lucide-react';
 import { PropertyDetails, PropertyVideo } from '../../hooks/usePropertyDetails';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
@@ -15,6 +15,8 @@ import { useToast } from '@/components/ui/use-toast';
 import { useVideoUploadSimple as useVideoUpload, validateVideoFile } from '../../hooks/useVideoUploadSimple';
 import { propertyVideoStorage } from '@/lib/supabase';
 import PropertyVideoPlayer from './PropertyVideoPlayer';
+import { imageOptimizationService } from '@/services/imageOptimizationService';
+import { validateImageFile, formatFileSize as formatFileSizeUtil } from '@/utils/imageOptimization';
 
 interface PropertyImageUploadProps {
   property: PropertyDetails;
@@ -53,6 +55,14 @@ const PropertyImageUpload: React.FC<PropertyImageUploadProps> = ({
   const [successMessage, setSuccessMessage] = useState('');
   const [imagesChanged, setImagesChanged] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [optimizing, setOptimizing] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [optimizationProgress, setOptimizationProgress] = useState(0);
+  const [optimizationStats, setOptimizationStats] = useState<{
+    totalSaved: number;
+    averageCompression: number;
+    optimizationTime: number;
+  } | null>(null);
   const [images, setImages] = useState<PropertyImage[]>([]);
   const [dragActive, setDragActive] = useState(false);
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
@@ -80,7 +90,7 @@ const PropertyImageUpload: React.FC<PropertyImageUploadProps> = ({
   // Video upload hook
   const {
     isUploading: isUploadingVideo,
-    uploadProgress,
+    uploadProgress: videoUploadProgress,
     error: uploadError,
     videoUrl,
     fileName,
@@ -176,35 +186,105 @@ const PropertyImageUpload: React.FC<PropertyImageUploadProps> = ({
     }
   }, [property]);
 
-  // Generate signed URLs for all images
+  // Generate URLs for all images with optimization support
   const generateSignedUrls = async (imageFiles: PropertyImage[]) => {
     if (!property?.id || !imageFiles || imageFiles.length === 0) return;
     
     const urlMap: Record<string, string> = {};
     
     for (const img of imageFiles) {
-      if (!img.fileName || img.fileName.startsWith('legacy-') || img.fileName.startsWith('img-')) {
+      if (!img.fileName) {
+        console.log(`[PropertyImageUpload] Skipping image with no fileName: ${img.id}`);
+        continue;
+      }
+
+      // Handle optimization records
+      if (img.fileName.startsWith('optimization_')) {
+        try {
+          const optimizationId = img.fileName.replace('optimization_', '');
+          console.log(`[PropertyImageUpload] Loading optimization record: ${optimizationId}`);
+          
+          const { data: optRecord, error: optError } = await supabase
+            .from('image_optimizations')
+            .select('*')
+            .eq('id', optimizationId)
+            .single();
+            
+          if (optError || !optRecord) {
+            console.warn(`[PropertyImageUpload] Optimization record not found: ${optimizationId}`);
+            continue;
+          }
+          
+          // Use public URL for medium variant (fastest loading)
+          if (optRecord.medium_path) {
+            const { data } = supabase.storage
+              .from(STORAGE_BUCKET)
+              .getPublicUrl(optRecord.medium_path);
+            
+            if (data?.publicUrl) {
+              urlMap[img.id] = data.publicUrl;
+              console.log(`[PropertyImageUpload] Loaded optimization image: ${optimizationId}`);
+              continue;
+            }
+          }
+          
+          // Fallback to full or thumbnail if medium not available
+          if (optRecord.full_path) {
+            const { data } = supabase.storage
+              .from(STORAGE_BUCKET)
+              .getPublicUrl(optRecord.full_path);
+            if (data?.publicUrl) {
+              urlMap[img.id] = data.publicUrl;
+              continue;
+            }
+          }
+          
+          if (optRecord.thumbnail_path) {
+            const { data } = supabase.storage
+              .from(STORAGE_BUCKET)
+              .getPublicUrl(optRecord.thumbnail_path);
+            if (data?.publicUrl) {
+              urlMap[img.id] = data.publicUrl;
+              continue;
+            }
+          }
+          
+        } catch (err) {
+          console.error(`[PropertyImageUpload] Error loading optimization record: ${img.fileName}`, err);
+        }
+      }
+      
+      // Handle legacy images (old format)
+      else if (img.fileName.startsWith('legacy-') || img.fileName.startsWith('img-')) {
+        console.log(`[PropertyImageUpload] Skipping legacy image: ${img.fileName}`);
         continue;
       }
       
-      try {
-        const { data, error } = await supabase
-          .storage
-          .from(STORAGE_BUCKET)
-          .createSignedUrl(`${property.id}/${img.fileName}`, 3600);
+      // Handle old storage-based filenames (try direct path)
+      else {
+        try {
+          const filePath = `${property.id}/${img.fileName}`;
+          console.log(`[PropertyImageUpload] Attempting to generate signed URL for: ${filePath}`);
           
-        if (error) {
-          console.error(`[PropertyImageUpload] Error generating signed URL for ${img.fileName}:`, error);
-          continue;
+          const { data, error } = await supabase
+            .storage
+            .from(STORAGE_BUCKET)
+            .createSignedUrl(filePath, 3600);
+            
+          if (error) {
+            console.warn(`[PropertyImageUpload] File not found in storage: ${img.fileName}`);
+            continue;
+          }
+          
+          urlMap[img.id] = data.signedUrl;
+          console.log(`[PropertyImageUpload] Successfully generated signed URL for ${img.fileName}`);
+        } catch (err) {
+          console.error(`[PropertyImageUpload] Unexpected error generating signed URL for ${img.fileName}:`, err);
         }
-        
-        urlMap[img.id] = data.signedUrl;
-        console.log(`[PropertyImageUpload] Generated signed URL for ${img.fileName}`);
-      } catch (err) {
-        console.error(`[PropertyImageUpload] Error generating signed URL:`, err);
       }
     }
     
+    console.log(`[PropertyImageUpload] Generated ${Object.keys(urlMap).length} URLs out of ${imageFiles.length} images`);
     setImageUrls(urlMap);
   };
 
@@ -264,14 +344,21 @@ const PropertyImageUpload: React.FC<PropertyImageUploadProps> = ({
 
   // Handle drop event
   const handleDrop = (e: React.DragEvent) => {
+    console.log('[PropertyImageUpload] Files dropped');
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
     
     const files = Array.from(e.dataTransfer.files);
+    console.log('[PropertyImageUpload] Dropped files:', files.length, files.map(f => f.name));
     
     if (activeTab === 'images') {
-      handleFiles(files);
+      if (files.length > 0) {
+        console.log('[PropertyImageUpload] Processing dropped image files');
+        handleFiles(files);
+      } else {
+        console.log('[PropertyImageUpload] No files to process');
+      }
     } else {
       // Handle video files
       const videoFiles = files.filter(file => file.type.startsWith('video/'));
@@ -283,7 +370,15 @@ const PropertyImageUpload: React.FC<PropertyImageUploadProps> = ({
 
   // Handle file selection for images
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('[PropertyImageUpload] File input changed');
     const files = event.target.files ? Array.from(event.target.files) : [];
+    console.log('[PropertyImageUpload] Selected files:', files.length, files.map(f => f.name));
+    
+    if (files.length === 0) {
+      console.log('[PropertyImageUpload] No files selected');
+      return;
+    }
+    
     handleFiles(files);
     
     // Reset the input value so the same file can be selected again if needed
@@ -305,8 +400,10 @@ const PropertyImageUpload: React.FC<PropertyImageUploadProps> = ({
     }
   };
 
-  // Process selected image files
+  // Process selected image files with optimization
   const handleFiles = async (files: File[]) => {
+    console.log('[PropertyImageUpload] handleFiles called with', files.length, 'files');
+    
     if (!property?.id) {
       setErrorMessage('Property ID is required for uploading images');
       return;
@@ -328,27 +425,151 @@ const PropertyImageUpload: React.FC<PropertyImageUploadProps> = ({
       return;
     }
 
-    // Check file sizes (limit to max file size)
-    const oversizedFiles = imageFiles.filter(file => file.size > MAX_FILE_SIZE);
-    if (oversizedFiles.length > 0) {
-      setErrorMessage(`Some files exceed the ${MAX_FILE_SIZE / (1024 * 1024)}MB size limit.`);
-      return;
+    // Validate files using the optimization service validation
+    const validFiles: File[] = [];
+    const validationErrors: string[] = [];
+
+    for (const file of imageFiles) {
+      try {
+        const validation = validateImageFile(file);
+        if (validation.valid) {
+          validFiles.push(file);
+        } else {
+          validationErrors.push(`${file.name}: ${validation.error}`);
+        }
+      } catch (validationError) {
+        console.error('[PropertyImageUpload] Validation error:', validationError);
+        validationErrors.push(`${file.name}: Validation failed`);
+      }
     }
+
+    if (validationErrors.length > 0) {
+      setErrorMessage(`File validation errors: ${validationErrors.join(', ')}`);
+      if (validFiles.length === 0) return;
+    }
+
+    console.log('[PropertyImageUpload] Processing', validFiles.length, 'valid files');
 
     setErrorMessage('');
     setSuccessMessage('');
+    setOptimizing(true);
     setUploading(true);
     
+    const optimizationResults: Array<{
+      originalSize: number;
+      optimizedSize: number;
+      compressionRatio: number;
+      optimizationTime: number;
+    }> = [];
+
+    const newImages: PropertyImage[] = [];
+    const newImageUrls: Record<string, string> = {};
+    
     try {
-      for (const file of imageFiles) {
-        await uploadImage(file);
+      for (const [idx, file] of validFiles.entries()) {
+        try {
+          // Update optimization progress
+          setOptimizationProgress((idx / validFiles.length) * 50); // 50% for optimization phase
+
+          console.log(`[PropertyImageUpload] Processing file ${idx + 1}/${validFiles.length}: ${file.name}`);
+          
+          // Use the image optimization service
+          const optimizationResult = await imageOptimizationService.uploadAndOptimizeImage(
+            file,
+            property.id,
+            images.length + idx,
+            'gallery'
+          );
+
+          if (!optimizationResult.success) {
+            throw new Error(optimizationResult.error || 'Image optimization failed');
+          }
+
+          // Update upload progress
+          setUploadProgress(((idx + 1) / validFiles.length) * 50 + 50); // 50% for upload phase
+
+          // Create PropertyImage record from optimization result
+          const imageId = `opt_${optimizationResult.optimizationRecord.id}`;
+          const isPrimary = (images.length + idx) === 0; // First image overall is primary
+
+          const newImage: PropertyImage = {
+            id: imageId,
+            fileName: `optimization_${optimizationResult.optimizationRecord.id}`, // Store reference to optimization record
+            isPrimary
+          };
+
+          newImages.push(newImage);
+
+          // Store the optimized image URLs (these are already signed/public URLs from the service)
+          newImageUrls[imageId] = optimizationResult.urls.medium || optimizationResult.urls.full || optimizationResult.urls.thumbnail || '';
+
+          // Calculate compression stats for UI
+          const originalSize = optimizationResult.optimizationRecord.original_size_bytes;
+          const optimizedSize = (optimizationResult.optimizationRecord.thumbnail_size_bytes || 0) +
+                               (optimizationResult.optimizationRecord.medium_size_bytes || 0) +
+                               (optimizationResult.optimizationRecord.full_size_bytes || 0);
+          
+          const compressionRatio = Math.round(((originalSize - optimizedSize) / originalSize) * 100);
+
+          optimizationResults.push({
+            originalSize,
+            optimizedSize,
+            compressionRatio,
+            optimizationTime: optimizationResult.optimizationRecord.optimization_time_ms
+          });
+
+          console.log(`[PropertyImageUpload] Successfully processed file ${idx + 1}: ${file.name}`);
+        } catch (fileError) {
+          console.error(`[PropertyImageUpload] Error processing file ${file.name}:`, fileError);
+          // Continue with other files instead of failing completely
+          setErrorMessage(`Failed to process ${file.name}: ${fileError.message}`);
+        }
       }
-      setSuccessMessage(`Successfully uploaded ${imageFiles.length} image${imageFiles.length > 1 ? 's' : ''}`);
+
+      if (newImages.length > 0) {
+        // Update states with all new images at once
+        const updatedImages = [...images, ...newImages];
+        setImages(updatedImages);
+        setImageUrls(prev => ({...prev, ...newImageUrls}));
+
+        // Calculate and display optimization stats
+        const totalOriginalSize = optimizationResults.reduce((sum, result) => sum + result.originalSize, 0);
+        const totalOptimizedSize = optimizationResults.reduce((sum, result) => sum + result.optimizedSize, 0);
+        const averageCompression = optimizationResults.length > 0 
+          ? optimizationResults.reduce((sum, result) => sum + result.compressionRatio, 0) / optimizationResults.length 
+          : 0;
+        const totalOptimizationTime = optimizationResults.reduce((sum, result) => sum + result.optimizationTime, 0);
+
+        setOptimizationStats({
+          totalSaved: totalOriginalSize - totalOptimizedSize,
+          averageCompression,
+          optimizationTime: totalOptimizationTime
+        });
+
+        // Update property in database with all images
+        try {
+          await saveImagesToProperty(updatedImages);
+          console.log('[PropertyImageUpload] Successfully saved images to property');
+        } catch (saveError) {
+          console.error('[PropertyImageUpload] Error saving images to property:', saveError);
+          setErrorMessage('Images were optimized but failed to save to property. Please try again.');
+          return;
+        }
+
+        setSuccessMessage(`Successfully uploaded and optimized ${newImages.length} image${newImages.length > 1 ? 's' : ''}. ${optimizationResults.length > 0 ? `Saved ${formatFileSize(totalOriginalSize - totalOptimizedSize)} (${Math.round(averageCompression)}% compression)` : ''}`);
+        setImagesChanged(true);
+      } else {
+        setErrorMessage('No images were successfully processed. Please try again.');
+      }
+      
     } catch (err) {
-      console.error('[PropertyImageUpload] Error uploading files:', err);
-      setErrorMessage('Failed to upload one or more images. Please try again.');
+      console.error('[PropertyImageUpload] Error uploading and optimizing files:', err);
+      setErrorMessage(`Failed to upload and optimize images: ${err.message}`);
     } finally {
+      setOptimizing(false);
       setUploading(false);
+      setOptimizationProgress(0);
+      setUploadProgress(0);
     }
   };
 
@@ -380,92 +601,6 @@ const PropertyImageUpload: React.FC<PropertyImageUploadProps> = ({
     }
   };
 
-  // Upload a single image to Supabase storage
-  const uploadImage = async (file: File) => {
-    if (!property?.id) return;
-
-    try {
-      // Generate a unique filename with timestamp and random string
-      const timestamp = Date.now();
-      const randomString = Math.random().toString(36).substring(2, 10);
-      const fileExtension = file.name.split('.').pop() || 'jpg';
-      const fileName = `${timestamp}_${randomString}.${fileExtension}`;
-      
-      // Full path where the file will be stored
-      const filePath = `${property.id}/${fileName}`;
-      
-      console.log(`[PropertyImageUpload] Uploading file to ${STORAGE_BUCKET}/${filePath}`);
-      
-      // Upload file directly to Supabase storage
-      const { data, error } = await supabase
-        .storage
-        .from(STORAGE_BUCKET)
-        .upload(filePath, file, {
-          cacheControl: '3600', // 1 hour cache
-          upsert: true
-        });
-        
-      if (error) {
-        console.error('[PropertyImageUpload] Storage upload error:', error);
-        throw error;
-      }
-      
-      if (!data) {
-        throw new Error('Upload failed: No data returned');
-      }
-      
-      console.log(`[PropertyImageUpload] Image uploaded successfully. Path: ${filePath}`);
-      
-      // Create a unique ID for the image
-      const imageId = `img_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-      
-      // Determine if this should be the primary image
-      const isPrimary = images.length === 0;
-      
-      // Generate a signed URL for the uploaded image
-      const { data: urlData, error: urlError } = await supabase
-        .storage
-        .from(STORAGE_BUCKET)
-        .createSignedUrl(filePath, 3600);
-        
-      if (urlError) {
-        console.error('[PropertyImageUpload] Error generating signed URL:', urlError);
-      } else {
-        // Store the signed URL in our cache
-        setImageUrls(prev => ({
-          ...prev,
-          [imageId]: urlData.signedUrl
-        }));
-      }
-      
-      // Add the new image to our local state
-      const newImage = { 
-        id: imageId, 
-        fileName: fileName, 
-        isPrimary
-      };
-      
-      // If this is the first image, make it primary
-      // Otherwise, update existing images to be non-primary
-      let updatedImages: PropertyImage[];
-      if (isPrimary) {
-        updatedImages = [...images.map(img => ({ ...img, isPrimary: false })), newImage];
-      } else {
-        updatedImages = [...images, newImage];
-      }
-      
-      // Save back to the database
-      await saveImagesToProperty(updatedImages);
-      
-      // Update local state
-      setImages(updatedImages);
-      setImagesChanged(true);
-      
-    } catch (err) {
-      console.error('[PropertyImageUpload] Upload error:', err);
-      throw err;
-    }
-  };
 
   // Remove an image
   const handleRemoveImage = async (imageId: string) => {
@@ -552,7 +687,7 @@ const PropertyImageUpload: React.FC<PropertyImageUploadProps> = ({
     }
   };
 
-  // Get image URL for display
+  // Get image URL for display with improved fallback handling
   const getImageUrl = (image: PropertyImage): string => {
     // First check if we have a cached signed URL
     if (image.id && imageUrls[image.id]) {
@@ -561,11 +696,33 @@ const PropertyImageUpload: React.FC<PropertyImageUploadProps> = ({
     
     // Check for legacy cases and incompatible formats
     if (!property?.id || !image.fileName || image.fileName.startsWith('legacy-') || image.fileName.startsWith('img-')) {
+      console.log(`[PropertyImageUpload] Using placeholder for legacy image: ${image.fileName}`);
       return '/noimage.png';
     }
     
-    // If we don't have a cached URL yet, show a placeholder temporarily 
-    // and the useEffect will update it later when signed URLs are generated
+    // If this looks like an optimized filename but we don't have a URL, the file might be missing
+    if (image.fileName.includes('_medium.webp') || image.fileName.includes('_thumbnail.webp') || image.fileName.includes('_full.webp')) {
+      console.log(`[PropertyImageUpload] Missing optimized file detected: ${image.fileName}`);
+      return '/noimage.png';
+    }
+    
+    // For other cases, try to construct a public URL as fallback
+    // This handles cases where files exist but signed URL generation failed
+    try {
+      const { data } = supabase.storage
+        .from(STORAGE_BUCKET)
+        .getPublicUrl(`${property.id}/${image.fileName}`);
+      
+      if (data?.publicUrl) {
+        console.log(`[PropertyImageUpload] Using public URL fallback for: ${image.fileName}`);
+        return data.publicUrl;
+      }
+    } catch (err) {
+      console.warn(`[PropertyImageUpload] Failed to generate public URL for ${image.fileName}:`, err);
+    }
+    
+    // Final fallback
+    console.log(`[PropertyImageUpload] Using final placeholder for: ${image.fileName}`);
     return '/noimage.png';
   };
 
@@ -633,13 +790,15 @@ const PropertyImageUpload: React.FC<PropertyImageUploadProps> = ({
           </p>
         </div>
         
-        <Button 
-          onClick={() => setUploadDialogOpen(true)}
-          className="flex items-center"
-        >
-          <ImageIcon className="h-4 w-4 mr-2" />
-          Add/Remove Images
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            onClick={() => setUploadDialogOpen(true)}
+            className="flex items-center"
+          >
+            <ImageIcon className="h-4 w-4 mr-2" />
+            Add/Remove Images
+          </Button>
+        </div>
       </div>
 
       {/* Enhanced Upload Dialog with Tabs */}
@@ -703,6 +862,84 @@ const PropertyImageUpload: React.FC<PropertyImageUploadProps> = ({
               >
                 Dismiss
               </Button>
+            </div>
+          )}
+
+          {/* Optimization Progress */}
+          {optimizing && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+              <div className="flex items-center gap-3 mb-3">
+                <Zap className="h-5 w-5 text-blue-600 animate-pulse" />
+                <span className="text-sm font-medium text-blue-900">
+                  Optimizing images for better performance...
+                </span>
+              </div>
+              <div className="space-y-2">
+                <div className="flex justify-between text-xs text-blue-700">
+                  <span>Optimization Progress</span>
+                  <span>{Math.round(optimizationProgress)}%</span>
+                </div>
+                <div className="h-2 bg-blue-100 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-blue-500 transition-all duration-300"
+                    style={{ width: `${optimizationProgress}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Upload Progress */}
+          {uploading && !optimizing && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+              <div className="flex items-center gap-3 mb-3">
+                <Upload className="h-5 w-5 text-green-600 animate-pulse" />
+                <span className="text-sm font-medium text-green-900">
+                  Uploading optimized images...
+                </span>
+              </div>
+              <div className="space-y-2">
+                <div className="flex justify-between text-xs text-green-700">
+                  <span>Upload Progress</span>
+                  <span>{Math.round(uploadProgress)}%</span>
+                </div>
+                <div className="h-2 bg-green-100 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-green-500 transition-all duration-300"
+                    style={{ width: `${uploadProgress}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Optimization Stats */}
+          {optimizationStats && (
+            <div className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg p-4 mb-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Zap className="h-5 w-5 text-green-600" />
+                <h4 className="text-sm font-medium text-foreground">Optimization Results</h4>
+              </div>
+              <div className="grid grid-cols-3 gap-4 text-center">
+                <div>
+                  <div className="text-lg font-semibold text-green-600">
+                    {Math.round(optimizationStats.averageCompression)}%
+                  </div>
+                  <div className="text-xs text-muted-foreground">Average Compression</div>
+                </div>
+                <div>
+                  <div className="text-lg font-semibold text-blue-600">
+                    {(optimizationStats.totalSaved / (1024 * 1024)).toFixed(1)}MB
+                  </div>
+                  <div className="text-xs text-muted-foreground">Space Saved</div>
+                </div>
+                <div>
+                  <div className="text-lg font-semibold text-purple-600">
+                    {(optimizationStats.optimizationTime / 1000).toFixed(1)}s
+                  </div>
+                  <div className="text-xs text-muted-foreground">Processing Time</div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -778,28 +1015,63 @@ const PropertyImageUpload: React.FC<PropertyImageUploadProps> = ({
                   <h3 className="text-sm font-medium text-slate-700 mb-3">
                     Current Images ({images.length})
                   </h3>
+                  
+                  {/* Missing files warning */}
+                  {images.some(img => img.fileName && (img.fileName.includes('_medium.webp') || img.fileName.includes('_thumbnail.webp') || img.fileName.includes('_full.webp')) && !imageUrls[img.id]) && (
+                    <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                      <div className="flex items-start gap-2">
+                        <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                        <div className="text-sm">
+                          <div className="font-medium text-amber-800">Some images are missing</div>
+                          <div className="text-amber-700 mt-1">
+                            These images were uploaded before the optimization system was implemented. 
+                            The image files are no longer available in storage. You can delete these entries 
+                            and re-upload the images to use the new optimization features.
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    {images.map((image) => {
+                    {images.map((image, index) => {
                       // Get the image URL
                       const imageUrl = getImageUrl(image);
+                      const isMissingFile = image.fileName && 
+                        (image.fileName.includes('_medium.webp') || image.fileName.includes('_thumbnail.webp') || image.fileName.includes('_full.webp')) && 
+                        !imageUrls[image.id];
                       
                       return (
                         <div
                           key={image.id}
-                          className={`relative group aspect-video rounded-lg overflow-hidden border ${
-                            image.isPrimary ? 'border-primary ring-1 ring-primary' : 'border-slate-200'
+                          className={`relative group aspect-video rounded-lg overflow-hidden border-2 ${
+                            image.isPrimary 
+                              ? 'border-primary ring-1 ring-primary' 
+                              : isMissingFile 
+                                ? 'border-amber-300 bg-amber-50' 
+                                : 'border-slate-200'
                           }`}
                         >
                           
                           <img
                             src={imageUrl}
                             alt="Property"
-                            className="w-full h-full object-cover"
+                            className={`w-full h-full object-cover ${isMissingFile ? 'opacity-50' : ''}`}
                             onError={(e) => {
                               console.log(`[PropertyImageUpload] Image load error for ${image.fileName}`);
                               e.currentTarget.src = '/noimage.png';
                             }}
                           />
+                          
+                          {/* Missing file indicator */}
+                          {isMissingFile && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-amber-100/80">
+                              <div className="text-center p-2">
+                                <AlertCircle className="h-6 w-6 text-amber-600 mx-auto mb-1" />
+                                <div className="text-xs text-amber-800 font-medium">File Missing</div>
+                              </div>
+                            </div>
+                          )}
                           <div className="absolute top-2 right-2 flex space-x-1">
                             {!image.isPrimary && (
                               <button
@@ -1043,12 +1315,12 @@ const PropertyImageUpload: React.FC<PropertyImageUploadProps> = ({
                       <div className="space-y-2">
                         <div className="flex justify-between text-sm">
                           <span>Upload Progress</span>
-                          <span>{Math.round(uploadProgress)}%</span>
+                          <span>{Math.round(videoUploadProgress)}%</span>
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-2">
                           <div
                             className="bg-primary h-2 rounded-full transition-all duration-300"
-                            style={{ width: `${uploadProgress}%` }}
+                            style={{ width: `${videoUploadProgress}%` }}
                           />
                         </div>
                         <p className="text-sm text-gray-600">

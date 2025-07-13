@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase';
 
 class FastImageService {
   private cache = new Map<string, string>();
+  private optimizationCache = new Map<string, string>();
   private readonly STORAGE_BUCKET = 'property-images-v2';
   private readonly DEFAULT_IMAGE = '/noimage.png';
   
@@ -16,13 +17,80 @@ class FastImageService {
     return data.publicUrl.replace(/\/$/, ''); // Remove trailing slash
   }
   
-  // Get direct public URL - ZERO API calls
+  // Get optimization image URL
+  async getOptimizationImageUrl(fileName: string): Promise<string> {
+    if (!fileName.startsWith('optimization_')) {
+      return this.DEFAULT_IMAGE;
+    }
+    
+    const optimizationId = fileName.replace('optimization_', '');
+    const cacheKey = `opt_${optimizationId}`;
+    
+    // Check cache first
+    if (this.optimizationCache.has(cacheKey)) {
+      return this.optimizationCache.get(cacheKey)!;
+    }
+    
+    try {
+      const { data: optRecord, error } = await supabase
+        .from('image_optimizations')
+        .select('medium_path, full_path, thumbnail_path')
+        .eq('id', optimizationId)
+        .single();
+        
+      if (error || !optRecord) {
+        console.warn('[FastImageService] Optimization record not found:', optimizationId);
+        this.optimizationCache.set(cacheKey, this.DEFAULT_IMAGE);
+        return this.DEFAULT_IMAGE;
+      }
+      
+      // Use medium variant for best balance of quality and loading speed
+      let imageUrl = this.DEFAULT_IMAGE;
+      if (optRecord.medium_path) {
+        const { data } = supabase.storage
+          .from(this.STORAGE_BUCKET)
+          .getPublicUrl(optRecord.medium_path);
+        
+        if (data?.publicUrl) {
+          imageUrl = data.publicUrl;
+        }
+      } else if (optRecord.full_path) {
+        const { data } = supabase.storage
+          .from(this.STORAGE_BUCKET)
+          .getPublicUrl(optRecord.full_path);
+        if (data?.publicUrl) imageUrl = data.publicUrl;
+      } else if (optRecord.thumbnail_path) {
+        const { data } = supabase.storage
+          .from(this.STORAGE_BUCKET)
+          .getPublicUrl(optRecord.thumbnail_path);
+        if (data?.publicUrl) imageUrl = data.publicUrl;
+      }
+      
+      // Cache the URL
+      this.optimizationCache.set(cacheKey, imageUrl);
+      return imageUrl;
+      
+    } catch (err) {
+      console.error('[FastImageService] Error loading optimization image:', err);
+      this.optimizationCache.set(cacheKey, this.DEFAULT_IMAGE);
+      return this.DEFAULT_IMAGE;
+    }
+  }
+
+  // Get direct public URL - supports optimization format
   getPublicImageUrl(propertyId: string, fileName: string): string {
     if (!propertyId || !fileName) return this.DEFAULT_IMAGE;
     
     // Handle legacy formats
     if (fileName.startsWith('data:image/')) return fileName;
     if (fileName.startsWith('legacy-') || fileName.startsWith('img-')) {
+      return this.DEFAULT_IMAGE;
+    }
+    
+    // Handle optimization format - return placeholder and load async
+    if (fileName.startsWith('optimization_')) {
+      // For optimization images, we need to do async loading
+      // Return default image initially, caller should handle async loading
       return this.DEFAULT_IMAGE;
     }
     

@@ -157,6 +157,10 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({
   propertyId,
   directUrls 
 }) => {
+  console.log('[PropertyGallery] Received props:', { images, video, propertyId, directUrls });
+  console.log('[PropertyGallery] Images count:', images?.length || 0);
+  console.log('[PropertyGallery] Images content:', images);
+  
   const [currentIndex, setCurrentIndex] = useState(0);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
   const [fullscreenIndex, setFullscreenIndex] = useState(0);
@@ -201,16 +205,21 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({
           if (!(a.is_primary || a.isPrimary) && (b.is_primary || b.isPrimary)) return 1;
           return (a.display_order || 0) - (b.display_order || 0);
         })
-        .map((img, index): MediaItem => ({
-          id: img.id || `img-${index}`,
-          type: 'image',
-          url: img.url,
-          dataUrl: img.dataUrl,
-          fileName: img.fileName,
-          is_primary: img.is_primary,
-          isPrimary: img.isPrimary,
-          display_order: img.display_order || index
-        }));
+        .map((img, index): MediaItem => {
+          console.log(`[PropertyGallery] Processing image ${index}:`, img);
+          console.log(`[PropertyGallery] Image ${index} URL:`, img.url);
+          
+          return {
+            id: img.id || `img-${index}`,
+            type: 'image',
+            url: img.url,
+            dataUrl: img.dataUrl,
+            fileName: img.fileName,
+            is_primary: img.is_primary,
+            isPrimary: img.isPrimary,
+            display_order: img.display_order || index
+          };
+        });
 
       allItems.push(...processedImages);
       
@@ -278,8 +287,12 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({
 
   // Optimized media URL resolver using cached public URLs
   const getOptimizedMediaSource = useCallback((item: MediaItem): string => {
+    console.log('[PropertyGallery] getOptimizedMediaSource called for item:', item);
+    console.log('[PropertyGallery] directUrls available:', directUrls);
+    
     // Handle video thumbnails
     if (item.type === 'video') {
+      console.log('[PropertyGallery] Processing video item');
       // For video thumbnails, prefer thumbnailUrl first
       if (item.thumbnailUrl) {
         return item.thumbnailUrl;
@@ -294,27 +307,43 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({
       return item.url || FALLBACK_IMAGE;
     }
 
-    // For images, use directUrls if available (legacy support)
+    // For images, prioritize the URL from the processed images array (from usePropertyMedia)
+    if (item.url && item.url !== '' && !item.url.includes('optimization_')) {
+      console.log('[PropertyGallery] Using processed image URL:', item.url);
+      return item.url;
+    }
+
+    // Legacy support: use directUrls if available (but only if processed URL not available)
     const imageIndex = mediaItems.findIndex(media => media.id === item.id && media.type === 'image');
+    console.log('[PropertyGallery] Image index for directUrls:', imageIndex);
+    console.log('[PropertyGallery] directUrls length:', directUrls?.length);
+    
     if (directUrls && directUrls.length > imageIndex && imageIndex >= 0) {
+      console.log('[PropertyGallery] Using directUrls[' + imageIndex + ']:', directUrls[imageIndex]);
       return directUrls[imageIndex];
     }
 
     // Handle dataUrl format (legacy)
     if (item.dataUrl && (item.dataUrl.startsWith('data:image/') || item.dataUrl.startsWith('blob:'))) {
+      console.log('[PropertyGallery] Using dataUrl format');
       return item.dataUrl;
     }
 
     // Use cached public URL if we have fileName and propertyId
     if (propertyId && item.fileName && !item.fileName.startsWith('legacy-') && !item.fileName.startsWith('img-')) {
-      return mediaCache.getPublicMediaUrl(propertyId, item.fileName, 'image');
+      console.log('[PropertyGallery] Using cached public URL for fileName:', item.fileName);
+      const cachedUrl = mediaCache.getPublicMediaUrl(propertyId, item.fileName, 'image');
+      console.log('[PropertyGallery] Generated cached URL:', cachedUrl);
+      return cachedUrl;
     }
 
     // Fallback to original URL
     if (item.url) {
+      console.log('[PropertyGallery] Using original URL fallback:', item.url);
       return item.url;
     }
 
+    console.log('[PropertyGallery] Using fallback image');
     return FALLBACK_IMAGE;
   }, [mediaItems, directUrls, propertyId]);
 
@@ -507,6 +536,12 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({
   const currentItem = mediaItems[currentIndex];
   const currentMediaUrl = getOptimizedMediaSource(currentItem);
   const isCurrentMediaLoading = loadingStates[currentItem.id] ?? false;
+  
+  console.log('[PropertyGallery] Current display state:');
+  console.log('[PropertyGallery] currentIndex:', currentIndex);
+  console.log('[PropertyGallery] currentItem:', currentItem);
+  console.log('[PropertyGallery] currentMediaUrl:', currentMediaUrl);
+  console.log('[PropertyGallery] isCurrentMediaLoading:', isCurrentMediaLoading);
 
   return (
     <div className="space-y-2">
@@ -613,8 +648,15 @@ const PropertyGallery: React.FC<PropertyGalleryProps> = ({
               src={currentMediaUrl}
               alt={`Property view ${currentIndex + 1}`}
               className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-              onError={(e) => handleMediaError(currentItem.id, e)}
-              onLoad={() => handleMediaLoad(currentItem.id)}
+              onError={(e) => {
+                console.error('[PropertyGallery] Image load error for URL:', currentMediaUrl);
+                console.error('[PropertyGallery] Image error event:', e);
+                handleMediaError(currentItem.id, e);
+              }}
+              onLoad={() => {
+                console.log('[PropertyGallery] Image loaded successfully for URL:', currentMediaUrl);
+                handleMediaLoad(currentItem.id);
+              }}
               loading="eager"
             />
           )}

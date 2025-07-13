@@ -1,15 +1,24 @@
 // src/components/property/wizard/sections/image-upload/hooks/useImageUpload.ts
-// Version: 1.1.0
-// Last Modified: 2025-02-01T14:00:00+05:30 (IST)
+// Version: 1.2.0 - Image Optimization Integration
+// Last Modified: 2025-07-13T14:00:00+05:30 (IST)
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { imageOptimizationService } from '@/services/imageOptimizationService';
+import { validateImageFile, formatFileSize, calculateCompressionPercentage } from '@/utils/imageOptimization';
 
 interface PropertyImage {
   id: string;
   url: string;
+  thumbnail_url?: string;
+  medium_url?: string;
+  full_url?: string;
   is_primary: boolean;
   display_order: number;
+  is_optimized?: boolean;
+  original_size?: number;
+  optimized_size?: number;
+  compression_ratio?: number;
 }
 
 export function useImageUpload(propertyId: string, onUploadComplete: () => void) {
@@ -17,12 +26,19 @@ export function useImageUpload(propertyId: string, onUploadComplete: () => void)
   const [previews, setPreviews] = useState<string[]>([]);
   const [existingImages, setExistingImages] = useState<PropertyImage[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [optimizing, setOptimizing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [primaryImageIndex, setPrimaryImageIndex] = useState(0);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [optimizationProgress, setOptimizationProgress] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [optimizationStats, setOptimizationStats] = useState<{
+    totalSaved: number;
+    averageCompression: number;
+    optimizationTime: number;
+  } | null>(null);
 
-  const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+  const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB (increased for optimization)
   const MAX_IMAGES = 10;
 
   useEffect(() => {
@@ -61,70 +77,128 @@ export function useImageUpload(propertyId: string, onUploadComplete: () => void)
       return;
     }
 
-    const validFiles = newFiles.filter(file => {
-      const isValid = file.type.startsWith('image/') && file.size <= MAX_FILE_SIZE;
-      if (!isValid) {
-        setError('Please select images under 5MB');
-      }
-      return isValid;
-    });
+    // Validate files using the new validation utility
+    const validFiles: File[] = [];
+    const validationErrors: string[] = [];
 
-    if (validFiles.length === 0) return;
+    for (const file of newFiles) {
+      const validation = validateImageFile(file);
+      if (validation.valid) {
+        validFiles.push(file);
+      } else {
+        validationErrors.push(`${file.name}: ${validation.error}`);
+      }
+    }
+
+    if (validationErrors.length > 0) {
+      setError(`File validation errors: ${validationErrors.join(', ')}`);
+      if (validFiles.length === 0) return;
+    }
 
     setError(null);
+    setOptimizing(true);
     setUploading(true);
     
+    const optimizationResults: Array<{
+      originalSize: number;
+      optimizedSize: number;
+      compressionRatio: number;
+      optimizationTime: number;
+    }> = [];
+
     try {
       for (const [idx, file] of validFiles.entries()) {
-        // Create preview
+        // Create preview for immediate feedback
         const reader = new FileReader();
         reader.onloadend = () => {
           setPreviews(prev => [...prev, reader.result as string]);
         };
         reader.readAsDataURL(file);
 
-        const startIndex = existingImages.length + images.length;
-        
-        // Upload immediately
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${propertyId}/${Date.now()}-${Math.random()}.${fileExt}`;
+        // Update optimization progress
+        setOptimizationProgress((idx / validFiles.length) * 50); // 50% for optimization phase
 
-        const { error: uploadError } = await supabase.storage
-          .from('property-images')
-          .upload(fileName, file, {
-            cacheControl: '3600',
-            upsert: false
-          });
+        // Optimize image using the new service
+        const optimizationResult = await imageOptimizationService.uploadAndOptimizeImage(
+          file,
+          propertyId,
+          existingImages.length + idx,
+          'gallery'
+        );
 
-        if (uploadError) throw uploadError;
+        if (!optimizationResult.success) {
+          throw new Error(optimizationResult.error || 'Image optimization failed');
+        }
 
-        const { data: { publicUrl } } = supabase.storage
-          .from('property-images')
-          .getPublicUrl(fileName);
+        // Update upload progress
+        setUploadProgress(((idx + 1) / validFiles.length) * 50 + 50); // 50% for upload phase
 
+        // Create property image record with optimization data
+        const startIndex = existingImages.length + idx;
         const { error: dbError, data: newImage } = await supabase
           .from('property_images')
           .insert([{
             property_id: propertyId,
-            url: publicUrl,
-            is_primary: startIndex + idx === primaryImageIndex,
-            display_order: startIndex + idx
+            url: optimizationResult.urls.medium || optimizationResult.urls.full, // Default to medium for display
+            thumbnail_url: optimizationResult.urls.thumbnail,
+            medium_url: optimizationResult.urls.medium,
+            full_url: optimizationResult.urls.full,
+            is_primary: startIndex === primaryImageIndex,
+            display_order: startIndex,
+            is_optimized: true
           }])
           .select()
           .single();
 
         if (dbError) throw dbError;
 
-        setExistingImages(prev => [...prev, newImage]);
+        // Calculate compression stats
+        const originalSize = optimizationResult.optimizationRecord.original_size_bytes;
+        const optimizedSize = (optimizationResult.optimizationRecord.thumbnail_size_bytes || 0) +
+                             (optimizationResult.optimizationRecord.medium_size_bytes || 0) +
+                             (optimizationResult.optimizationRecord.full_size_bytes || 0);
+        
+        const compressionRatio = calculateCompressionPercentage(originalSize, optimizedSize);
+
+        // Add compression info to the image data
+        const imageWithStats = {
+          ...newImage,
+          original_size: originalSize,
+          optimized_size: optimizedSize,
+          compression_ratio: compressionRatio
+        };
+
+        optimizationResults.push({
+          originalSize,
+          optimizedSize,
+          compressionRatio,
+          optimizationTime: optimizationResult.optimizationRecord.optimization_time_ms
+        });
+
+        setExistingImages(prev => [...prev, imageWithStats]);
         setImages(prev => [...prev, file]);
-        setUploadProgress(((idx + 1) / validFiles.length) * 100);
       }
+
+      // Calculate and display optimization stats
+      const totalOriginalSize = optimizationResults.reduce((sum, result) => sum + result.originalSize, 0);
+      const totalOptimizedSize = optimizationResults.reduce((sum, result) => sum + result.optimizedSize, 0);
+      const averageCompression = optimizationResults.reduce((sum, result) => sum + result.compressionRatio, 0) / optimizationResults.length;
+      const totalOptimizationTime = optimizationResults.reduce((sum, result) => sum + result.optimizationTime, 0);
+
+      setOptimizationStats({
+        totalSaved: totalOriginalSize - totalOptimizedSize,
+        averageCompression,
+        optimizationTime: totalOptimizationTime
+      });
+
     } catch (error) {
-      console.error('Upload error:', error);
-      setError('Failed to upload some images');
+      console.error('Upload and optimization error:', error);
+      setError(`Failed to process images: ${error.message}`);
     } finally {
+      setOptimizing(false);
       setUploading(false);
       setUploadProgress(0);
+      setOptimizationProgress(0);
     }
   };
 
@@ -197,9 +271,12 @@ export function useImageUpload(propertyId: string, onUploadComplete: () => void)
     existingImages,
     error,
     uploading,
+    optimizing,
     uploadProgress,
+    optimizationProgress,
     primaryImageIndex,
     isLoading,
+    optimizationStats,
     handleFileSelect,
     removeImage,
     handleSetPrimaryImage,

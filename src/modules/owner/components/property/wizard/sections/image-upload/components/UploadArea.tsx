@@ -7,7 +7,7 @@ import { ImagePlus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface UploadAreaProps {
-  images: File[];
+  images: any[]; // Can accept both File[] and PropertyImage[]
   onFileSelect: (files: File[]) => void;
   disabled?: boolean;
 }

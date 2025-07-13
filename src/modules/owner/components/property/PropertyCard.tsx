@@ -91,6 +91,13 @@ const extractPropertyImages = (property: Property) => {
       return mediaImages;
     }
     
+    // Check for imageFiles (new optimization format)
+    const imageFiles = property.property_details?.imageFiles;
+    if (imageFiles && Array.isArray(imageFiles) && imageFiles.length > 0) {
+      console.log(`Found ${imageFiles.length} images in property_details.imageFiles`, imageFiles);
+      return imageFiles;
+    }
+    
     // Check for other possible image locations
     const legacyImages = property.property_details?.images;
     if (legacyImages && Array.isArray(legacyImages) && legacyImages.length > 0) {
@@ -112,6 +119,12 @@ const buildImageUrl = (propertyId: string, imageUrl: string): string => {
   if (imageUrl.startsWith('http')) {
     console.log('Using full image URL:', imageUrl);
     return imageUrl;
+  }
+  
+  // Handle optimization format - return placeholder (will be loaded async)
+  if (imageUrl.startsWith('optimization_')) {
+    console.log('Found optimization image format:', imageUrl);
+    return '/noimage.png'; // Placeholder - component will handle async loading
   }
   
   // If imageUrl has the property ID in it, handle that case
@@ -322,6 +335,7 @@ export function PropertyCard({
   const isDraft = property.status === 'draft';
   const [storedImages, setStoredImages] = React.useState<any[]>([]);
   const [imageUrl, setImageUrl] = React.useState<string | null>(null);
+  const [asyncImageUrl, setAsyncImageUrl] = React.useState<string | null>(null);
   
   useEffect(() => {
     const fetchImages = async () => {
@@ -346,11 +360,61 @@ export function PropertyCard({
         // Log the found image for debugging
         console.log('Found main image in extracted images:', mainImage);
         
-        if (mainImage && mainImage.url) {
-          // Normalize URL for the image
-          const propertyId = property.id || '';
-          const url = buildImageUrl(propertyId, mainImage.url);
-          setImageUrl(url);
+        if (mainImage && (mainImage.url || mainImage.fileName)) {
+          // Handle optimization images
+          if (mainImage.fileName && mainImage.fileName.startsWith('optimization_')) {
+            console.log('Loading optimization image:', mainImage.fileName);
+            try {
+              // Load optimization image async
+              const optimizationId = mainImage.fileName.replace('optimization_', '');
+              const { data: optRecord, error } = await supabase
+                .from('image_optimizations')
+                .select('medium_path, full_path, thumbnail_path')
+                .eq('id', optimizationId)
+                .single();
+                
+              if (!error && optRecord) {
+                const STORAGE_BUCKET = 'property-images-v2';
+                let optimizedUrl = null;
+                
+                // Try medium, then full, then thumbnail
+                if (optRecord.medium_path) {
+                  const { data } = supabase.storage
+                    .from(STORAGE_BUCKET)
+                    .getPublicUrl(optRecord.medium_path);
+                  if (data?.publicUrl) optimizedUrl = data.publicUrl;
+                } else if (optRecord.full_path) {
+                  const { data } = supabase.storage
+                    .from(STORAGE_BUCKET)
+                    .getPublicUrl(optRecord.full_path);
+                  if (data?.publicUrl) optimizedUrl = data.publicUrl;
+                } else if (optRecord.thumbnail_path) {
+                  const { data } = supabase.storage
+                    .from(STORAGE_BUCKET)
+                    .getPublicUrl(optRecord.thumbnail_path);
+                  if (data?.publicUrl) optimizedUrl = data.publicUrl;
+                }
+                
+                if (optimizedUrl) {
+                  console.log('Loaded optimization image URL:', optimizedUrl);
+                  setAsyncImageUrl(optimizedUrl);
+                  return; // Don't set the placeholder URL
+                }
+              }
+            } catch (error) {
+              console.error('Failed to load optimization image:', error);
+            }
+          }
+          
+          // Handle regular images or fallback
+          if (mainImage.url) {
+            const propertyId = property.id || '';
+            const url = buildImageUrl(propertyId, mainImage.url);
+            setImageUrl(url);
+          } else {
+            // Set placeholder for optimization images while loading
+            setImageUrl('/noimage.png');
+          }
         }
       } else if (property.id) {
         // If no images found in property data, try to fetch directly from storage
@@ -413,9 +477,9 @@ export function PropertyCard({
       
       {/* Property Image */}
       <div className="relative h-48 overflow-hidden bg-muted">
-        {imageUrl ? (
+        {(asyncImageUrl || imageUrl) ? (
           <img 
-            src={imageUrl} 
+            src={asyncImageUrl || imageUrl} 
             alt={title}
             className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
             onLoad={() => console.log('Image loaded successfully:', imageUrl)}

@@ -10,7 +10,9 @@ import {
   Image as ImageIcon,
   AlertCircle,
   Star,
-  Loader2
+  Loader2,
+  Zap,
+  TrendingDown
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useImageUpload } from './image-upload/hooks/useImageUpload';
@@ -31,9 +33,12 @@ export function ImageUploadSection({
     existingImages,
     error,
     uploading,
+    optimizing,
     uploadProgress,
+    optimizationProgress,
     primaryImageIndex,
     isLoading,
+    optimizationStats,
     handleFileSelect,
     removeImage,
     handleSetPrimaryImage,
@@ -58,8 +63,56 @@ export function ImageUploadSection({
         <UploadArea
           images={existingImages}
           onFileSelect={handleFileSelect}
-          disabled={uploading}
+          disabled={uploading || optimizing}
         />
+
+        {/* Optimization Progress */}
+        {optimizing && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-center gap-3 mb-3">
+              <Zap className="h-5 w-5 text-blue-600 animate-pulse" />
+              <span className="text-sm font-medium text-blue-900">
+                Optimizing images for better performance...
+              </span>
+            </div>
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs text-blue-700">
+                <span>Optimization Progress</span>
+                <span>{Math.round(optimizationProgress)}%</span>
+              </div>
+              <div className="h-2 bg-blue-100 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-blue-500 transition-all duration-300"
+                  style={{ width: `${optimizationProgress}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Upload Progress */}
+        {uploading && !optimizing && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+            <div className="flex items-center gap-3 mb-3">
+              <Upload className="h-5 w-5 text-green-600 animate-pulse" />
+              <span className="text-sm font-medium text-green-900">
+                Uploading optimized images...
+              </span>
+            </div>
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs text-green-700">
+                <span>Upload Progress</span>
+                <span>{Math.round(uploadProgress)}%</span>
+              </div>
+              <div className="h-2 bg-green-100 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-green-500 transition-all duration-300"
+                  style={{ width: `${uploadProgress}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Image Grid */}
         {existingImages.length > 0 && (
@@ -140,17 +193,49 @@ export function ImageUploadSection({
           </div>
         )}
 
+        {/* Optimization Stats */}
+        {optimizationStats && (
+          <div className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <TrendingDown className="h-5 w-5 text-green-600" />
+              <h4 className="text-sm font-medium text-foreground">Optimization Results</h4>
+            </div>
+            <div className="grid grid-cols-3 gap-4 text-center">
+              <div>
+                <div className="text-lg font-semibold text-green-600">
+                  {Math.round(optimizationStats.averageCompression)}%
+                </div>
+                <div className="text-xs text-muted-foreground">Average Compression</div>
+              </div>
+              <div>
+                <div className="text-lg font-semibold text-blue-600">
+                  {(optimizationStats.totalSaved / (1024 * 1024)).toFixed(1)}MB
+                </div>
+                <div className="text-xs text-muted-foreground">Space Saved</div>
+              </div>
+              <div>
+                <div className="text-lg font-semibold text-purple-600">
+                  {(optimizationStats.optimizationTime / 1000).toFixed(1)}s
+                </div>
+                <div className="text-xs text-muted-foreground">Processing Time</div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Upload Tips */}
         <div className="bg-muted rounded-lg p-4">
           <h4 className="text-sm font-medium text-foreground mb-2 flex items-center gap-2">
             <ImageIcon className="h-4 w-4" />
-            Photo Requirements
+            Smart Photo Upload
           </h4>
           <ul className="text-sm text-muted-foreground space-y-1 list-disc pl-5">
             <li>Upload up to 10 photos</li>
-            <li>First image will be the primary photo</li>
-            <li>Maximum size: 5MB per image</li>
-            <li>Supported formats: JPG, PNG</li>
+            <li>Automatic optimization to WebP format for faster loading</li>
+            <li>Multiple sizes generated (thumbnail, medium, full)</li>
+            <li>Maximum size: 50MB per image (will be optimized)</li>
+            <li>Supported formats: JPG, PNG, WebP</li>
+            <li>Click the star to set primary photo</li>
           </ul>
         </div>
 
