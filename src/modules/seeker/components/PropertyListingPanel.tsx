@@ -1,9 +1,9 @@
 // src/modules/seeker/components/PropertyListingPanel.tsx
-// Version: 5.4.0
-// Last Modified: 08-06-2025 18:45 IST
-// Purpose: Fixed property count display logic to prevent showing more properties than total available
+// Version: 5.5.0
+// Last Modified: 13-07-2025 16:30 IST
+// Purpose: Added auto-scroll functionality for marker hover integration
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { PropertyType } from '@/modules/owner/components/property/types';
 import { Button } from '@/components/ui/button';
 import { Loader2, Info } from 'lucide-react';
@@ -24,6 +24,7 @@ interface PropertyListingPanelProps {
   setActiveProperty: (property: PropertyType | null) => void;
   favoriteProperties?: Set<string>;
   isLoadingFavorites?: boolean;
+  scrollToPropertyId?: string | null;
 }
 
 const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
@@ -38,16 +39,57 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
   hoveredProperty,
   setActiveProperty,
   favoriteProperties = new Set(),
-  isLoadingFavorites = false
+  isLoadingFavorites = false,
+  scrollToPropertyId = null
 }) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [propertyLikeState, setPropertyLikeState] = useState<Record<string, boolean>>({});
+  
+  // Refs for scroll functionality
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const propertyRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   // Calculate safe display counts - ensure we never show more than the total
   const displayCount = Math.min(properties.length, totalCount);
   const effectiveTotalCount = Math.max(totalCount, properties.length);
   const remainingCount = Math.max(0, effectiveTotalCount - displayCount);
+
+  // Auto-scroll to property when scrollToPropertyId changes
+  const scrollToProperty = useCallback((propertyId: string) => {
+    const element = propertyRefs.current[propertyId];
+    const container = scrollContainerRef.current;
+    
+    if (element && container) {
+      const containerRect = container.getBoundingClientRect();
+      const elementRect = element.getBoundingClientRect();
+      
+      // Calculate if element is visible
+      const isVisible = 
+        elementRect.top >= containerRect.top && 
+        elementRect.bottom <= containerRect.bottom;
+      
+      if (!isVisible) {
+        // Scroll to element with smooth behavior
+        element.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+          inline: 'nearest'
+        });
+      }
+    }
+  }, []);
+
+  // Handle scroll to property when scrollToPropertyId changes
+  useEffect(() => {
+    if (scrollToPropertyId) {
+      const timeoutId = setTimeout(() => {
+        scrollToProperty(scrollToPropertyId);
+      }, 100); // Small delay to ensure DOM is updated
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [scrollToPropertyId, scrollToProperty]);
 
   // Setup initial like states when favorites or properties change
   useEffect(() => {
@@ -217,9 +259,13 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
           {properties.map((property, index) => (
             <div 
               key={property.id}
+              ref={(el) => {
+                propertyRefs.current[property.id] = el;
+              }}
               className={`
                 transition-all duration-200 
                 ${hoveredProperty === property.id ? 'bg-muted/40 scale-[1.02]' : 'hover:bg-muted/20'}
+                ${scrollToPropertyId === property.id ? 'ring-2 ring-primary ring-offset-2' : ''}
                 ${index === 0 ? 'rounded-t-xl' : ''}
                 ${index === properties.length - 1 ? 'rounded-b-xl' : ''}
               `}
@@ -271,7 +317,10 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
         </div>
         
         {/* Property listing with proper scrolling and bottom spacing */}
-        <div className="flex-1 overflow-y-auto">
+        <div 
+          ref={scrollContainerRef}
+          className="flex-1 overflow-y-auto"
+        >
           <div className="min-h-0">
             {renderContent()}
           </div>

@@ -9,7 +9,8 @@ import { PropertyType } from '@/modules/owner/components/property/types';
 import { SearchResult } from '@/components/Search/types/search.types';
 import { 
   ChevronRight, MapPin, Bed, Bath, Square, Users, 
-  Coffee, Building, Home, Calendar, Utensils, Briefcase, FileText, Map
+  Coffee, Building, Home, Calendar, Utensils, Briefcase, FileText, Map,
+  Clock, CheckCircle, AlertCircle, Star, Wifi, Car
 } from 'lucide-react';
 import FavoriteButton from './FavoriteButton';
 import { formatPrice } from '../services/seekerService';
@@ -47,6 +48,73 @@ interface PropertyItemProps {
 // Type guard to check if property is SearchResult
 const isSearchResult = (property: PropertyItemData): property is SearchResult => {
   return 'transactionType' in property && !('property_details' in property);
+};
+
+// Helper function to format property age
+const formatPropertyAge = (createdAt: string): string => {
+  if (!createdAt) return '';
+  
+  const now = new Date();
+  const created = new Date(createdAt);
+  const diffInMs = now.getTime() - created.getTime();
+  const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+  
+  if (diffInDays === 0) return 'Posted today';
+  if (diffInDays === 1) return 'Posted yesterday';
+  if (diffInDays < 7) return `Posted ${diffInDays} days ago`;
+  if (diffInDays < 30) return `Posted ${Math.floor(diffInDays / 7)} weeks ago`;
+  if (diffInDays < 365) return `Posted ${Math.floor(diffInDays / 30)} months ago`;
+  return `Posted ${Math.floor(diffInDays / 365)} years ago`;
+};
+
+// Helper function to get property status
+const getPropertyStatus = (property: PropertyItemData): { status: string; icon: React.ReactNode; color: string } => {
+  const status = isSearchResult(property) ? property.status : property.status;
+  
+  switch (status?.toLowerCase()) {
+    case 'active':
+      return { status: 'Available', icon: <CheckCircle className="h-3 w-3" />, color: 'text-green-600' };
+    case 'inactive':
+      return { status: 'Not Available', icon: <AlertCircle className="h-3 w-3" />, color: 'text-red-600' };
+    case 'pending':
+      return { status: 'Under Review', icon: <Clock className="h-3 w-3" />, color: 'text-yellow-600' };
+    default:
+      return { status: 'Available', icon: <CheckCircle className="h-3 w-3" />, color: 'text-green-600' };
+  }
+};
+
+// Helper function to extract key amenities/features
+const getPropertyAmenities = (property: PropertyItemData): Array<{ icon: React.ReactNode; text: string }> => {
+  const amenities = [];
+  
+  if (!isSearchResult(property)) {
+    const details = property.property_details || {};
+    const basicDetails = details.basicDetails || {};
+    
+    // Check for parking
+    if (basicDetails.parking || basicDetails.parkingAvailable) {
+      amenities.push({ icon: <Car className="h-3 w-3" />, text: 'Parking' });
+    }
+    
+    // Check for furnished status
+    if (basicDetails.furnishingStatus === 'fully_furnished') {
+      amenities.push({ icon: <Star className="h-3 w-3" />, text: 'Furnished' });
+    } else if (basicDetails.furnishingStatus === 'semi_furnished') {
+      amenities.push({ icon: <Star className="h-3 w-3" />, text: 'Semi-furnished' });
+    }
+    
+    // Check for wifi/internet (common in modern properties)
+    if (basicDetails.internet || basicDetails.wifi) {
+      amenities.push({ icon: <Wifi className="h-3 w-3" />, text: 'WiFi' });
+    }
+    
+    // For commercial properties, add business-relevant features
+    if (property.property_type === 'commercial') {
+      amenities.push({ icon: <Briefcase className="h-3 w-3" />, text: 'Business' });
+    }
+  }
+  
+  return amenities;
 };
 
 const PropertyItem: React.FC<PropertyItemProps> = ({
@@ -115,6 +183,11 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
 
   // Get real-time favorite status from context
   const isCurrentlyFavorited = isFavorite(propertyData.id);
+
+  // Get property age, status, and amenities
+  const propertyAge = formatPropertyAge(propertyData.createdAt);
+  const propertyStatus = getPropertyStatus(property);
+  const propertyAmenities = getPropertyAmenities(property);
 
   // Generate image URL
   const imageUrl = useMemo(() => {
@@ -435,116 +508,169 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
       key={`property-${propertyData.id}`}
       className={`
         relative transition-all duration-300 
-        ${isHovered ? 'bg-gradient-to-r from-blue-50/50 to-purple-50/50 shadow-md' : 'hover:bg-muted/30'}
-        hover:shadow-lg rounded-xl mx-2 my-1
+        ${isHovered ? 'bg-gradient-to-r from-blue-50/50 to-purple-50/50 shadow-lg scale-[1.02]' : 'hover:bg-muted/30'}
+        hover:shadow-xl rounded-2xl mx-2 my-2 border border-border/20 hover:border-blue-200/60 bg-card/50 backdrop-blur-sm
       `}
     >
       {/* Enhanced Favorite Button - Top Right Corner with real-time state */}
-      <div className="absolute top-3 right-3 z-10">
+      <div className="absolute top-4 right-4 z-10">
         <FavoriteButton
-          initialIsLiked={isCurrentlyFavorited} // Use real-time state from context
+          initialIsLiked={isCurrentlyFavorited}
           onToggle={handleFavoriteToggle}
           isLoading={isFavoriteLoading}
-          className="w-8 h-8 bg-white/90 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-200"
+          className="w-9 h-9 bg-white/95 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-200 border border-white/40"
         />
       </div>
 
-      <div className="p-4"
+      <div className="p-5"
         onMouseEnter={() => onHover(propertyData.id, true)}
         onMouseLeave={() => onHover(propertyData.id, false)}
         onClick={() => onSelect(property)}
       >
-        {/* Enhanced Property Name with conditional rendering */}
-        {propertyData.title && (
-          <div className="mb-3">
-            <Link
-              to={`/seeker/property/${propertyData.id}`}
-              className="text-sm font-semibold text-blue-600 hover:text-blue-700 hover:underline truncate block transition-colors duration-200"
-            >
-              {propertyData.title}
-            </Link>
-          </div>
-        )}
-        
         <Link 
           to={`/seeker/property/${propertyData.id}`} 
-          className="flex gap-3 group"
+          className="block group"
         >
-          {/* Enhanced Property image with better styling */}
-          <div className="relative h-20 w-24 flex-shrink-0 overflow-hidden rounded-xl shadow-sm group-hover:shadow-md transition-shadow duration-200">
-            <img
-              src={asyncImageUrl || imageUrl}
-              alt={propertyData.title || 'Property'}
-              className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
-              loading="lazy"
-              onError={(e) => {
-                const target = e.target as HTMLImageElement;
-                target.onerror = null; // Prevent infinite loop
-                target.src = '/noimage.png';
-              }}
-            />
-            {/* Enhanced image overlay on hover */}
-            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-200 rounded-xl"></div>
-          </div>
-          
-          {/* Enhanced Property details with improved spacing */}
-          <div className="flex-1 min-w-0 space-y-2">
-            {/* Enhanced Location with conditional rendering */}
-            {propertyData.location && (
-              <div className="flex items-center text-xs text-muted-foreground">
-                <MapPin className="h-3 w-3 mr-1.5 flex-shrink-0 text-blue-500" />
-                <span className="truncate font-medium">
-                  {propertyData.location}
-                </span>
+          {/* Enhanced Layout: Image at top, content below */}
+          <div className="space-y-4">
+            {/* Enhanced Property image with better styling and larger size */}
+            <div className="relative h-48 w-full overflow-hidden rounded-xl shadow-md group-hover:shadow-lg transition-all duration-300">
+              <img
+                src={asyncImageUrl || imageUrl}
+                alt={propertyData.title || 'Property'}
+                className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-500"
+                loading="lazy"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  target.onerror = null;
+                  target.src = '/noimage.png';
+                }}
+              />
+              {/* Enhanced image overlay on hover */}
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300 rounded-xl"></div>
+              
+              {/* Property Type and Status Badges - Moved to image overlay */}
+              <div className="absolute bottom-3 left-3 flex flex-wrap gap-2">
+                {displayData.propertyType && (
+                  <div className="inline-flex items-center text-xs text-white px-3 py-1.5 rounded-full bg-black/70 backdrop-blur-sm font-medium shadow-sm">
+                    {displayData.propertyType}
+                  </div>
+                )}
+                {displayData.listingDisplay && (
+                  <div className={`
+                    inline-flex items-center text-xs text-white px-3 py-1.5 rounded-full font-medium shadow-sm backdrop-blur-sm
+                    ${displayData.listingDisplay.toLowerCase().includes('rent') 
+                      ? 'bg-blue-600/90' 
+                      : 'bg-green-600/90'
+                    }
+                  `}>
+                    {displayData.listingDisplay}
+                  </div>
+                )}
               </div>
-            )}
-            
-            {/* Enhanced Price with conditional rendering */}
-            {displayData.price && (
-              <p className="text-sm font-bold text-foreground">
-                {displayData.price}
-              </p>
-            )}
-            
-            {/* Enhanced Property specs with conditional rendering */}
-            {displayData.icons.length > 0 && (
-              <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                {displayData.icons.map((icon, index) => (
-                  <span key={index} className="flex items-center hover:text-foreground transition-colors duration-200">
-                    <span className="text-blue-500">{icon.icon}</span>
-                    <span className="whitespace-nowrap font-medium">{icon.text}</span>
-                  </span>
-                ))}
+              
+              {/* Property Status - Top right of image */}
+              <div className="absolute top-3 left-3">
+                <div className={`inline-flex items-center text-xs px-2.5 py-1 rounded-full bg-white/95 backdrop-blur-sm font-medium shadow-sm ${propertyStatus.color}`}>
+                  {propertyStatus.icon}
+                  <span className="ml-1">{propertyStatus.status}</span>
+                </div>
               </div>
-            )}
+            </div>
             
-            {/* Enhanced Property Type and Listing Type Badges with conditional rendering */}
-            <div className="mt-3 flex flex-wrap gap-2">
-              {/* Enhanced Property Type Badge - Shows main category (Residential/Commercial/Land) */}
-              {displayData.propertyType && (
-                <div className="inline-flex items-center text-xs text-white px-2.5 py-1 rounded-full bg-gradient-to-r from-gray-500 to-gray-600 font-medium shadow-sm">
-                  {displayData.propertyType}
+            {/* Enhanced Content Section */}
+            <div className="space-y-3">
+              {/* Enhanced Property Title */}
+              {propertyData.title && (
+                <div>
+                  <h3 className="text-lg font-bold text-foreground group-hover:text-blue-600 transition-colors duration-200 line-clamp-2 leading-tight">
+                    {propertyData.title}
+                  </h3>
                 </div>
               )}
               
-              {/* Enhanced Listing Type Badge - Shows transaction type (For Rent/For Sale) */}
-              {displayData.listingDisplay && (
-                <div className={`
-                  inline-flex items-center text-xs text-white px-2.5 py-1 rounded-full font-medium shadow-sm
-                  ${displayData.listingDisplay.toLowerCase().includes('rent') 
-                    ? 'bg-gradient-to-r from-blue-500 to-blue-600' 
-                    : 'bg-gradient-to-r from-green-500 to-green-600'
-                  }
-                `}>
-                  {displayData.listingDisplay}
+              {/* Enhanced Location and Property Age */}
+              <div className="space-y-2">
+                {propertyData.location && (
+                  <div className="flex items-center text-sm text-muted-foreground">
+                    <MapPin className="h-4 w-4 mr-2 flex-shrink-0 text-blue-500" />
+                    <span className="truncate font-medium group-hover:text-foreground transition-colors duration-200">
+                      {propertyData.location}
+                    </span>
+                  </div>
+                )}
+                
+                {/* Property Age */}
+                {propertyAge && (
+                  <div className="flex items-center text-xs text-muted-foreground">
+                    <Clock className="h-3 w-3 mr-1.5 flex-shrink-0 text-gray-500" />
+                    <span className="font-medium">{propertyAge}</span>
+                  </div>
+                )}
+              </div>
+              
+              {/* Enhanced Price Display */}
+              {displayData.price && (
+                <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20 p-3 rounded-lg border border-blue-100 dark:border-blue-800/30">
+                  <p className="text-xl font-bold text-blue-700 dark:text-blue-400">
+                    {displayData.price}
+                  </p>
                 </div>
               )}
+              
+              {/* Enhanced Property Specifications */}
+              {displayData.icons.length > 0 && (
+                <div className="space-y-3">
+                  {/* Main specs in a 2-column grid */}
+                  <div className="grid grid-cols-2 gap-2">
+                    {displayData.icons.slice(0, 4).map((icon, index) => (
+                      <div key={index} className="flex items-center text-sm text-muted-foreground bg-muted/40 px-3 py-2 rounded-lg hover:bg-muted/60 transition-colors duration-200">
+                        <span className="text-blue-500 mr-2">{icon.icon}</span>
+                        <span className="font-medium">{icon.text}</span>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  {/* Additional specs if available */}
+                  {displayData.icons.length > 4 && (
+                    <div className="flex flex-wrap gap-1">
+                      {displayData.icons.slice(4).map((icon, index) => (
+                        <div key={index + 4} className="inline-flex items-center text-xs text-muted-foreground bg-muted/30 px-2 py-1 rounded-md">
+                          <span className="text-blue-500 mr-1">{icon.icon}</span>
+                          <span className="font-medium">{icon.text}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* Key Amenities */}
+                  {propertyAmenities.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Key Features</h4>
+                      <div className="flex flex-wrap gap-1">
+                        {propertyAmenities.map((amenity, index) => (
+                          <div key={`amenity-${index}`} className="inline-flex items-center text-xs text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-950/30 px-2 py-1 rounded-md border border-emerald-200 dark:border-emerald-800/30">
+                            <span className="text-emerald-600 dark:text-emerald-400 mr-1">{amenity.icon}</span>
+                            <span className="font-medium">{amenity.text}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {/* Enhanced "View Details" Section */}
+              <div className="flex items-center justify-between pt-2 border-t border-border/30">
+                <span className="text-sm text-muted-foreground font-medium">
+                  View Details
+                </span>
+                <div className="flex items-center text-blue-600 group-hover:text-blue-700">
+                  <span className="text-sm font-medium mr-1">Explore</span>
+                  <ChevronRight className="h-4 w-4 group-hover:translate-x-1 transition-transform duration-200" />
+                </div>
+              </div>
             </div>
-          </div>
-          
-          {/* Enhanced Chevron icon with hover animation */}
-          <div className="self-center flex-shrink-0">
-            <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-blue-500 group-hover:translate-x-0.5 transition-all duration-200" />
           </div>
         </Link>
       </div>

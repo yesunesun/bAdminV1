@@ -41,6 +41,7 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
   const [currentFilters, setCurrentFilters] = useState<SearchFilters | null>(null);
   const [activeProperty, setActiveProperty] = useState<SearchResult | null>(null);
   const [hoveredProperty, setHoveredProperty] = useState<string | null>(null);
+  const [scrollToPropertyId, setScrollToPropertyId] = useState<string | null>(null);
 
   // Use the centralized Google Maps loading hook
   const { isLoaded: mapsLoaded, loadError } = useGoogleMaps(searchProperties);
@@ -92,9 +93,25 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
     }
   }, [propertyListCount, configLoading, toast]); // Include configLoading in dependencies
   
-  // Handle property hover
+  // Handle property hover from listing
   const handlePropertyHover = useCallback((propertyId: string, isHovering: boolean) => {
     setHoveredProperty(isHovering ? propertyId : null);
+  }, []);
+
+  // Handle marker hover from map (triggers auto-scroll)
+  const handleMarkerHover = useCallback((propertyId: string, isHovering: boolean) => {
+    if (isHovering) {
+      setScrollToPropertyId(propertyId);
+      setHoveredProperty(propertyId);
+    } else {
+      setScrollToPropertyId(null);
+      setHoveredProperty(null);
+    }
+  }, []);
+
+  // Handle marker click from map (triggers scroll to property)
+  const handleMarkerClick = useCallback((propertyId: string) => {
+    setScrollToPropertyId(propertyId);
   }, []);
   
   // Load user favorites when component mounts or user changes
@@ -444,6 +461,7 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
                 setActiveProperty={setActiveProperty}
                 favoriteProperties={favoriteProperties}
                 isLoadingFavorites={isLoadingFavorites}
+                scrollToPropertyId={scrollToPropertyId}
               />
             </div>
             
@@ -458,6 +476,8 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
                     activeProperty={activeProperty}
                     setActiveProperty={setActiveProperty}
                     hoveredPropertyId={hoveredProperty}
+                    onMarkerHover={handleMarkerHover}
+                    onMarkerClick={handleMarkerClick}
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center bg-muted/30">

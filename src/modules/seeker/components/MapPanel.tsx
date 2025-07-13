@@ -5,10 +5,8 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useGoogleMaps, DEFAULT_MAP_CENTER } from '../hooks/useGoogleMaps';
-import { GoogleMap, InfoWindow } from '@react-google-maps/api';
-import { Button } from '@/components/ui/button';
+import { GoogleMap } from '@react-google-maps/api';
 import { SearchResult } from '@/components/Search/types/search.types';
-import { useNavigate } from 'react-router-dom';
 import { MapPin, Home, Building2, Trees } from 'lucide-react';
 import { 
   detectPropertyType, 
@@ -57,6 +55,8 @@ interface MapPanelProps {
   activeProperty: SearchResult | null;
   setActiveProperty: (property: SearchResult | null) => void;
   hoveredPropertyId: string | null;
+  onMarkerHover?: (propertyId: string, isHovering: boolean) => void;
+  onMarkerClick?: (propertyId: string) => void;
 }
 
 const MapPanel: React.FC<MapPanelProps> = ({
@@ -66,8 +66,9 @@ const MapPanel: React.FC<MapPanelProps> = ({
   activeProperty,
   setActiveProperty,
   hoveredPropertyId,
+  onMarkerHover,
+  onMarkerClick,
 }) => {
-  const navigate = useNavigate();
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [mapReady, setMapReady] = useState(false);
   const [visiblePropertiesCount, setVisiblePropertiesCount] = useState<number>(0);
@@ -117,11 +118,6 @@ const MapPanel: React.FC<MapPanelProps> = ({
       return coords !== null;
     });
   }, [properties, getPropertyCoordinates]);
-
-  // Navigate to property detail page
-  const handlePropertyClick = useCallback((property: SearchResult) => {
-    navigate(`/properties/${property.id}`);
-  }, [navigate]);
 
   // Update visible properties count
   const updateVisiblePropertiesCount = useCallback(() => {
@@ -283,16 +279,29 @@ const MapPanel: React.FC<MapPanelProps> = ({
           const marker = new google.maps.Marker({
             position: { lat: coords.lat, lng: coords.lng },
             map: map,
-            title: property.title || `Property ${property.id}`,
+            title: '', // Remove hover title
             icon: markerIcon,
             animation: isHovered || isActive ? google.maps.Animation.BOUNCE : undefined,
             zIndex: isHovered || isActive ? 1000 : 1
           });
           
-          // Add click listener
+          // Add click listener to scroll to property in list
           marker.addListener('click', () => {
-            setActiveProperty(property);
+            if (onMarkerClick) {
+              onMarkerClick(property.id);
+            }
           });
+          
+          // Add hover listeners for auto-scroll functionality
+          if (onMarkerHover) {
+            marker.addListener('mouseover', () => {
+              onMarkerHover(property.id, true);
+            });
+            
+            marker.addListener('mouseout', () => {
+              onMarkerHover(property.id, false);
+            });
+          }
           
           newMarkers.push(marker);
           
@@ -430,72 +439,6 @@ const MapPanel: React.FC<MapPanelProps> = ({
         options={mapOptions}
         onLoad={onMapLoad}
       >
-        {/* Info Window for Active Property */}
-        {activeProperty && (() => {
-          const coords = getPropertyCoordinates(activeProperty);
-          if (!coords) return null;
-          
-          return (
-            <InfoWindow
-              position={{ lat: coords.lat, lng: coords.lng }}
-              onCloseClick={() => setActiveProperty(null)}
-            >
-              <div className="p-3 max-w-xs">
-                <div className="flex items-start gap-3 mb-3">
-                  {/* Property Type Icon */}
-                  <div className="flex-shrink-0">
-                    {(() => {
-                      const propertyInfo = detectPropertyType(activeProperty);
-                      switch (propertyInfo.type) {
-                        case 'residential':
-                          return <Home className="h-5 w-5 text-blue-600" />;
-                        case 'commercial':
-                          return <Building2 className="h-5 w-5 text-green-600" />;
-                        case 'land':
-                          return <Trees className="h-5 w-5 text-orange-600" />;
-                        default:
-                          return <Home className="h-5 w-5 text-blue-600" />;
-                      }
-                    })()}
-                  </div>
-                  
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-sm mb-1 text-foreground line-clamp-2">
-                      {activeProperty.title || 'Property'}
-                    </h3>
-                    <div className="text-xs text-muted-foreground capitalize">
-                      {(() => {
-                        const propertyInfo = detectPropertyType(activeProperty);
-                        return `${propertyInfo.type} • ${propertyInfo.subtype}`;
-                      })()}
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="mb-3 text-xs text-muted-foreground">
-                  {activeProperty.property_details?.price && (
-                    <span className="font-bold text-primary text-sm">
-                      ₹{activeProperty.property_details.price}
-                    </span>
-                  )}
-                  {activeProperty.property_details?.location && (
-                    <div className="mt-1 flex items-center">
-                      <span className="truncate">{activeProperty.property_details.location}</span>
-                    </div>
-                  )}
-                </div>
-                
-                <Button 
-                  size="sm" 
-                  className="text-xs h-8 w-full rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground"
-                  onClick={() => handlePropertyClick(activeProperty)}
-                >
-                  View Details
-                </Button>
-              </div>
-            </InfoWindow>
-          );
-        })()}
       </GoogleMap>
     </div>
   );
