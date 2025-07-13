@@ -165,7 +165,9 @@ function AppLayout() {
   
   return (
     <div className="flex flex-col min-h-screen">
-      <Header onFavoritesClick={handleFavoritesClick} />
+      <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8">
+        <Header onFavoritesClick={handleFavoritesClick} />
+      </div>
       <FavoritesDrawer open={isFavoritesOpen} onClose={handleFavoritesClose} />
       <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex-grow">
         <Outlet />
