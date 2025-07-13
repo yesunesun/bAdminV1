@@ -7,6 +7,7 @@ import React from 'react';
 import { FieldText } from '../components/fields/FieldText';
 import { FieldList } from '../components/fields/FieldList';
 import { FieldCurrency } from '../components/fields/FieldCurrency';
+import { FieldTime } from '../components/fields/FieldTime';
 import { SectionComponentProps } from '../types';
 
 export const PGDetailsSection: React.FC<SectionComponentProps> = ({
@@ -18,36 +19,23 @@ export const PGDetailsSection: React.FC<SectionComponentProps> = ({
   
   return (
     <div className="space-y-2">
-      {/* PG Type */}
-      <FieldText label="PG Type" value={data.pgType} />
-      
       {/* Gender Preference */}
-      <FieldText label="Gender Preference" value={data.genderPreference} />
+      <FieldText label="Place is available for" value={data.genderPreference} />
       
-      {/* Meal Options */}
-      <FieldList label="Meal Options" value={data.mealOptions} />
+      {/* Occupant Type */}
+      <FieldText label="Preferred guests" value={data.occupantType} />
       
-      {/* Room Types Available */}
-      <FieldList label="Room Types" value={data.roomTypes} />
+      {/* Available From */}
+      <FieldText label="Available from" value={data.availableFrom} />
       
-      {/* Occupancy Types Available */}
-      <FieldList label="Occupancy Types" value={data.occupancyTypes} />
-      
-      {/* Rent Amount */}
-      <FieldCurrency label="Rent From" value={data.rentStart || data.minRent} />
-      <FieldCurrency label="Rent To" value={data.rentEnd || data.maxRent} />
-      
-      {/* Security Deposit */}
-      <FieldCurrency label="Security Deposit" value={data.securityDeposit} />
+      {/* Gate Closing Time - Display in 12-hour format */}
+      <FieldTime label="Gate closing time" value={data.gateClosingTime} />
       
       {/* Rules */}
-      <FieldList label="Rules" value={data.rules} />
+      <FieldList label="PG/Hostel Rules" value={data.rules} />
       
-      {/* Facilities */}
-      <FieldList label="Facilities" value={data.facilities} />
-      
-      {/* Notice Period */}
-      <FieldText label="Notice Policy" value={data.noticePolicy} />
+      {/* Description */}
+      <FieldText label="Description" value={data.description} />
     </div>
   );
 };

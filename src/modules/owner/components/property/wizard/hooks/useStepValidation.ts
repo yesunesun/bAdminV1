@@ -150,8 +150,8 @@ export function useStepValidation({
        // Note: 'directions' is optional and only shown when user clicks "Add Directions"
      ],
      
-     // ✅ FIXED: PG details - REMOVED monthlyRent and securityDeposit
-     'res_pg_pg_details': ['genderPreference', 'occupantType', 'mealOption', 'availableFrom'],
+     // ✅ FIXED: PG details - REMOVED mealOption (now handled in Room Details tab)
+     'res_pg_pg_details': ['genderPreference', 'occupantType', 'availableFrom'],
      
      // ✅ FIXED: Coworking details - COMPLETE list of mandatory fields matching CoworkingDetails.tsx
      'com_cow_coworking_details': [

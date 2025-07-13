@@ -98,8 +98,7 @@ const PGDetails: React.FC<FormSectionProps> = ({
     // Check if any of the fields are at root level but should be in step
     const fieldsToCheck = [
       'genderPreference', 'gender', 'occupantType', 'preferredGuests',
-      'mealOption', 'foodIncluded', 'mealOptions', 'rules',
-      'noSmoking', 'noDrinking', 'noNonVeg', 'noGuardians', 'noOppositeSexEntry',
+      'rules', 'noSmoking', 'noDrinking', 'noNonVeg', 'noGuardians', 'noOppositeSexEntry',
       'gateClosingTime', 'availableFrom', 'description'
     ];
     
@@ -137,14 +136,12 @@ const PGDetails: React.FC<FormSectionProps> = ({
   // Watch values for debugging
   const watchedValues = watch([
     getFieldPath('genderPreference'),
-    getFieldPath('occupantType'),
-    getFieldPath('mealOption')
+    getFieldPath('occupantType')
   ]);
 
   console.log("Watched PG Details values:", {
     genderPreference: watchedValues[0],
-    occupantType: watchedValues[1],
-    mealOption: watchedValues[2]
+    occupantType: watchedValues[1]
   });
 
   return (
@@ -259,8 +256,8 @@ const PGDetails: React.FC<FormSectionProps> = ({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-        {/* Available From - MANDATORY */}
+      {/* Available From - MANDATORY */}
+      <div className="mb-6">
         <div className="space-y-2">
           <RequiredLabel htmlFor={getFieldPath("availableFrom")}>Available from *</RequiredLabel>
           <div className="relative">
@@ -273,6 +270,7 @@ const PGDetails: React.FC<FormSectionProps> = ({
                 setStepValue('availableFrom', newValue, { shouldValidate: true });
               }}
               className={cn(
+                "w-full md:w-1/2",
                 errors.steps?.[actualStepId]?.availableFrom && "border-destructive focus-visible:ring-destructive"
               )}
             />
@@ -286,45 +284,6 @@ const PGDetails: React.FC<FormSectionProps> = ({
           {shouldShowFieldError('availableFrom') && (
             <p className="text-sm text-red-600 mt-0.5">
               {getFieldValidation('availableFrom').error}
-            </p>
-          )}
-        </div>
-
-        {/* Food Included - MANDATORY */}
-        <div className="space-y-3">
-          <RequiredLabel htmlFor={getFieldPath("mealOption")}>Food included *</RequiredLabel>
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
-              <input
-                type="radio"
-                id="foodYes"
-                value="Food Included"
-                checked={getValue('mealOption') === 'Food Included'}
-                onChange={() => setStepValue('mealOption', 'Food Included', { shouldValidate: true })}
-                className="h-4 w-4 text-primary rounded-full"
-              />
-              <label htmlFor="foodYes" className="text-sm">Yes</label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <input
-                type="radio"
-                id="foodNo"
-                value="No Food"
-                checked={getValue('mealOption') === 'No Food'}
-                onChange={() => setStepValue('mealOption', 'No Food', { shouldValidate: true })}
-                className="h-4 w-4 text-primary rounded-full"
-              />
-              <label htmlFor="foodNo" className="text-sm">No</label>
-            </div>
-          </div>
-          {errors.steps?.[actualStepId]?.mealOption && (
-            <p className="text-sm text-destructive mt-1">
-              {errors.steps?.[actualStepId]?.mealOption?.message as string}
-            </p>
-          )}
-          {shouldShowFieldError('mealOption') && (
-            <p className="text-sm text-red-600 mt-0.5">
-              {getFieldValidation('mealOption').error}
             </p>
           )}
         </div>

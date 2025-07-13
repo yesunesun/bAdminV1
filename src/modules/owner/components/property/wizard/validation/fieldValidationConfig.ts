@@ -425,7 +425,7 @@ const getRequiredFieldsForStep = (stepId: string): string[] => {
     // PG/Hostel steps - bathrooms handled in room details or features
     'res_pg_basic_details': ['roomType', 'roomCapacity', 'expectedRent', 'expectedDeposit', 'bathroomType', 'roomSize', 'mealOption'],
     'res_pg_location': ['address', 'city', 'state', 'pinCode', 'locality'],
-    'res_pg_pg_details': ['genderPreference', 'occupantType', 'mealOption', 'availableFrom'],
+    'res_pg_pg_details': ['genderPreference', 'occupantType', 'availableFrom'],
     'res_pg_features': ['propertyShowOption', 'propertyCondition', 'amenities'],
     
     // Commercial rent
