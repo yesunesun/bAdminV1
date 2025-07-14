@@ -8,12 +8,15 @@ import { useGoogleMaps } from '../hooks/useGoogleMaps';
 import { SearchContainer, SearchFilters, SearchResult } from '@/components/Search';
 import PropertyListingPanel from './PropertyListingPanel';
 import MapPanel from './MapPanel';
+import VisitedPropertiesSection from './VisitedPropertiesSection';
+import RecommendedPropertiesSection from './RecommendedPropertiesSection';
 import { AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getUserFavorites, togglePropertyLike } from '../services/seekerService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { useAppConfig } from '@/config/hooks/useAppConfig';
+import { usePropertyRecommendations } from '../hooks/usePropertyRecommendations';
 
 interface PropertyMapHomeViewProps {
   onFavoriteAction?: (propertyId: string) => boolean;
@@ -45,6 +48,26 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
 
   // Use the centralized Google Maps loading hook
   const { isLoaded: mapsLoaded, loadError } = useGoogleMaps(searchProperties);
+  
+  // Use property recommendations hook
+  const {
+    enhancedProperties,
+    recommendedProperties,
+    premiumProperties,
+    sponsoredProperties,
+    isProcessing: recommendationsProcessing,
+    userPreferences,
+    refreshRecommendations
+  } = usePropertyRecommendations({
+    properties: searchProperties,
+    enabled: true,
+    options: {
+      includePremium: true,
+      includeSponsored: true,
+      premiumRatio: 20,
+      sponsoredLimit: 3
+    }
+  });
 
   // Load latest properties on component mount (DEFAULT BEHAVIOR)
   useEffect(() => {
@@ -444,13 +467,33 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
       {/* Main Content Container - Takes remaining height with proper constraints */}
       <div className="flex-1 w-full overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 py-4 h-full">
+          {/* Visited Properties Section - Only shows if user has visited properties */}
+          <div className="mb-4">
+            <VisitedPropertiesSection maxItems={3} showClearAll={false} />
+          </div>
+          
+          {/* Recommended Properties Section - Shows personalized recommendations and premium listings */}
+          {(recommendedProperties.length > 0 || premiumProperties.length > 0 || sponsoredProperties.length > 0) && (
+            <div className="mb-6">
+              <RecommendedPropertiesSection
+                recommendedProperties={recommendedProperties}
+                premiumProperties={premiumProperties}
+                sponsoredProperties={sponsoredProperties}
+                userPreferences={userPreferences}
+                onPropertySelect={setActiveProperty}
+                onPropertyHover={handlePropertyHover}
+                hoveredProperty={hoveredProperty}
+              />
+            </div>
+          )}
+          
           {/* Main Content - Fixed height layout with more precise constraints */}
           <div className="flex flex-col md:flex-row gap-4 h-full">
             {/* Property Listings Panel - Fixed height with careful calculation */}
             <div className="w-full md:w-1/3 h-[600px] md:h-full">
               <PropertyListingPanel
-                properties={searchProperties}
-                loading={searchLoading}
+                properties={enhancedProperties.length > 0 ? enhancedProperties : searchProperties}
+                loading={searchLoading || recommendationsProcessing}
                 loadingMore={loadingMore}
                 hasMore={searchProperties.length < searchTotalCount}
                 totalCount={searchTotalCount}

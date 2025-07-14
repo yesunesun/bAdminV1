@@ -11,12 +11,15 @@ import { Button } from '@/components/ui/button';
 import { HomeIcon, ChevronLeftIcon, RefreshCw } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { imageService } from '@/services/imageService';
+import { useVisitedProperties } from '@/contexts/VisitedPropertiesContext';
+import { fastImageService } from '@/modules/seeker/components/PropertyItem/services/fastImageService';
 
 const PropertyDetailPage: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const [refreshKey, setRefreshKey] = useState(0);
   const { property, loading, error, isLiked, toggleLike } = usePropertyDetails(refreshKey);
+  const { addVisit } = useVisitedProperties();
   const { toast } = useToast();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [directUrls, setDirectUrls] = useState<string[]>([]);
@@ -36,6 +39,108 @@ const PropertyDetailPage: React.FC = () => {
       });
     }
   }, [loading, isRefreshing, toast]);
+
+  // Track property visit when property loads
+  useEffect(() => {
+    if (property && id && !loading) {
+      // Generate proper image URL using the same logic as PropertyItem
+      const getImageUrl = () => {
+        console.log('🔍 [PropertyDetailPage] Getting image for visit tracking:', {
+          propertyId: property.id,
+          primary_image: property.primary_image,
+          property_images: property.property_images,
+          property_details: property.property_details
+        });
+        
+        try {
+          // Method 1: Use primary_image field if available
+          if (property.primary_image && property.primary_image.trim()) {
+            console.log('✅ [PropertyDetailPage] Found primary_image:', property.primary_image);
+            // If it's already a full URL, use it
+            if (property.primary_image.startsWith('http') || property.primary_image.startsWith('/')) {
+              console.log('✅ [PropertyDetailPage] Using direct URL:', property.primary_image);
+              return property.primary_image;
+            }
+            // If it's not an optimization file, construct the URL
+            if (!property.primary_image.startsWith('optimization_')) {
+              const constructedUrl = fastImageService.getPublicImageUrl(property.id, property.primary_image);
+              console.log('✅ [PropertyDetailPage] Constructed URL:', constructedUrl);
+              return constructedUrl;
+            }
+          }
+          
+          // Method 2: Check for imageFiles in property_details
+          const details = property.property_details || {};
+          console.log('🔍 [PropertyDetailPage] Checking imageFiles:', details.imageFiles);
+          
+          if (details.imageFiles && Array.isArray(details.imageFiles) && details.imageFiles.length > 0) {
+            const primaryImage = details.imageFiles.find((img: any) => img.isPrimary);
+            const imageToUse = primaryImage || details.imageFiles[0];
+            
+            console.log('🔍 [PropertyDetailPage] Selected imageFile:', imageToUse);
+            
+            if (imageToUse.fileName && !imageToUse.fileName.startsWith('optimization_')) {
+              const constructedUrl = fastImageService.getPublicImageUrl(property.id, imageToUse.fileName);
+              console.log('✅ [PropertyDetailPage] Constructed URL from imageFiles:', constructedUrl);
+              return constructedUrl;
+            }
+          }
+          
+          // Method 3: Check property_images array
+          if (property.property_images && Array.isArray(property.property_images) && property.property_images.length > 0) {
+            const primaryImage = property.property_images.find((img: any) => img.is_primary);
+            const imageToUse = primaryImage || property.property_images[0];
+            
+            if (imageToUse.url && imageToUse.url.startsWith('http')) {
+              return imageToUse.url;
+            }
+            
+            if (imageToUse.fileName) {
+              return fastImageService.getPublicImageUrl(property.id, imageToUse.fileName);
+            }
+          }
+          
+          // Method 4: Try to find any image in the storage bucket (async fallback)
+          console.log('🔄 [PropertyDetailPage] Trying async image search as fallback');
+          fastImageService.findFirstImageUrl(property.id).then(asyncUrl => {
+            if (asyncUrl !== '/noimage.png') {
+              console.log('✅ [PropertyDetailPage] Found async image:', asyncUrl);
+              // Update the visited property with the found image
+              const updatedProperty = {
+                id: property.id,
+                title: property.property_details?.flow?.title || property.title || 'Property Listing',
+                price: property.price || 0,
+                location: property.property_details?.location?.address || property.address || '',
+                propertyType: property.property_type || 'residential',
+                transactionType: property.property_details?.flow?.listingType || 'rent',
+                primary_image: asyncUrl
+              };
+              addVisit(updatedProperty);
+            }
+          });
+          
+          return '/noimage.png';
+        } catch (error) {
+          console.error('Error generating image URL for visited property:', error);
+          return '/noimage.png';
+        }
+      };
+
+      // Extract relevant data for visited properties
+      const visitedProperty = {
+        id: property.id,
+        title: property.property_details?.flow?.title || property.title || 'Property Listing',
+        price: property.price || 0,
+        location: property.property_details?.location?.address || property.address || '',
+        propertyType: property.property_type || 'residential',
+        transactionType: property.property_details?.flow?.listingType || 'rent',
+        primary_image: getImageUrl()
+      };
+      
+      console.log('📝 [PropertyDetailPage] Storing visited property:', visitedProperty);
+      addVisit(visitedProperty);
+    }
+  }, [property, id, loading, addVisit]);
 
   // Optimized image preloading with caching
   useEffect(() => {

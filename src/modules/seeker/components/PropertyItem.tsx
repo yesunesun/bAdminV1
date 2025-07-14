@@ -10,7 +10,7 @@ import { SearchResult } from '@/components/Search/types/search.types';
 import { 
   ChevronRight, MapPin, Bed, Bath, Square, Users, 
   Coffee, Building, Home, Calendar, Utensils, Briefcase, FileText, Map,
-  Clock, CheckCircle, AlertCircle, Star, Wifi, Car
+  Clock, CheckCircle, AlertCircle, Star, Wifi, Car, Crown, Zap, Award
 } from 'lucide-react';
 import FavoriteButton from './FavoriteButton';
 import { formatPrice } from '../services/seekerService';
@@ -28,11 +28,19 @@ import {
 } from '../utils/propertyTitleUtils';
 import { fastImageService } from './PropertyItem/services/fastImageService';
 import { useFavorites } from '@/contexts/FavoritesContext';
+import { useVisitedProperties } from '@/contexts/VisitedPropertiesContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
+import { 
+  isPropertyPremium, 
+  isPropertySponsored, 
+  getPremiumBadgeText, 
+  getPremiumBadgeStyle,
+  EnhancedProperty 
+} from '../services/recommendationService';
 
 // Union type to handle both formats
-type PropertyItemData = PropertyType | SearchResult;
+type PropertyItemData = PropertyType | SearchResult | EnhancedProperty;
 
 interface PropertyItemProps {
   property: PropertyItemData;
@@ -83,6 +91,58 @@ const getPropertyStatus = (property: PropertyItemData): { status: string; icon: 
   }
 };
 
+// Helper function to render premium badges
+const renderPremiumBadge = (property: PropertyItemData): React.ReactNode => {
+  const isPremium = isPropertyPremium(property);
+  const isSponsored = isPropertySponsored(property);
+  
+  if (!isPremium && !isSponsored) return null;
+  
+  const badgeText = getPremiumBadgeText(property);
+  const badgeStyle = getPremiumBadgeStyle(property);
+  
+  // Get appropriate icon for badge type
+  const getBadgeIcon = () => {
+    switch (badgeText.toLowerCase()) {
+      case 'sponsored':
+        return <Zap className="h-3 w-3 mr-1" />;
+      case 'premium':
+        return <Crown className="h-3 w-3 mr-1" />;
+      case 'featured':
+        return <Star className="h-3 w-3 mr-1" />;
+      case 'verified':
+        return <Award className="h-3 w-3 mr-1" />;
+      case 'new':
+        return <Zap className="h-3 w-3 mr-1" />;
+      default:
+        return <Star className="h-3 w-3 mr-1" />;
+    }
+  };
+  
+  return (
+    <div className={`
+      inline-flex items-center text-xs font-bold px-2.5 py-1.5 rounded-full 
+      backdrop-blur-sm shadow-lg border
+      ${badgeStyle}
+      animate-pulse
+    `}>
+      {getBadgeIcon()}
+      {badgeText}
+    </div>
+  );
+};
+
+// Helper function to check if property has recommendation data
+const getRecommendationData = (property: PropertyItemData) => {
+  const enhanced = property as EnhancedProperty;
+  return {
+    hasRecommendation: enhanced.recommendation_score !== undefined,
+    score: enhanced.recommendation_score || 0,
+    reason: enhanced.recommendation_reason || '',
+    similarityScore: enhanced.similarity_score || 0
+  };
+};
+
 // Helper function to extract key amenities/features
 const getPropertyAmenities = (property: PropertyItemData): Array<{ icon: React.ReactNode; text: string }> => {
   const amenities = [];
@@ -127,8 +187,9 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
   onFavoriteToggle, // Legacy prop - will be replaced by context
   onShare
 }) => {
-  // Get favorites context and auth
+  // Get favorites context, visited properties context, and auth
   const { isFavorite, addFavorite, removeFavorite } = useFavorites();
+  const { isVisited, addVisit } = useVisitedProperties();
   const { user } = useAuth();
   const { toast } = useToast();
   
@@ -179,167 +240,100 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
         status: isValidStringField(property.status) ? property.status : 'active'
       };
     }
-  }, [property]);
+  }, [property.id, property.title, property.price]);
 
-  // Get real-time favorite status from context
+  // Get real-time favorite status and visited status from context
   const isCurrentlyFavorited = isFavorite(propertyData.id);
+  const isCurrentlyVisited = isVisited(propertyData.id);
 
-  // Get property age, status, and amenities
+  // Get property age, status, amenities, and recommendation data
   const propertyAge = formatPropertyAge(propertyData.createdAt);
   const propertyStatus = getPropertyStatus(property);
   const propertyAmenities = getPropertyAmenities(property);
+  const recommendationData = getRecommendationData(property);
+  const isPremiumProperty = isPropertyPremium(property);
+  const isSponsoredProperty = isPropertySponsored(property);
 
-  // Generate image URL
+  // Generate image URL with minimal dependencies to prevent infinite re-renders
   const imageUrl = useMemo(() => {
-    console.log(`🔍 [PropertyItem] Generating image for property ${propertyData.id}:`, {
-      propertyData_primary_image: propertyData.primary_image,
-      property_primary_image: property.primary_image,
-      property_property_images: property.property_images,
-      property_details: property.property_details
-    });
-    
-    try {
-      // Method 1: Use primary_image field if available
-      if (propertyData.primary_image && propertyData.primary_image.trim()) {
-        // Handle optimization format in primary_image
-        if (propertyData.primary_image.startsWith('optimization_')) {
-          console.log(`🔄 [PropertyItem] Found optimization primary_image: ${propertyData.primary_image}`);
-          return '/noimage.png'; // Placeholder - async loading will handle this
-        }
-        
-        const constructedUrl = fastImageService.getPublicImageUrl(propertyData.id, propertyData.primary_image);
-        console.log(`✅ [PropertyItem] Method 1 - Using primary_image: ${propertyData.primary_image} -> ${constructedUrl}`);
-        return constructedUrl;
+    // If we have a primary image from propertyData, use it first
+    if (propertyData.primary_image && propertyData.primary_image.trim()) {
+      if (propertyData.primary_image.startsWith('optimization_')) {
+        return '/noimage.png'; // Placeholder - async loading will handle this
       }
-      
-      // Method 2: Check if it's PropertyType and has property_images
-      if (!isSearchResult(property) && property.property_images && Array.isArray(property.property_images) && property.property_images.length > 0) {
-        const primaryImage = property.property_images.find(img => img.is_primary);
-        const imageToUse = primaryImage || property.property_images[0];
-        
-        if (imageToUse.url && imageToUse.url.startsWith('http')) {
-          return imageToUse.url;
-        }
-        
-        if (imageToUse.fileName) {
-          const constructedUrl = fastImageService.getPublicImageUrl(propertyData.id, imageToUse.fileName);
-          return constructedUrl;
-        }
-      }
-      
-      // Method 3: Check for imageFiles (new optimization format)
-      if (!isSearchResult(property)) {
-        const details = property.property_details || {};
-        console.log(`[PropertyItem] Checking imageFiles for property ${propertyData.id}:`, details.imageFiles);
-        
-        if (details.imageFiles && Array.isArray(details.imageFiles) && details.imageFiles.length > 0) {
-          const primaryImage = details.imageFiles.find(img => img.isPrimary);
-          const imageToUse = primaryImage || details.imageFiles[0];
-          
-          console.log(`[PropertyItem] Selected image from imageFiles:`, imageToUse);
-          
-          if (imageToUse.fileName) {
-            // Handle optimization format
-            if (imageToUse.fileName.startsWith('optimization_')) {
-              // For optimization images, we need async loading - component will handle this
-              console.log(`🔄 [PropertyItem] Found optimization image: ${imageToUse.fileName}`);
-              return '/noimage.png'; // Placeholder - component should handle async loading
-            }
-            
-            const constructedUrl = fastImageService.getPublicImageUrl(propertyData.id, imageToUse.fileName);
-            console.log(`✅ [PropertyItem] Method 3 - Using imageFiles: ${imageToUse.fileName} -> ${constructedUrl}`);
-            return constructedUrl;
-          }
-        }
-        
-        // Method 4: Legacy property_details support
-        if (details.primaryImage) {
-          if (details.primaryImage.startsWith('http') || details.primaryImage.startsWith('/')) {
-            return details.primaryImage;
-          }
-          return fastImageService.getPublicImageUrl(propertyData.id, details.primaryImage);
-        }
-      }
-      
-      console.log(`❌ [PropertyItem] No image found for property ${propertyData.id}, using default`);
-      return '/noimage.png';
-    } catch (error) {
-      console.error(`❌ [PropertyItem] Error generating image for property ${propertyData.id}:`, error);
-      return '/noimage.png';
+      return fastImageService.getPublicImageUrl(propertyData.id, propertyData.primary_image);
     }
-  }, [propertyData.id, propertyData.primary_image, property]);
+    
+    // Fallback to default image
+    return '/noimage.png';
+  }, [propertyData.id, propertyData.primary_image]);
 
   // Handle async loading for optimization images
   useEffect(() => {
     const loadOptimizationImage = async () => {
-      console.log(`[PropertyItem] useEffect - checking for optimization images`);
-      
-      if (!property) {
-        console.log(`[PropertyItem] Skipping - no property`);
-        return;
+      if (!property || asyncImageUrl) {
+        return; // Skip if no property or already loaded
       }
       
       if (isSearchResult(property)) {
-        console.log(`[PropertyItem] This is a SearchResult property:`, property);
-        console.log(`[PropertyItem] SearchResult primary_image:`, property.primary_image);
-        
         // Handle optimization format in SearchResult primary_image
         if (property.primary_image && property.primary_image.startsWith('optimization_')) {
-          console.log(`🔄 [PropertyItem] Loading SearchResult optimization image: ${property.primary_image}`);
           try {
             const optimizedUrl = await fastImageService.getOptimizationImageUrl(property.primary_image);
-            console.log(`[PropertyItem] SearchResult getOptimizationImageUrl returned:`, optimizedUrl);
-            
             if (optimizedUrl && optimizedUrl !== '/noimage.png') {
               setAsyncImageUrl(optimizedUrl);
-              console.log(`✅ [PropertyItem] Loaded SearchResult optimization image: ${optimizedUrl}`);
-            } else {
-              console.log(`❌ [PropertyItem] SearchResult getOptimizationImageUrl returned fallback/empty`);
             }
           } catch (error) {
-            console.error(`❌ [PropertyItem] Failed to load SearchResult optimization image:`, error);
+            console.error(`Failed to load SearchResult optimization image:`, error);
           }
-        } else {
-          console.log(`[PropertyItem] SearchResult primary_image is not optimization format:`, property.primary_image);
         }
         return;
       }
       
       const details = property.property_details || {};
-      console.log(`[PropertyItem] Property details:`, details);
-      console.log(`[PropertyItem] imageFiles:`, details.imageFiles);
       
       if (details.imageFiles && Array.isArray(details.imageFiles) && details.imageFiles.length > 0) {
         const primaryImage = details.imageFiles.find(img => img.isPrimary);
         const imageToUse = primaryImage || details.imageFiles[0];
         
-        console.log(`[PropertyItem] Selected image for async loading:`, imageToUse);
-        
         if (imageToUse.fileName && imageToUse.fileName.startsWith('optimization_')) {
-          console.log(`🔄 [PropertyItem] Loading optimization image: ${imageToUse.fileName}`);
           try {
             const optimizedUrl = await fastImageService.getOptimizationImageUrl(imageToUse.fileName);
-            console.log(`[PropertyItem] getOptimizationImageUrl returned:`, optimizedUrl);
-            
             if (optimizedUrl && optimizedUrl !== '/noimage.png') {
               setAsyncImageUrl(optimizedUrl);
-              console.log(`✅ [PropertyItem] Loaded optimization image: ${optimizedUrl}`);
-            } else {
-              console.log(`❌ [PropertyItem] getOptimizationImageUrl returned fallback/empty`);
             }
           } catch (error) {
-            console.error(`❌ [PropertyItem] Failed to load optimization image:`, error);
+            console.error(`Failed to load optimization image:`, error);
           }
-        } else {
-          console.log(`[PropertyItem] Image fileName doesn't start with optimization_:`, imageToUse.fileName);
         }
-      } else {
-        console.log(`[PropertyItem] No imageFiles found`);
       }
     };
     
-    loadOptimizationImage();
-  }, [property]);
+    // Only run once per property and only if we don't have an async image yet
+    if (!asyncImageUrl) {
+      loadOptimizationImage();
+    }
+  }, [property.id, asyncImageUrl]); // Use property.id instead of entire property object
+
+  // Update visited properties with the actual working image URL
+  useEffect(() => {
+    if (isCurrentlyVisited && (asyncImageUrl || imageUrl) && (asyncImageUrl || imageUrl) !== '/noimage.png') {
+      const workingImageUrl = asyncImageUrl || imageUrl;
+      
+      // Update the visited property with the working image URL
+      const updatedVisitedProperty = {
+        id: propertyData.id,
+        title: propertyData.title || 'Property Listing',
+        price: propertyData.price || 0,
+        location: propertyData.location || '',
+        propertyType: propertyData.propertyType || 'residential',
+        transactionType: propertyData.transactionType || 'rent',
+        primary_image: workingImageUrl
+      };
+      
+      addVisit(updatedVisitedProperty);
+    }
+  }, [asyncImageUrl, imageUrl, isCurrentlyVisited, propertyData.id, addVisit]); // Use propertyData.id instead of entire object
 
   // Generate display data for SearchResult
   const displayData = useMemo(() => {
@@ -436,7 +430,7 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
       // Use existing logic for PropertyType
       return getFlowSpecificDisplayData(property, detectPropertyFlowType(property), property.property_details || {});
     }
-  }, [property, propertyData]);
+  }, [propertyData.id, propertyData.propertyType, propertyData.transactionType, propertyData.price]);
   
   // UPDATED: Handle favorite toggle using FavoritesContext directly
   const handleFavoriteToggle = async (isLiked: boolean) => {
@@ -509,6 +503,9 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
       className={`
         relative transition-all duration-300 
         ${isHovered ? 'bg-gradient-to-r from-blue-50/50 to-purple-50/50 shadow-lg scale-[1.02]' : 'hover:bg-muted/30'}
+        ${isPremiumProperty || isSponsoredProperty ? 'ring-2 ring-offset-2' : ''}
+        ${isPremiumProperty ? 'ring-purple-300/50' : ''}
+        ${isSponsoredProperty ? 'ring-orange-300/50' : ''}
         hover:shadow-xl rounded-2xl mx-2 my-2 border border-border/20 hover:border-blue-200/60 bg-card/50 backdrop-blur-sm
       `}
     >
@@ -569,23 +566,54 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
                 )}
               </div>
               
-              {/* Property Status - Top right of image */}
-              <div className="absolute top-3 left-3">
+              {/* Premium/Sponsored Badge - Top right of image */}
+              {(isPremiumProperty || isSponsoredProperty) && (
+                <div className="absolute top-3 right-3">
+                  {renderPremiumBadge(property)}
+                </div>
+              )}
+              
+              {/* Property Status and Visited Indicator - Top right of image */}
+              <div className="absolute top-3 left-3 flex flex-col gap-2">
                 <div className={`inline-flex items-center text-xs px-2.5 py-1 rounded-full bg-white/95 backdrop-blur-sm font-medium shadow-sm ${propertyStatus.color}`}>
                   {propertyStatus.icon}
                   <span className="ml-1">{propertyStatus.status}</span>
                 </div>
+                {isCurrentlyVisited && (
+                  <div className="inline-flex items-center text-xs px-2.5 py-1 rounded-full bg-purple-600/95 backdrop-blur-sm font-medium shadow-sm text-white">
+                    <Clock className="h-3 w-3 mr-1" />
+                    <span>Visited</span>
+                  </div>
+                )}
               </div>
             </div>
             
             {/* Enhanced Content Section */}
             <div className="space-y-3">
-              {/* Enhanced Property Title */}
+              {/* Enhanced Property Title with Recommendation Indicator */}
               {propertyData.title && (
-                <div>
+                <div className="space-y-2">
                   <h3 className="text-lg font-bold text-foreground group-hover:text-blue-600 transition-colors duration-200 line-clamp-2 leading-tight">
                     {propertyData.title}
                   </h3>
+                  
+                  {/* Recommendation Score Indicator */}
+                  {recommendationData.hasRecommendation && recommendationData.score > 50 && (
+                    <div className="flex items-center gap-2">
+                      <div className="inline-flex items-center text-xs font-medium px-2 py-1 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        <Star className="h-3 w-3 mr-1 text-emerald-600" />
+                        <span>Recommended for you</span>
+                        <span className="ml-1 text-emerald-600 font-bold">{Math.round(recommendationData.score)}%</span>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Recommendation Reason */}
+                  {recommendationData.reason && recommendationData.score > 70 && (
+                    <p className="text-xs text-muted-foreground italic">
+                      {recommendationData.reason}
+                    </p>
+                  )}
                 </div>
               )}
               

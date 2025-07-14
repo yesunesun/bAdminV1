@@ -7,6 +7,7 @@ import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { FavoritesProvider } from './contexts/FavoritesContext';
+import { VisitedPropertiesProvider } from './contexts/VisitedPropertiesContext';
 import { FlowProvider } from './contexts/FlowContext';
 import { Header, BrandLogo } from '@/components/Header';
 import { useAdminAccess } from './modules/admin/hooks/useAdminAccess';
@@ -209,8 +210,9 @@ function App() {
   return (
     <AuthProvider>
       <FavoritesProvider>
-        <BrowserRouter>
-          <FlowProvider>
+        <VisitedPropertiesProvider>
+          <BrowserRouter>
+            <FlowProvider>
             <div className="min-h-screen bg-background">
               <Routes>
                 {/* Auth Routes - accessible to everyone */}
@@ -428,8 +430,9 @@ function App() {
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </div>
-          </FlowProvider>
-        </BrowserRouter>
+            </FlowProvider>
+          </BrowserRouter>
+        </VisitedPropertiesProvider>
       </FavoritesProvider>
     </AuthProvider>
   );
