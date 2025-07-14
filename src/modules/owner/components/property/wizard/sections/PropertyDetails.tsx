@@ -110,7 +110,7 @@ export function PropertyDetails({
     }
   };
 
-  // ✅ UPDATED: Basic field validation - removed bathrooms validation logic
+  // ✅ UPDATED: Basic field validation - removed bathrooms validation logic, added floor comparison
   const validateField = (fieldName: string, value: any) => {
     let error = '';
     
@@ -154,6 +154,46 @@ export function PropertyDetails({
     }));
     
     return error === '';
+  };
+
+  // ✅ NEW: Validate floor comparison logic
+  const validateFloorComparison = (currentFloor?: string, currentTotalFloors?: string) => {
+    const floor = currentFloor || values.floor;
+    const totalFloors = currentTotalFloors || values.totalFloors;
+    
+    const floorNum = parseInt(floor) || 0;
+    const totalFloorsNum = parseInt(totalFloors) || 0;
+    
+    let totalFloorsError = '';
+    
+    // Only validate comparison if both fields have values
+    if (floor && totalFloors) {
+      if (totalFloorsNum < floorNum) {
+        totalFloorsError = 'Total floors cannot be less than floor';
+      }
+    }
+    
+    // Update validation errors for floor comparison
+    setValidationErrors(prev => {
+      const newErrors = { ...prev };
+      
+      // Clear previous floor comparison errors
+      if (prev.floor && prev.floor.includes('cannot be')) {
+        newErrors.floor = '';
+      }
+      if (prev.totalFloors && prev.totalFloors.includes('cannot be')) {
+        newErrors.totalFloors = '';
+      }
+      
+      // Set new floor comparison error on totalFloors field
+      if (totalFloorsError) {
+        newErrors.totalFloors = totalFloorsError;
+      }
+      
+      return newErrors;
+    });
+    
+    return !totalFloorsError;
   };
 
   // ✅ UPDATED: Get user-friendly field label - removed bathrooms
@@ -276,6 +316,16 @@ export function PropertyDetails({
     setValues(prev => ({ ...prev, [field]: value }));
     saveField(field, value);
     markFieldTouched(field);
+    
+    // ✅ NEW: Trigger floor comparison validation when floor or totalFloors changes
+    if (field === 'floor' || field === 'totalFloors') {
+      // Use setTimeout to ensure state is updated before validation
+      setTimeout(() => {
+        const currentFloor = field === 'floor' ? value : values.floor;
+        const currentTotalFloors = field === 'totalFloors' ? value : values.totalFloors;
+        validateFloorComparison(currentFloor, currentTotalFloors);
+      }, 0);
+    }
   };
 
   // Handle numeric input with validation

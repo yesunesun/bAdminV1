@@ -17,6 +17,47 @@ const CACHE_EXPIRY = 60000; // 1 minute cache expiry
 const DATA_VERSION = 'v3';
 
 /**
+ * Extracts coordinates from property data
+ */
+const extractCoordinates = (propertyData: any): { latitude: number | null, longitude: number | null } => {
+  if (!propertyData || !propertyData.steps) {
+    return { latitude: null, longitude: null };
+  }
+
+  // Look for coordinates in location-related steps
+  const locationSteps = Object.keys(propertyData.steps).filter(stepId => 
+    stepId.includes('location') || stepId.includes('_location')
+  );
+
+  for (const stepId of locationSteps) {
+    const stepData = propertyData.steps[stepId];
+    if (stepData && stepData.latitude && stepData.longitude) {
+      const lat = parseFloat(stepData.latitude);
+      const lng = parseFloat(stepData.longitude);
+      
+      if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+        return { latitude: lat, longitude: lng };
+      }
+    }
+  }
+
+  // Fallback: Look for coordinates in any step
+  for (const stepId of Object.keys(propertyData.steps)) {
+    const stepData = propertyData.steps[stepId];
+    if (stepData && stepData.latitude && stepData.longitude) {
+      const lat = parseFloat(stepData.latitude);
+      const lng = parseFloat(stepData.longitude);
+      
+      if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+        return { latitude: lat, longitude: lng };
+      }
+    }
+  }
+
+  return { latitude: null, longitude: null };
+};
+
+/**
  * Creates a clean property data structure based on flow type
  */
 const createEmptyPropertyStructure = (
@@ -329,12 +370,17 @@ export const propertyService = {
       // Create in properties_v2 table
       const now = new Date().toISOString();
       
+      // Extract coordinates from property data
+      const coords = extractCoordinates(organizedData);
+      
       const propertyRecord = {
         owner_id: userId,
         created_at: now,
         updated_at: now,
         status: status,
-        property_details: organizedData
+        property_details: organizedData,
+        coordinates: coords.latitude && coords.longitude ? 
+          { lat: coords.latitude, lng: coords.longitude } : null
       };
       
       const { data, error } = await supabase
@@ -441,9 +487,14 @@ export const propertyService = {
       console.log('Updating property with flow:', organizedData.flow);
       
       // Update in properties_v2 table
+      // Extract coordinates from property data
+      const coords = extractCoordinates(organizedData);
+      
       const updateData = {
         updated_at: new Date().toISOString(),
-        property_details: organizedData
+        property_details: organizedData,
+        coordinates: coords.latitude && coords.longitude ? 
+          { lat: coords.latitude, lng: coords.longitude } : null
       };
       
       if (status) {

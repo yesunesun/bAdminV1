@@ -78,14 +78,14 @@ export function useStepValidation({
      ],
      
      // Location steps - including locality as required
-     'res_rent_location': ['address', 'city', 'state', 'pinCode', 'locality'],
-     'res_sale_location': ['address', 'city', 'state', 'pinCode', 'locality'],
-     'res_flat_location': ['address', 'city', 'state', 'pinCode', 'locality'],
-     'res_pg_location': ['address', 'city', 'state', 'pinCode', 'locality'],
-     'com_rent_location': ['address', 'city', 'state', 'pinCode', 'locality'],
-     'com_sale_location': ['address', 'city', 'state', 'pinCode', 'locality'],
-     'com_cow_location': ['address', 'city', 'state', 'pinCode', 'locality'],
-     'land_sale_location': ['address', 'city', 'state', 'pinCode'],
+     'res_rent_location': ['address', 'city', 'state', 'pinCode', 'locality', 'latitude', 'longitude'],
+     'res_sale_location': ['address', 'city', 'state', 'pinCode', 'locality', 'latitude', 'longitude'],
+     'res_flat_location': ['address', 'city', 'state', 'pinCode', 'locality', 'latitude', 'longitude'],
+     'res_pg_location': ['address', 'city', 'state', 'pinCode', 'locality', 'latitude', 'longitude'],
+     'com_rent_location': ['address', 'city', 'state', 'pinCode', 'locality', 'latitude', 'longitude'],
+     'com_sale_location': ['address', 'city', 'state', 'pinCode', 'locality', 'latitude', 'longitude'],
+     'com_cow_location': ['address', 'city', 'state', 'pinCode', 'locality', 'latitude', 'longitude'],
+     'land_sale_location': ['address', 'city', 'state', 'pinCode', 'latitude', 'longitude'],
      
      // ✅ FIXED: Commercial rental step - exactly matching UI requirements
      'com_rent_rental': ['rentalType', 'rentAmount', 'securityDeposit', 'advanceRent', 'maintenance', 'camCharges', 'availableFrom', 'parking', 'operatingHours', 'businessPreferences'],
@@ -786,6 +786,8 @@ const labels: Record<string, string> = {
  state: 'State',
  pinCode: 'PIN Code',
  locality: 'Locality',
+ latitude: 'Latitude',
+ longitude: 'Longitude',
  
  // ✅ UPDATED: Rental/Sale fields - Added maintenanceCharges and Commercial Sale specific fields
  rentalType: 'Rental Type',

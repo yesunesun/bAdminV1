@@ -15,7 +15,16 @@
       "Bash(npx supabase:*)",
       "Bash(node:*)",
       "Bash(npx ts-node:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(npx playwright:*)",
+      "Bash(chmod:*)",
+      "Bash(VITE_SUPABASE_URL=https://lkzbwrrauvdinwypmhyb.supabase.co VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxremJ3cnJhdXZkaW53eXBtaHliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ4MDUwMjUsImV4cCI6MjA1MDM4MTAyNX0.AOgnwreEODI-JgoeH93eHe-4s2AO8zi4kZa0DuPaNAU node check_properties.js)",
+      "Bash(VITE_SUPABASE_URL=https://lkzbwrrauvdinwypmhyb.supabase.co VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxremJ3cnJhdXZkaW53eXBtaHliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ4MDUwMjUsImV4cCI6MjA1MDM4MTAyNX0.AOgnwreEODI-JgoeH93eHe-4s2AO8zi4kZa0DuPaNAU node test_coordinates.js)",
+      "Bash(VITE_SUPABASE_URL=https://lkzbwrrauvdinwypmhyb.supabase.co VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxremJ3cnJhdXZkaW53eXBtaHliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ4MDUwMjUsImV4cCI6MjA1MDM4MTAyNX0.AOgnwreEODI-JgoeH93eHe-4s2AO8zi4kZa0DuPaNAU node update_property_coordinates.js)",
+      "Bash(VITE_SUPABASE_URL=https://lkzbwrrauvdinwypmhyb.supabase.co VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxremJ3cnJhdXZkaW53eXBtaHliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ4MDUwMjUsImV4cCI6MjA1MDM4MTAyNX0.AOgnwreEODI-JgoeH93eHe-4s2AO8zi4kZa0DuPaNAU node test_coordinate_saving.js)",
+      "Bash(mv:*)",
+      "Bash(true)",
+      "Bash(VITE_SUPABASE_URL=https://lkzbwrrauvdinwypmhyb.supabase.co VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxremJ3cnJhdXZkaW53eXBtaHliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ4MDUwMjUsImV4cCI6MjA1MDM4MTAyNX0.AOgnwreEODI-JgoeH93eHe-4s2AO8zi4kZa0DuPaNAU node test-scripts/remove-properties-without-coordinates.js)"
     ],
     "deny": []
   }

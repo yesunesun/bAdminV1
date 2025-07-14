@@ -18,6 +18,45 @@ import { useContext } from 'react';
 import { AuthContext } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { prepareFormDataForSubmission } from '@/modules/owner/components/property/wizard/utils/formDataFormatter';
+
+// Helper function to extract coordinates from form data
+const extractCoordinatesFromFormData = (formData: any): { latitude: number | null, longitude: number | null } => {
+  if (!formData || !formData.steps) {
+    return { latitude: null, longitude: null };
+  }
+
+  // Look for coordinates in location-related steps
+  const locationSteps = Object.keys(formData.steps).filter(stepId => 
+    stepId.includes('location') || stepId.includes('_location')
+  );
+
+  for (const stepId of locationSteps) {
+    const stepData = formData.steps[stepId];
+    if (stepData && stepData.latitude && stepData.longitude) {
+      const lat = parseFloat(stepData.latitude);
+      const lng = parseFloat(stepData.longitude);
+      
+      if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+        return { latitude: lat, longitude: lng };
+      }
+    }
+  }
+
+  // Fallback: Look for coordinates in any step
+  for (const stepId of Object.keys(formData.steps)) {
+    const stepData = formData.steps[stepId];
+    if (stepData && stepData.latitude && stepData.longitude) {
+      const lat = parseFloat(stepData.latitude);
+      const lng = parseFloat(stepData.longitude);
+      
+      if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+        return { latitude: lat, longitude: lng };
+      }
+    }
+  }
+
+  return { latitude: null, longitude: null };
+};
 import { formatCurrency, formatArea, formatBoolean } from './services/dataFormatter';
 
 // Helper function to clean up the JSON structure
@@ -261,6 +300,10 @@ export const PropertySummary: React.FC<PropertySummaryProps> = (props) => {
 
       console.log('Saving original form data:', originalData);
 
+      // Extract coordinates from form data
+      const coords = extractCoordinatesFromFormData(originalData);
+      console.log('Extracted coordinates:', coords);
+
       // Create new property or update existing one
       const now = new Date().toISOString();
       let savedPropertyId: string;
@@ -271,6 +314,8 @@ export const PropertySummary: React.FC<PropertySummaryProps> = (props) => {
           .from('properties_v2')
           .update({
             property_details: originalData,
+            coordinates: coords.latitude && coords.longitude ? 
+              { lat: coords.latitude, lng: coords.longitude } : null,
             updated_at: now,
             status: 'draft'
           })
@@ -297,6 +342,8 @@ export const PropertySummary: React.FC<PropertySummaryProps> = (props) => {
             created_at: now,
             updated_at: now,
             property_details: originalData,
+            coordinates: coords.latitude && coords.longitude ? 
+              { lat: coords.latitude, lng: coords.longitude } : null,
             status: 'draft'
           }])
           .select();

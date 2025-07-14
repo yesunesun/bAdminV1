@@ -708,17 +708,19 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
     updateFormAndState('pinCode', numericValue);
   };
 
-  // Calculate step completion
+  // Calculate step completion - including coordinates
   const stepCompletion = useStepCompletion({
     requiredFields: [
-      'address', 'locality', 'city', 'pinCode'
+      'address', 'locality', 'city', 'pinCode', 'latitude', 'longitude'
     ],
     fieldLabels: {
       ...DEFAULT_FIELD_LABELS,
       address: 'Address',
       locality: 'Locality',
       city: 'City',
-      pinCode: 'PIN Code'
+      pinCode: 'PIN Code',
+      latitude: 'Latitude',
+      longitude: 'Longitude'
     },
     form,
     stepId: effectiveStepId,

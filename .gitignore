@@ -35,3 +35,18 @@ dist-ssr
 prompt/btadmin_all_files.txt
 prompt/btadmin_dependencies.txt
 prompt/db_structure.txt
+
+# Test results and reports
+test-results/
+playwright-report/
+coverage/
+.nyc_output/
+
+# Test files
+tests/
+test-scripts/
+
+# Lambda/deployment files
+*.zip
+lambda-*.zip
+deployment-*.zip
