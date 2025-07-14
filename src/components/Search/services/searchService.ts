@@ -300,17 +300,30 @@ class BtSearchService implements SearchService {
   ): Promise<SearchResponse> {
     console.log('🎯 SearchService.smartSearch called with:', { filters, pagination });
     
-    try {
-      const response = await btServiceClient.smartSearch(filters, pagination);
-      console.log('✅ SearchService.smartSearch completed:', {
-        resultCount: response.results.length,
-        totalCount: response.totalCount
-      });
-      return response;
-    } catch (error) {
-      console.error('❌ SearchService.smartSearch error:', error);
-      throw error;
+    // Check if the search query is a property code
+    const query = filters.searchQuery?.trim();
+    if (query && this.isPropertyCode(query)) {
+      console.log('🎯 SmartSearch detected property code, using searchByCode:', query);
+      return this.searchByCodeFromSupabase(query, true);
     }
+    
+    // Temporarily disable btService to clean up console - go directly to Supabase fallback
+    console.log('🔄 Using Supabase directly for smartSearch (btService temporarily disabled)');
+    return this.searchPropertiesFromSupabase(filters, pagination);
+    
+    // TODO: Re-enable btService when compression issues are resolved
+    // try {
+    //   const response = await btServiceClient.smartSearch(filters, pagination);
+    //   console.log('✅ SearchService.smartSearch completed:', {
+    //     resultCount: response.results.length,
+    //     totalCount: response.totalCount
+    //   });
+    //   return response;
+    // } catch (error) {
+    //   console.error('❌ SearchService.smartSearch error, falling back to Supabase:', error);
+    //   // For non-property code queries, fall back to regular search
+    //   return this.searchPropertiesFromSupabase(filters, pagination);
+    // }
   }
 
   /**
@@ -319,17 +332,22 @@ class BtSearchService implements SearchService {
   async searchByCode(code: string, exact: boolean = true): Promise<SearchResponse> {
     console.log('🔍 SearchService.searchByCode called with:', { code, exact });
     
-    try {
-      const response = await btServiceClient.searchByCode(code, exact);
-      console.log('✅ SearchService.searchByCode completed:', {
-        resultCount: response.results.length,
-        totalCount: response.totalCount
-      });
-      return response;
-    } catch (error) {
-      console.error('❌ SearchService.searchByCode error:', error);
-      throw error;
-    }
+    // Temporarily disable btService to clean up console - go directly to Supabase fallback
+    console.log('🔄 Using Supabase directly (btService temporarily disabled)');
+    return this.searchByCodeFromSupabase(code, exact);
+    
+    // TODO: Re-enable btService when compression issues are resolved
+    // try {
+    //   const response = await btServiceClient.searchByCode(code, exact);
+    //   console.log('✅ SearchService.searchByCode completed:', {
+    //     resultCount: response.results.length,
+    //     totalCount: response.totalCount
+    //   });
+    //   return response;
+    // } catch (error) {
+    //   console.error('❌ SearchService.searchByCode error, falling back to Supabase:', error);
+    //   return this.searchByCodeFromSupabase(code, exact);
+    // }
   }
 
   /**
@@ -431,6 +449,122 @@ class BtSearchService implements SearchService {
         totalCount: 0,
         page: 1,
         limit
+      };
+    }
+  }
+
+  /**
+   * Fallback: Search by property code directly from Supabase
+   */
+  private async searchByCodeFromSupabase(code: string, exact: boolean = true): Promise<SearchResponse> {
+    console.log('🔄 Using Supabase fallback for searchByCode');
+    console.log('🔍 SearchByCode parameters:', { code, exact, trimmedCode: code.trim() });
+    
+    try {
+      // Use the appropriate function based on exact flag
+      const rpcFunction = exact ? 'search_property_by_code' : 'search_property_by_code_insensitive';
+      console.log('🔍 Using RPC function:', rpcFunction);
+      
+      const { data, error } = await supabase.rpc(rpcFunction, { 
+        p_code: code.trim()
+      });
+
+      if (error) {
+        console.error('❌ Supabase search by code fallback error:', error);
+        throw error;
+      }
+
+      console.log('🔍 Search by code Raw Data:', {
+        rpcFunction,
+        dataLength: data?.length || 0,
+        data: data,
+        code: code
+      });
+
+      // First create base results
+      const baseResults: SearchResult[] = data?.map((item: any) => ({
+        id: item.id,
+        title: item.title,
+        location: `${item.city || ''}, ${item.state || ''}`.trim().replace(/^,\s*|,\s*$/, ''),
+        price: item.price || 0,
+        propertyType: item.property_type,
+        transactionType: item.flow_type?.includes('rent') ? 'rent' : 
+                       item.flow_type?.includes('sale') ? 'buy' : 
+                       item.subtype === 'sale' ? 'buy' : 'rent',
+        subType: item.subtype,
+        bhk: item.bedrooms ? `${item.bedrooms}bhk` : null,
+        area: item.area || 0,
+        ownerName: item.owner_email?.split('@')[0] || 'Owner',
+        ownerPhone: '+91 98765 43210', // Default phone
+        createdAt: item.created_at,
+        status: item.status,
+        primary_image: item.primary_image,
+        code: item.code,
+        latitude: null, // Property code search doesn't include coordinates
+        longitude: null
+      })) || [];
+
+      // Now fetch property_details for each result to get additional information
+      const results: SearchResult[] = await Promise.all(
+        baseResults.map(async (result) => {
+          try {
+            const { data: propertyData, error: propertyError } = await supabase
+              .from('properties_v2')
+              .select('property_details')
+              .eq('id', result.id)
+              .single();
+
+            if (propertyError || !propertyData?.property_details) {
+              console.warn(`⚠️  Could not fetch property_details for ${result.id}:`, propertyError);
+              return result;
+            }
+
+            const propertyDetails = propertyData.property_details;
+
+            // Extract additional fields using our utility functions
+            const furnishingStatus = extractFurnishingStatus(propertyDetails);
+            const preferredTenants = extractPreferredTenants(propertyDetails);
+            const parking = extractParking(propertyDetails);
+            const internet = extractInternet(propertyDetails);
+
+            return {
+              ...result,
+              furnishingStatus,
+              preferredTenants,
+              parking,
+              internet
+            };
+          } catch (error) {
+            console.warn(`⚠️  Error fetching property_details for ${result.id}:`, error);
+            return result;
+          }
+        })
+      );
+
+      const finalResponse = {
+        results,
+        totalCount: results.length,
+        page: 1,
+        limit: results.length
+      };
+
+      console.log('✅ Supabase search by code fallback completed:', {
+        code,
+        exact,
+        resultCount: results.length,
+        totalCount: results.length,
+        finalResponse: finalResponse,
+        sampleResult: results[0] || null
+      });
+
+      return finalResponse;
+    } catch (error) {
+      console.error('❌ Supabase search by code fallback failed:', error);
+      return {
+        results: [],
+        totalCount: 0,
+        page: 1,
+        limit: 50
       };
     }
   }
