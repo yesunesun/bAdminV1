@@ -250,7 +250,7 @@ const CoworkingDetailsSection: React.FC<CoworkingDetailsSectionProps> = ({ cowor
                 {formatIndianRupees(data.price)}
               </span>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                {!data.isSale && <span>/month</span>}
+                {!data.isSale && <span>/mo</span>}
                 {data.isNegotiable && (
                   <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
                     Negotiable

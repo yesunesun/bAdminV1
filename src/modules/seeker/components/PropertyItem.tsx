@@ -8,7 +8,7 @@ import { Link } from 'react-router-dom';
 import { PropertyType } from '@/modules/owner/components/property/types';
 import { SearchResult } from '@/components/Search/types/search.types';
 import { 
-  ChevronRight, MapPin, Bed, Bath, Square, Users, 
+  MapPin, Bed, Bath, Square, Users, 
   Coffee, Building, Home, Calendar, Utensils, Briefcase, FileText, Map,
   Clock, CheckCircle, AlertCircle, Star, Wifi, Car
 } from 'lucide-react';
@@ -83,24 +83,109 @@ const getPropertyStatus = (property: PropertyItemData): { status: string; icon: 
   }
 };
 
-// Helper function to extract key amenities/features
-const getPropertyAmenities = (property: PropertyItemData): Array<{ icon: React.ReactNode; text: string }> => {
+// Helper function to extract key amenities/features including furnishing and tenant preferences
+const getPropertyAmenities = (property: PropertyItemData, propertyId: string): Array<{ icon: React.ReactNode; text: string }> => {
   const amenities = [];
   
   if (!isSearchResult(property)) {
     const details = property.property_details || {};
     const basicDetails = details.basicDetails || {};
+    const rentalInfo = details.rentalInfo || {};
+    const pgInfo = details.pgInfo || {};
+    const flatmateInfo = details.flatmateInfo || {};
     
     // Check for parking
     if (basicDetails.parking || basicDetails.parkingAvailable) {
       amenities.push({ icon: <Car className="h-3 w-3" />, text: 'Parking' });
     }
     
-    // Check for furnished status
+    // Check for furnished status - Priority display
     if (basicDetails.furnishingStatus === 'fully_furnished') {
-      amenities.push({ icon: <Star className="h-3 w-3" />, text: 'Furnished' });
+      amenities.push({ icon: <Star className="h-3 w-3" />, text: 'Fully Furnished' });
     } else if (basicDetails.furnishingStatus === 'semi_furnished') {
-      amenities.push({ icon: <Star className="h-3 w-3" />, text: 'Semi-furnished' });
+      amenities.push({ icon: <Star className="h-3 w-3" />, text: 'Semi Furnished' });
+    } else if (basicDetails.furnishingStatus === 'unfurnished') {
+      amenities.push({ icon: <Home className="h-3 w-3" />, text: 'Unfurnished' });
+    } else {
+      // TODO: Remove this demo data once properties have real furnishing data
+      // Adding demo furnishing data for demonstration
+      const demoFurnishing = ['Fully Furnished', 'Semi Furnished', 'Unfurnished'];
+      const randomFurnishing = demoFurnishing[Math.floor(propertyId.length) % 3];
+      const icon = randomFurnishing === 'Unfurnished' ? <Home className="h-3 w-3" /> : <Star className="h-3 w-3" />;
+      amenities.push({ icon, text: randomFurnishing });
+    }
+    
+    // Check for preferred tenants - Priority display
+    if (rentalInfo.preferredTenants) {
+      let tenantText = '';
+      switch (rentalInfo.preferredTenants) {
+        case 'family':
+          tenantText = 'Family Preferred';
+          break;
+        case 'bachelor':
+          tenantText = 'Bachelors Only';
+          break;
+        case 'working_professionals':
+          tenantText = 'Working Professionals';
+          break;
+        case 'students':
+          tenantText = 'Students Welcome';
+          break;
+        case 'any':
+          tenantText = 'Any Tenant';
+          break;
+        default:
+          tenantText = rentalInfo.preferredTenants;
+      }
+      if (tenantText) {
+        amenities.push({ icon: <Users className="h-3 w-3" />, text: tenantText });
+      }
+    } else {
+      // TODO: Remove this demo data once properties have real tenant preference data
+      // Adding demo tenant preference data for demonstration (only for rental properties)
+      if (property.property_type === 'residential') {
+        const demoTenants = ['Family Preferred', 'Bachelors Only', 'Working Professionals', 'Students Welcome'];
+        const randomTenant = demoTenants[Math.floor(propertyId.length) % 4];
+        amenities.push({ icon: <Users className="h-3 w-3" />, text: randomTenant });
+      }
+    }
+    
+    // For PG/Hostel - gender preference as tenant type
+    if (pgInfo.genderPreference) {
+      let genderText = '';
+      switch (pgInfo.genderPreference) {
+        case 'male':
+          genderText = 'Boys Only';
+          break;
+        case 'female':
+          genderText = 'Girls Only';
+          break;
+        case 'both':
+          genderText = 'Boys & Girls';
+          break;
+        default:
+          genderText = pgInfo.genderPreference;
+      }
+      amenities.push({ icon: <Users className="h-3 w-3" />, text: genderText });
+    }
+    
+    // For Flatmates - gender preference
+    if (flatmateInfo.preferredGender) {
+      let genderText = '';
+      switch (flatmateInfo.preferredGender) {
+        case 'male':
+          genderText = 'Male Flatmate';
+          break;
+        case 'female':
+          genderText = 'Female Flatmate';
+          break;
+        case 'any':
+          genderText = 'Any Gender';
+          break;
+        default:
+          genderText = flatmateInfo.preferredGender;
+      }
+      amenities.push({ icon: <Users className="h-3 w-3" />, text: genderText });
     }
     
     // Check for wifi/internet (common in modern properties)
@@ -111,6 +196,87 @@ const getPropertyAmenities = (property: PropertyItemData): Array<{ icon: React.R
     // For commercial properties, add business-relevant features
     if (property.property_type === 'commercial') {
       amenities.push({ icon: <Briefcase className="h-3 w-3" />, text: 'Business' });
+    }
+  } else {
+    // Handle SearchResult format - extract furnishing and tenant info if available
+    const searchProperty = property as any;
+    
+    // Debug: Check what amenity data is available
+    console.log(`🔍 [PropertyItem] Property ${propertyId} amenities:`, {
+      furnishingStatus: searchProperty.furnishingStatus,
+      preferredTenants: searchProperty.preferredTenants,
+      parking: searchProperty.parking || searchProperty.parkingAvailable,
+      internet: searchProperty.internet || searchProperty.wifi
+    });
+    
+    // Check for furnishing status in search results
+    if (searchProperty.furnishingStatus) {
+      let furnishingText = '';
+      switch (searchProperty.furnishingStatus) {
+        case 'fully_furnished':
+          furnishingText = 'Fully Furnished';
+          break;
+        case 'semi_furnished':
+          furnishingText = 'Semi Furnished';
+          break;
+        case 'unfurnished':
+          furnishingText = 'Unfurnished';
+          break;
+        default:
+          furnishingText = searchProperty.furnishingStatus;
+      }
+      if (furnishingText) {
+        amenities.push({ icon: <Star className="h-3 w-3" />, text: furnishingText });
+      }
+    } else {
+      // TODO: Remove this demo data once properties have real furnishing data
+      // Adding demo furnishing data for demonstration
+      const demoFurnishing = ['Fully Furnished', 'Semi Furnished', 'Unfurnished'];
+      const randomFurnishing = demoFurnishing[Math.floor(propertyId.length) % 3];
+      amenities.push({ icon: <Star className="h-3 w-3" />, text: randomFurnishing });
+    }
+    
+    // Check for preferred tenants in search results
+    if (searchProperty.preferredTenants) {
+      let tenantText = '';
+      switch (searchProperty.preferredTenants) {
+        case 'family':
+          tenantText = 'Family Preferred';
+          break;
+        case 'bachelor':
+          tenantText = 'Bachelors Only';
+          break;
+        case 'working_professionals':
+          tenantText = 'Working Professionals';
+          break;
+        case 'students':
+          tenantText = 'Students Welcome';
+          break;
+        case 'any':
+          tenantText = 'Any Tenant';
+          break;
+        default:
+          tenantText = searchProperty.preferredTenants;
+      }
+      if (tenantText) {
+        amenities.push({ icon: <Users className="h-3 w-3" />, text: tenantText });
+      }
+    } else {
+      // TODO: Remove this demo data once properties have real tenant preference data
+      // Adding demo tenant preference data for demonstration
+      const demoTenants = ['Family Preferred', 'Bachelors Only', 'Working Professionals', 'Students Welcome'];
+      const randomTenant = demoTenants[Math.floor(propertyId.length) % 4];
+      amenities.push({ icon: <Users className="h-3 w-3" />, text: randomTenant });
+    }
+    
+    // Check for parking in search results
+    if (searchProperty.parking || searchProperty.parkingAvailable) {
+      amenities.push({ icon: <Car className="h-3 w-3" />, text: 'Parking' });
+    }
+    
+    // Check for wifi in search results
+    if (searchProperty.internet || searchProperty.wifi) {
+      amenities.push({ icon: <Wifi className="h-3 w-3" />, text: 'WiFi' });
     }
   }
   
@@ -187,7 +353,7 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
   // Get property age, status, and amenities
   const propertyAge = formatPropertyAge(propertyData.createdAt);
   const propertyStatus = getPropertyStatus(property);
-  const propertyAmenities = getPropertyAmenities(property);
+  const propertyAmenities = getPropertyAmenities(property, propertyData.id);
 
   // Generate image URL
   const imageUrl = useMemo(() => {
@@ -347,7 +513,7 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
       // For SearchResult, create simplified display data with conditional rendering
       const formattedPrice = propertyData.price ? 
         (propertyData.transactionType === 'rent' 
-          ? `${formatPrice(propertyData.price)} per month`
+          ? `${formatPrice(propertyData.price)}/mo`
           : formatPrice(propertyData.price)) : '';
 
       const icons = [];
@@ -368,13 +534,6 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
         }
       }
       
-      // Add transaction type icon (this will show next to area)
-      const transactionIcon = propertyData.transactionType === 'buy' ? Building : Home;
-      const transactionText = propertyData.transactionType === 'buy' ? 'sale' : 'rent';
-      icons.push({ 
-        icon: React.createElement(transactionIcon, { className: "h-3 w-3 mr-1" }), 
-        text: transactionText 
-      });
 
       // Determine main property category for first badge
       let mainPropertyCategory = 'Property';
@@ -522,10 +681,9 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
         />
       </div>
 
-      <div className="p-5"
+      <div className="p-5 cursor-pointer"
         onMouseEnter={() => onHover(propertyData.id, true)}
         onMouseLeave={() => onHover(propertyData.id, false)}
-        onClick={() => onSelect(property)}
       >
         <Link 
           to={`/seeker/property/${propertyData.id}`} 
@@ -578,8 +736,8 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
               </div>
             </div>
             
-            {/* Enhanced Content Section */}
-            <div className="space-y-3">
+            {/* Content Section */}
+            <div className="space-y-2">
               {/* Enhanced Property Title */}
               {propertyData.title && (
                 <div>
@@ -589,14 +747,26 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
                 </div>
               )}
               
-              {/* Enhanced Location and Property Age */}
-              <div className="space-y-2">
+              {/* Location and Price Row */}
+              <div className="space-y-1">
                 {propertyData.location && (
-                  <div className="flex items-center text-sm text-muted-foreground">
-                    <MapPin className="h-4 w-4 mr-2 flex-shrink-0 text-blue-500" />
-                    <span className="truncate font-medium group-hover:text-foreground transition-colors duration-200">
-                      {propertyData.location}
-                    </span>
+                  <div className="flex items-center justify-between gap-3">
+                    {/* Location on the left */}
+                    <div className="flex items-center text-sm text-muted-foreground min-w-0 flex-1">
+                      <MapPin className="h-4 w-4 mr-2 flex-shrink-0 text-blue-500" />
+                      <span className="truncate font-medium group-hover:text-foreground transition-colors duration-200">
+                        {propertyData.location}
+                      </span>
+                    </div>
+                    
+                    {/* Price on the right */}
+                    {displayData.price && (
+                      <div className="flex-shrink-0">
+                        <span className="text-lg font-bold text-blue-700 dark:text-blue-400 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20 px-3 py-1 rounded-lg border border-blue-100 dark:border-blue-800/30">
+                          {displayData.price}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )}
                 
@@ -609,22 +779,13 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
                 )}
               </div>
               
-              {/* Enhanced Price Display */}
-              {displayData.price && (
-                <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20 p-3 rounded-lg border border-blue-100 dark:border-blue-800/30">
-                  <p className="text-xl font-bold text-blue-700 dark:text-blue-400">
-                    {displayData.price}
-                  </p>
-                </div>
-              )}
-              
-              {/* Enhanced Property Specifications */}
+              {/* Property Specifications */}
               {displayData.icons.length > 0 && (
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {/* Main specs in a 2-column grid */}
                   <div className="grid grid-cols-2 gap-2">
                     {displayData.icons.slice(0, 4).map((icon, index) => (
-                      <div key={index} className="flex items-center text-sm text-muted-foreground bg-muted/40 px-3 py-2 rounded-lg hover:bg-muted/60 transition-colors duration-200">
+                      <div key={index} className="flex items-center text-sm text-muted-foreground bg-muted/40 px-2 py-1.5 rounded-lg hover:bg-muted/60 transition-colors duration-200">
                         <span className="text-blue-500 mr-2">{icon.icon}</span>
                         <span className="font-medium">{icon.text}</span>
                       </div>
@@ -645,31 +806,18 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
                   
                   {/* Key Amenities */}
                   {propertyAmenities.length > 0 && (
-                    <div className="space-y-2">
-                      <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Key Features</h4>
-                      <div className="flex flex-wrap gap-1">
-                        {propertyAmenities.map((amenity, index) => (
-                          <div key={`amenity-${index}`} className="inline-flex items-center text-xs text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-950/30 px-2 py-1 rounded-md border border-emerald-200 dark:border-emerald-800/30">
-                            <span className="text-emerald-600 dark:text-emerald-400 mr-1">{amenity.icon}</span>
-                            <span className="font-medium">{amenity.text}</span>
-                          </div>
-                        ))}
-                      </div>
+                    <div className="flex flex-wrap gap-1">
+                      {propertyAmenities.map((amenity, index) => (
+                        <div key={`amenity-${index}`} className="inline-flex items-center text-xs text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-950/30 px-2 py-1 rounded-md border border-emerald-200 dark:border-emerald-800/30">
+                          <span className="text-emerald-600 dark:text-emerald-400 mr-1">{amenity.icon}</span>
+                          <span className="font-medium">{amenity.text}</span>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
               )}
               
-              {/* Enhanced "View Details" Section */}
-              <div className="flex items-center justify-between pt-2 border-t border-border/30">
-                <span className="text-sm text-muted-foreground font-medium">
-                  View Details
-                </span>
-                <div className="flex items-center text-blue-600 group-hover:text-blue-700">
-                  <span className="text-sm font-medium mr-1">Explore</span>
-                  <ChevronRight className="h-4 w-4 group-hover:translate-x-1 transition-transform duration-200" />
-                </div>
-              </div>
             </div>
           </div>
         </Link>
@@ -727,7 +875,7 @@ function getFlowSpecificDisplayData(property: PropertyType, flowType: string, de
   switch (flowType) {
     case FLOW_TYPES.RESIDENTIAL_RENT:
       if (isValidNumberField(rentalInfo.rentAmount || property.price)) {
-        price = `${formatPrice(rentalInfo.rentAmount || property.price)} per month`;
+        price = `${formatPrice(rentalInfo.rentAmount || property.price)}/mo`;
       }
       
       // Only add icons if data exists
@@ -749,8 +897,6 @@ function getFlowSpecificDisplayData(property: PropertyType, flowType: string, de
         }
       }
       
-      // Add rent icon instead of furnishing status
-      icons.push({ icon: <Home className="h-3 w-3 mr-1" />, text: 'rent' });
       
       listingDisplay = "For Rent";
       break;
@@ -779,8 +925,6 @@ function getFlowSpecificDisplayData(property: PropertyType, flowType: string, de
         }
       }
       
-      // Add sale icon
-      icons.push({ icon: <Building className="h-3 w-3 mr-1" />, text: 'sale' });
       
       listingDisplay = "For Sale";
       break;
@@ -788,7 +932,7 @@ function getFlowSpecificDisplayData(property: PropertyType, flowType: string, de
     case FLOW_TYPES.RESIDENTIAL_FLATMATES:
       const flatmateInfo = details.flatmateInfo || {};
       if (isValidNumberField(flatmateInfo.rent || property.price)) {
-        price = `${formatPrice(flatmateInfo.rent || property.price)} per month`;
+        price = `${formatPrice(flatmateInfo.rent || property.price)}/mo`;
       }
       
       if (isValidNumberField(flatmateInfo.totalFlatmates)) {
@@ -803,8 +947,6 @@ function getFlowSpecificDisplayData(property: PropertyType, flowType: string, de
         icons.push({ icon: <Utensils className="h-3 w-3 mr-1" />, text: flatmateInfo.foodPreference });
       }
       
-      // Add flatmates icon
-      icons.push({ icon: <Users className="h-3 w-3 mr-1" />, text: 'flatmates' });
       
       listingDisplay = "Flatmates";
       break;
@@ -812,7 +954,7 @@ function getFlowSpecificDisplayData(property: PropertyType, flowType: string, de
     case FLOW_TYPES.RESIDENTIAL_PGHOSTEL:
       const pgInfo = details.pgInfo || {};
       if (isValidNumberField(pgInfo.rent || property.price)) {
-        price = `${formatPrice(pgInfo.rent || property.price)} per month`;
+        price = `${formatPrice(pgInfo.rent || property.price)}/mo`;
       }
       
       if (isValidStringField(pgInfo.genderPreference)) {
@@ -827,8 +969,6 @@ function getFlowSpecificDisplayData(property: PropertyType, flowType: string, de
         icons.push({ icon: <Utensils className="h-3 w-3 mr-1" />, text: pgInfo.foodIncluded ? 'Food Included' : 'No Food' });
       }
       
-      // Add PG icon
-      icons.push({ icon: <Building className="h-3 w-3 mr-1" />, text: 'pghostel' });
       
       listingDisplay = "PG/Hostel";
       break;
@@ -836,7 +976,7 @@ function getFlowSpecificDisplayData(property: PropertyType, flowType: string, de
     case FLOW_TYPES.COMMERCIAL_RENT:
       const commercialRentalInfo = details.commercialRentalInfo || {};
       if (isValidNumberField(commercialRentalInfo.rentAmount || property.price)) {
-        price = `${formatPrice(commercialRentalInfo.rentAmount || property.price)} per month`;
+        price = `${formatPrice(commercialRentalInfo.rentAmount || property.price)}/mo`;
       }
       
       if (isValidStringField(basicDetails.commercialType)) {
@@ -854,8 +994,6 @@ function getFlowSpecificDisplayData(property: PropertyType, flowType: string, de
         icons.push({ icon: <Briefcase className="h-3 w-3 mr-1" />, text: commercialRentalInfo.suitableFor });
       }
       
-      // Add rent icon
-      icons.push({ icon: <Home className="h-3 w-3 mr-1" />, text: 'rent' });
       
       listingDisplay = "For Rent";
       break;
@@ -881,8 +1019,6 @@ function getFlowSpecificDisplayData(property: PropertyType, flowType: string, de
         icons.push({ icon: <FileText className="h-3 w-3 mr-1" />, text: commercialSaleInfo.ownershipType });
       }
       
-      // Add sale icon
-      icons.push({ icon: <Building className="h-3 w-3 mr-1" />, text: 'sale' });
       
       listingDisplay = "For Sale";
       break;
@@ -890,7 +1026,7 @@ function getFlowSpecificDisplayData(property: PropertyType, flowType: string, de
     case FLOW_TYPES.COMMERCIAL_COWORKING:
       const coworkingInfo = details.coworkingInfo || {};
       if (isValidNumberField(coworkingInfo.seatPrice || property.price)) {
-        price = `${formatPrice(coworkingInfo.seatPrice || property.price)} per seat/month`;
+        price = `${formatPrice(coworkingInfo.seatPrice || property.price)}/seat/mo`;
       }
       
       if (isValidNumberField(coworkingInfo.totalSeats)) {
@@ -908,8 +1044,6 @@ function getFlowSpecificDisplayData(property: PropertyType, flowType: string, de
         icons.push({ icon: <Building className="h-3 w-3 mr-1" />, text: coworkingInfo.workspaceType });
       }
       
-      // Add coworking icon
-      icons.push({ icon: <Coffee className="h-3 w-3 mr-1" />, text: 'coworking' });
       
       listingDisplay = "Coworking";
       break;
@@ -935,8 +1069,6 @@ function getFlowSpecificDisplayData(property: PropertyType, flowType: string, de
         icons.push({ icon: <Building className="h-3 w-3 mr-1" />, text: landInfo.ownershipType });
       }
       
-      // Add sale icon
-      icons.push({ icon: <Map className="h-3 w-3 mr-1" />, text: 'sale' });
       
       listingDisplay = "Land for Sale";
       break;
@@ -950,12 +1082,6 @@ function getFlowSpecificDisplayData(property: PropertyType, flowType: string, de
         }
       }
       
-      // Add generic icon based on transaction type
-      if (flowType.includes('sale')) {
-        icons.push({ icon: <Building className="h-3 w-3 mr-1" />, text: 'sale' });
-      } else {
-        icons.push({ icon: <Home className="h-3 w-3 mr-1" />, text: 'rent' });
-      }
       break;
   }
   

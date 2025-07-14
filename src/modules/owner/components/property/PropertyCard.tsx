@@ -517,7 +517,7 @@ export function PropertyCard({
             {price.toLocaleString('en-IN')}
           </span>
           {isForRent && (
-            <span className="ml-1 text-sm font-normal text-muted-foreground">/month</span>
+            <span className="ml-1 text-sm font-normal text-muted-foreground">/mo</span>
           )}
         </div>
         

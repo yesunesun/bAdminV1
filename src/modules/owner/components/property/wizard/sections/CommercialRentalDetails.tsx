@@ -183,7 +183,7 @@ export const CommercialRentalDetails: React.FC<FormSectionProps> = ({
           {/* Rent Amount - MANDATORY */}
           <div className="space-y-2">
             <RequiredLabel htmlFor={getFieldId('rentAmount')} required>
-              {rentalType === 'lease' ? 'Lease Amount (₹)' : 'Rent Amount (₹) per month'}
+              {rentalType === 'lease' ? 'Lease Amount (₹)' : 'Rent Amount (₹)/mo'}
             </RequiredLabel>
             <div className="relative">
               <Input

@@ -201,7 +201,7 @@ const FlatmatesDetailsSection: React.FC<FlatmatesDetailsSectionProps> = ({ flatm
                 {formatIndianRupees(data.expectedRent)}
               </span>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <span>/month</span>
+                <span>/mo</span>
                 {data.isNegotiable && (
                   <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
                     Negotiable

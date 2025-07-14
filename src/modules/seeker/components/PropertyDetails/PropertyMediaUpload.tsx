@@ -336,7 +336,7 @@ const BasicDetailsSection: React.FC<{
           <span className="text-2xl font-bold text-primary">
             {formatIndianRupees(price)}
           </span>
-          {!isSaleProperty && <span className="text-gray-500 ml-1">/month</span>}
+          {!isSaleProperty && <span className="text-gray-500 ml-1">/mo</span>}
         </div>
       </div>
 
@@ -533,7 +533,7 @@ const PricingDetailsSection: React.FC<{
         </span>
         <div className="text-2xl font-bold text-primary">
           {formatIndianRupees(mainPrice)}
-          {!isSaleProperty && <span className="text-gray-500 text-base ml-1">/month</span>}
+          {!isSaleProperty && <span className="text-gray-500 text-base ml-1">/mo</span>}
         </div>
       </div>
 

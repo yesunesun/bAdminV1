@@ -75,7 +75,7 @@ const PricingDetailsSection: React.FC<PricingDetailsSectionProps> = ({
         </span>
         <div className="text-2xl font-bold text-primary">
           {formatIndianRupees(mainPrice)}
-          {!isSaleProperty && <span className="text-gray-500 text-base ml-1">/month</span>}
+          {!isSaleProperty && <span className="text-gray-500 text-base ml-1">/mo</span>}
         </div>
       </div>
 

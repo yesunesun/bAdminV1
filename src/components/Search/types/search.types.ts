@@ -37,6 +37,11 @@ export interface SearchResult {
   // NEW: Coordinate fields for map marker rendering
   latitude?: number; // Latitude coordinate from search SQL functions
   longitude?: number; // Longitude coordinate from search SQL functions
+  // NEW: Property details for enhanced display
+  furnishingStatus?: string; // Furnishing status (fully_furnished, semi_furnished, unfurnished)
+  preferredTenants?: string; // Preferred tenants (family, bachelor, working_professionals, students, any)
+  parking?: boolean; // Parking availability
+  internet?: boolean; // Internet/WiFi availability
 }
 
 export interface SearchState {

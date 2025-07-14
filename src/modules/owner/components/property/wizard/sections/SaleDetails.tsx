@@ -396,7 +396,7 @@ export function SaleDetails({ form, adType, stepId: providedStepId }: SaleDetail
                 name="maintenanceCost"
               />
               <span className="absolute right-3 inset-y-0 flex items-center text-sm text-slate-500">
-                per month
+/mo
               </span>
             </div>
             {/* FIXED: Added proper validation error display */}

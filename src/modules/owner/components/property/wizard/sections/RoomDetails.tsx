@@ -305,7 +305,7 @@ const RoomDetails: React.FC<FormSectionProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         {/* Expected Rent - MANDATORY */}
         <div className="space-y-2">
-          <RequiredLabel htmlFor={getFieldPath("expectedRent")}>Expected Rent (₹/month) *</RequiredLabel>
+          <RequiredLabel htmlFor={getFieldPath("expectedRent")}>Expected Rent (₹/mo) *</RequiredLabel>
           <Input
             id={getFieldPath("expectedRent")}
             type="number"

@@ -30,7 +30,7 @@ const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
 }) => {
   const formatPrice = (price: number, transactionType: string) => {
     if (transactionType === 'rent') {
-      return `₹${price.toLocaleString('en-IN')}/month`;
+      return `₹${price.toLocaleString('en-IN')}/mo`;
     }
     
     if (price >= 10000000) {

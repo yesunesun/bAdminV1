@@ -6,6 +6,12 @@
 import { btServiceClient } from './btServiceClient';
 import { SearchFilters, SearchResult, SearchResponse, SearchPaginationOptions } from '../types/search.types';
 import { supabase } from '../../../lib/supabase';
+import { 
+  extractFurnishingStatus, 
+  extractPreferredTenants, 
+  extractParking, 
+  extractInternet 
+} from '../utils/propertyExtractors';
 
 /**
  * Parse price range string into min and max values
@@ -195,7 +201,8 @@ class BtSearchService implements SearchService {
         }))
       });
 
-      const results: SearchResult[] = data?.map((item: any) => ({
+      // First create base results
+      const baseResults: SearchResult[] = data?.map((item: any) => ({
         id: item.id,
         title: item.title,
         location: `${item.city || ''}, ${item.state || ''}`.trim().replace(/^,\s*|,\s*$/, ''),
@@ -216,6 +223,51 @@ class BtSearchService implements SearchService {
         latitude: item.latitude,
         longitude: item.longitude
       })) || [];
+
+      // Now fetch property_details for each result to get additional information
+      const results: SearchResult[] = await Promise.all(
+        baseResults.map(async (result) => {
+          try {
+            const { data: propertyData, error: propertyError } = await supabase
+              .from('properties_v2')
+              .select('property_details')
+              .eq('id', result.id)
+              .single();
+
+            if (propertyError || !propertyData?.property_details) {
+              console.warn(`⚠️  Could not fetch property_details for ${result.id}:`, propertyError);
+              return result;
+            }
+
+            const propertyDetails = propertyData.property_details;
+
+            // Extract additional fields using our utility functions
+            const furnishingStatus = extractFurnishingStatus(propertyDetails);
+            const preferredTenants = extractPreferredTenants(propertyDetails);
+            const parking = extractParking(propertyDetails);
+            const internet = extractInternet(propertyDetails);
+
+            // Log extracted data for debugging (remove in production)
+            console.log(`🔍 [PropertyExtractors] Property ${result.id}:`, {
+              furnishingStatus,
+              preferredTenants,
+              parking,
+              internet
+            });
+
+            return {
+              ...result,
+              furnishingStatus,
+              preferredTenants,
+              parking,
+              internet
+            };
+          } catch (error) {
+            console.warn(`⚠️  Error fetching property_details for ${result.id}:`, error);
+            return result;
+          }
+        })
+      );
 
       console.log('✅ Supabase search fallback completed:', {
         resultCount: results.length,

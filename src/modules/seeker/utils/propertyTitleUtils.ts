@@ -494,7 +494,7 @@ export function getPropertyDisplayData(property: any) {
   } else if (price === 1) {
     formattedPrice = 'Contact for price';
   } else if (flowType.includes('rent')) {
-    formattedPrice = `₹${price.toLocaleString('en-IN')} per month`;
+    formattedPrice = `₹${price.toLocaleString('en-IN')}/mo`;
   } else {
     formattedPrice = `₹${price.toLocaleString('en-IN')}`;
   }

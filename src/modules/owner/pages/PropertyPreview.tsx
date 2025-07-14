@@ -74,7 +74,7 @@ const PropertyPreview = () => {
             <IndianRupee className="w-5 h-5 text-blue-600 mr-2" />
             <div>
               <p className="text-2xl font-bold text-blue-600">₹{property_details.rentAmount}</p>
-              <p className="text-sm text-blue-600">per month</p>
+              <p className="text-sm text-blue-600">/mo</p>
             </div>
           </div>
         </div>
