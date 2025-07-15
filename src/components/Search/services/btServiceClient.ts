@@ -1,7 +1,7 @@
 // src/components/Search/services/btServiceClient.ts
-// Version: 1.0.0
-// Last Modified: 2025-07-10
-// Purpose: btService API client for search functionality
+// Version: 3.0.0
+// Last Modified: 2025-07-15
+// Purpose: btService v3 API client for search functionality
 
 import { SearchFilters, SearchResult, SearchResponse, SearchPaginationOptions } from '../types/search.types';
 
@@ -69,9 +69,47 @@ export class BtServiceClient {
         hasResults: apiResponse.data?.results ? apiResponse.data.results.length : 'N/A'
       });
 
-      // Extract data from btService response format {success: true, data: {results, totalCount}}
+      // Extract data from btService response format
       if (apiResponse.success && apiResponse.data) {
-        return apiResponse.data;
+        // Handle v3 endpoints that return raw arrays vs structured responses
+        if (Array.isArray(apiResponse.data)) {
+          // v3 endpoints return raw arrays - transform to expected format
+          const rawResults = apiResponse.data;
+          const totalCount = rawResults.length > 0 ? rawResults[0].total_count || rawResults.length : 0;
+          
+          // Transform raw data to SearchResult format
+          const transformedResults = rawResults.map((item: any) => ({
+            id: item.id,
+            title: item.title,
+            location: `${item.city || ''}, ${item.state || ''}`.trim().replace(/^,\s*|,\s*$/, ''),
+            price: item.price || 0,
+            propertyType: item.property_type,
+            transactionType: item.flow_type?.includes('rent') ? 'rent' : 
+                           item.flow_type?.includes('sale') ? 'buy' : 
+                           item.subtype === 'sale' ? 'buy' : 'rent',
+            subType: item.subtype,
+            bhk: item.bedrooms ? `${item.bedrooms}bhk` : null,
+            area: item.area || 0,
+            ownerName: item.owner_email?.split('@')[0] || 'Owner',
+            ownerPhone: '+91 98765 43210', // Default phone
+            createdAt: item.created_at,
+            status: item.status,
+            primary_image: item.primary_image,
+            code: item.code || null,
+            latitude: item.latitude,
+            longitude: item.longitude
+          }));
+          
+          return {
+            results: transformedResults,
+            totalCount: totalCount,
+            page: 1, // v3 endpoints don't provide pagination info
+            limit: transformedResults.length
+          };
+        } else {
+          // Regular structured response (v1/v2 endpoints)
+          return apiResponse.data;
+        }
       } else {
         throw new Error(apiResponse.error || 'API request failed');
       }
@@ -110,70 +148,50 @@ export class BtServiceClient {
   }
 
   /**
-   * Search properties with filters
+   * Search properties with filters (v3 endpoint)
    */
   async search(
     filters: SearchFilters,
     pagination?: SearchPaginationOptions
   ): Promise<SearchResponse> {
-    const queryParams = new URLSearchParams();
+    const endpoint = `/api/v3/search/search-all-properties`;
     
-    // Add pagination
-    if (pagination?.page) {
-      queryParams.append('page', pagination.page.toString());
-    }
-    if (pagination?.limit) {
-      queryParams.append('limit', pagination.limit.toString());
-    }
-
-    const endpoint = `/api/search?${queryParams.toString()}`;
+    // Transform filters to v3 format
+    const v3Params = this.transformFiltersToV3Format(filters, pagination);
     
     return this.makeRequest<SearchResponse>(endpoint, {
       method: 'POST',
-      body: JSON.stringify({
-        filters,
-        options: pagination
-      }),
+      body: JSON.stringify(v3Params),
     });
   }
 
   /**
-   * Smart search (detects property codes)
+   * Smart search (detects property codes) - v3 endpoint
    */
   async smartSearch(
     filters: SearchFilters,
     pagination?: SearchPaginationOptions
   ): Promise<SearchResponse> {
-    const queryParams = new URLSearchParams();
+    const endpoint = `/api/v3/search/smart`;
     
-    // Add pagination
-    if (pagination?.page) {
-      queryParams.append('page', pagination.page.toString());
-    }
-    if (pagination?.limit) {
-      queryParams.append('limit', pagination.limit.toString());
-    }
-
-    const endpoint = `/api/search/smart?${queryParams.toString()}`;
+    // Transform filters to v3 format
+    const v3Params = this.transformFiltersToV3Format(filters, pagination);
     
     return this.makeRequest<SearchResponse>(endpoint, {
       method: 'POST',
-      body: JSON.stringify({
-        filters,
-        options: pagination
-      }),
+      body: JSON.stringify(v3Params),
     });
   }
 
   /**
-   * Search by property code
+   * Search by property code - v3 endpoint
    */
   async searchByCode(code: string, exact: boolean = true): Promise<SearchResponse> {
     const queryParams = new URLSearchParams({
       exact: exact.toString()
     });
 
-    const endpoint = `/api/search/code/${code}?${queryParams.toString()}`;
+    const endpoint = `/api/v3/search/code/${code}?${queryParams.toString()}`;
     
     return this.makeRequest<SearchResponse>(endpoint, {
       method: 'GET',
@@ -181,7 +199,7 @@ export class BtServiceClient {
   }
 
   /**
-   * Get latest properties
+   * Get latest properties - v3 endpoint
    */
   async getLatestProperties(limit: number = 50, offset: number = 0): Promise<SearchResponse> {
     const queryParams = new URLSearchParams({
@@ -189,7 +207,7 @@ export class BtServiceClient {
       offset: offset.toString()
     });
 
-    const endpoint = `/api/search/latest?${queryParams.toString()}`;
+    const endpoint = `/api/v3/search/latest?${queryParams.toString()}`;
     
     return this.makeRequest<SearchResponse>(endpoint, {
       method: 'GET',
@@ -214,7 +232,106 @@ export class BtServiceClient {
   }
 
   /**
-   * Check if a query is a valid property code
+   * Validate property code using v3 endpoint
+   */
+  async validatePropertyCode(code: string): Promise<boolean> {
+    try {
+      const endpoint = `/api/v3/search/validate-code/${code}`;
+      const response = await this.makeRequest<{ isValid: boolean }>(endpoint, {
+        method: 'GET',
+      });
+      return response.isValid;
+    } catch (error) {
+      console.error('Property code validation error:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Transform btAdmin filters to v3 API format
+   */
+  private transformFiltersToV3Format(filters: SearchFilters, pagination?: SearchPaginationOptions) {
+    // Parse price range
+    const parsePriceRange = (priceRange: string): { min: number | null; max: number | null } | null => {
+      if (!priceRange || priceRange === 'any') {
+        return { min: null, max: null };
+      }
+
+      const priceRanges: Record<string, { min: number | null; max: number | null }> = {
+        'under-10l': { min: null, max: 1000000 },
+        '10l-25l': { min: 1000000, max: 2500000 },
+        '25l-50l': { min: 2500000, max: 5000000 },
+        '50l-75l': { min: 5000000, max: 7500000 },
+        '75l-1cr': { min: 7500000, max: 10000000 },
+        '1cr-2cr': { min: 10000000, max: 20000000 },
+        '2cr-3cr': { min: 20000000, max: 30000000 },
+        '3cr-5cr': { min: 30000000, max: 50000000 },
+        '5cr-10cr': { min: 50000000, max: 100000000 },
+        'above-10cr': { min: 100000000, max: null }
+      };
+
+      return priceRanges[priceRange] || null;
+    };
+
+    // Get transaction type from filters (added by useSearch transformation)
+    const transactionType = (filters as any).transactionType;
+    
+    // Handle special property types: pghostel and flatmates
+    let p_property_type = null;
+    let p_subtype = null;
+    
+    if (filters.selectedPropertyType === 'pghostel') {
+      // PG/Hostel is stored as residential with pghostel subtype
+      p_property_type = 'residential';
+      p_subtype = 'pghostel';
+    } else if (filters.selectedPropertyType === 'flatmates') {
+      // Flatmates is stored as residential with flatmates subtype
+      p_property_type = 'residential';
+      p_subtype = 'flatmates';
+    } else {
+      // Regular property types
+      p_property_type = (filters.selectedPropertyType && filters.selectedPropertyType !== 'any') ? filters.selectedPropertyType : null;
+      
+      // Map transaction type to p_subtype only if not already used for property subtype
+      if (transactionType === 'buy') {
+        p_subtype = 'sale'; // Buy transactions are stored as 'sale' in database
+      } else if (transactionType === 'rent') {
+        p_subtype = 'rent';
+      }
+      // If transactionType is null or 'any', p_subtype stays null to search all
+    }
+
+    const priceRange = parsePriceRange(filters.selectedPriceRange);
+
+    console.log('🔧 V3 Parameter Transformation:', {
+      actionType: filters.actionType,
+      transactionType: transactionType,
+      selectedPropertyType: filters.selectedPropertyType,
+      mapped_p_property_type: p_property_type,
+      mapped_p_subtype: p_subtype,
+      selectedSubType: filters.selectedSubType
+    });
+
+    return {
+      p_search_query: filters.searchQuery || null,
+      p_city: (filters.selectedLocation && filters.selectedLocation !== 'any') ? filters.selectedLocation : null,
+      p_state: null, // Not currently used in btAdmin
+      p_property_type: p_property_type,
+      p_subtype: p_subtype, // Either property subtype (pghostel/flatmates) or transaction type (sale/rent)
+      p_property_subtype: (filters.selectedSubType && filters.selectedSubType !== 'any') ? filters.selectedSubType : null,
+      p_min_price: priceRange?.min || null,
+      p_max_price: priceRange?.max || null,
+      p_bedrooms: filters.selectedBHK ? parseInt(filters.selectedBHK.replace(/[^0-9]/g, '')) : null,
+      p_bathrooms: null, // Not currently used in btAdmin
+      p_area_min: null, // Not currently used in btAdmin
+      p_area_max: null, // Not currently used in btAdmin
+      p_limit: pagination?.limit || 50,
+      p_offset: pagination?.offset || 0
+    };
+  }
+
+  /**
+   * Check if a query is a valid property code (local validation)
    */
   isPropertyCode(query: string): boolean {
     // Property codes are exactly 6 alphanumeric characters

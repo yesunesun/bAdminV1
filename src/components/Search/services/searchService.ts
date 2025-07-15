@@ -1,7 +1,7 @@
 // src/components/Search/services/searchService.ts
-// Version: 2.1.0
-// Last Modified: 2025-07-11
-// Purpose: Search service with btService API and Supabase fallback
+// Version: 3.0.0
+// Last Modified: 2025-07-15
+// Purpose: Search service with btService v3 API and Supabase fallback
 
 import { btServiceClient } from './btServiceClient';
 import { SearchFilters, SearchResult, SearchResponse, SearchPaginationOptions } from '../types/search.types';
@@ -58,27 +58,23 @@ export interface SearchService {
 class BtSearchService implements SearchService {
   
   /**
-   * Search properties with filters and fallback to Supabase
+   * Search properties with filters using v3 endpoints with Supabase fallback
    */
   async search(
     filters: SearchFilters,
     pagination?: SearchPaginationOptions
   ): Promise<SearchResponse> {
-    // Temporarily disable btService to clean up console - go directly to Supabase fallback
-    return this.searchPropertiesFromSupabase(filters, pagination);
-    
-    // TODO: Re-enable btService when compression issues are resolved
-    // try {
-    //   const response = await btServiceClient.search(filters, pagination);
-    //   console.log('✅ SearchService.search completed:', {
-    //     resultCount: response.results.length,
-    //     totalCount: response.totalCount
-    //   });
-    //   return response;
-    // } catch (error) {
-    //   console.error('❌ SearchService.search error, falling back to Supabase:', error);
-    //   return this.searchPropertiesFromSupabase(filters, pagination);
-    // }
+    try {
+      const response = await btServiceClient.search(filters, pagination);
+      console.log('✅ SearchService.search (v3) completed:', {
+        resultCount: response.results.length,
+        totalCount: response.totalCount
+      });
+      return response;
+    } catch (error) {
+      console.error('❌ SearchService.search (v3) error, falling back to Supabase:', error);
+      return this.searchPropertiesFromSupabase(filters, pagination);
+    }
   }
 
   /**
@@ -338,86 +334,66 @@ class BtSearchService implements SearchService {
   }
 
   /**
-   * Smart search with property code detection
+   * Smart search with property code detection using v3 endpoints
    */
   async smartSearch(
     filters: SearchFilters,
     pagination?: SearchPaginationOptions
   ): Promise<SearchResponse> {
-    // Smart search with property code detection
-    
-    // Check if the search query is a property code
-    const query = filters.searchQuery?.trim();
-    if (query && this.isPropertyCode(query)) {
-      // Property code detected, using direct code search
-      return this.searchByCodeFromSupabase(query, true);
+    try {
+      const response = await btServiceClient.smartSearch(filters, pagination);
+      console.log('✅ SearchService.smartSearch (v3) completed:', {
+        resultCount: response.results.length,
+        totalCount: response.totalCount
+      });
+      return response;
+    } catch (error) {
+      console.error('❌ SearchService.smartSearch (v3) error, falling back to Supabase:', error);
+      // For API failures, fall back to local property code detection and Supabase
+      const query = filters.searchQuery?.trim();
+      if (query && this.isPropertyCode(query)) {
+        return this.searchByCodeFromSupabase(query, true);
+      }
+      return this.searchPropertiesFromSupabase(filters, pagination);
     }
-    
-    // Temporarily disable btService to clean up console - go directly to Supabase fallback
-    // Using Supabase directly for smartSearch
-    return this.searchPropertiesFromSupabase(filters, pagination);
-    
-    // TODO: Re-enable btService when compression issues are resolved
-    // try {
-    //   const response = await btServiceClient.smartSearch(filters, pagination);
-    //   console.log('✅ SearchService.smartSearch completed:', {
-    //     resultCount: response.results.length,
-    //     totalCount: response.totalCount
-    //   });
-    //   return response;
-    // } catch (error) {
-    //   console.error('❌ SearchService.smartSearch error, falling back to Supabase:', error);
-    //   // For non-property code queries, fall back to regular search
-    //   return this.searchPropertiesFromSupabase(filters, pagination);
-    // }
   }
 
   /**
-   * Search by property code
+   * Search by property code using v3 endpoints
    */
   async searchByCode(code: string, exact: boolean = true): Promise<SearchResponse> {
-    console.log('🔍 SearchService.searchByCode called with:', { code, exact });
+    console.log('🔍 SearchService.searchByCode (v3) called with:', { code, exact });
     
-    // Temporarily disable btService to clean up console - go directly to Supabase fallback
-    console.log('🔄 Using Supabase directly (btService temporarily disabled)');
-    return this.searchByCodeFromSupabase(code, exact);
-    
-    // TODO: Re-enable btService when compression issues are resolved
-    // try {
-    //   const response = await btServiceClient.searchByCode(code, exact);
-    //   console.log('✅ SearchService.searchByCode completed:', {
-    //     resultCount: response.results.length,
-    //     totalCount: response.totalCount
-    //   });
-    //   return response;
-    // } catch (error) {
-    //   console.error('❌ SearchService.searchByCode error, falling back to Supabase:', error);
-    //   return this.searchByCodeFromSupabase(code, exact);
-    // }
+    try {
+      const response = await btServiceClient.searchByCode(code, exact);
+      console.log('✅ SearchService.searchByCode (v3) completed:', {
+        resultCount: response.results.length,
+        totalCount: response.totalCount
+      });
+      return response;
+    } catch (error) {
+      console.error('❌ SearchService.searchByCode (v3) error, falling back to Supabase:', error);
+      return this.searchByCodeFromSupabase(code, exact);
+    }
   }
 
   /**
-   * Get latest properties with fallback to Supabase
+   * Get latest properties using v3 endpoints with Supabase fallback
    */
   async getLatestProperties(limit: number = 50, offset: number = 0): Promise<SearchResponse> {
-    console.log('📋 SearchService.getLatestProperties called with:', { limit, offset });
+    console.log('📋 SearchService.getLatestProperties (v3) called with:', { limit, offset });
     
-    // Temporarily disable btService to clean up console - go directly to Supabase fallback
-    console.log('🔄 Using Supabase directly (btService temporarily disabled)');
-    return this.getLatestPropertiesFromSupabase(limit, offset);
-    
-    // TODO: Re-enable btService when compression issues are resolved
-    // try {
-    //   const response = await btServiceClient.getLatestProperties(limit, offset);
-    //   console.log('✅ SearchService.getLatestProperties completed:', {
-    //     resultCount: response.results.length,
-    //     totalCount: response.totalCount
-    //   });
-    //   return response;
-    // } catch (error) {
-    //   console.error('❌ SearchService.getLatestProperties error, falling back to Supabase:', error);
-    //   return this.getLatestPropertiesFromSupabase(limit, offset);
-    // }
+    try {
+      const response = await btServiceClient.getLatestProperties(limit, offset);
+      console.log('✅ SearchService.getLatestProperties (v3) completed:', {
+        resultCount: response.results.length,
+        totalCount: response.totalCount
+      });
+      return response;
+    } catch (error) {
+      console.error('❌ SearchService.getLatestProperties (v3) error, falling back to Supabase:', error);
+      return this.getLatestPropertiesFromSupabase(limit, offset);
+    }
   }
 
   /**
