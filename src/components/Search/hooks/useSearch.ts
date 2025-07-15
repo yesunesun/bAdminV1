@@ -21,7 +21,7 @@ export const useSearch = (onSearchCallback?: (filters: SearchFilters) => void) =
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const pageSize = 10; // Reduced for testing pagination
+  const pageSize = 50; // Standard page size for property listings
 
   // Track if filters were just cleared to trigger default search
   const [wasCleared, setWasCleared] = useState(false);

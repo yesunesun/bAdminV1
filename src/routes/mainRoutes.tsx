@@ -18,6 +18,7 @@ import AllProperties from '../modules/seeker/pages/AllProperties/index';
 // Import our pages
 import HomePage from '../pages/HomePage';
 import FindPage from '../pages/FindPage';
+import MCPSearchPage from '../pages/MCPSearchPage';
 
 export const mainRoutes = [
   {
@@ -53,6 +54,8 @@ export const mainRoutes = [
   // Browse and explore routes - same functionality as find
   { path: '/browse', element: <FindPage /> },
   { path: '/explore', element: <FindPage /> },
+  // MCP Search page
+  { path: '/mcp-search', element: <MCPSearchPage /> },
   // Add direct route to AllProperties
   { path: '/allproperties', element: <AllProperties /> },
   // Keep existing HomePage at /home path unchanged

@@ -15,7 +15,8 @@ import {
   Sunset,
   LayoutGrid,
   Sparkles,
-  Plus
+  Plus,
+  Bot
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -328,6 +329,18 @@ export function Header({ onFavoritesClick }: HeaderProps) {
                         <LayoutGrid className="h-4 w-4 mr-2" />
                         My Properties
                       </Link>
+                      
+                      {/* MCP Search - Only visible in development mode */}
+                      {isDevelopmentMode && (
+                        <Link 
+                          to="/mcp-search" 
+                          className="flex w-full items-center px-4 py-2 text-sm text-foreground hover:bg-accent"
+                          onClick={() => setIsProfileDropdownOpen(false)}
+                        >
+                          <Bot className="h-4 w-4 mr-2" />
+                          MCP Search
+                        </Link>
+                      )}
                       
                       <div className="h-px bg-border mx-2 my-1" />
                       

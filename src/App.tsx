@@ -25,6 +25,7 @@ import EditProperty from './modules/owner/pages/EditProperty';
 import ListYourProperty from './modules/owner/pages/ListYourProperty';
 import PropertyDetailPage from './modules/seeker/pages/PropertyDetailPage';
 import AllProperties from './modules/seeker/pages/AllProperties/index';
+import MCPSearchPage from './pages/MCPSearchPage';
 
 // Route Configurations
 import { authRoutes } from './routes/authRoutes';
@@ -314,6 +315,16 @@ function App() {
                       <PublicOrProtectedRoute>
                         <AllProperties />
                       </PublicOrProtectedRoute>
+                    } 
+                  />
+                  
+                  {/* MCP Search Page - Development only */}
+                  <Route 
+                    path="/mcp-search" 
+                    element={
+                      <ProtectedRoute>
+                        <MCPSearchPage />
+                      </ProtectedRoute>
                     } 
                   />
                   

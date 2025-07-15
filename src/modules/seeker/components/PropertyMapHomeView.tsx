@@ -254,7 +254,8 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
           const backendFilters = {
             ...searchFilters,
             transactionType: searchFilters.actionType === 'sell' ? 'buy' : 
-                            searchFilters.actionType === 'buy' ? 'buy' : 'rent'
+                            searchFilters.actionType === 'buy' ? 'buy' : 
+                            searchFilters.actionType === 'rent' ? 'rent' : null
           };
           
           response = await searchService.smartSearch(backendFilters, {
@@ -266,7 +267,8 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
           const backendFilters = {
             ...searchFilters,
             transactionType: searchFilters.actionType === 'sell' ? 'buy' : 
-                            searchFilters.actionType === 'buy' ? 'buy' : 'rent'
+                            searchFilters.actionType === 'buy' ? 'buy' : 
+                            searchFilters.actionType === 'rent' ? 'rent' : null
           };
           
           // Perform regular search using searchService
@@ -331,7 +333,8 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
           const backendFilters = {
             ...currentFilters,
             transactionType: currentFilters.actionType === 'sell' ? 'buy' : 
-                            currentFilters.actionType === 'buy' ? 'buy' : 'rent'
+                            currentFilters.actionType === 'buy' ? 'buy' : 
+                            currentFilters.actionType === 'rent' ? 'rent' : null
           };
           
           response = await searchService.smartSearch(backendFilters, {
@@ -343,7 +346,8 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
           const backendFilters = {
             ...currentFilters,
             transactionType: currentFilters.actionType === 'sell' ? 'buy' : 
-                            currentFilters.actionType === 'buy' ? 'buy' : 'rent'
+                            currentFilters.actionType === 'buy' ? 'buy' : 
+                            currentFilters.actionType === 'rent' ? 'rent' : null
           };
           
           response = await searchService.search(backendFilters, {

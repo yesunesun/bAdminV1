@@ -64,10 +64,7 @@ class BtSearchService implements SearchService {
     filters: SearchFilters,
     pagination?: SearchPaginationOptions
   ): Promise<SearchResponse> {
-    console.log('🔍 SearchService.search called with:', { filters, pagination });
-    
     // Temporarily disable btService to clean up console - go directly to Supabase fallback
-    console.log('🔄 Using Supabase directly (btService temporarily disabled)');
     return this.searchPropertiesFromSupabase(filters, pagination);
     
     // TODO: Re-enable btService when compression issues are resolved
@@ -85,16 +82,83 @@ class BtSearchService implements SearchService {
   }
 
   /**
+   * Search all property types and combine results (for Buy/Rent with propertyType=any)
+   */
+  private async searchAllPropertyTypes(
+    filters: SearchFilters,
+    dbTransactionType: string,
+    pagination?: SearchPaginationOptions
+  ): Promise<SearchResponse> {
+    console.log('🔍 Starting multi-property-type search for:', dbTransactionType);
+    
+    try {
+      const searchPromises = [];
+      
+      // Search residential properties
+      const residentialFilters = { ...filters, selectedPropertyType: 'residential' };
+      searchPromises.push(this.searchPropertiesFromSupabase(residentialFilters, pagination));
+      
+      // Search commercial properties
+      const commercialFilters = { ...filters, selectedPropertyType: 'commercial' };
+      searchPromises.push(this.searchPropertiesFromSupabase(commercialFilters, pagination));
+      
+      // Search land properties (only for sale transactions)
+      if (dbTransactionType === 'sale') {
+        const landFilters = { ...filters, selectedPropertyType: 'land' };
+        searchPromises.push(this.searchPropertiesFromSupabase(landFilters, pagination));
+      }
+      
+      // Wait for all searches to complete
+      const results = await Promise.all(searchPromises);
+      
+      // Combine all results
+      const combinedResults = [];
+      let totalCount = 0;
+      
+      for (const result of results) {
+        combinedResults.push(...result.results);
+        totalCount += result.totalCount;
+      }
+      
+      console.log('🔍 Multi-property-type search completed:', {
+        residential: results[0]?.results?.length || 0,
+        commercial: results[1]?.results?.length || 0,
+        land: results[2]?.results?.length || 0,
+        totalCombined: combinedResults.length,
+        totalCount
+      });
+      
+      return {
+        results: combinedResults,
+        totalCount,
+        page: pagination?.page || 1,
+        limit: pagination?.limit || 50
+      };
+    } catch (error) {
+      console.error('❌ Multi-property-type search failed:', error);
+      return {
+        results: [],
+        totalCount: 0,
+        page: 1,
+        limit: pagination?.limit || 50
+      };
+    }
+  }
+
+  /**
    * Fallback: Search properties directly from Supabase
    */
   private async searchPropertiesFromSupabase(
     filters: SearchFilters,
     pagination?: SearchPaginationOptions
   ): Promise<SearchResponse> {
-    console.log('🔄 Using Supabase fallback for search');
-    console.log('🔍 DEBUG: Raw filters received:', filters);
+    // Using Supabase fallback for search
     
     try {
+      // When selectedPropertyType is 'any' but we have a specific transaction type,
+      // we need to search all property types and combine results
+      const needsAllPropertyTypes = filters.selectedPropertyType === 'any' && (filters as any).transactionType !== null;
+      
       let rpcFunction = 'search_residential_properties';
       
       // Check selectedPropertyType instead of propertyType
@@ -103,27 +167,34 @@ class BtSearchService implements SearchService {
       } else if (filters.selectedPropertyType === 'land') {
         rpcFunction = 'search_land_properties';
       }
+      // pghostel and flatmates are residential properties with specific subtypes
+      // so they should use search_residential_properties function
 
       // Map transaction type: 'rent' stays 'rent', 'buy' becomes 'sale'
       // Note: filters.transactionType comes from the transformation in useSearch.ts
-      const dbTransactionType = (filters as any).transactionType === 'buy' ? 'sale' : (filters as any).transactionType;
+      let dbTransactionType = (filters as any).transactionType === 'buy' ? 'sale' : (filters as any).transactionType;
+      
+      // Handle pghostel and flatmates property types - these are residential properties with specific subtypes
+      if (filters.selectedPropertyType === 'pghostel') {
+        dbTransactionType = 'pghostel';
+      } else if (filters.selectedPropertyType === 'flatmates') {
+        dbTransactionType = 'flatmates';
+      }
       
       // Parse price range
       const priceRange = parsePriceRange(filters.selectedPriceRange);
-      console.log('🔍 Price Range Debug:', {
-        selectedPriceRange: filters.selectedPriceRange,
-        parsedPriceRange: priceRange
-      });
       
-      console.log('🔍 Search Debug:', {
-        originalFilters: filters,
-        rpcFunction,
-        dbTransactionType,
-        selectedPropertyType: filters.selectedPropertyType,
-        actionType: filters.actionType,
-        hasTransactionType: 'transactionType' in filters,
-        transactionTypeValue: (filters as any).transactionType
-      });
+      // Debug transaction type filtering
+      console.log('🚨 DEBUG p_subtype:', dbTransactionType, 'isNull:', dbTransactionType === null);
+      console.log('🚨 DEBUG selectedPropertyType:', filters.selectedPropertyType);
+      console.log('🚨 DEBUG actionType from filters:', (filters as any).actionType);
+      console.log('🚨 DEBUG needsAllPropertyTypes:', needsAllPropertyTypes);
+      
+      // If we need to search all property types, do multiple searches and combine results
+      if (needsAllPropertyTypes) {
+        console.log('🔍 Searching all property types for transaction type:', dbTransactionType);
+        return this.searchAllPropertyTypes(filters, dbTransactionType, pagination);
+      }
       
       // Build parameters based on the function type
       const baseParams = {
@@ -174,14 +245,7 @@ class BtSearchService implements SearchService {
         };
       }
 
-      console.log('🔍 Database Call Debug:', {
-        rpcFunction,
-        rpcParams,
-        dbTransactionType,
-        queryParameters: rpcParams
-      });
-      
-      console.log('🔍 Detailed RPC Parameters:', JSON.stringify(rpcParams, null, 2));
+      // Database call with transaction type filtering
 
       const { data, error } = await supabase.rpc(rpcFunction, rpcParams);
 
@@ -190,16 +254,7 @@ class BtSearchService implements SearchService {
         throw error;
       }
 
-      console.log('🔍 Search Raw Data:', {
-        dataLength: data?.length || 0,
-        firstItem: data?.[0],
-        sampleFlowTypes: data?.slice(0, 3).map((item: any) => ({
-          id: item.id,
-          flow_type: item.flow_type,
-          subtype: item.subtype,
-          title: item.title
-        }))
-      });
+      // Process search results
 
       // First create base results
       const baseResults: SearchResult[] = data?.map((item: any) => ({
@@ -247,13 +302,7 @@ class BtSearchService implements SearchService {
             const parking = extractParking(propertyDetails);
             const internet = extractInternet(propertyDetails);
 
-            // Log extracted data for debugging (remove in production)
-            console.log(`🔍 [PropertyExtractors] Property ${result.id}:`, {
-              furnishingStatus,
-              preferredTenants,
-              parking,
-              internet
-            });
+            // Extract additional property details
 
             return {
               ...result,
@@ -269,10 +318,7 @@ class BtSearchService implements SearchService {
         })
       );
 
-      console.log('✅ Supabase search fallback completed:', {
-        resultCount: results.length,
-        totalCount: results.length
-      });
+      // Search completed
 
       return {
         results,
@@ -298,17 +344,17 @@ class BtSearchService implements SearchService {
     filters: SearchFilters,
     pagination?: SearchPaginationOptions
   ): Promise<SearchResponse> {
-    console.log('🎯 SearchService.smartSearch called with:', { filters, pagination });
+    // Smart search with property code detection
     
     // Check if the search query is a property code
     const query = filters.searchQuery?.trim();
     if (query && this.isPropertyCode(query)) {
-      console.log('🎯 SmartSearch detected property code, using searchByCode:', query);
+      // Property code detected, using direct code search
       return this.searchByCodeFromSupabase(query, true);
     }
     
     // Temporarily disable btService to clean up console - go directly to Supabase fallback
-    console.log('🔄 Using Supabase directly for smartSearch (btService temporarily disabled)');
+    // Using Supabase directly for smartSearch
     return this.searchPropertiesFromSupabase(filters, pagination);
     
     // TODO: Re-enable btService when compression issues are resolved
