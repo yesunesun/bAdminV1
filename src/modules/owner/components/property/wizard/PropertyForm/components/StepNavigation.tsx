@@ -1,12 +1,21 @@
 // src/modules/owner/components/property/wizard/PropertyForm/components/StepNavigation.tsx
-// Version: 4.0.0
-// Last Modified: 29-05-2025 17:30 IST
-// Purpose: Enhanced step navigation with validation blocking and progress indicators
+// Version: 4.2.0
+// Last Modified: 16-07-2025 15:15 IST
+// Purpose: Fixed location button logic - prioritizes Find Location when coordinates missing
 
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { ArrowLeft, ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, AlertCircle, CheckCircle2, MapPin, Navigation } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+
+interface LocationContext {
+  isLocationStep: boolean;
+  hasCoordinates: boolean;
+  isFetchingCoordinates: boolean;
+  onFindLocation?: () => Promise<boolean>;
+  canAutoFetch: boolean;
+  coordinatesMissing?: boolean;
+}
 
 interface StepNavigationProps {
   formStep: number;
@@ -22,6 +31,9 @@ interface StepNavigationProps {
   validationErrors?: string[];
   completionPercentage?: number;
   requiredFieldsRemaining?: number;
+  
+  // Location context props
+  locationContext?: LocationContext;
   
   // Customization props
   showProgress?: boolean;
@@ -44,6 +56,9 @@ const StepNavigation: React.FC<StepNavigationProps> = ({
   validationErrors = [],
   completionPercentage = 0,
   requiredFieldsRemaining = 0,
+  
+  // Location context props
+  locationContext,
   
   // Customization props
   showProgress = true,
@@ -79,7 +94,31 @@ const StepNavigation: React.FC<StepNavigationProps> = ({
     return null;
   }
 
-  // Function to proceed to the next step
+  // Determine button behavior based on location context
+  const isLocationStep = locationContext?.isLocationStep || false;
+  const hasCoordinates = locationContext?.hasCoordinates || false;
+  const isFetchingCoordinates = locationContext?.isFetchingCoordinates || false;
+  const canAutoFetch = locationContext?.canAutoFetch || false;
+  const coordinatesMissing = locationContext?.coordinatesMissing || false;
+
+  // SIMPLIFIED LOGIC: Always show "Next" button, never show "Find Location"
+  // The Next button will handle coordinate fetching internally
+  
+  // Button is disabled if:
+  // 1. General validation fails (canProceed = false) OR
+  // 2. Currently validating/fetching
+  const isActionButtonDisabled = !canProceed || isValidating || isFetchingCoordinates;
+
+  console.log('[StepNavigation] Button logic:', {
+    isLocationStep,
+    hasCoordinates,
+    coordinatesMissing,
+    canProceed,
+    isActionButtonDisabled,
+    isFetchingCoordinates
+  });
+
+  // Function to proceed to the next step (handles both regular and location logic)
   const handleContinue = (event: React.MouseEvent) => {
     event.preventDefault();
     
@@ -92,12 +131,12 @@ const StepNavigation: React.FC<StepNavigationProps> = ({
       return;
     }
     
+    // Always call handleNextStep - it will handle coordinate logic internally
     handleNextStep();
   };
 
-  // Get button states
-  const isNextDisabled = !canProceed || isValidating;
-  const isPrevDisabled = formStep === 1 || disablePrevious || isValidating;
+  // Get button states for Previous button
+  const isPrevDisabled = formStep === 1 || disablePrevious || isValidating || isFetchingCoordinates;
 
   // Progress indicator component - REMOVED: Now handled by UnifiedStepIndicator
   const ProgressIndicator = () => {
@@ -109,6 +148,36 @@ const StepNavigation: React.FC<StepNavigationProps> = ({
   const ValidationSummary = () => {
     // Always return null - validation summary is now handled by UnifiedStepIndicator
     return null;
+  };
+
+  // Render Next Button (always show Next, never Find Location)
+  const renderActionButton = () => {
+    return (
+      <Button
+        type="button"
+        onClick={handleContinue}
+        disabled={isActionButtonDisabled}
+        size={size}
+        className={cn(
+          config.button,
+          'transition-all duration-200',
+          !canProceed && 'bg-amber-500 hover:bg-amber-600 border-amber-500 hover:border-amber-600',
+          isActionButtonDisabled && 'opacity-50 cursor-not-allowed'
+        )}
+      >
+        {isValidating || isFetchingCoordinates ? (
+          <>
+            <div className={cn(config.icon, 'animate-spin rounded-full border-2 border-current border-t-transparent')} />
+            {isFetchingCoordinates ? 'Getting Location...' : 'Validating...'}
+          </>
+        ) : (
+          <>
+            {canProceed ? 'Next' : 'Complete Required Fields'}
+            <ArrowRight className={config.icon} />
+          </>
+        )}
+      </Button>
+    );
   };
 
   if (variant === 'minimal') {
@@ -126,25 +195,7 @@ const StepNavigation: React.FC<StepNavigationProps> = ({
           Previous
         </Button>
         
-        <Button
-          type="button"
-          onClick={handleContinue}
-          disabled={isNextDisabled}
-          size={size}
-          className={cn(config.button)}
-        >
-          {isValidating ? (
-            <>
-              <div className={cn(config.icon, 'animate-spin rounded-full border-2 border-current border-t-transparent')} />
-              Validating...
-            </>
-          ) : (
-            <>
-              Next
-              <ArrowRight className={config.icon} />
-            </>
-          )}
-        </Button>
+        {renderActionButton()}
       </div>
     );
   }
@@ -176,29 +227,7 @@ const StepNavigation: React.FC<StepNavigationProps> = ({
         </Button>
         
         {/* Next button */}
-        <Button
-          type="button"
-          onClick={handleContinue}
-          disabled={isNextDisabled}
-          size={size}
-          className={cn(
-            config.button,
-            'transition-all duration-200',
-            !canProceed && 'bg-amber-500 hover:bg-amber-600 border-amber-500 hover:border-amber-600'
-          )}
-        >
-          {isValidating ? (
-            <>
-              <div className={cn(config.icon, 'animate-spin rounded-full border-2 border-current border-t-transparent')} />
-              Validating...
-            </>
-          ) : (
-            <>
-              {canProceed ? 'Continue' : 'Complete Required Fields'}
-              <ArrowRight className={config.icon} />
-            </>
-          )}
-        </Button>
+        {renderActionButton()}
       </div>
       
       {/* Step indicator */}

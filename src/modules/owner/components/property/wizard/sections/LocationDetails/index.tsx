@@ -1,9 +1,9 @@
 // src/modules/owner/components/property/wizard/sections/LocationDetails/index.tsx
-// Version: 7.2.0
-// Last Modified: 02-06-2025 14:30 IST
-// Purpose: Added automatic coordinate fetching when Continue is clicked without coordinates
+// Version: 7.4.0
+// Last Modified: 16-07-2025 15:45 IST
+// Purpose: Complete implementation with coordinates hidden from step completion display
 
-import React, { useRef, useState, useEffect, useCallback } from 'react';
+import React, { useRef, useState, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { FormSection } from '@/components/FormSection';
 import { FormSectionProps } from '../../../types';
 import { useGoogleMaps } from './hooks/useGoogleMaps';
@@ -14,9 +14,25 @@ import { MapPin, Navigation } from 'lucide-react';
 import ErrorBoundary from '@/components/ui/ErrorBoundary';
 import { useStepValidation } from '../../hooks/useStepValidation';
 import { StepCompletionIndicator } from '../../components/StepCompletionIndicator';
-import { useStepCompletion, DEFAULT_FIELD_LABELS } from '../../hooks/useStepCompletion';
+import { useStepCompletionWithoutCoordinates } from '../../hooks/useStepCompletionWithoutCoordinates';
+import { DEFAULT_FIELD_LABELS } from '../../hooks/useStepCompletion';
 
-export function LocationDetails({ form, stepId }: FormSectionProps) {
+// Interface for exposing methods to parent components
+export interface LocationDetailsRef {
+  hasValidCoordinates: () => boolean;
+  autoFetchCoordinates: () => Promise<boolean>;
+  getCoordinatesStatus: () => {
+    hasCoordinates: boolean;
+    isFetching: boolean;
+    canAutoFetch: boolean;
+  };
+}
+
+interface LocationDetailsProps extends FormSectionProps {
+  onCoordinatesChange?: (hasCoordinates: boolean) => void;
+}
+
+const LocationDetails = forwardRef<LocationDetailsRef, LocationDetailsProps>(({ form, stepId, onCoordinatesChange }, ref) => {
   // Initialize validation system
   const {
     validateField,
@@ -71,6 +87,7 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
   const [locationError, setLocationError] = useState<string | null>(null);
   const [coordinatesVerified, setCoordinatesVerified] = useState(false);
   const [showCoordinateSuccess, setShowCoordinateSuccess] = useState(false);
+  const [lastValidAddress, setLastValidAddress] = useState<string>('');
 
   // Form values state
   const [values, setValues] = useState({
@@ -84,6 +101,59 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
     latitude: getField('latitude', ''),
     longitude: getField('longitude', '')
   });
+
+  // Check if coordinates are present and valid
+  const hasValidCoordinates = useCallback(() => {
+    const lat = values.latitude || getField('latitude');
+    const lng = values.longitude || getField('longitude');
+    
+    return lat && lng && 
+           !isNaN(parseFloat(String(lat))) && 
+           !isNaN(parseFloat(String(lng))) &&
+           parseFloat(String(lat)) !== 0 && 
+           parseFloat(String(lng)) !== 0;
+  }, [values.latitude, values.longitude, getField]);
+
+  // Check if address has changed since last coordinate fetch
+  const hasAddressChanged = useCallback(() => {
+    const currentAddress = values.address;
+    return currentAddress !== lastValidAddress && currentAddress.trim() !== '';
+  }, [values.address, lastValidAddress]);
+
+  // Expose methods to parent component via ref
+  useImperativeHandle(ref, () => ({
+    hasValidCoordinates,
+    autoFetchCoordinates,
+    getCoordinatesStatus: () => ({
+      hasCoordinates: hasValidCoordinates(),
+      isFetching: isAutoFetchingCoordinates || isGeocoding || isGeolocating,
+      canAutoFetch: values.address.trim() !== '' || navigator.geolocation !== undefined
+    })
+  }), [hasValidCoordinates, isAutoFetchingCoordinates, isGeocoding, isGeolocating, values.address]);
+
+  // Notify parent when coordinates change
+  useEffect(() => {
+    if (onCoordinatesChange) {
+      onCoordinatesChange(hasValidCoordinates());
+    }
+  }, [hasValidCoordinates, onCoordinatesChange]);
+
+  // Reset coordinates when address changes
+  useEffect(() => {
+    if (hasAddressChanged() && hasValidCoordinates()) {
+      console.log('[LocationDetails] Address changed, resetting coordinates');
+      updateFormAndState('latitude', '');
+      updateFormAndState('longitude', '');
+      setCoordinatesVerified(false);
+      setLastValidAddress('');
+      
+      // Clear marker from map
+      if (markerInstance) {
+        markerInstance.setMap(null);
+        setMarkerInstance(null);
+      }
+    }
+  }, [values.address, hasAddressChanged, hasValidCoordinates]);
 
   // Ensure step structure exists
   useEffect(() => {
@@ -125,18 +195,6 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
     saveField(field, value);
     markFieldAsTouched(field);
   }, [saveField, markFieldAsTouched]);
-
-  // Check if coordinates are present and valid
-  const hasValidCoordinates = useCallback(() => {
-    const lat = values.latitude || getField('latitude');
-    const lng = values.longitude || getField('longitude');
-    
-    return lat && lng && 
-           !isNaN(parseFloat(String(lat))) && 
-           !isNaN(parseFloat(String(lng))) &&
-           parseFloat(String(lat)) !== 0 && 
-           parseFloat(String(lng)) !== 0;
-  }, [values.latitude, values.longitude, getField]);
 
   // Check for edit mode
   const isEditMode = window.location.pathname.includes('/edit');
@@ -187,6 +245,7 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
         updateFormAndState('latitude', lat);
         updateFormAndState('longitude', lng);
         setCoordinatesVerified(true);
+        setLastValidAddress(values.address); // Mark current address as valid
         
         setShowCoordinateSuccess(true);
         setTimeout(() => setShowCoordinateSuccess(false), 3000);
@@ -207,6 +266,7 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
         map.setCenter(position);
         updateMarkerPosition(position);
         setCoordinatesVerified(true);
+        setLastValidAddress(values.address);
       }
     } catch (error) {
       console.error('Error initializing map:', error);
@@ -236,6 +296,7 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
         updateFormAndState('latitude', newPosition.lat());
         updateFormAndState('longitude', newPosition.lng());
         setCoordinatesVerified(true);
+        setLastValidAddress(values.address); // Mark current address as valid
         
         setShowCoordinateSuccess(true);
         setTimeout(() => setShowCoordinateSuccess(false), 3000);
@@ -271,6 +332,7 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
           updateFormAndState('latitude', location.lat());
           updateFormAndState('longitude', location.lng());
           setCoordinatesVerified(true);
+          setLastValidAddress(addressText); // Mark this address as valid
           
           setShowCoordinateSuccess(true);
           setTimeout(() => setShowCoordinateSuccess(false), 3000);
@@ -347,6 +409,7 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
         if (status === 'OK' && results && results.length > 0) {
           const address = results[0].formatted_address;
           updateFormAndState('address', address);
+          setLastValidAddress(address); // Mark this address as valid
           
           const addressComponents = results[0].address_components || [];
           
@@ -398,10 +461,13 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
     geocodeAddress(values.address);
   };
 
-  // NEW: Auto-fetch coordinates when Continue is clicked without coordinates
-  const autoFetchCoordinates = useCallback(async () => {
+  // Enhanced auto-fetch coordinates function
+  const autoFetchCoordinates = useCallback(async (): Promise<boolean> => {
+    console.log('[LocationDetails] autoFetchCoordinates called');
+    
     // If coordinates already exist, no need to fetch
     if (hasValidCoordinates()) {
+      console.log('[LocationDetails] Coordinates already exist, skipping auto-fetch');
       return Promise.resolve(true);
     }
 
@@ -410,8 +476,11 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
 
     // Strategy 1: Try geocoding the address first (same as "Find on Map")
     if (values.address && values.address.trim()) {
+      console.log('[LocationDetails] Trying geocoding strategy for address:', values.address);
+      
       return new Promise<boolean>((resolve) => {
         if (!mapLoaded || !window.google || !window.google.maps) {
+          console.log('[LocationDetails] Google Maps not ready');
           setIsAutoFetchingCoordinates(false);
           resolve(false);
           return;
@@ -426,10 +495,12 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
           if (status === 'OK' && results && results.length > 0) {
             const location = results[0].geometry.location;
             
+            console.log('[LocationDetails] Geocoding successful:', location.lat(), location.lng());
             
             updateFormAndState('latitude', location.lat());
             updateFormAndState('longitude', location.lng());
             setCoordinatesVerified(true);
+            setLastValidAddress(values.address);
             
             setShowCoordinateSuccess(true);
             setTimeout(() => setShowCoordinateSuccess(false), 3000);
@@ -442,14 +513,59 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
             setIsAutoFetchingCoordinates(false);
             resolve(true);
           } else {
-            setIsAutoFetchingCoordinates(false);
-            resolve(false);
+            console.log('[LocationDetails] Geocoding failed, trying geolocation fallback');
+            
+            // Strategy 2 fallback: Try current location
+            if (!navigator.geolocation) {
+              setLocationError('Unable to get coordinates. Please use "Find on Map" or "Use My Location" buttons.');
+              setIsAutoFetchingCoordinates(false);
+              resolve(false);
+              return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+              (position) => {
+                const { latitude, longitude } = position.coords;
+                
+                console.log('[LocationDetails] Geolocation successful:', latitude, longitude);
+                
+                updateFormAndState('latitude', latitude);
+                updateFormAndState('longitude', longitude);
+                setCoordinatesVerified(true);
+                setLastValidAddress(values.address);
+                
+                setShowCoordinateSuccess(true);
+                setTimeout(() => setShowCoordinateSuccess(false), 3000);
+                
+                const latlng = { lat: latitude, lng: longitude };
+                if (mapInstance) {
+                  mapInstance.setCenter(latlng);
+                  updateMarkerPosition(latlng);
+                }
+                
+                reverseGeocode(latlng);
+                setIsAutoFetchingCoordinates(false);
+                resolve(true);
+              },
+              (error) => {
+                console.log('[LocationDetails] Geolocation failed:', error);
+                setLocationError('Unable to get coordinates automatically. Please use "Find on Map" or "Use My Location" buttons to set the location.');
+                setIsAutoFetchingCoordinates(false);
+                resolve(false);
+              },
+              {
+                enableHighAccuracy: false,
+                timeout: 5000,
+                maximumAge: 300000
+              }
+            );
           }
         });
       });
     }
 
-    // Strategy 2: If no address or geocoding fails, try current location
+    // Strategy 2: If no address, try current location directly
+    console.log('[LocationDetails] No address provided, trying geolocation directly');
     
     return new Promise<boolean>((resolve) => {
       if (!navigator.geolocation) {
@@ -463,10 +579,12 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
         (position) => {
           const { latitude, longitude } = position.coords;
           
+          console.log('[LocationDetails] Direct geolocation successful:', latitude, longitude);
           
           updateFormAndState('latitude', latitude);
           updateFormAndState('longitude', longitude);
           setCoordinatesVerified(true);
+          setLastValidAddress(values.address);
           
           setShowCoordinateSuccess(true);
           setTimeout(() => setShowCoordinateSuccess(false), 3000);
@@ -482,14 +600,15 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
           resolve(true);
         },
         (error) => {
+          console.log('[LocationDetails] Direct geolocation failed:', error);
           setLocationError('Unable to get coordinates automatically. Please use "Find on Map" or "Use My Location" buttons to set the location.');
           setIsAutoFetchingCoordinates(false);
           resolve(false);
         },
         {
-          enableHighAccuracy: false, // Use faster, less accurate location for auto-fetch
-          timeout: 5000, // Shorter timeout for auto-fetch
-          maximumAge: 300000 // Allow cached position up to 5 minutes old
+          enableHighAccuracy: false,
+          timeout: 5000,
+          maximumAge: 300000
         }
       );
     });
@@ -503,95 +622,6 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
     reverseGeocode, 
     updateMarkerPosition
   ]);
-
-  // NEW: Enhanced navigation interceptor
-  useEffect(() => {
-    const handleBeforeNavigation = async (event: Event) => {
-      // Only intercept if coordinates are missing
-      if (hasValidCoordinates()) {
-        return; // Allow navigation
-      }
-
-      // Stop the default navigation
-      event.preventDefault();
-      event.stopPropagation();
-
-
-      try {
-        const success = await autoFetchCoordinates();
-        
-        if (success) {
-          // Allow navigation to proceed by re-triggering the navigation
-          // Find the navigation button and trigger it again
-          setTimeout(() => {
-            const nextButton = document.querySelector('button[data-testid="next-button"], button:contains("Next"), button:contains("Continue")') as HTMLButtonElement;
-            if (nextButton) {
-              nextButton.click();
-            }
-          }, 100);
-        } else {
-          setLocationError('Coordinates are required to proceed. Please use "Find on Map" or "Use My Location" buttons to set the location.');
-        }
-      } catch (error) {
-        console.error('[NavigationInterceptor] Error during auto-fetch:', error);
-        setLocationError('Unable to get coordinates automatically. Please use "Find on Map" or "Use My Location" buttons.');
-      }
-    };
-
-    // Find and attach to navigation buttons
-    const attachToNavigationButtons = () => {
-      // Look for common navigation button patterns
-      const selectors = [
-        'button[data-testid="next-button"]',
-        'button[type="submit"]',
-        'button:contains("Next")',
-        'button:contains("Continue")',
-        'button:contains("Proceed")'
-      ];
-
-      let buttons: HTMLButtonElement[] = [];
-      
-      // Use more reliable button finding
-      const allButtons = document.querySelectorAll('button');
-      allButtons.forEach(button => {
-        const text = button.textContent?.toLowerCase() || '';
-        if (text.includes('next') || text.includes('continue') || text.includes('proceed') || 
-            button.type === 'submit' || button.getAttribute('data-testid') === 'next-button') {
-          buttons.push(button);
-        }
-      });
-
-      buttons.forEach(button => {
-        // Remove existing listener if any
-        button.removeEventListener('click', handleBeforeNavigation, true);
-        // Add new listener with capture=true to intercept before other handlers
-        button.addEventListener('click', handleBeforeNavigation, true);
-      });
-
-      return buttons;
-    };
-
-    // Initial attachment
-    const buttons = attachToNavigationButtons();
-
-    // Re-attach when DOM changes (for dynamically added buttons)
-    const observer = new MutationObserver(() => {
-      attachToNavigationButtons();
-    });
-
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true
-    });
-
-    // Cleanup
-    return () => {
-      observer.disconnect();
-      buttons.forEach(button => {
-        button.removeEventListener('click', handleBeforeNavigation, true);
-      });
-    };
-  }, [hasValidCoordinates, autoFetchCoordinates]);
   
   // Get current location
   const getUserCurrentLocation = async () => {
@@ -653,6 +683,7 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
         updateFormAndState('latitude', latitude);
         updateFormAndState('longitude', longitude);
         setCoordinatesVerified(true);
+        setLastValidAddress(values.address);
         
         setShowCoordinateSuccess(true);
         setTimeout(() => setShowCoordinateSuccess(false), 3000);
@@ -708,19 +739,18 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
     updateFormAndState('pinCode', numericValue);
   };
 
-  // Calculate step completion - including coordinates
-  const stepCompletion = useStepCompletion({
+  // Calculate step completion - excluding coordinates from UI display but including them in validation
+  const stepCompletion = useStepCompletionWithoutCoordinates({
     requiredFields: [
-      'address', 'locality', 'city', 'pinCode', 'latitude', 'longitude'
+      'address', 'locality', 'city', 'pinCode', 'latitude', 'longitude' // Include all for validation
     ],
     fieldLabels: {
       ...DEFAULT_FIELD_LABELS,
       address: 'Address',
       locality: 'Locality',
       city: 'City',
-      pinCode: 'PIN Code',
-      latitude: 'Latitude',
-      longitude: 'Longitude'
+      pinCode: 'PIN Code'
+      // Don't include latitude/longitude labels - they won't be shown to user
     },
     form,
     stepId: effectiveStepId,
@@ -732,7 +762,7 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
       title="Location Details"
       description="Where is your property located?"
     >
-      {/* Step Completion Progress Bar */}
+      {/* Step Completion Progress Bar - Now hides coordinates */}
       <StepCompletionIndicator
         completionPercentage={stepCompletion.completionPercentage}
         unfilledFields={stepCompletion.unfilledFields}
@@ -952,18 +982,18 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
             </div>
           )}
 
-          {/* COORDINATES REQUIREMENT NOTICE */}
+          {/* COORDINATES REQUIREMENT NOTICE - Updated messaging */}
           {!hasValidCoordinates() && (
-            <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded">
+            <div className="bg-blue-50 border border-blue-200 text-blue-800 px-4 py-3 rounded">
               <p className="text-sm">
-                <strong>📍 Location coordinates are required</strong><br/>
-                Please use one of the following options to set your property location:
+                <strong>📍 Location coordinates will be captured automatically</strong><br/>
+                When you click "Next", we'll try to get your property's exact location automatically. 
+                If that doesn't work, you can use one of these manual options:
               </p>
               <ul className="text-xs mt-2 ml-4 list-disc">
                 <li>Click "Find on Map" to locate your address</li>
                 <li>Click "Use My Location" to use your current position</li>
                 <li>Click directly on the map to select a location</li>
-                <li>Or simply click "Continue" and we'll try to locate your address automatically</li>
               </ul>
             </div>
           )}
@@ -971,4 +1001,9 @@ export function LocationDetails({ form, stepId }: FormSectionProps) {
       </div>
     </FormSection>
   );
-}
+});
+
+LocationDetails.displayName = 'LocationDetails';
+
+export { LocationDetails };
+export default LocationDetails;

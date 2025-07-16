@@ -1,9 +1,9 @@
 // src/modules/owner/components/property/wizard/PropertyForm/index.tsx
-// Version: 11.4.0
-// Last Modified: 30-01-2025 15:35 IST
-// Purpose: Fixed step validation status passing to FormNavigation component
+// Version: 11.6.0
+// Last Modified: 16-07-2025 15:00 IST
+// Purpose: Complete implementation of Find Location button behavior with location context
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 // Import FLOW_TYPES and step sequences
@@ -25,6 +25,9 @@ import WizardBreadcrumbs from '../components/WizardBreadcrumbs';
 import { FormNavigation } from '../components/FormNavigation';
 import UnifiedStepIndicator from '../components/UnifiedStepIndicator';
 import { updateMandatoryFieldsStatus, calculateCompletionStats } from '../utils/mandatoryFieldsUtils';
+
+// Import LocationDetailsRef type
+import type { LocationDetailsRef } from '../sections/LocationDetails';
 
 // Hooks
 import { useStepNavigation } from './hooks/useStepNavigation';
@@ -63,6 +66,13 @@ export function PropertyForm({
   const [saveInProgress, setSaveInProgress] = useState(false);
   const [propertyIdAfterSave, setPropertyIdAfterSave] = useState<string | null>(null);
   const [selectedCity, setSelectedCity] = useState<string>(initialData?.locality || '');
+
+  // Location context state for StepNavigation
+  const [locationHasCoordinates, setLocationHasCoordinates] = useState(false);
+  const [locationIsFetching, setLocationIsFetching] = useState(false);
+  
+  // Ref to access LocationDetails methods
+  const locationDetailsRef = useRef<LocationDetailsRef>(null);
 
   console.log('[PropertyForm] Initialized with FlowContext:', {
     flowType,
@@ -173,6 +183,9 @@ export function PropertyForm({
     currentStepId
   });
 
+  // Check if current step is a location step
+  const isLocationStep = currentStepId.includes('location');
+
   // Track form data changes
   useFormDataChangeTracking(form);
 
@@ -191,70 +204,179 @@ export function PropertyForm({
     return status;
   }, [formStep, stepIsValid, completionPercentage]);
 
-  // ENHANCED: Next step handler with validation blocking
-  const handleNextStepWithValidation = () => {
+  // Handle coordinates change from LocationDetails
+  const handleCoordinatesChange = React.useCallback((hasCoordinates: boolean) => {
+    console.log('[PropertyForm] Coordinates changed:', hasCoordinates);
+    setLocationHasCoordinates(hasCoordinates);
+  }, []);
+
+  // Handle Find Location action
+  const handleFindLocation = React.useCallback(async (): Promise<boolean> => {
+    console.log('[PropertyForm] handleFindLocation called');
+    
+    if (!locationDetailsRef.current) {
+      console.warn('[PropertyForm] LocationDetails ref not available');
+      return false;
+    }
+
+    try {
+      setLocationIsFetching(true);
+      const success = await locationDetailsRef.current.autoFetchCoordinates();
+      console.log('[PropertyForm] Find Location result:', success);
+      return success;
+    } catch (error) {
+      console.error('[PropertyForm] Error in Find Location:', error);
+      return false;
+    } finally {
+      setLocationIsFetching(false);
+    }
+  }, []);
+
+  // ENHANCED: Next step handler with automatic coordinate fetching
+  const handleNextStepWithValidation = async () => {
     console.log('[PropertyForm] handleNextStepWithValidation called:', {
       currentStep: formStep,
       currentStepId,
       stepIsValid,
-      canProceed: canProceedToNextStep()
+      canProceed: canProceedToNextStep(),
+      isLocationStep,
+      locationHasCoordinates
     });
 
-    // Validate current step before proceeding
-    if (!canProceedToNextStep()) {
-      console.log('[PropertyForm] Navigation blocked - validation failed');
+    // For location steps, handle coordinate logic
+    if (isLocationStep && areCoordinatesMissing()) {
+      console.log('[PropertyForm] Location step with missing coordinates - attempting auto-fetch');
       
-      // Get validation summary for user feedback
+      // First check if other required fields are filled
       const summary = getValidationSummary();
-      const missingFields = summary?.invalidFields.map(f => f.name) || [];
+      const missingFields = summary?.invalidFields.filter(f => f.name !== 'latitude' && f.name !== 'longitude') || [];
       
-      // Show user-friendly alert
-      const fieldLabels = {
-        propertyType: 'Property Type',
-        bhkType: 'BHK Configuration',
-        floor: 'Floor',
-        totalFloors: 'Total Floors',
-        propertyAge: 'Property Age',
-        facing: 'Facing Direction',
-        builtUpArea: 'Built-up Area',
-        bathrooms: 'Bathrooms',
-        address: 'Address',
-        city: 'City',
-        state: 'State',
-        pinCode: 'PIN Code',
-        locality: 'Locality',
-        expectedPrice: 'Expected Price',
-        maintenanceCost: 'Maintenance Cost',
-        kitchenType: 'Kitchen Type',
-        availableFrom: 'Available From',
-        furnishing: 'Furnishing',
-        parking: 'Parking'
-      };
+      if (missingFields.length > 0) {
+        // Other fields are missing - show normal validation error
+        const fieldLabels = {
+          propertyType: 'Property Type',
+          bhkType: 'BHK Configuration',
+          floor: 'Floor',
+          totalFloors: 'Total Floors',
+          propertyAge: 'Property Age',
+          facing: 'Facing Direction',
+          builtUpArea: 'Built-up Area',
+          bathrooms: 'Bathrooms',
+          address: 'Address',
+          city: 'City',
+          state: 'State',
+          pinCode: 'PIN Code',
+          locality: 'Locality',
+          expectedPrice: 'Expected Price',
+          maintenanceCost: 'Maintenance Cost',
+          kitchenType: 'Kitchen Type',
+          availableFrom: 'Available From',
+          furnishing: 'Furnishing',
+          parking: 'Parking'
+        };
 
-      const missingFieldLabels = missingFields.map(field => 
-        fieldLabels[field as keyof typeof fieldLabels] || field
-      );
+        const missingFieldLabels = missingFields.map(field => 
+          fieldLabels[field.name as keyof typeof fieldLabels] || field.name
+        );
 
-      alert(`Please complete these required fields before proceeding:\n\n• ${missingFieldLabels.join('\n• ')}`);
-      
-      // Scroll to first missing field
-      const firstMissingField = missingFields[0];
-      if (firstMissingField) {
-        const fieldElement = document.querySelector(`[name="${firstMissingField}"]`) || 
-                            document.querySelector(`input[placeholder*="${firstMissingField}"]`) ||
-                            document.querySelector(`select[name="${firstMissingField}"]`);
+        alert(`Please complete these required fields before proceeding:\n\n• ${missingFieldLabels.join('\n• ')}`);
         
-        if (fieldElement) {
-          fieldElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          setTimeout(() => {
-            if ('focus' in fieldElement) {
-              (fieldElement as HTMLElement).focus();
-            }
-          }, 500);
+        // Scroll to first missing field
+        const firstMissingField = missingFields[0];
+        if (firstMissingField) {
+          const fieldElement = document.querySelector(`[name="${firstMissingField.name}"]`) || 
+                              document.querySelector(`input[placeholder*="${firstMissingField.name}"]`) ||
+                              document.querySelector(`select[name="${firstMissingField.name}"]`);
+          
+          if (fieldElement) {
+            fieldElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            setTimeout(() => {
+              if ('focus' in fieldElement) {
+                (fieldElement as HTMLElement).focus();
+              }
+            }, 500);
+          }
         }
+        return; // Block navigation
       }
-      
-      return; // Block navigation
+
+      // Only coordinates are missing - try to auto-fetch
+      try {
+        console.log('[PropertyForm] Attempting to auto-fetch coordinates');
+        const success = await handleFindLocation();
+        
+        if (success) {
+          console.log('[PropertyForm] Coordinates fetched successfully, proceeding to next step');
+          // Continue with normal flow below
+        } else {
+          console.log('[PropertyForm] Coordinate fetch failed');
+          alert('Unable to get location coordinates automatically. Please check your address is correct and try again, or use the "Find on Map" or "Use My Location" buttons to set the location manually.');
+          return; // Block navigation
+        }
+      } catch (error) {
+        console.error('[PropertyForm] Error fetching coordinates:', error);
+        alert('Unable to get location coordinates. Please check your address and try again, or use the "Find on Map" or "Use My Location" buttons to set the location manually.');
+        return; // Block navigation
+      }
+    } else {
+      // Non-location step or coordinates already exist - validate normally
+      if (!canProceedToNextStep()) {
+        console.log('[PropertyForm] Navigation blocked - validation failed');
+        
+        // Get validation summary for user feedback
+        const summary = getValidationSummary();
+        const missingFields = summary?.invalidFields.map(f => f.name) || [];
+        
+        // Show user-friendly alert
+        const fieldLabels = {
+          propertyType: 'Property Type',
+          bhkType: 'BHK Configuration',
+          floor: 'Floor',
+          totalFloors: 'Total Floors',
+          propertyAge: 'Property Age',
+          facing: 'Facing Direction',
+          builtUpArea: 'Built-up Area',
+          bathrooms: 'Bathrooms',
+          address: 'Address',
+          city: 'City',
+          state: 'State',
+          pinCode: 'PIN Code',
+          locality: 'Locality',
+          latitude: 'Latitude',
+          longitude: 'Longitude',
+          expectedPrice: 'Expected Price',
+          maintenanceCost: 'Maintenance Cost',
+          kitchenType: 'Kitchen Type',
+          availableFrom: 'Available From',
+          furnishing: 'Furnishing',
+          parking: 'Parking'
+        };
+
+        const missingFieldLabels = missingFields.map(field => 
+          fieldLabels[field as keyof typeof fieldLabels] || field
+        );
+
+        alert(`Please complete these required fields before proceeding:\n\n• ${missingFieldLabels.join('\n• ')}`);
+        
+        // Scroll to first missing field
+        const firstMissingField = missingFields[0];
+        if (firstMissingField) {
+          const fieldElement = document.querySelector(`[name="${firstMissingField}"]`) || 
+                              document.querySelector(`input[placeholder*="${firstMissingField}"]`) ||
+                              document.querySelector(`select[name="${firstMissingField}"]`);
+          
+          if (fieldElement) {
+            fieldElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            setTimeout(() => {
+              if ('focus' in fieldElement) {
+                (fieldElement as HTMLElement).focus();
+              }
+            }, 500);
+          }
+        }
+        
+        return; // Block navigation
+      }
     }
 
     // Validation passed - proceed to next step
@@ -404,6 +526,48 @@ export function PropertyForm({
   const mandatoryFields = updateMandatoryFieldsStatus(form, currentStepId);
   const completionStats = calculateCompletionStats(mandatoryFields);
 
+  // Check if address has been modified for coordinate reset requirement
+  const checkAddressModified = React.useCallback(() => {
+    if (!isLocationStep || !locationDetailsRef.current) return false;
+    
+    const status = locationDetailsRef.current.getCoordinatesStatus();
+    return !status.hasCoordinates && status.canAutoFetch;
+  }, [isLocationStep]);
+
+  // Enhanced validation logic for location steps
+  const canProceedWithLocationLogic = React.useCallback(() => {
+    // Always allow proceeding - let the Next button handle coordinate logic
+    return true;
+  }, []);
+
+  // Check if coordinates are missing for internal logic
+  const areCoordinatesMissing = React.useCallback(() => {
+    if (!isLocationStep) return false;
+    
+    const summary = getValidationSummary();
+    const missingFields = summary?.invalidFields.map(f => f.name) || [];
+    
+    return missingFields.some(field => field === 'latitude' || field === 'longitude');
+  }, [isLocationStep, getValidationSummary]);
+
+  // Create location context for StepNavigation
+  const locationContext = React.useMemo(() => {
+    if (!isLocationStep) return undefined;
+    
+    const summary = getValidationSummary();
+    const missingFields = summary?.invalidFields.map(f => f.name) || [];
+    const hasAddress = form.getValues(`steps.${currentStepId}.address`)?.trim() || '';
+    
+    return {
+      isLocationStep: true,
+      hasCoordinates: locationHasCoordinates,
+      isFetchingCoordinates: locationIsFetching,
+      onFindLocation: handleFindLocation,
+      canAutoFetch: hasAddress || navigator.geolocation !== undefined,
+      coordinatesMissing: areCoordinatesMissing()
+    };
+  }, [isLocationStep, locationHasCoordinates, locationIsFetching, handleFindLocation, getValidationSummary, form, currentStepId, areCoordinatesMissing]);
+
   console.log('[PropertyForm] Rendering with validation:', {
     currentStepId,
     stepIsValid,
@@ -412,7 +576,9 @@ export function PropertyForm({
     validationErrors,
     stepValidationStatus,
     mandatoryFields,
-    completionStats
+    completionStats,
+    isLocationStep,
+    locationContext
   });
 
   return (
@@ -483,9 +649,11 @@ export function PropertyForm({
                 status={status}
                 savedPropertyId={effectivePropertyId}
                 handleImageUploadComplete={handleImageUploadComplete}
+                ref={isLocationStep ? locationDetailsRef : undefined}
+                onCoordinatesChange={isLocationStep ? handleCoordinatesChange : undefined}
               />
               
-              {/* Simplified Step Navigation - only Previous/Next buttons */}
+              {/* Enhanced Step Navigation with Location Context */}
               <StepNavigation 
                 formStep={formStep}
                 STEPS={flowSteps}
@@ -493,11 +661,12 @@ export function PropertyForm({
                 handleNextStep={handleNextStepWithValidation}
                 isLastStep={isReviewStep}
                 disablePrevious={saving || saveInProgress}
-                canProceed={canProceedToNextStep()}
+                canProceed={canProceedWithLocationLogic()}
                 isValidating={saving || saveInProgress}
                 validationErrors={[]}
                 completionPercentage={0}
                 requiredFieldsRemaining={0}
+                locationContext={locationContext}
                 showProgress={false}
                 showValidationSummary={false}
                 size="md"
