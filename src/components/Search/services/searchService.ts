@@ -66,11 +66,19 @@ class BtSearchService implements SearchService {
   ): Promise<SearchResponse> {
     try {
       const response = await btServiceClient.search(filters, pagination);
+      
+      // ENHANCEMENT: Add property_details to btService results for image extraction
+      const enhancedResults = await this.enhanceResultsWithPropertyDetails(response.results);
+      
       console.log('✅ SearchService.search (v3) completed:', {
-        resultCount: response.results.length,
+        resultCount: enhancedResults.length,
         totalCount: response.totalCount
       });
-      return response;
+      
+      return {
+        ...response,
+        results: enhancedResults
+      };
     } catch (error) {
       console.error('❌ SearchService.search (v3) error, falling back to Supabase:', error);
       return this.searchPropertiesFromSupabase(filters, pagination);
@@ -385,15 +393,64 @@ class BtSearchService implements SearchService {
     
     try {
       const response = await btServiceClient.getLatestProperties(limit, offset);
+      
+      // ENHANCEMENT: Add property_details to btService results for image extraction
+      const enhancedResults = await this.enhanceResultsWithPropertyDetails(response.results);
+      
       console.log('✅ SearchService.getLatestProperties (v3) completed:', {
-        resultCount: response.results.length,
+        resultCount: enhancedResults.length,
         totalCount: response.totalCount
       });
-      return response;
+      
+      return {
+        ...response,
+        results: enhancedResults
+      };
     } catch (error) {
       console.error('❌ SearchService.getLatestProperties (v3) error, falling back to Supabase:', error);
       return this.getLatestPropertiesFromSupabase(limit, offset);
     }
+  }
+
+  /**
+   * Enhance btService results with property_details for image extraction
+   */
+  private async enhanceResultsWithPropertyDetails(results: SearchResult[]): Promise<SearchResult[]> {
+    console.log('🔧 Enhancing btService results with property_details for image extraction');
+    console.log('🔧 Input results count:', results.length);
+    
+    const enhancedResults = await Promise.all(
+      results.map(async (result) => {
+        try {
+          const { data: propertyData, error: propertyError } = await supabase
+            .from('properties_v2')
+            .select('property_details')
+            .eq('id', result.id)
+            .single();
+
+          if (propertyError || !propertyData?.property_details) {
+            console.warn(`⚠️  Could not fetch property_details for ${result.id}:`, propertyError);
+            return result;
+          }
+
+          // Add property_details to the result
+          const enhanced = {
+            ...result,
+            property_details: propertyData.property_details
+          };
+          
+          console.log(`✅ Enhanced ${result.id} with property_details. Has imageFiles:`, !!(propertyData.property_details.imageFiles));
+          
+          return enhanced;
+        } catch (error) {
+          console.warn(`⚠️  Error fetching property_details for ${result.id}:`, error);
+          return result;
+        }
+      })
+    );
+    
+    console.log('✅ Enhanced results with property_details:', enhancedResults.length);
+    return enhancedResults;
   }
 
   /**

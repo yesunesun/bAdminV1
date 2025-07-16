@@ -14,7 +14,7 @@ import { Loader2, Heart, X, AlertCircle } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import PropertyItem from './PropertyItem'; // Import the new PropertyItem component
-import { fastImageService } from './PropertyItem/services/fastImageService';
+import { unifiedImageService } from '@/services/unifiedImageService';
 
 interface FavoritesDrawerProps {
   open: boolean;
@@ -62,6 +62,11 @@ const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({ open, onClose }) => {
 
   // Get property image using the same logic as PropertyItem component
   const getPropertyImage = (property: any): string => {
+    // TEMPORARILY DISABLED: Return default image to prevent 406 errors
+    console.warn(`[FavoritesDrawer] Image loading temporarily disabled for property ${property.id}`);
+    return '/noimage.png';
+    
+    /*
     console.log(`🔍 [FavoritesDrawer] Getting image for property ${property.id}:`, {
       property_id: property.id,
       primary_image: property.primary_image,
@@ -72,7 +77,7 @@ const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({ open, onClose }) => {
     try {
       // Method 1: Use primary_image field if available
       if (property.primary_image && property.primary_image.trim()) {
-        const imageUrl = fastImageService.getPublicImageUrl(property.id, property.primary_image);
+        const imageUrl = await unifiedImageService.getImageUrl(property.id, property.primary_image);
         console.log(`✅ [FavoritesDrawer] Method 1 - Using primary_image: ${property.primary_image} -> ${imageUrl}`);
         return imageUrl;
       }
@@ -91,7 +96,7 @@ const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({ open, onClose }) => {
         }
         
         if (imageToUse.fileName) {
-          const imageUrl = fastImageService.getPublicImageUrl(property.id, imageToUse.fileName);
+          const imageUrl = await unifiedImageService.getImageUrl(property.id, imageToUse.fileName);
           console.log(`✅ [FavoritesDrawer] Method 2 - Using fileName: ${imageToUse.fileName} -> ${imageUrl}`);
           return imageUrl;
         }
@@ -105,8 +110,8 @@ const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({ open, onClose }) => {
           console.log(`✅ [FavoritesDrawer] Method 3 - Using direct primaryImage: ${details.primaryImage}`);
           return details.primaryImage;
         }
-        const imageUrl = fastImageService.getPublicImageUrl(property.id, details.primaryImage);
-        console.log(`✅ [FavoritesDrawer] Method 3 - Using primaryImage with fastImageService: ${details.primaryImage} -> ${imageUrl}`);
+        const imageUrl = await unifiedImageService.getImageUrl(property.id, details.primaryImage);
+        console.log(`✅ [FavoritesDrawer] Method 3 - Using primaryImage with unifiedImageService: ${details.primaryImage} -> ${imageUrl}`);
         return imageUrl;
       }
       
@@ -119,7 +124,7 @@ const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({ open, onClose }) => {
         console.log(`🔍 [FavoritesDrawer] Method 4 - Using image:`, imageToUse);
         
         if (imageToUse && imageToUse.fileName) {
-          const imageUrl = fastImageService.getPublicImageUrl(property.id, imageToUse.fileName);
+          const imageUrl = await unifiedImageService.getImageUrl(property.id, imageToUse.fileName);
           console.log(`✅ [FavoritesDrawer] Method 4 - Using fileName: ${imageToUse.fileName} -> ${imageUrl}`);
           return imageUrl;
         }
@@ -131,6 +136,7 @@ const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({ open, onClose }) => {
       console.error(`❌ [FavoritesDrawer] Error getting image for property ${property.id}:`, error);
       return '/noimage.png';
     }
+    */
   };
 
   // Handle removing a property from favorites

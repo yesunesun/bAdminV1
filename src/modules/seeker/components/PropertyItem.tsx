@@ -26,7 +26,7 @@ import {
   formatDetailedLocation,
   detectPropertyFlowType
 } from '../utils/propertyTitleUtils';
-import { fastImageService } from './PropertyItem/services/fastImageService';
+import { unifiedImageService } from '@/services/unifiedImageService';
 import { useFavorites } from '@/contexts/FavoritesContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
@@ -349,127 +349,114 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
   const propertyStatus = getPropertyStatus(property);
   const propertyAmenities = getPropertyAmenities(property, propertyData.id);
 
-  // Generate image URL
+  // Generate image URL using unified service
   const imageUrl = useMemo(() => {
-    // Generate image URL based on property data
-    
-    try {
-      // Method 1: Use primary_image field if available
-      if (propertyData.primary_image && propertyData.primary_image.trim()) {
-        // Handle optimization format in primary_image
-        if (propertyData.primary_image.startsWith('optimization_')) {
-          return '/noimage.png'; // Placeholder - async loading will handle this
-        }
-        
-        const constructedUrl = fastImageService.getPublicImageUrl(propertyData.id, propertyData.primary_image);
-        return constructedUrl;
-      }
-      
-      // Method 2: Check if it's PropertyType and has property_images
-      if (!isSearchResult(property) && property.property_images && Array.isArray(property.property_images) && property.property_images.length > 0) {
-        const primaryImage = property.property_images.find(img => img.is_primary);
-        const imageToUse = primaryImage || property.property_images[0];
-        
-        if (imageToUse.url && imageToUse.url.startsWith('http')) {
-          return imageToUse.url;
-        }
-        
-        if (imageToUse.fileName) {
-          const constructedUrl = fastImageService.getPublicImageUrl(propertyData.id, imageToUse.fileName);
-          return constructedUrl;
-        }
-      }
-      
-      // Method 3: Check for imageFiles (new optimization format)
-      if (!isSearchResult(property)) {
-        const details = property.property_details || {};
-        
-        if (details.imageFiles && Array.isArray(details.imageFiles) && details.imageFiles.length > 0) {
-          const primaryImage = details.imageFiles.find(img => img.isPrimary);
-          const imageToUse = primaryImage || details.imageFiles[0];
-          
-          
-          if (imageToUse.fileName) {
-            // Handle optimization format
-            if (imageToUse.fileName.startsWith('optimization_')) {
-              // For optimization images, we need async loading - component will handle this
-              return '/noimage.png'; // Placeholder - component should handle async loading
-            }
-            
-            const constructedUrl = fastImageService.getPublicImageUrl(propertyData.id, imageToUse.fileName);
-            return constructedUrl;
-          }
-        }
-        
-        // Method 4: Legacy property_details support
-        if (details.primaryImage) {
-          if (details.primaryImage.startsWith('http') || details.primaryImage.startsWith('/')) {
-            return details.primaryImage;
-          }
-          return fastImageService.getPublicImageUrl(propertyData.id, details.primaryImage);
-        }
-      }
-      
-      return '/noimage.png';
-    } catch (error) {
-      // Error generating image
-      return '/noimage.png';
-    }
-  }, [propertyData.id, propertyData.primary_image, property]);
+    // Return placeholder initially - async loading will handle the actual URL
+    return '/noimage.png';
+  }, []);
 
-  // Handle async loading for optimization images
+  // Handle async loading with unified service
   useEffect(() => {
-    const loadOptimizationImage = async () => {
-      
+    const loadImageWithUnifiedService = async () => {
       if (!property) {
         return;
       }
       
-      if (isSearchResult(property)) {
+      try {
+        let fileName = '';
         
-        // Handle optimization format in SearchResult primary_image
-        if (property.primary_image && property.primary_image.startsWith('optimization_')) {
-          try {
-            const optimizedUrl = await fastImageService.getOptimizationImageUrl(property.primary_image);
+        // Debug: Log the entire property object structure
+        console.log(`[PropertyItem] 🔍 Property Debug for ${propertyData.id}:`, {
+          isSearchResult: isSearchResult(property),
+          primary_image: property.primary_image,
+          hasPropertyDetails: !!property.property_details,
+          propertyType: typeof property
+        });
+        
+        // ADDITIONAL DEBUG: Log specific property details structure
+        if (property.property_details) {
+          console.log(`[PropertyItem] 📋 Property Details Structure for ${propertyData.id}:`, {
+            hasImageFiles: !!(property.property_details.imageFiles),
+            imageFilesLength: property.property_details.imageFiles?.length || 0,
+            hasPrimaryImage: !!(property.property_details.primaryImage),
+            primaryImageValue: property.property_details.primaryImage
+          });
+        }
+        
+        if (isSearchResult(property)) {
+          // Handle SearchResult format
+          if (property.primary_image && property.primary_image.trim()) {
+            fileName = property.primary_image;
+            console.log(`[PropertyItem] SearchResult primary_image: "${fileName}" for property ${propertyData.id}`);
+          } else {
+            console.log(`[PropertyItem] ❌ SearchResult has no primary_image for property ${propertyData.id}. primary_image = "${property.primary_image}"`);
             
-            if (optimizedUrl && optimizedUrl !== '/noimage.png') {
-              setAsyncImageUrl(optimizedUrl);
-            } else {
+            // FALLBACK: Try to extract from property_details if available
+            if (property.property_details) {
+              const details = property.property_details;
+              console.log(`[PropertyItem] 🔍 Trying fallback extraction from property_details for ${propertyData.id}`);
+              
+              if (details.imageFiles && Array.isArray(details.imageFiles) && details.imageFiles.length > 0) {
+                const primaryImage = details.imageFiles.find(img => img.isPrimary);
+                const imageToUse = primaryImage || details.imageFiles[0];
+                fileName = imageToUse.fileName || '';
+                console.log(`[PropertyItem] 🔄 Fallback found imageFiles: "${fileName}"`);
+              } else if (details.primaryImage) {
+                fileName = details.primaryImage;
+                console.log(`[PropertyItem] 🔄 Fallback found primaryImage: "${fileName}"`);
+              }
             }
-          } catch (error) {
-            // Failed to load SearchResult optimization image
           }
         } else {
+          // Handle PropertyType format
+          const details = property.property_details || {};
+          
+          // Try different image sources in order of preference
+          if (details.imageFiles && Array.isArray(details.imageFiles) && details.imageFiles.length > 0) {
+            const primaryImage = details.imageFiles.find(img => img.isPrimary);
+            const imageToUse = primaryImage || details.imageFiles[0];
+            fileName = imageToUse.fileName || '';
+          } else if (property.property_images && Array.isArray(property.property_images) && property.property_images.length > 0) {
+            const primaryImage = property.property_images.find(img => img.is_primary);
+            const imageToUse = primaryImage || property.property_images[0];
+            fileName = imageToUse.fileName || imageToUse.url || '';
+          } else if (details.primaryImage) {
+            fileName = details.primaryImage;
+          }
         }
-        return;
-      }
-      
-      const details = property.property_details || {};
-      
-      if (details.imageFiles && Array.isArray(details.imageFiles) && details.imageFiles.length > 0) {
-        const primaryImage = details.imageFiles.find(img => img.isPrimary);
-        const imageToUse = primaryImage || details.imageFiles[0];
         
+        // CRITICAL FIX: Don't process UUIDs as filenames
+        const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (uuidPattern.test(fileName)) {
+          console.log(`[PropertyItem] 🚫 SKIPPING UUID as filename: "${fileName}" for property ${propertyData.id}`);
+          return;
+        }
         
-        if (imageToUse.fileName && imageToUse.fileName.startsWith('optimization_')) {
-          try {
-            const optimizedUrl = await fastImageService.getOptimizationImageUrl(imageToUse.fileName);
-            
-            if (optimizedUrl && optimizedUrl !== '/noimage.png') {
-              setAsyncImageUrl(optimizedUrl);
-            } else {
-            }
-          } catch (error) {
-            // Failed to load optimization image
+        if (fileName && fileName.trim()) {
+          // Debug logging
+          console.log(`[PropertyItem] Loading image for property ${propertyData.id}, fileName: "${fileName}"`);
+          
+          // Use unified service to get image URL
+          const imageUrl = await unifiedImageService.getImageUrl(propertyData.id, fileName, 'medium');
+          
+          console.log(`[PropertyItem] Unified service returned URL: ${imageUrl}`);
+          
+          if (imageUrl && imageUrl !== '/noimage.png') {
+            console.log(`[PropertyItem] ✅ Image loaded successfully for ${propertyData.id}`);
+            setAsyncImageUrl(imageUrl);
+          } else {
+            console.log(`[PropertyItem] ❌ Image failed to load for ${propertyData.id}, got default image`);
           }
         } else {
+          console.log(`[PropertyItem] ❌ No filename found for property ${propertyData.id}. fileName = "${fileName}"`);
         }
-      } else {
+      } catch (error) {
+        console.error(`[PropertyItem] Failed to load image for property ${propertyData.id}:`, error);
       }
     };
     
-    loadOptimizationImage();
-  }, [property]);
+    loadImageWithUnifiedService();
+  }, [property, propertyData.id]);
 
   // Generate display data for SearchResult
   const displayData = useMemo(() => {
@@ -666,6 +653,7 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
                   const target = e.target as HTMLImageElement;
                   target.onerror = null;
                   target.src = '/noimage.png';
+                  console.debug(`[PropertyItem] Image failed to load for property ${propertyData.id}`);
                 }}
               />
               {/* Enhanced image overlay on hover */}
