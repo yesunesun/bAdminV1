@@ -50,3 +50,4 @@ test-scripts/
 *.zip
 lambda-*.zip
 deployment-*.zip
+src/debug/
