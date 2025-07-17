@@ -148,7 +148,7 @@ export const CommercialRentalDetails: React.FC<FormSectionProps> = ({
           <div className="space-y-2">
             <RequiredLabel htmlFor={getFieldId('rentalType')} required>Rental Type</RequiredLabel>
             <Select
-              value={getFieldValue('rentalType') || 'rent'}
+              value={getFieldValue('rentalType') || ''}
               onValueChange={(value) => updateFormAndState('rentalType', value as 'rent' | 'lease')}
               disabled={isEditMode}
             >
@@ -159,7 +159,7 @@ export const CommercialRentalDetails: React.FC<FormSectionProps> = ({
                   getFieldError('rentalType') && "border-destructive focus-visible:ring-destructive"
                 )}
               >
-                <SelectValue placeholder="Select Type" />
+                <SelectValue placeholder="Select Rental Type" />
               </SelectTrigger>
               <SelectContent>
                 {COMMERCIAL_RENTAL_TYPES.map((type) => (

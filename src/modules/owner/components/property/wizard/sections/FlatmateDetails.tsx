@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { FormSectionProps } from '../types';
 import { useStepValidation } from '../hooks/useStepValidation';
+import { UnifiedStepIndicator } from '../components/UnifiedStepIndicator';
 import { cn } from '@/lib/utils';
 
 const FlatmateDetails: React.FC<FormSectionProps> = ({ 
@@ -159,6 +160,23 @@ const FlatmateDetails: React.FC<FormSectionProps> = ({
       title="Flatmate Details"
       description="Specify room facilities and flatmate preferences"
     >
+      {/* Step Progress Indicator */}
+      <UnifiedStepIndicator
+        isValid={stepIsValid}
+        completionPercentage={completionPercentage}
+        requiredFieldsRemaining={requiredFields.length - requiredFields.filter(field => {
+          const value = getField(field);
+          return value !== undefined && value !== null && value !== '';
+        }).length}
+        totalRequiredFields={requiredFields.length}
+        currentStep={3}
+        totalSteps={5}
+        stepTitle="Flatmate Details"
+        canProceed={stepIsValid}
+        variant="compact"
+        showStepCounter={true}
+        showFieldChecklist={false}
+      />
 
       <div className="space-y-5">
         {/* Combined Sections in Two-Column Layout */}
@@ -167,7 +185,6 @@ const FlatmateDetails: React.FC<FormSectionProps> = ({
           <div className="space-y-3">
             <h3 className="text-base font-semibold">Room Details</h3>
             <div className="space-y-3 p-3 bg-secondary/20 rounded-lg">
-              <ToggleButtonGroup label="Attached Bathroom" name="hasAttachedBathroom" />
               <ToggleButtonGroup label="AC Room" name="hasAC" />
               <ToggleButtonGroup label="Balcony" name="hasBalcony" />
             </div>

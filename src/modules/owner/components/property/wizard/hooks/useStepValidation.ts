@@ -134,8 +134,7 @@ export function useStepValidation({
      
      // ✅ FIXED: Flatmate details step - ALL fields made mandatory to match actual component
      'res_flat_flatmate_details': [
-       // Room Details Toggle Fields
-       'hasAttachedBathroom',    // Attached Bathroom (Yes/No)
+       // Room Details Toggle Fields (removed hasAttachedBathroom as it's duplicate)
        'hasAC',                  // AC Room (Yes/No)
        'hasBalcony',             // Balcony (Yes/No)
        // Flatmate Preferences Toggle Fields
@@ -145,8 +144,8 @@ export function useStepValidation({
        // Contact & Utilities Fields
        'propertyShowPerson',     // Who Will Show the Property?
        'waterSupply',            // Water Supply
-       // Additional Details Field
-       'about'                   // Additional Details About Flatmate Requirements
+       // Additional Details Field (made optional to fix progression issue)
+       // 'about' - removed from required as it's optional field
        // Note: 'directions' is optional and only shown when user clicks "Add Directions"
      ],
      
@@ -868,7 +867,6 @@ const labels: Record<string, string> = {
  capacity: 'Capacity',
  
  // ✅ ADDED: Flatmate Details specific field labels
- hasAttachedBathroom: 'Attached Bathroom',
  hasAC: 'AC Room',
  hasBalcony: 'Balcony',
  isNonVegAllowed: 'Non-Veg Allowed',
