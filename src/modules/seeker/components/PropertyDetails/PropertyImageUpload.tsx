@@ -15,8 +15,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { useVideoUploadSimple as useVideoUpload, validateVideoFile } from '../../hooks/useVideoUploadSimple';
 import { propertyVideoStorage } from '@/lib/supabase';
 import PropertyVideoPlayer from './PropertyVideoPlayer';
-import { imageOptimizationService } from '@/services/imageOptimizationService';
-import { validateImageFile, formatFileSize as formatFileSizeUtil } from '@/utils/imageOptimization';
+import { simpleImageService } from '@/services/simpleImageService';
 
 interface PropertyImageUploadProps {
   property: PropertyDetails;
@@ -431,8 +430,14 @@ const PropertyImageUpload: React.FC<PropertyImageUploadProps> = ({
 
     for (const file of imageFiles) {
       try {
-        const validation = validateImageFile(file);
-        if (validation.valid) {
+        // Simple validation without optimization
+        const validation = {
+          isValid: file.type.startsWith('image/') && file.size <= 50 * 1024 * 1024, // 50MB limit
+          error: file.type.startsWith('image/') ? 
+            (file.size <= 50 * 1024 * 1024 ? null : 'File size too large (max 50MB)') : 
+            'Not a valid image file'
+        };
+        if (validation.isValid) {
           validFiles.push(file);
         } else {
           validationErrors.push(`${file.name}: ${validation.error}`);
@@ -473,49 +478,56 @@ const PropertyImageUpload: React.FC<PropertyImageUploadProps> = ({
 
           console.log(`[PropertyImageUpload] Processing file ${idx + 1}/${validFiles.length}: ${file.name}`);
           
-          // Use the image optimization service
-          const optimizationResult = await imageOptimizationService.uploadAndOptimizeImage(
-            file,
-            property.id,
-            images.length + idx,
-            'gallery'
-          );
+          // Direct upload without optimization
+          const timestamp = Date.now();
+          const randomId = Math.random().toString(36).substring(2, 10);
+          const fileName = `${timestamp}_${randomId}.${file.name.split('.').pop()}`;
+          const filePath = `${property.id}/${fileName}`;
 
-          if (!optimizationResult.success) {
-            throw new Error(optimizationResult.error || 'Image optimization failed');
+          // Upload to storage
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from(STORAGE_BUCKET)
+            .upload(filePath, file, {
+              cacheControl: '3600',
+              upsert: false
+            });
+
+          if (uploadError) {
+            throw new Error(`Upload failed: ${uploadError.message}`);
           }
 
           // Update upload progress
-          setUploadProgress(((idx + 1) / validFiles.length) * 50 + 50); // 50% for upload phase
+          setUploadProgress(((idx + 1) / validFiles.length) * 100);
 
-          // Create PropertyImage record from optimization result
-          const imageId = `opt_${optimizationResult.optimizationRecord.id}`;
+          // Create PropertyImage record
+          const imageId = `img_${timestamp}_${idx}`;
           const isPrimary = (images.length + idx) === 0; // First image overall is primary
 
           const newImage: PropertyImage = {
             id: imageId,
-            fileName: `optimization_${optimizationResult.optimizationRecord.id}`, // Store reference to optimization record
+            fileName: fileName,
             isPrimary
           };
 
           newImages.push(newImage);
 
-          // Store the optimized image URLs (these are already signed/public URLs from the service)
-          newImageUrls[imageId] = optimizationResult.urls.medium || optimizationResult.urls.full || optimizationResult.urls.thumbnail || '';
-
-          // Calculate compression stats for UI
-          const originalSize = optimizationResult.optimizationRecord.original_size_bytes;
-          const optimizedSize = (optimizationResult.optimizationRecord.thumbnail_size_bytes || 0) +
-                               (optimizationResult.optimizationRecord.medium_size_bytes || 0) +
-                               (optimizationResult.optimizationRecord.full_size_bytes || 0);
+          // Store the public URL
+          const { data: { publicUrl } } = supabase.storage
+            .from(STORAGE_BUCKET)
+            .getPublicUrl(filePath);
           
-          const compressionRatio = Math.round(((originalSize - optimizedSize) / originalSize) * 100);
+          newImageUrls[imageId] = publicUrl;
+
+          // Calculate compression stats for UI (no optimization, so just use file size)
+          const originalSize = file.size;
+          const optimizedSize = file.size;
+          const compressionRatio = 0; // No compression
 
           optimizationResults.push({
             originalSize,
             optimizedSize,
             compressionRatio,
-            optimizationTime: optimizationResult.optimizationRecord.optimization_time_ms
+            optimizationTime: 0 // No optimization
           });
 
           console.log(`[PropertyImageUpload] Successfully processed file ${idx + 1}: ${file.name}`);

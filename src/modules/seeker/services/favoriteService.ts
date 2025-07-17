@@ -204,7 +204,7 @@ export const getUserFavorites = async () => {
         
         console.log(`🔍 [getUserFavorites] Property ${property.id} - extracted images:`, propertyImages);
         
-        // Find primary image filename for fastImageService
+        // Find primary image filename for simpleImageService
         let primaryImageFilename = null;
         if (propertyImages.length > 0) {
           const primary = propertyImages.find(img => img.is_primary);
@@ -224,10 +224,10 @@ export const getUserFavorites = async () => {
         
         console.log(`🔍 [getUserFavorites] Property ${property.id} - final primaryImageFilename:`, primaryImageFilename);
         
-        // Set primary_image field for fastImageService (this is what the image service expects)
+        // Set primary_image field for simpleImageService (this is what the image service expects)
         const finalProperty = {
           ...processedProperty,
-          primary_image: primaryImageFilename, // This is the key field that fastImageService uses
+          primary_image: primaryImageFilename, // This is the key field that simpleImageService uses
           property_details: {
             ...(processedProperty.property_details || {}),
             primaryImage: primaryImageFilename // Keep legacy support

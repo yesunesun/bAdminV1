@@ -5,7 +5,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useLazyLoad } from '@/hooks/useLazyLoad';
-import { imageService } from '@/services/imageService';
+import { simpleImageService } from '@/services/simpleImageService';
 
 interface LazyImageProps {
   propertyId: string;
@@ -66,8 +66,8 @@ const LazyImage: React.FC<LazyImageProps> = ({
           imageUrl = image.url;
         }
         // Priority 3: Get URL from image service (if it exists)
-        else if (image.fileName && propertyId && typeof imageService !== 'undefined') {
-          imageUrl = await imageService.getImageUrl(propertyId, image.fileName);
+        else if (image.fileName && propertyId && typeof simpleImageService !== 'undefined') {
+          imageUrl = simpleImageService.getPropertyImageUrl(propertyId, image.id);
         }
         
         if (imageUrl && imageUrl !== placeholder) {

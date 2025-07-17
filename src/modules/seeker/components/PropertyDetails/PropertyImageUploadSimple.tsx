@@ -74,26 +74,28 @@ export function PropertyImageUploadSimple({
     return null; // Don't show anything if not authorized
   }
 
-  const testImageOptimizationService = async () => {
+  const testSimpleImageService = async () => {
     try {
       setError('');
       toast({
-        title: "Testing Image Optimization Service",
-        description: "Checking if the service can be imported and initialized...",
+        title: "Testing Simple Image Service",
+        description: "Checking if the service can get property images...",
         variant: "default"
       });
 
       // Test 1: Import the service
-      const { imageOptimizationService } = await import('@/services/imageOptimizationService');
-      console.log('✅ imageOptimizationService imported successfully');
+      const { simpleImageService } = await import('@/services/simpleImageService');
+      console.log('✅ simpleImageService imported successfully');
 
-      // Test 2: Try to get property optimizations (should not throw error)
-      const optimizations = await imageOptimizationService.getPropertyOptimizations(property.id);
-      console.log('✅ getPropertyOptimizations works, found:', optimizations.length, 'records');
+      // Test 2: Try to get property images
+      const imageUrl = simpleImageService.getPropertyImageUrl(property.id);
+      const imageUrls = simpleImageService.getPropertyImageUrls(property.id);
+      console.log('✅ getPropertyImageUrl works, URL:', imageUrl);
+      console.log('✅ getPropertyImageUrls works, found:', imageUrls.length, 'images');
 
       toast({
         title: "Service Test Passed",
-        description: `Image optimization service is working. Found ${optimizations.length} existing optimization records.`,
+        description: `Simple image service is working. Found ${imageUrls.length} images.`,
         variant: "default"
       });
 
@@ -114,13 +116,13 @@ export function PropertyImageUploadSimple({
         <div>
           <h3 className="text-lg font-medium">Property Media (Debug Mode)</h3>
           <p className="text-muted-foreground text-sm">
-            Testing image optimization functionality
+            Testing simple image service functionality
           </p>
         </div>
         
         <div className="flex gap-2">
           <Button 
-            onClick={testImageOptimizationService}
+            onClick={testSimpleImageService}
             variant="outline"
           >
             Test Service

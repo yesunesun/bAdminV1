@@ -14,7 +14,7 @@ import { Loader2, Heart, X, AlertCircle } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import PropertyItem from './PropertyItem'; // Import the new PropertyItem component
-import { unifiedImageService } from '@/services/unifiedImageService';
+import { simpleImageService } from '@/services/simpleImageService';
 
 interface FavoritesDrawerProps {
   open: boolean;
@@ -77,7 +77,7 @@ const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({ open, onClose }) => {
     try {
       // Method 1: Use primary_image field if available
       if (property.primary_image && property.primary_image.trim()) {
-        const imageUrl = await unifiedImageService.getImageUrl(property.id, property.primary_image);
+        const imageUrl = await simpleImageService.getImageUrl(property.id, property.primary_image);
         console.log(`✅ [FavoritesDrawer] Method 1 - Using primary_image: ${property.primary_image} -> ${imageUrl}`);
         return imageUrl;
       }
@@ -96,7 +96,7 @@ const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({ open, onClose }) => {
         }
         
         if (imageToUse.fileName) {
-          const imageUrl = await unifiedImageService.getImageUrl(property.id, imageToUse.fileName);
+          const imageUrl = await simpleImageService.getImageUrl(property.id, imageToUse.fileName);
           console.log(`✅ [FavoritesDrawer] Method 2 - Using fileName: ${imageToUse.fileName} -> ${imageUrl}`);
           return imageUrl;
         }
@@ -110,8 +110,8 @@ const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({ open, onClose }) => {
           console.log(`✅ [FavoritesDrawer] Method 3 - Using direct primaryImage: ${details.primaryImage}`);
           return details.primaryImage;
         }
-        const imageUrl = await unifiedImageService.getImageUrl(property.id, details.primaryImage);
-        console.log(`✅ [FavoritesDrawer] Method 3 - Using primaryImage with unifiedImageService: ${details.primaryImage} -> ${imageUrl}`);
+        const imageUrl = await simpleImageService.getImageUrl(property.id, details.primaryImage);
+        console.log(`✅ [FavoritesDrawer] Method 3 - Using primaryImage with simpleImageService: ${details.primaryImage} -> ${imageUrl}`);
         return imageUrl;
       }
       
@@ -124,7 +124,7 @@ const FavoritesDrawer: React.FC<FavoritesDrawerProps> = ({ open, onClose }) => {
         console.log(`🔍 [FavoritesDrawer] Method 4 - Using image:`, imageToUse);
         
         if (imageToUse && imageToUse.fileName) {
-          const imageUrl = await unifiedImageService.getImageUrl(property.id, imageToUse.fileName);
+          const imageUrl = await simpleImageService.getImageUrl(property.id, imageToUse.fileName);
           console.log(`✅ [FavoritesDrawer] Method 4 - Using fileName: ${imageToUse.fileName} -> ${imageUrl}`);
           return imageUrl;
         }

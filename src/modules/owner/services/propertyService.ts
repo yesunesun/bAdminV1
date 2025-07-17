@@ -1,7 +1,7 @@
 // src/modules/owner/services/propertyService.ts
-// Version: 9.3.0
-// Last Modified: 09-07-2025 17:50 IST
-// Purpose: Enhanced flow detection, improved flatmate data handling, and automatic property code generation
+// Version: 10.0.0
+// Last Modified: 17-07-2025 22:20 IST
+// Purpose: Enhanced flow detection, improved flatmate data handling, automatic property code generation, and direct image support
 
 import { supabase } from '@/lib/supabase';
 import { FormData } from '../components/property/wizard/types';
@@ -14,7 +14,7 @@ const propertiesCache = new Map<string, {data: any[], timestamp: number}>();
 const CACHE_EXPIRY = 60000; // 1 minute cache expiry
 
 // Data version for the new structure
-const DATA_VERSION = 'v3';
+const DATA_VERSION = 'v4'; // Updated for direct images
 
 /**
  * Extracts coordinates from property data
@@ -70,7 +70,7 @@ const createEmptyPropertyStructure = (
   const flowKey = `${flowCategory}_${flowListingType}`;
   const flowSteps = FLOW_STEPS[flowKey] || FLOW_STEPS.default;
   
-  // Initialize structure - ONLY with meta, flow, steps, and media
+  // Initialize structure - ONLY with meta, flow, steps, imageFiles
   const structure: any = {
     meta: {
       _version: DATA_VERSION,
@@ -83,14 +83,7 @@ const createEmptyPropertyStructure = (
       listingType: flowListingType
     },
     steps: {},
-    media: {
-      photos: {
-        images: []
-      },
-      videos: {
-        urls: []
-      }
-    }
+    imageFiles: [] // Direct image storage
   };
   
   // Initialize each step with empty object (excluding review step)
@@ -104,6 +97,72 @@ const createEmptyPropertyStructure = (
 };
 
 /**
+ * Migrates old image structure to new direct image structure
+ */
+const migrateImageStructure = (propertyData: any): any => {
+  if (!propertyData) return propertyData;
+
+  // If already has imageFiles, return as is
+  if (propertyData.imageFiles && Array.isArray(propertyData.imageFiles)) {
+    return propertyData;
+  }
+
+  // Initialize imageFiles array
+  const imageFiles = [];
+
+  // Check various old image storage locations
+  const imageSources = [
+    propertyData.media?.photos?.images,
+    propertyData.media?.images,
+    propertyData.photos?.images,
+    propertyData.images,
+    propertyData.steps?.image_upload?.images,
+    propertyData.steps?.media?.images
+  ];
+
+  for (const source of imageSources) {
+    if (Array.isArray(source) && source.length > 0) {
+      source.forEach((img, index) => {
+        if (img && (img.url || img.dataUrl)) {
+          imageFiles.push({
+            id: img.id || `migrated_${Date.now()}_${index}`,
+            fileName: img.fileName || img.filename || `image_${index}.jpg`,
+            url: img.url || img.dataUrl,
+            isPrimary: img.isPrimary || img.is_primary || index === 0,
+            uploadedAt: img.uploadedAt || img.created_at || new Date().toISOString(),
+            fileSize: img.fileSize || img.size || 0,
+            displayOrder: img.displayOrder || index
+          });
+        }
+      });
+      break; // Use first found source
+    }
+  }
+
+  // Remove old image structures and add new imageFiles
+  const cleanedData = { ...propertyData };
+  delete cleanedData.media;
+  delete cleanedData.photos;
+  delete cleanedData.images;
+  
+  // Clean steps
+  if (cleanedData.steps) {
+    Object.keys(cleanedData.steps).forEach(stepKey => {
+      if (cleanedData.steps[stepKey]) {
+        delete cleanedData.steps[stepKey].images;
+        delete cleanedData.steps[stepKey].media;
+        delete cleanedData.steps[stepKey].photos;
+      }
+    });
+  }
+
+  cleanedData.imageFiles = imageFiles;
+  
+  console.log(`Migrated ${imageFiles.length} images to new structure`);
+  return cleanedData;
+};
+
+/**
  * Organizes property data into the correct structure
  */
 const organizePropertyData = (propertyData: any): any => {
@@ -114,9 +173,12 @@ const organizePropertyData = (propertyData: any): any => {
   
   console.log(`Organizing property data with flow: ${flowCategory}_${flowListingType}`);
   
+  // Migrate image structure first
+  const migratedData = migrateImageStructure(propertyData);
+  
   // Check if data is already in the new format with steps
-  if (propertyData.steps && Object.keys(propertyData.steps).length > 0) {
-    return ensureCompleteStructure(propertyData);
+  if (migratedData.steps && Object.keys(migratedData.steps).length > 0) {
+    return ensureCompleteStructure(migratedData);
   }
   
   // Create flow context for proper detection
@@ -129,8 +191,8 @@ const organizePropertyData = (propertyData: any): any => {
   
   // Use FlowServiceFactory to convert legacy data to new format
   try {
-    const flowService = FlowServiceFactory.getFlowService(propertyData, flowContext);
-    const formattedData = flowService.formatData(propertyData);
+    const flowService = FlowServiceFactory.getFlowService(migratedData, flowContext);
+    const formattedData = flowService.formatData(migratedData);
     return ensureCompleteStructure(formattedData);
   } catch (error) {
     console.error('Error formatting property data:', error);
@@ -138,18 +200,18 @@ const organizePropertyData = (propertyData: any): any => {
     // Fallback to simple flow service
     try {
       const flowService = FlowServiceFactory.getService(flowCategory, flowListingType);
-      const formattedData = flowService.formatData(propertyData);
+      const formattedData = flowService.formatData(migratedData);
       return ensureCompleteStructure(formattedData);
     } catch (fallbackError) {
       console.error('Error with fallback flow service:', fallbackError);
-      return ensureCompleteStructure(propertyData);
+      return ensureCompleteStructure(migratedData);
     }
   }
 };
 
 /**
  * Ensures the data structure is complete with all required sections
- * ONLY meta, flow, steps, and media - NO root-level sections
+ * ONLY meta, flow, steps, and imageFiles - NO root-level sections
  */
 const ensureCompleteStructure = (data: any): any => {
   if (!data) return createEmptyPropertyStructure();
@@ -204,19 +266,9 @@ const ensureCompleteStructure = (data: any): any => {
     }
   }
   
-  // Ensure media section exists
-  if (!result.media) {
-    result.media = {
-      photos: { images: [] },
-      videos: { urls: [] }
-    };
-  } else {
-    if (!result.media.photos) {
-      result.media.photos = { images: [] };
-    }
-    if (!result.media.videos) {
-      result.media.videos = { urls: [] };
-    }
+  // Ensure imageFiles array exists
+  if (!result.imageFiles || !Array.isArray(result.imageFiles)) {
+    result.imageFiles = [];
   }
   
   // Remove any old root-level sections to keep output clean
@@ -233,8 +285,34 @@ const ensureCompleteStructure = (data: any): any => {
   delete result.rentalInfo;
   delete result.saleInfo;
   delete result.commercial_details;
+  delete result.media;
+  delete result.photos;
+  delete result.images;
   
   return result;
+};
+
+/**
+ * Gets the primary image URL from imageFiles array
+ */
+const getPrimaryImageUrl = (imageFiles: any[]): string | null => {
+  if (!Array.isArray(imageFiles) || imageFiles.length === 0) {
+    return null;
+  }
+
+  // Find primary image
+  const primaryImage = imageFiles.find(img => img.isPrimary);
+  if (primaryImage && primaryImage.url) {
+    return primaryImage.url;
+  }
+
+  // Fallback to first image
+  const firstImage = imageFiles[0];
+  if (firstImage && firstImage.url) {
+    return firstImage.url;
+  }
+
+  return null;
 };
 
 export const propertyService = {
@@ -271,8 +349,9 @@ export const propertyService = {
         organizedData.meta.id = property.id;
         organizedData.meta.owner_id = property.owner_id;
         
-        // Get images
-        const images = organizedData.media?.photos?.images || [];
+        // Get images from new structure
+        const images = organizedData.imageFiles || [];
+        const primaryImageUrl = getPrimaryImageUrl(images);
         
         return {
           id: property.id,
@@ -281,7 +360,8 @@ export const propertyService = {
           updated_at: property.updated_at,
           status: property.status || 'draft',
           property_details: organizedData,
-          images
+          images,
+          primaryImageUrl
         };
       });
       
@@ -328,8 +408,9 @@ export const propertyService = {
       organizedData.meta.id = data.id;
       organizedData.meta.owner_id = data.owner_id;
       
-      // Get images
-      const images = organizedData.media?.photos?.images || [];
+      // Get images from new structure
+      const images = organizedData.imageFiles || [];
+      const primaryImageUrl = getPrimaryImageUrl(images);
       
       return {
         id: data.id,
@@ -338,7 +419,8 @@ export const propertyService = {
         updated_at: data.updated_at,
         status: data.status || 'draft',
         property_details: organizedData,
-        images
+        images,
+        primaryImageUrl
       };
     } catch (error) {
       console.error('Error in getPropertyById:', error);
@@ -423,8 +505,9 @@ export const propertyService = {
       // Clear cache for this user
       propertiesCache.delete(userId);
       
-      // Get images
-      const images = organizedData.media?.photos?.images || [];
+      // Get images from new structure
+      const images = organizedData.imageFiles || [];
+      const primaryImageUrl = getPrimaryImageUrl(images);
       
       return {
         id: data[0].id,
@@ -433,7 +516,8 @@ export const propertyService = {
         updated_at: now,
         status: status,
         property_details: organizedData,
-        images
+        images,
+        primaryImageUrl
       };
     } catch (error) {
       console.error('Error in createProperty:', error);
@@ -517,8 +601,9 @@ export const propertyService = {
       // Clear cache for this user
       propertiesCache.delete(userId);
       
-      // Get images
-      const images = organizedData.media?.photos?.images || [];
+      // Get images from new structure
+      const images = organizedData.imageFiles || [];
+      const primaryImageUrl = getPrimaryImageUrl(images);
       
       return {
         id: data.id,
@@ -527,7 +612,8 @@ export const propertyService = {
         updated_at: data.updated_at,
         status: data.status,
         property_details: organizedData,
-        images
+        images,
+        primaryImageUrl
       };
     } catch (error) {
       console.error('Error in updateProperty:', error);
@@ -557,6 +643,10 @@ export const propertyService = {
             }
             deepMerge(target[key][stepKey], source[key][stepKey]);
           });
+        }
+        // Special handling for imageFiles - replace completely if provided
+        else if (key === 'imageFiles' && Array.isArray(source[key])) {
+          target[key] = source[key];
         }
         // If both are objects and not arrays, recursively merge
         else if (
@@ -695,3 +785,5 @@ export const propertyService = {
     }
   }
 };
+
+// End of file

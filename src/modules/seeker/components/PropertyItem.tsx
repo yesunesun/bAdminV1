@@ -26,7 +26,7 @@ import {
   formatDetailedLocation,
   detectPropertyFlowType
 } from '../utils/propertyTitleUtils';
-import { unifiedImageService } from '@/services/unifiedImageService';
+import { simpleImageService } from '@/services/simpleImageService';
 import { useFavorites } from '@/contexts/FavoritesContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
@@ -355,15 +355,15 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
     return '/noimage.png';
   }, []);
 
-  // Handle async loading with unified service
+  // Handle async loading with simple service
   useEffect(() => {
-    const loadImageWithUnifiedService = async () => {
+    const loadImageWithSimpleService = async () => {
       if (!property) {
         return;
       }
       
       try {
-        let fileName = '';
+        let imageUrl = '';
         
         // Debug: Log the entire property object structure
         console.log(`[PropertyItem] 🔍 Property Debug for ${propertyData.id}:`, {
@@ -383,79 +383,23 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
           });
         }
         
-        if (isSearchResult(property)) {
-          // Handle SearchResult format
-          if (property.primary_image && property.primary_image.trim()) {
-            fileName = property.primary_image;
-            console.log(`[PropertyItem] SearchResult primary_image: "${fileName}" for property ${propertyData.id}`);
-          } else {
-            console.log(`[PropertyItem] ❌ SearchResult has no primary_image for property ${propertyData.id}. primary_image = "${property.primary_image}"`);
-            
-            // FALLBACK: Try to extract from property_details if available
-            if (property.property_details) {
-              const details = property.property_details;
-              console.log(`[PropertyItem] 🔍 Trying fallback extraction from property_details for ${propertyData.id}`);
-              
-              if (details.imageFiles && Array.isArray(details.imageFiles) && details.imageFiles.length > 0) {
-                const primaryImage = details.imageFiles.find(img => img.isPrimary);
-                const imageToUse = primaryImage || details.imageFiles[0];
-                fileName = imageToUse.fileName || '';
-                console.log(`[PropertyItem] 🔄 Fallback found imageFiles: "${fileName}"`);
-              } else if (details.primaryImage) {
-                fileName = details.primaryImage;
-                console.log(`[PropertyItem] 🔄 Fallback found primaryImage: "${fileName}"`);
-              }
-            }
-          }
-        } else {
-          // Handle PropertyType format
-          const details = property.property_details || {};
-          
-          // Try different image sources in order of preference
-          if (details.imageFiles && Array.isArray(details.imageFiles) && details.imageFiles.length > 0) {
-            const primaryImage = details.imageFiles.find(img => img.isPrimary);
-            const imageToUse = primaryImage || details.imageFiles[0];
-            fileName = imageToUse.fileName || '';
-          } else if (property.property_images && Array.isArray(property.property_images) && property.property_images.length > 0) {
-            const primaryImage = property.property_images.find(img => img.is_primary);
-            const imageToUse = primaryImage || property.property_images[0];
-            fileName = imageToUse.fileName || imageToUse.url || '';
-          } else if (details.primaryImage) {
-            fileName = details.primaryImage;
-          }
-        }
+        // Use simple service to get image URL
+        imageUrl = await simpleImageService.getPropertyImageUrlAsync(propertyData.id);
         
-        // CRITICAL FIX: Don't process UUIDs as filenames
-        const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-        if (uuidPattern.test(fileName)) {
-          console.log(`[PropertyItem] 🚫 SKIPPING UUID as filename: "${fileName}" for property ${propertyData.id}`);
-          return;
-        }
+        console.log(`[PropertyItem] Simple service returned URL: ${imageUrl}`);
         
-        if (fileName && fileName.trim()) {
-          // Debug logging
-          console.log(`[PropertyItem] Loading image for property ${propertyData.id}, fileName: "${fileName}"`);
-          
-          // Use unified service to get image URL
-          const imageUrl = await unifiedImageService.getImageUrl(propertyData.id, fileName, 'medium');
-          
-          console.log(`[PropertyItem] Unified service returned URL: ${imageUrl}`);
-          
-          if (imageUrl && imageUrl !== '/noimage.png') {
-            console.log(`[PropertyItem] ✅ Image loaded successfully for ${propertyData.id}`);
-            setAsyncImageUrl(imageUrl);
-          } else {
-            console.log(`[PropertyItem] ❌ Image failed to load for ${propertyData.id}, got default image`);
-          }
+        if (imageUrl && imageUrl !== '/noimage.png') {
+          console.log(`[PropertyItem] ✅ Image loaded successfully for ${propertyData.id}`);
+          setAsyncImageUrl(imageUrl);
         } else {
-          console.log(`[PropertyItem] ❌ No filename found for property ${propertyData.id}. fileName = "${fileName}"`);
+          console.log(`[PropertyItem] ❌ Image failed to load for ${propertyData.id}, got default image`);
         }
       } catch (error) {
         console.error(`[PropertyItem] Failed to load image for property ${propertyData.id}:`, error);
       }
     };
     
-    loadImageWithUnifiedService();
+    loadImageWithSimpleService();
   }, [property, propertyData.id]);
 
   // Generate display data for SearchResult

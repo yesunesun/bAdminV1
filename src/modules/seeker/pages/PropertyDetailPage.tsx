@@ -10,7 +10,7 @@ import PropertyDetails from '../components/PropertyDetails';
 import { Button } from '@/components/ui/button';
 import { HomeIcon, ChevronLeftIcon, RefreshCw } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
-import { imageService } from '@/services/imageService';
+import { simpleImageService } from '@/services/simpleImageService';
 
 const PropertyDetailPage: React.FC = () => {
   const navigate = useNavigate();
@@ -59,7 +59,7 @@ const PropertyDetailPage: React.FC = () => {
 
         if (imageFiles.length > 0) {
           // Use the image service to preload all images in parallel
-          const urls = await imageService.preloadImages(id, imageFiles);
+          const urls = await simpleImageService.preloadPropertyImages(id);
           setDirectUrls(urls.filter(url => url !== '/noimage.png'));
         }
 
@@ -76,7 +76,7 @@ const PropertyDetailPage: React.FC = () => {
   // Cleanup image service on unmount
   useEffect(() => {
     return () => {
-      imageService.cleanup();
+      simpleImageService.cleanup();
     };
   }, []);
 
@@ -119,7 +119,7 @@ const PropertyDetailPage: React.FC = () => {
     setRefreshKey(timestamp);
     
     // Clear image service cache
-    imageService.cleanup();
+    simpleImageService.cleanup();
     setDirectUrls([]);
     
     toast({
