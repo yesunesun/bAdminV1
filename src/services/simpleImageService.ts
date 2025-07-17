@@ -72,12 +72,35 @@ class SimpleImageService {
         selectedImage = imageFiles[0];
       }
 
-      if (!selectedImage || !selectedImage.url) {
+      if (!selectedImage) {
         console.log(`[SimpleImageService] No valid image found for property: ${propertyId}`);
         return '/noimage.png';
       }
 
-      const imageUrl = selectedImage.url;
+      let imageUrl = selectedImage.url;
+      
+      // If url is empty but fileName exists, generate public URL from Supabase storage
+      if ((!imageUrl || imageUrl === '') && selectedImage.fileName) {
+        console.log(`[SimpleImageService] URL empty, generating public URL from fileName: ${selectedImage.fileName}`);
+        
+        const { data } = supabase.storage
+          .from(this.STORAGE_BUCKET)
+          .getPublicUrl(`${propertyId}/${selectedImage.fileName}`);
+        
+        if (data.publicUrl) {
+          imageUrl = data.publicUrl;
+          console.log(`[SimpleImageService] Generated public URL: ${imageUrl}`);
+        } else {
+          console.log(`[SimpleImageService] Failed to generate public URL for ${propertyId}/${selectedImage.fileName}`);
+          return '/noimage.png';
+        }
+      }
+
+      if (!imageUrl || imageUrl === '') {
+        console.log(`[SimpleImageService] No valid image URL found for property: ${propertyId}`);
+        return '/noimage.png';
+      }
+
       console.log(`[SimpleImageService] Found image URL: ${imageUrl}`);
 
       // Cache the result
@@ -131,7 +154,23 @@ class SimpleImageService {
       // Sort by display order and extract URLs
       const urls = imageFiles
         .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0))
-        .map(img => img.url)
+        .map(img => {
+          // If url exists and is not empty, use it
+          if (img.url && img.url !== '') {
+            return img.url;
+          }
+          
+          // If url is empty but fileName exists, generate public URL
+          if (img.fileName) {
+            const { data } = supabase.storage
+              .from(this.STORAGE_BUCKET)
+              .getPublicUrl(`${propertyId}/${img.fileName}`);
+            
+            return data.publicUrl || '';
+          }
+          
+          return '';
+        })
         .filter(url => url && url !== '');
 
       console.log(`[SimpleImageService] Found ${urls.length} images for property: ${propertyId}`);
