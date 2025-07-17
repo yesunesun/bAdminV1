@@ -51,3 +51,4 @@ test-scripts/
 lambda-*.zip
 deployment-*.zip
 src/debug/
+storage/
