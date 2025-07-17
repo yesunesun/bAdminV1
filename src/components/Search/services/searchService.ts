@@ -413,44 +413,58 @@ class BtSearchService implements SearchService {
   }
 
   /**
-   * Enhance btService results with property_details for image extraction
+   * Enhance btService results with property_details for image extraction (OPTIMIZED)
    */
   private async enhanceResultsWithPropertyDetails(results: SearchResult[]): Promise<SearchResult[]> {
     console.log('🔧 Enhancing btService results with property_details for image extraction');
     console.log('🔧 Input results count:', results.length);
     
-    const enhancedResults = await Promise.all(
-      results.map(async (result) => {
-        try {
-          const { data: propertyData, error: propertyError } = await supabase
-            .from('properties_v2')
-            .select('property_details')
-            .eq('id', result.id)
-            .single();
+    if (results.length === 0) {
+      return results;
+    }
+    
+    try {
+      // Extract all property IDs
+      const propertyIds = results.map(result => result.id);
+      
+      // Make a single batch query instead of individual queries
+      const { data: propertyDetailsData, error: batchError } = await supabase
+        .from('properties_v2')
+        .select('id, property_details')
+        .in('id', propertyIds);
 
-          if (propertyError || !propertyData?.property_details) {
-            console.warn(`⚠️  Could not fetch property_details for ${result.id}:`, propertyError);
-            return result;
-          }
+      if (batchError) {
+        console.warn('⚠️  Batch query error, returning original results:', batchError);
+        return results;
+      }
 
-          // Add property_details to the result
-          const enhanced = {
+      // Create a map for quick lookup
+      const propertyDetailsMap = new Map(
+        propertyDetailsData?.map(item => [item.id, item.property_details]) || []
+      );
+
+      // Enhance results with property_details
+      const enhancedResults = results.map(result => {
+        const propertyDetails = propertyDetailsMap.get(result.id);
+        
+        if (propertyDetails) {
+          console.log(`✅ Enhanced ${result.id} with property_details. Has imageFiles:`, !!(propertyDetails.imageFiles));
+          return {
             ...result,
-            property_details: propertyData.property_details
+            property_details: propertyDetails
           };
-          
-          console.log(`✅ Enhanced ${result.id} with property_details. Has imageFiles:`, !!(propertyData.property_details.imageFiles));
-          
-          return enhanced;
-        } catch (error) {
-          console.warn(`⚠️  Error fetching property_details for ${result.id}:`, error);
+        } else {
+          console.warn(`⚠️  No property_details found for ${result.id}`);
           return result;
         }
-      })
-    );
-    
-    console.log('✅ Enhanced results with property_details:', enhancedResults.length);
-    return enhancedResults;
+      });
+      
+      console.log('✅ Enhanced results with property_details (batch):', enhancedResults.length);
+      return enhancedResults;
+    } catch (error) {
+      console.warn('⚠️  Error in batch enhancement, returning original results:', error);
+      return results;
+    }
   }
 
   /**
@@ -469,7 +483,7 @@ class BtSearchService implements SearchService {
         });
 
       if (error) {
-        console.error('❌ Supabase fallback error:', error);
+        console.error('❌ Supabase RPC fallback error:', error);
         throw error;
       }
 
@@ -499,19 +513,13 @@ class BtSearchService implements SearchService {
       const paginatedResults = allResults.slice(offset, offset + limit);
       const totalCount = data?.[0]?.total_count || allResults.length;
 
-      console.log('✅ Supabase fallback completed:', {
+      console.log('✅ RPC fallback completed:', {
         requestedLimit: requestLimit,
         totalResults: allResults.length,
         offset,
         limit,
         returnedCount: paginatedResults.length,
-        totalCount,
-        sampleFlowTypes: data?.slice(0, 3).map((item: any) => ({
-          id: item.id,
-          flow_type: item.flow_type,
-          subtype: item.subtype,
-          title: item.title
-        }))
+        totalCount
       });
 
       return {
@@ -521,7 +529,7 @@ class BtSearchService implements SearchService {
         limit
       };
     } catch (error) {
-      console.error('❌ Supabase fallback failed:', error);
+      console.error('❌ RPC fallback failed:', error);
       // Return empty results instead of throwing to maintain UI functionality
       return {
         results: [],

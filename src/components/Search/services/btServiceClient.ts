@@ -20,9 +20,9 @@ export class BtServiceClient {
 
   constructor(config: BtServiceConfig) {
     this.baseUrl = config.baseUrl.replace(/\/$/, ''); // Remove trailing slash
-    this.timeout = config.timeout || 60000; // 60 seconds - increased for better reliability
-    this.retryAttempts = config.retryAttempts || 3;
-    this.retryDelay = config.retryDelay || 2000; // 2 seconds - increased delay between retries
+    this.timeout = config.timeout || 5000; // 5 seconds - fast timeout for better UX
+    this.retryAttempts = config.retryAttempts || 1; // Single attempt to fail fast
+    this.retryDelay = config.retryDelay || 1000; // 1 second delay
   }
 
   /**
