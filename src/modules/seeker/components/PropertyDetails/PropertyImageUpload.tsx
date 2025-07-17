@@ -1,7 +1,7 @@
 // src/modules/seeker/components/PropertyDetails/PropertyImageUpload.tsx
-// Version: 10.0.0
-// Last Modified: 27-05-2025 10:15 IST
-// Purpose: Enhanced with video upload capability in the same interface
+// Version: 11.0.0
+// Last Modified: 17-07-2025 20:50 IST
+// Purpose: Simplified component - removed legacy format support, fixed 400 errors
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -27,6 +27,7 @@ interface PropertyImage {
   id: string;
   fileName: string;
   isPrimary: boolean;
+  url?: string; // Added to support existing public URLs
 }
 
 // Constants
@@ -146,46 +147,26 @@ const PropertyImageUpload: React.FC<PropertyImageUploadProps> = ({
       // Get images from property_details
       const propertyDetails = property.property_details || {};
       
-      // Check if we have images in the new format (fileName based)
+      // Check if we have images in the current format
       if (propertyDetails.imageFiles && Array.isArray(propertyDetails.imageFiles)) {
-        console.log('[PropertyImageUpload] Found images in property details (fileName format):', propertyDetails.imageFiles.length);
+        console.log('[PropertyImageUpload] Found images in property details:', propertyDetails.imageFiles.length);
         setImages(propertyDetails.imageFiles);
         
-        // Generate signed URLs for all images
+        // Generate URLs for all images
         generateSignedUrls(propertyDetails.imageFiles);
         return;
       }
       
-      // Legacy format: Check for dataUrl images
-      if (propertyDetails.images && Array.isArray(propertyDetails.images)) {
-        console.log('[PropertyImageUpload] Found legacy images in property details (dataUrl format):', propertyDetails.images.length);
-        // Convert from old format to new format
-        const convertedImages = propertyDetails.images.map((img: any, index: number) => ({
-          id: img.id || `img-${index}`,
-          fileName: img.id || `legacy-${index}`, // This is just a placeholder for legacy images
-          isPrimary: !!img.isPrimary
-        }));
-        setImages(convertedImages);
-        
-        // Cache the dataUrls
-        const urlMap: Record<string, string> = {};
-        propertyDetails.images.forEach((img: any) => {
-          if (img.id && img.dataUrl) {
-            urlMap[img.id] = img.dataUrl;
-          }
-        });
-        setImageUrls(urlMap);
-      } else {
-        console.log('[PropertyImageUpload] No images found in property details');
-        setImages([]);
-      }
+      // No images found
+      console.log('[PropertyImageUpload] No images found in property details');
+      setImages([]);
     } catch (err) {
       console.error('[PropertyImageUpload] Error loading images from property details:', err);
       setImages([]);
     }
   }, [property]);
 
-  // Generate URLs for all images with optimization support
+  // Generate URLs for all images - simplified to handle only current format
   const generateSignedUrls = async (imageFiles: PropertyImage[]) => {
     if (!property?.id || !imageFiles || imageFiles.length === 0) return;
     
@@ -197,89 +178,32 @@ const PropertyImageUpload: React.FC<PropertyImageUploadProps> = ({
         continue;
       }
 
-      // Handle optimization records
-      if (img.fileName.startsWith('optimization_')) {
-        try {
-          const optimizationId = img.fileName.replace('optimization_', '');
-          console.log(`[PropertyImageUpload] Loading optimization record: ${optimizationId}`);
-          
-          const { data: optRecord, error: optError } = await supabase
-            .from('image_optimizations')
-            .select('*')
-            .eq('id', optimizationId)
-            .single();
-            
-          if (optError || !optRecord) {
-            console.warn(`[PropertyImageUpload] Optimization record not found: ${optimizationId}`);
-            continue;
-          }
-          
-          // Use public URL for medium variant (fastest loading)
-          if (optRecord.medium_path) {
-            const { data } = supabase.storage
-              .from(STORAGE_BUCKET)
-              .getPublicUrl(optRecord.medium_path);
-            
-            if (data?.publicUrl) {
-              urlMap[img.id] = data.publicUrl;
-              console.log(`[PropertyImageUpload] Loaded optimization image: ${optimizationId}`);
-              continue;
-            }
-          }
-          
-          // Fallback to full or thumbnail if medium not available
-          if (optRecord.full_path) {
-            const { data } = supabase.storage
-              .from(STORAGE_BUCKET)
-              .getPublicUrl(optRecord.full_path);
-            if (data?.publicUrl) {
-              urlMap[img.id] = data.publicUrl;
-              continue;
-            }
-          }
-          
-          if (optRecord.thumbnail_path) {
-            const { data } = supabase.storage
-              .from(STORAGE_BUCKET)
-              .getPublicUrl(optRecord.thumbnail_path);
-            if (data?.publicUrl) {
-              urlMap[img.id] = data.publicUrl;
-              continue;
-            }
-          }
-          
-        } catch (err) {
-          console.error(`[PropertyImageUpload] Error loading optimization record: ${img.fileName}`, err);
-        }
-      }
-      
-      // Handle legacy images (old format)
-      else if (img.fileName.startsWith('legacy-') || img.fileName.startsWith('img-')) {
-        console.log(`[PropertyImageUpload] Skipping legacy image: ${img.fileName}`);
+      // Use existing public URL if available (current format)
+      if (img.url && img.url.startsWith('https://')) {
+        console.log(`[PropertyImageUpload] Using existing public URL for ${img.fileName}`);
+        urlMap[img.id] = img.url;
         continue;
       }
-      
-      // Handle old storage-based filenames (try direct path)
-      else {
-        try {
-          const filePath = `${property.id}/${img.fileName}`;
-          console.log(`[PropertyImageUpload] Attempting to generate signed URL for: ${filePath}`);
+
+      // If no public URL, try to generate signed URL with correct path
+      try {
+        const filePath = `properties/${property.id}/images/${img.fileName}`;
+        console.log(`[PropertyImageUpload] Attempting to generate signed URL for: ${filePath}`);
+        
+        const { data, error } = await supabase
+          .storage
+          .from(STORAGE_BUCKET)
+          .createSignedUrl(filePath, 3600);
           
-          const { data, error } = await supabase
-            .storage
-            .from(STORAGE_BUCKET)
-            .createSignedUrl(filePath, 3600);
-            
-          if (error) {
-            console.warn(`[PropertyImageUpload] File not found in storage: ${img.fileName}`);
-            continue;
-          }
-          
-          urlMap[img.id] = data.signedUrl;
-          console.log(`[PropertyImageUpload] Successfully generated signed URL for ${img.fileName}`);
-        } catch (err) {
-          console.error(`[PropertyImageUpload] Unexpected error generating signed URL for ${img.fileName}:`, err);
+        if (error) {
+          console.warn(`[PropertyImageUpload] File not found in storage: ${img.fileName}`);
+          continue;
         }
+        
+        urlMap[img.id] = data.signedUrl;
+        console.log(`[PropertyImageUpload] Successfully generated signed URL for ${img.fileName}`);
+      } catch (err) {
+        console.error(`[PropertyImageUpload] Error generating signed URL for ${img.fileName}:`, err);
       }
     }
     
