@@ -3,7 +3,7 @@
 // Last Modified: 03-06-2025 14:45 IST
 // Purpose: Updated Expected Price field UX to match Commercial Rent pattern with inline Negotiable checkbox
 
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { FormSection } from '@/components/FormSection';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -304,6 +304,18 @@ export function SaleDetails({ form, adType, stepId: providedStepId }: SaleDetail
     }
   };
 
+  // Get current step values for completion calculation
+  const currentStepValues = useMemo(() => {
+    if (!effectiveStepId) return {};
+    const stepData = form.getValues(`steps.${effectiveStepId}`) || {};
+    return {
+      expectedPrice: stepData.expectedPrice || '',
+      furnishingStatus: stepData.furnishing || '',
+      kitchenType: stepData.kitchenType || '',
+      parking: stepData.parking || ''
+    };
+  }, [form, effectiveStepId, expectedPriceValue, furnishing, kitchenType, parking]);
+
   // Calculate step completion
   const stepCompletion = useStepCompletion({
     requiredFields: [
@@ -318,7 +330,7 @@ export function SaleDetails({ form, adType, stepId: providedStepId }: SaleDetail
     },
     form,
     stepId: effectiveStepId,
-    values
+    values: currentStepValues
   });
 
   return (
