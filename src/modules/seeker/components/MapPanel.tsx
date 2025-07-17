@@ -7,9 +7,8 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useGoogleMaps, DEFAULT_MAP_CENTER } from '../hooks/useGoogleMaps';
 import { GoogleMap } from '@react-google-maps/api';
 import { SearchResult } from '@/components/Search/types/search.types';
-import { MapPin, Home, Building2, Trees } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { 
-  detectPropertyType, 
   getPropertyMarker, 
   markerIconCache
 } from '@/utils/mapMarkers';
@@ -71,16 +70,6 @@ const MapPanel: React.FC<MapPanelProps> = ({
 }) => {
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [mapReady, setMapReady] = useState(false);
-  const [visiblePropertiesCount, setVisiblePropertiesCount] = useState<number>(0);
-  const [totalMarkersCreated, setTotalMarkersCreated] = useState<number>(0);
-  const [propertyTypeCounts, setPropertyTypeCounts] = useState({
-    residential: 0,
-    commercial: 0,
-    land: 0
-  });
-  
-  // Check if we're in development mode
-  const isDevelopment = import.meta.env.DEV || process.env.NODE_ENV === 'development';
   
   // Ref to store marker instances for cleanup
   const markersRef = useRef<google.maps.Marker[]>([]);
@@ -119,39 +108,6 @@ const MapPanel: React.FC<MapPanelProps> = ({
     });
   }, [properties, getPropertyCoordinates]);
 
-  // Update visible properties count
-  const updateVisiblePropertiesCount = useCallback(() => {
-    if (!map || !isLoaded) return;
-
-    try {
-      const bounds = map.getBounds();
-      if (!bounds) {
-        setVisiblePropertiesCount(propertiesWithCoordinates().length);
-        return;
-      }
-
-      let visibleCount = 0;
-      const typeCounts = { residential: 0, commercial: 0, land: 0 };
-      
-      propertiesWithCoordinates().forEach(property => {
-        const coords = getPropertyCoordinates(property);
-        if (coords) {
-          const position = new google.maps.LatLng(coords.lat, coords.lng);
-          
-          if (bounds.contains(position)) {
-            visibleCount++;
-            const propertyInfo = detectPropertyType(property);
-            typeCounts[propertyInfo.type]++;
-          }
-        }
-      });
-
-      setVisiblePropertiesCount(visibleCount);
-      setPropertyTypeCounts(typeCounts);
-    } catch (error) {
-      setVisiblePropertiesCount(propertiesWithCoordinates().length);
-    }
-  }, [map, isLoaded, propertiesWithCoordinates, getPropertyCoordinates]);
 
   // Auto-pan map to show hovered property marker
   const panToPropertyIfNeeded = useCallback((propertyId: string) => {
@@ -197,10 +153,6 @@ const MapPanel: React.FC<MapPanelProps> = ({
     setMap(map);
     setMapReady(true);
     
-    // Add bounds event listener to update visible count
-    map.addListener('bounds_changed', updateVisiblePropertiesCount);
-    map.addListener('zoom_changed', updateVisiblePropertiesCount);
-    
     // Add bounds if we have properties with coordinates
     const validProperties = propertiesWithCoordinates();
     
@@ -236,9 +188,6 @@ const MapPanel: React.FC<MapPanelProps> = ({
               const currentZoom = map.getZoom() || 14;
               map.setZoom(Math.max(Math.min(currentZoom, 14), 13));
             }
-            
-            // Update visible count after setting bounds
-            setTimeout(updateVisiblePropertiesCount, 500);
           }, 100);
         }
       } catch (e) {
@@ -249,7 +198,7 @@ const MapPanel: React.FC<MapPanelProps> = ({
       map.setCenter(DEFAULT_MAP_CENTER);
       map.setZoom(14);
     }
-  }, [propertiesWithCoordinates, updateVisiblePropertiesCount, getPropertyCoordinates]);
+  }, [propertiesWithCoordinates, getPropertyCoordinates]);
 
   // Create markers only for properties with valid coordinates
   useEffect(() => {
@@ -311,10 +260,6 @@ const MapPanel: React.FC<MapPanelProps> = ({
       });
       
       markersRef.current = newMarkers;
-      setTotalMarkersCreated(newMarkers.length);
-      
-      // Update visible count after a short delay to ensure map is ready
-      setTimeout(updateVisiblePropertiesCount, 300);
     }
     
     // Cleanup function
@@ -324,7 +269,7 @@ const MapPanel: React.FC<MapPanelProps> = ({
       });
       markersRef.current = [];
     };
-  }, [properties, isLoaded, mapReady, map, hoveredPropertyId, activeProperty, updateVisiblePropertiesCount, propertiesWithCoordinates, getPropertyCoordinates]);
+  }, [properties, isLoaded, mapReady, map, hoveredPropertyId, activeProperty, propertiesWithCoordinates, getPropertyCoordinates]);
 
   // Cleanup marker cache on unmount
   useEffect(() => {
@@ -381,57 +326,6 @@ const MapPanel: React.FC<MapPanelProps> = ({
 
   return (
     <div className="w-full h-full rounded-2xl overflow-hidden relative">
-      {/* Enhanced Property Count Indicator - Only visible in development mode */}
-      {isDevelopment && (
-        <div className="absolute top-4 right-4 z-10 bg-white/95 backdrop-blur-sm rounded-2xl p-4 shadow-lg border border-border/20">
-          <div className="flex items-center gap-2 text-sm font-medium text-foreground mb-3">
-            <MapPin className="h-4 w-4 text-primary" />
-            <span>
-              {visiblePropertiesCount} of {propertiesWithCoordinates().length} properties
-            </span>
-          </div>
-          
-          {/* Debug info */}
-          <div className="text-xs text-muted-foreground mb-2">
-            Markers: {totalMarkersCreated}/{propertiesWithCoordinates().length}
-          </div>
-          
-          <div className="text-xs text-muted-foreground mb-2">
-            Total properties: {properties.length}
-          </div>
-          
-          <div className="text-xs text-muted-foreground mb-2">
-            With coordinates: {propertiesWithCoordinates().length}
-          </div>
-          
-          {/* Property Type Breakdown */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 text-xs">
-              <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-              <Home className="h-3 w-3 text-blue-600" />
-              <span className="text-muted-foreground">Residential: {propertyTypeCounts.residential}</span>
-            </div>
-            <div className="flex items-center gap-2 text-xs">
-              <div className="w-3 h-3 rounded-full bg-green-500"></div>
-              <Building2 className="h-3 w-3 text-green-600" />
-              <span className="text-muted-foreground">Commercial: {propertyTypeCounts.commercial}</span>
-            </div>
-            <div className="flex items-center gap-2 text-xs">
-              <div className="w-3 h-3 rounded-full bg-orange-500"></div>
-              <Trees className="h-3 w-3 text-orange-600" />
-              <span className="text-muted-foreground">Land: {propertyTypeCounts.land}</span>
-            </div>
-          </div>
-          
-          {/* Development mode indicator */}
-          <div className="mt-2 pt-2 border-t border-border/20">
-            <div className="text-xs text-orange-600 font-medium">
-              🔧 DEV MODE
-            </div>
-          </div>
-        </div>
-      )}
-
       <GoogleMap
         mapContainerStyle={mapContainerStyle}
         center={DEFAULT_MAP_CENTER}
