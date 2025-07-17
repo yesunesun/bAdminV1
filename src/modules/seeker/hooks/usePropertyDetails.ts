@@ -473,39 +473,8 @@ export const usePropertyDetails = (refreshDependency = 0) => {
         console.log('[usePropertyDetails] Video extracted from property_details:', extractedVideo.fileName);
       }
       
-      // 3. As a fallback, fetch images from property_images table
-      const timestamp = new Date().getTime();
-      let dbImages: PropertyImage[] = [];
-      
-      if (extractedImages.length === 0) {
-        console.log('[usePropertyDetails] No images found in property_details, falling back to property_images table');
-        
-        const { data: imagesData, error: imagesError } = await supabase
-          .from('property_images')
-          .select('*')
-          .eq('property_id', propertyId)
-          .order('created_at', { ascending: false }); // Newest images first
-        
-        if (imagesError) {
-          console.error('[usePropertyDetails] Error fetching images from table:', imagesError);
-        } else if (imagesData && imagesData.length > 0) {
-          console.log('[usePropertyDetails] Found images in property_images table:', imagesData.length);
-          
-          // Add cache-busting to image URLs and transform to consistent format
-          dbImages = imagesData.map(img => ({
-            id: img.id,
-            url: img.url.includes('?')
-              ? `${img.url}&_t=${timestamp}`
-              : `${img.url}?_t=${timestamp}`,
-            is_primary: !!img.is_primary,
-            isPrimary: !!img.is_primary, // Add camelCase version for newer code
-            display_order: img.display_order || 999
-          }));
-        }
-      }
-      
-      // Merge images, preferring JSON-extracted ones if available
-      const allImages = extractedImages.length > 0 ? extractedImages : dbImages;
+      // 3. Use only the images from property_details (no fallback to deprecated table)
+      const allImages = extractedImages;
       console.log('[usePropertyDetails] Final combined image count:', allImages.length);
       
       // Debug - log image URLs for inspection
