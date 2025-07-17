@@ -8,8 +8,7 @@ import { PropertyDetailModal } from './PropertyDetailModal/index'; // Updated im
 import { PropertyFilters } from './property-approval/PropertyFilters';
 import { PropertyTable } from './property-approval/PropertyTable';
 import { RejectReasonModal } from './property-approval/RejectReasonModal';
-import { Property } from '@/components/property/PropertyFormTypes';
-import { supabase } from '@/lib/supabase';
+import { PropertyType as Property } from '@/modules/owner/components/property/PropertyFormTypes';
 
 interface PropertyOwner {
   id: string;
@@ -32,13 +31,13 @@ export function PropertyApprovalList({
   onReject, 
   isProcessing 
 }: PropertyApprovalListProps) {
-  // State for filters
-  const [statusFilter, setStatusFilter] = useState<'all' | 'draft' | 'published'>('draft');
+  // State for filters - Default to show all properties
+  const [statusFilter, setStatusFilter] = useState<'all' | 'draft' | 'published'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [propertyTypeFilter, setPropertyTypeFilter] = useState<string>('all');
   const [locationFilter, setLocationFilter] = useState<string>('all');
   const [ownerFilter, setOwnerFilter] = useState<string>('all');
-  const [hasImagesFilter, setHasImagesFilter] = useState<'all' | 'with_images' | 'without_images'>('with_images');
+  const [hasImagesFilter, setHasImagesFilter] = useState<'all' | 'with_images' | 'without_images'>('all');
   
   // Modal states
   const [rejectReasonModalOpen, setRejectReasonModalOpen] = useState(false);
@@ -84,8 +83,30 @@ export function PropertyApprovalList({
       const citySet = new Set<string>();
       
       properties.forEach(property => {
+        // Add city from direct property field
         if (property.city) {
           citySet.add(property.city);
+        }
+        
+        // Add city from flow-based structure
+        const flow = property.property_details?.flow;
+        const steps = property.property_details?.steps;
+        if (flow && steps) {
+          const { category, listingType } = flow;
+          let stepId = '';
+          
+          if (category === 'residential') {
+            stepId = `res_${listingType}_location`;
+          } else if (category === 'commercial') {
+            stepId = `com_${listingType}_location`;
+          } else if (category === 'land') {
+            stepId = 'land_sale_location';
+          }
+          
+          const stepData = steps[stepId] || {};
+          if (stepData.city) {
+            citySet.add(stepData.city);
+          }
         }
       });
       
@@ -100,15 +121,64 @@ export function PropertyApprovalList({
     const matchesStatus = statusFilter === 'all' || property.status === statusFilter;
     
     const matchesSearch = !searchQuery || 
-      property.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      property.address?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      property.city?.toLowerCase().includes(searchQuery.toLowerCase());
+      (property.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+       property.property_details?.meta?.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+       property.address?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+       property.city?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+       property.owner_email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+       // Search in flow-based data structure
+       Object.values(property.property_details?.steps || {}).some((step: any) => 
+         step?.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+         step?.propertyTitle?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+         step?.city?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+         step?.locality?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+         step?.propertyType?.toLowerCase().includes(searchQuery.toLowerCase())
+       ));
     
     const matchesPropertyType = propertyTypeFilter === 'all' || 
-      property.property_details?.propertyType === propertyTypeFilter;
+      // Check in flow-based structure
+      (() => {
+        const flow = property.property_details?.flow;
+        const steps = property.property_details?.steps;
+        if (!flow || !steps) return false;
+        
+        const { category, listingType } = flow;
+        let stepId = '';
+        
+        if (category === 'residential') {
+          stepId = `res_${listingType}_basic_details`;
+        } else if (category === 'commercial') {
+          stepId = `com_${listingType}_basic_details`;
+        } else if (category === 'land') {
+          stepId = 'land_sale_basic_details';
+        }
+        
+        const stepData = steps[stepId] || {};
+        return stepData.propertyType === propertyTypeFilter;
+      })();
       
     const matchesLocation = locationFilter === 'all' || 
-      property.city === locationFilter;
+      property.city === locationFilter ||
+      // Check in flow-based structure
+      (() => {
+        const flow = property.property_details?.flow;
+        const steps = property.property_details?.steps;
+        if (!flow || !steps) return false;
+        
+        const { category, listingType } = flow;
+        let stepId = '';
+        
+        if (category === 'residential') {
+          stepId = `res_${listingType}_location`;
+        } else if (category === 'commercial') {
+          stepId = `com_${listingType}_location`;
+        } else if (category === 'land') {
+          stepId = 'land_sale_location';
+        }
+        
+        const stepData = steps[stepId] || {};
+        return stepData.city === locationFilter;
+      })();
       
     const matchesOwner = ownerFilter === 'all' || 
       property.owner_id === ownerFilter;
@@ -120,6 +190,7 @@ export function PropertyApprovalList({
     return matchesStatus && matchesSearch && matchesPropertyType && 
            matchesLocation && matchesOwner && matchesImages;
   });
+
 
   // Handler functions
   const handleReject = (id: string) => {
@@ -158,7 +229,25 @@ export function PropertyApprovalList({
   // Get all unique property types for filter options
   const getAllPropertyTypes = () => {
     const types = properties
-      .map(p => p.property_details?.propertyType)
+      .map(p => {
+        const flow = p.property_details?.flow;
+        const steps = p.property_details?.steps;
+        if (!flow || !steps) return null;
+        
+        const { category, listingType } = flow;
+        let stepId = '';
+        
+        if (category === 'residential') {
+          stepId = `res_${listingType}_basic_details`;
+        } else if (category === 'commercial') {
+          stepId = `com_${listingType}_basic_details`;
+        } else if (category === 'land') {
+          stepId = 'land_sale_basic_details';
+        }
+        
+        const stepData = steps[stepId] || {};
+        return stepData.propertyType;
+      })
       .filter(Boolean)
       .filter((value, index, self) => self.indexOf(value) === index);
     return types;
@@ -198,9 +287,6 @@ export function PropertyApprovalList({
       <PropertyTable 
         filteredProperties={filteredProperties}
         ownersMap={ownersMap}
-        isProcessing={isProcessing}
-        onApprove={onApprove}
-        handleReject={handleReject}
         handleViewProperty={handleViewProperty}
         searchQuery={searchQuery}
         statusFilter={statusFilter}

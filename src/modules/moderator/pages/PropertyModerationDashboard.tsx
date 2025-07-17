@@ -2,10 +2,10 @@
 // Version: 1.7.0
 // Last Modified: 26-02-2025 21:45 IST
 
-import React, { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import React, { useState, useEffect, useCallback } from 'react';
+import { supabase, adminSupabase } from '@/lib/supabase';
 import { PropertyApprovalList } from '../components/PropertyApprovalList';
-import { Property } from '@/components/property/PropertyFormTypes';
+import { PropertyType as Property } from '@/modules/owner/components/property/PropertyFormTypes';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAdminAccess } from '@/modules/admin/hooks/useAdminAccess';
 import { AlertCircle, CheckCircle, Clock, Activity, MapPin, User } from 'lucide-react';
@@ -26,64 +26,116 @@ export default function PropertyModerationDashboard() {
     owners: 0
   });
 
-  useEffect(() => {
-    if (roleLoading) return;
-    
-    if (!isPropertyModerator) {
-      setError('You do not have permission to access this page');
-      setLoading(false);
-      return;
-    }
-    
-    fetchProperties();
-  }, [user, isPropertyModerator, roleLoading]);
-
-  const fetchProperties = async () => {
+  const fetchProperties = useCallback(async () => {
     try {
       setLoading(true);
       
-      // Query the view directly
+      // Query properties_v2 table directly - we'll try to get owner emails separately
       const { data, error: fetchError } = await supabase
-        .from('property_with_owner_emails')
-        .select('*');
+        .from('properties_v2')
+        .select('*')
+        .order('created_at', { ascending: false });
 
       if (fetchError) {
-        console.error('Error with view query, falling back to standard query:', fetchError);
-        
-        // Fallback to standard query if view fails
-        const { data: fallbackData, error: fallbackError } = await supabase
-          .from('properties')
-          .select(`
-            *,
-            property_images (
-              id,
-              url
-            )
-          `)
-          .order('created_at', { ascending: false });
-          
-        if (fallbackError) throw fallbackError;
-        
-        // Transform the fallback data
-        const formattedProperties = fallbackData.map(item => ({
-          ...item,
-          images: item.property_images,
-          owner_email: item.owner_id
-        })) as Property[];
-        
-        setProperties(formattedProperties);
-        
-        // Calculate stats with fallback data
-        calculateStats(formattedProperties);
-        
-        return;
+        console.error('Error fetching properties:', fetchError);
+        throw fetchError;
       }
+      
+      // Get owner emails from auth.users table
+      const ownerIds = [...new Set(data.map(item => item.owner_id))];
+      const ownerEmails: Record<string, string> = {};
+      
+      console.log('🔍 Fetching emails for owner IDs:', ownerIds);
+      
+      try {
+        // Method 1: Try to get all users using RPC function (most efficient)
+        const { data: allUsersData, error: rpcError } = await supabase.rpc('get_all_auth_users');
+        console.log('📧 RPC get_all_auth_users result:', { count: allUsersData?.length, rpcError });
+        
+        if (!rpcError && allUsersData && Array.isArray(allUsersData)) {
+          // Create a mapping of user ID to email from RPC result
+          const userMap = new Map<string, string>();
+          allUsersData.forEach((user: any) => {
+            if (user.id && user.email) {
+              userMap.set(user.id, user.email);
+            }
+          });
+          
+          // Map owner IDs to emails
+          ownerIds.forEach(ownerId => {
+            const email = userMap.get(ownerId);
+            if (email) {
+              ownerEmails[ownerId] = email;
+              console.log(`✅ Found email for ${ownerId}: ${email}`);
+            } else {
+              console.warn(`❌ No email found for owner ${ownerId} in RPC result`);
+              ownerEmails[ownerId] = `User-${ownerId.substring(0, 8)}...`;
+            }
+          });
+        } else {
+          // Fallback Method 2: Try admin client listUsers
+          console.log('🔍 RPC failed, trying admin client listUsers...');
+          const { data: adminUsersData, error: adminError } = await adminSupabase.auth.admin.listUsers();
+          console.log('📧 Admin listUsers result:', { count: adminUsersData?.users?.length, adminError });
+          
+          if (!adminError && adminUsersData?.users) {
+            // Create a mapping of user ID to email from admin result
+            const userMap = new Map<string, string>();
+            adminUsersData.users.forEach((user: any) => {
+              if (user.id && user.email) {
+                userMap.set(user.id, user.email);
+              }
+            });
+            
+            // Map owner IDs to emails
+            ownerIds.forEach(ownerId => {
+              const email = userMap.get(ownerId);
+              if (email) {
+                ownerEmails[ownerId] = email;
+                console.log(`✅ Found email for ${ownerId}: ${email}`);
+              } else {
+                console.warn(`❌ No email found for owner ${ownerId} in admin result`);
+                ownerEmails[ownerId] = `User-${ownerId.substring(0, 8)}...`;
+              }
+            });
+          } else {
+            // Fallback Method 3: Individual getUserById calls
+            console.log('🔍 Admin listUsers failed, trying individual getUserById calls...');
+            for (const ownerId of ownerIds) {
+              try {
+                const { data: userData, error: userError } = await adminSupabase.auth.admin.getUserById(ownerId);
+                if (userData?.user?.email) {
+                  ownerEmails[ownerId] = userData.user.email;
+                  console.log(`✅ Found email for ${ownerId}: ${userData.user.email}`);
+                } else {
+                  console.warn(`❌ No email found for owner ${ownerId}:`, userError);
+                  ownerEmails[ownerId] = `User-${ownerId.substring(0, 8)}...`;
+                }
+              } catch (error) {
+                console.warn(`❌ Failed to fetch email for owner ${ownerId}:`, error);
+                ownerEmails[ownerId] = `User-${ownerId.substring(0, 8)}...`;
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error('❌ All email fetching methods failed:', error);
+        // Set fallback display for all owner IDs
+        ownerIds.forEach(ownerId => {
+          ownerEmails[ownerId] = `User-${ownerId.substring(0, 8)}...`;
+        });
+      }
+      
+      console.log('📧 Final owner emails mapping:', ownerEmails);
 
-      // Transform the data to match the Property type
+      // Transform the data to match the Property type - extract images from property_details.imageFiles
       const formattedProperties = data.map(item => ({
         ...item,
-        images: item.property_images || [],
-        owner_email: item.owner_email || item.owner_id
+        images: item.property_details?.imageFiles || [],
+        owner_email: ownerEmails[item.owner_id] || item.owner_id,
+        // Fix location display - extract from property_details
+        city: item.city || item.property_details?.details?.location?.city || item.property_details?.details?.res_rent_location?.city || item.property_details?.details?.com_rent_location?.city || 'N/A',
+        state: item.state || item.property_details?.details?.location?.state || item.property_details?.details?.res_rent_location?.state || item.property_details?.details?.com_rent_location?.state || 'Telangana'
       })) as Property[];
 
       setProperties(formattedProperties);
@@ -97,7 +149,19 @@ export default function PropertyModerationDashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (roleLoading) return;
+    
+    if (!isPropertyModerator) {
+      setError('You do not have permission to access this page');
+      setLoading(false);
+      return;
+    }
+    
+    fetchProperties();
+  }, [user, isPropertyModerator, roleLoading, fetchProperties]);
   
   // Helper function to calculate statistics
   const calculateStats = (propertyData: Property[]) => {
@@ -124,7 +188,7 @@ export default function PropertyModerationDashboard() {
       setProcessingId(id);
       
       const { error: updateError } = await supabase
-        .from('properties')
+        .from('properties_v2')
         .update({ 
           status: 'published',
           tags: ['public'],
@@ -165,7 +229,7 @@ export default function PropertyModerationDashboard() {
       
       // Update property with rejection status and reason
       const { error: updateError } = await supabase
-        .from('properties')
+        .from('properties_v2')
         .update({ 
           status: 'rejected',
           property_details: {

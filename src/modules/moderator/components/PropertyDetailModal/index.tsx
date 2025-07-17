@@ -39,8 +39,7 @@ export function PropertyDetailModal({
     isLoading: imagesLoading,
     deletingImageId,
     successfulImageId,
-    deleteImage,
-    refreshImages
+    deleteImage
   } = usePropertyImages(property.id);
 
   // Check if property is in pending state
