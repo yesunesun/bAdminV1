@@ -64,6 +64,14 @@ class BtSearchService implements SearchService {
     filters: SearchFilters,
     pagination?: SearchPaginationOptions
   ): Promise<SearchResponse> {
+    // Check if btService should be skipped
+    const skipBtService = import.meta.env.VITE_SKIP_BTSERVICE === 'true';
+    
+    if (skipBtService) {
+      console.log('⚡ Skipping btService - using Supabase directly');
+      return this.searchPropertiesFromSupabase(filters, pagination);
+    }
+    
     try {
       const response = await btServiceClient.search(filters, pagination);
       
@@ -348,6 +356,18 @@ class BtSearchService implements SearchService {
     filters: SearchFilters,
     pagination?: SearchPaginationOptions
   ): Promise<SearchResponse> {
+    // Check if btService should be skipped
+    const skipBtService = import.meta.env.VITE_SKIP_BTSERVICE === 'true';
+    
+    if (skipBtService) {
+      console.log('⚡ Skipping btService - using Supabase directly for smart search');
+      const query = filters.searchQuery?.trim();
+      if (query && this.isPropertyCode(query)) {
+        return this.searchByCodeFromSupabase(query, true);
+      }
+      return this.searchPropertiesFromSupabase(filters, pagination);
+    }
+    
     try {
       const response = await btServiceClient.smartSearch(filters, pagination);
       console.log('✅ SearchService.smartSearch (v3) completed:', {
@@ -372,6 +392,14 @@ class BtSearchService implements SearchService {
   async searchByCode(code: string, exact: boolean = true): Promise<SearchResponse> {
     console.log('🔍 SearchService.searchByCode (v3) called with:', { code, exact });
     
+    // Check if btService should be skipped
+    const skipBtService = import.meta.env.VITE_SKIP_BTSERVICE === 'true';
+    
+    if (skipBtService) {
+      console.log('⚡ Skipping btService - using Supabase directly for code search');
+      return this.searchByCodeFromSupabase(code, exact);
+    }
+    
     try {
       const response = await btServiceClient.searchByCode(code, exact);
       console.log('✅ SearchService.searchByCode (v3) completed:', {
@@ -390,6 +418,14 @@ class BtSearchService implements SearchService {
    */
   async getLatestProperties(limit: number = 50, offset: number = 0): Promise<SearchResponse> {
     console.log('📋 SearchService.getLatestProperties (v3) called with:', { limit, offset });
+    
+    // Check if btService should be skipped
+    const skipBtService = import.meta.env.VITE_SKIP_BTSERVICE === 'true';
+    
+    if (skipBtService) {
+      console.log('⚡ Skipping btService - using Supabase directly for latest properties');
+      return this.getLatestPropertiesFromSupabase(limit, offset);
+    }
     
     try {
       const response = await btServiceClient.getLatestProperties(limit, offset);
@@ -661,6 +697,14 @@ class BtSearchService implements SearchService {
    */
   async getSearchSuggestions(query: string): Promise<string[]> {
     console.log('💡 SearchService.getSearchSuggestions called with query:', query);
+    
+    // Check if btService should be skipped
+    const skipBtService = import.meta.env.VITE_SKIP_BTSERVICE === 'true';
+    
+    if (skipBtService) {
+      console.log('⚡ Skipping btService - returning empty suggestions');
+      return []; // Return empty array when btService is skipped
+    }
     
     try {
       const suggestions = await btServiceClient.getSearchSuggestions(query);
