@@ -341,7 +341,7 @@ export class BtServiceClient {
 
 // Default configuration
 const defaultConfig: BtServiceConfig = {
-  baseUrl: import.meta.env.VITE_BTSERVICE_URL || 'http://localhost:3001',
+  baseUrl: import.meta.env.VITE_BTSERVICE_URL?.trim() || 'https://foth5qlfc8.execute-api.us-east-1.amazonaws.com/prod',
   timeout: 30000,
   retryAttempts: 3,
   retryDelay: 1000,
