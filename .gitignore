@@ -46,6 +46,9 @@ coverage/
 tests/
 test-scripts/
 
+# Operations directory
+operations/
+
 # Lambda/deployment files
 *.zip
 lambda-*.zip
@@ -57,3 +60,5 @@ storage/
 .env.development
 .env.production
 .env.local
+
+operations/
