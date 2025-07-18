@@ -193,7 +193,7 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
 
   // Render content
   const renderContent = () => {
-    if (loading && properties.length === 0) {
+    if (loading) {
       // Enhanced loading placeholders with better visual hierarchy
       return (
         <div className="divide-y divide-border/50">
