@@ -175,6 +175,10 @@ export const usePropertyMapData = () => {
         return;
       }
       
+      // DEBUG: Start timing property fetch
+      const fetchStartTime = performance.now();
+      console.log('🔍 [PERFORMANCE] Starting property fetch at:', new Date().toISOString());
+      
       // Reset pagination and properties when filters change
       setCurrentPage(1);
       setProperties([]);
@@ -207,6 +211,12 @@ export const usePropertyMapData = () => {
         setProperties(validProperties);
         setTotalCount(totalCountValue);
         setHasMore(validProperties.length > 0 && validProperties.length < totalCountValue);
+        
+        // DEBUG: End timing property fetch
+        const fetchEndTime = performance.now();
+        const fetchDuration = fetchEndTime - fetchStartTime;
+        console.log(`🔍 [PERFORMANCE] Property fetch completed in ${fetchDuration.toFixed(2)}ms`);
+        console.log('🔍 [PERFORMANCE] Properties ready for rendering at:', new Date().toISOString());
         
         // Update location suggestions based on fetched properties
         if (propertiesArray.length > 0) {

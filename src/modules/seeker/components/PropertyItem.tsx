@@ -366,33 +366,33 @@ const PropertyItem: React.FC<PropertyItemProps> = ({
         let imageUrl = '';
         
         // Debug: Log the entire property object structure
-        console.log(`[PropertyItem] 🔍 Property Debug for ${propertyData.id}:`, {
-          isSearchResult: isSearchResult(property),
-          primary_image: property.primary_image,
-          hasPropertyDetails: !!property.property_details,
-          propertyType: typeof property
-        });
+        // console.log(`[PropertyItem] 🔍 Property Debug for ${propertyData.id}:`, {
+        //   isSearchResult: isSearchResult(property),
+        //   primary_image: property.primary_image,
+        //   hasPropertyDetails: !!property.property_details,
+        //   propertyType: typeof property
+        // });
         
         // ADDITIONAL DEBUG: Log specific property details structure
         if (property.property_details) {
-          console.log(`[PropertyItem] 📋 Property Details Structure for ${propertyData.id}:`, {
-            hasImageFiles: !!(property.property_details.imageFiles),
-            imageFilesLength: property.property_details.imageFiles?.length || 0,
-            hasPrimaryImage: !!(property.property_details.primaryImage),
-            primaryImageValue: property.property_details.primaryImage
-          });
+          // console.log(`[PropertyItem] 📋 Property Details Structure for ${propertyData.id}:`, {
+          //   hasImageFiles: !!(property.property_details.imageFiles),
+          //   imageFilesLength: property.property_details.imageFiles?.length || 0,
+          //   hasPrimaryImage: !!(property.property_details.primaryImage),
+          //   primaryImageValue: property.property_details.primaryImage
+          // });
         }
         
         // Use simple service to get image URL
         imageUrl = await simpleImageService.getPropertyImageUrlAsync(propertyData.id);
         
-        console.log(`[PropertyItem] Simple service returned URL: ${imageUrl}`);
+        // console.log(`[PropertyItem] Simple service returned URL: ${imageUrl}`);
         
         if (imageUrl && imageUrl !== '/noimage.png') {
-          console.log(`[PropertyItem] ✅ Image loaded successfully for ${propertyData.id}`);
+          // console.log(`[PropertyItem] ✅ Image loaded successfully for ${propertyData.id}`);
           setAsyncImageUrl(imageUrl);
         } else {
-          console.log(`[PropertyItem] ❌ Image failed to load for ${propertyData.id}, got default image`);
+          // console.log(`[PropertyItem] ❌ Image failed to load for ${propertyData.id}, got default image`);
         }
       } catch (error) {
         console.error(`[PropertyItem] Failed to load image for property ${propertyData.id}:`, error);

@@ -31,7 +31,7 @@ class SimpleImageService {
     }
 
     try {
-      console.log(`[SimpleImageService] Getting image for property: ${propertyId}, fileName: ${fileName}, preferPrimary: ${preferPrimary}`);
+      // console.log(`[SimpleImageService] Getting image for property: ${propertyId}, fileName: ${fileName}, preferPrimary: ${preferPrimary}`);
       
       // Fetch property data to get imageFiles array
       const { data: property, error } = await supabase
@@ -47,7 +47,7 @@ class SimpleImageService {
 
       const imageFiles = property.property_details?.imageFiles;
       if (!Array.isArray(imageFiles) || imageFiles.length === 0) {
-        console.log(`[SimpleImageService] No images found for property: ${propertyId}`);
+        // console.log(`[SimpleImageService] No images found for property: ${propertyId}`);
         return '/noimage.png';
       }
 
@@ -73,7 +73,7 @@ class SimpleImageService {
       }
 
       if (!selectedImage) {
-        console.log(`[SimpleImageService] No valid image found for property: ${propertyId}`);
+        // console.log(`[SimpleImageService] No valid image found for property: ${propertyId}`);
         return '/noimage.png';
       }
 
@@ -97,11 +97,11 @@ class SimpleImageService {
       }
 
       if (!imageUrl || imageUrl === '') {
-        console.log(`[SimpleImageService] No valid image URL found for property: ${propertyId}`);
+        // console.log(`[SimpleImageService] No valid image URL found for property: ${propertyId}`);
         return '/noimage.png';
       }
 
-      console.log(`[SimpleImageService] Found image URL: ${imageUrl}`);
+      // console.log(`[SimpleImageService] Found image URL: ${imageUrl}`);
 
       // Cache the result
       this.cache.set(cacheKey, {
@@ -112,7 +112,7 @@ class SimpleImageService {
       return imageUrl;
 
     } catch (error) {
-      console.error(`[SimpleImageService] Error getting image for property ${propertyId}:`, error);
+      // console.error(`[SimpleImageService] Error getting image for property ${propertyId}:`, error);
       return '/noimage.png';
     }
   }
@@ -132,7 +132,7 @@ class SimpleImageService {
     }
 
     try {
-      console.log(`[SimpleImageService] Getting all images for property: ${propertyId}`);
+      // console.log(`[SimpleImageService] Getting all images for property: ${propertyId}`);
       
       const { data: property, error } = await supabase
         .from('properties_v2')
@@ -147,7 +147,7 @@ class SimpleImageService {
 
       const imageFiles = property.property_details?.imageFiles;
       if (!Array.isArray(imageFiles) || imageFiles.length === 0) {
-        console.log(`[SimpleImageService] No images found for property: ${propertyId}`);
+        // console.log(`[SimpleImageService] No images found for property: ${propertyId}`);
         return [];
       }
 
@@ -184,7 +184,7 @@ class SimpleImageService {
       return urls;
 
     } catch (error) {
-      console.error(`[SimpleImageService] Error getting images for property ${propertyId}:`, error);
+      // console.error(`[SimpleImageService] Error getting images for property ${propertyId}:`, error);
       return [];
     }
   }
@@ -224,7 +224,7 @@ class SimpleImageService {
 
       return '/noimage.png';
     } catch (error) {
-      console.error(`[SimpleImageService] Error getting direct image URL for ${propertyId}/${fileName}:`, error);
+      // console.error(`[SimpleImageService] Error getting direct image URL for ${propertyId}/${fileName}:`, error);
       return '/noimage.png';
     }
   }

@@ -49,6 +49,10 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
   // Load latest properties on component mount (DEFAULT BEHAVIOR)
   useEffect(() => {
     const loadLatestProperties = async () => {
+      // DEBUG: Start timing property fetch in PropertyMapHomeView
+      const startTime = performance.now();
+      console.log('🏠 [PERFORMANCE] PropertyMapHomeView: Starting property fetch at:', new Date().toISOString());
+      
       setSearchLoading(true);
       
       try {
@@ -65,6 +69,12 @@ const PropertyMapHomeView: React.FC<PropertyMapHomeViewProps> = ({ onFavoriteAct
         setHoveredProperty(null);
         setCurrentPage(1);
         setCurrentFilters(null); // No filters for latest properties
+        
+        // DEBUG: End timing property fetch in PropertyMapHomeView
+        const endTime = performance.now();
+        const duration = endTime - startTime;
+        console.log(`🏠 [PERFORMANCE] PropertyMapHomeView: Property fetch completed in ${duration.toFixed(2)}ms`);
+        console.log('🏠 [PERFORMANCE] PropertyMapHomeView: Properties ready for state update at:', new Date().toISOString());
         
       } catch (error) {
         // Set empty state on error but don't show error toast immediately

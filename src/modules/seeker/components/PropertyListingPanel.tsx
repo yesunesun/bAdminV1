@@ -110,6 +110,34 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
     }
   }, [properties.length, totalCount]);
 
+  // DEBUG: Monitor when properties are updated and rendered
+  useEffect(() => {
+    if (properties.length > 0) {
+      const renderCompleteTime = performance.now();
+      console.log(`🏁 [PERFORMANCE] PropertyListingPanel: ${properties.length} properties rendered in DOM at:`, new Date().toISOString());
+      console.log(`🏁 [PERFORMANCE] PropertyListingPanel: Total properties in state: ${properties.length}`);
+      
+      // Calculate total time from page start
+      const pageStartTime = (window as any).seekerPageStartTime;
+      if (pageStartTime) {
+        const totalTime = renderCompleteTime - pageStartTime;
+        console.log(`⏱️ [PERFORMANCE] TOTAL TIME: From page start to property rendering: ${totalTime.toFixed(2)}ms`);
+      }
+      
+      // Schedule a check to see when the DOM has been updated
+      setTimeout(() => {
+        const domUpdateTime = performance.now();
+        console.log('✅ [PERFORMANCE] PropertyListingPanel: DOM update completed at:', new Date().toISOString());
+        
+        // Final total time calculation
+        if (pageStartTime) {
+          const finalTotalTime = domUpdateTime - pageStartTime;
+          console.log(`🎯 [PERFORMANCE] FINAL TOTAL TIME: From page start to DOM completion: ${finalTotalTime.toFixed(2)}ms`);
+        }
+      }, 0);
+    }
+  }, [properties]);
+
   // Handle favorite toggle with persistence
   const handleFavoriteToggle = async (propertyId: string, newLikedState: boolean) => {
     if (!user) {
@@ -193,6 +221,10 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
 
   // Render content
   const renderContent = () => {
+    // DEBUG: Start timing property rendering
+    const renderStartTime = performance.now();
+    console.log('🎨 [PERFORMANCE] PropertyListingPanel: Starting render at:', new Date().toISOString());
+    
     if (loading) {
       // Enhanced loading placeholders with better visual hierarchy
       return (
@@ -254,7 +286,7 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
       );
     } else {
       // Enhanced property cards with improved spacing
-      return (
+      const result = (
         <div className="divide-y divide-border/30">
           {properties.map((property, index) => (
             <div 
@@ -284,6 +316,14 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
           ))}
         </div>
       );
+      
+      // DEBUG: End timing property rendering
+      const renderEndTime = performance.now();
+      const renderDuration = renderEndTime - renderStartTime;
+      console.log(`🎨 [PERFORMANCE] PropertyListingPanel: Render completed in ${renderDuration.toFixed(2)}ms`);
+      console.log('🎨 [PERFORMANCE] PropertyListingPanel: Properties rendered at:', new Date().toISOString());
+      
+      return result;
     }
   };
 

@@ -484,7 +484,7 @@ class BtSearchService implements SearchService {
         const propertyDetails = propertyDetailsMap.get(result.id);
         
         if (propertyDetails) {
-          console.log(`✅ Enhanced ${result.id} with property_details. Has imageFiles:`, !!(propertyDetails.imageFiles));
+          // console.log(`✅ Enhanced ${result.id} with property_details. Has imageFiles:`, !!(propertyDetails.imageFiles));
           return {
             ...result,
             property_details: propertyDetails

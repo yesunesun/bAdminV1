@@ -16,6 +16,15 @@ const PropertyMapHome: React.FC = () => {
   const [showFavorites, setShowFavorites] = useState<boolean>(false);
   const [showLoginPrompt, setShowLoginPrompt] = useState<boolean>(false);
   
+  // DEBUG: Record when seeker page starts loading
+  React.useEffect(() => {
+    const pageStartTime = performance.now();
+    console.log('🏠 [PERFORMANCE] Seeker page component mounted at:', new Date().toISOString());
+    
+    // Mark that the page has started loading
+    (window as any).seekerPageStartTime = pageStartTime;
+  }, []);
+  
   // Handle favorite action
   const handleFavoriteAction = (propertyId: string) => {
     if (!user) {

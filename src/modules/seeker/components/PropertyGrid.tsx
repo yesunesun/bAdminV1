@@ -52,6 +52,10 @@ const PropertyGrid: React.FC<PropertyGridProps> = ({
       
       if (propertiesToLoad.length === 0) return;
       
+      // DEBUG: Start timing image loading
+      const imageLoadStartTime = performance.now();
+      console.log(`🖼️ [PERFORMANCE] PropertyGrid: Starting image load for ${propertiesToLoad.length} properties at:`, new Date().toISOString());
+      
       const newImageCache = { ...propertyImageCache };
       
       // Process each property
@@ -117,6 +121,12 @@ const PropertyGrid: React.FC<PropertyGridProps> = ({
       
       // Update cache with all new images
       setPropertyImageCache(newImageCache);
+      
+      // DEBUG: End timing image loading
+      const imageLoadEndTime = performance.now();
+      const imageLoadDuration = imageLoadEndTime - imageLoadStartTime;
+      console.log(`🖼️ [PERFORMANCE] PropertyGrid: Image loading completed in ${imageLoadDuration.toFixed(2)}ms`);
+      console.log('🖼️ [PERFORMANCE] PropertyGrid: Images cached and ready at:', new Date().toISOString());
     };
     
     loadPropertyImages();
