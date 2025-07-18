@@ -73,11 +73,11 @@ export const CommercialRentalDetails: React.FC<FormSectionProps> = ({
     validateField(field);
   };
   
-  // Migrate existing data from root to step object on component mount (removed furnishing)
+  // Migrate existing data from root to step object on component mount (removed furnishing and parking)
   useEffect(() => {
     const fieldsToMigrate = [
       'rentalType', 'rentAmount', 'rentNegotiable', 'securityDeposit', 
-      'availableFrom', 'maintenance', 'parking', 
+      'availableFrom', 'maintenance', 
       'businessPreferences', 'operatingHours', 'hasLockInPeriod', 
       'lockInPeriod', 'advanceRent', 'includesUtilities', 'camCharges'
     ];
@@ -351,7 +351,7 @@ export const CommercialRentalDetails: React.FC<FormSectionProps> = ({
           </div>
         </div>
 
-        {/* Fourth Row - Available From and Parking (removed furnishing) */}
+        {/* Fourth Row - Available From (parking removed) */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Available From - MANDATORY */}
           <div className="space-y-2">
@@ -376,39 +376,9 @@ export const CommercialRentalDetails: React.FC<FormSectionProps> = ({
             )}
           </div>
 
-          {/* Parking - MANDATORY */}
-          <div className="space-y-2">
-            <RequiredLabel htmlFor={getFieldId('parking')} required>Parking</RequiredLabel>
-            <Select
-              value={getFieldValue('parking') || ''}
-              onValueChange={(value) => updateFormAndState('parking', value)}
-            >
-              <SelectTrigger 
-                id={getFieldId('parking')}
-                className={cn(
-                  "w-full",
-                  getFieldError('parking') && "border-destructive focus-visible:ring-destructive"
-                )}
-              >
-                <SelectValue placeholder="Select Parking Option" />
-              </SelectTrigger>
-              <SelectContent>
-                {COMMERCIAL_PARKING_OPTIONS.map((option) => (
-                  <SelectItem key={option} value={option}>
-                    {option}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {/* ✅ ADDED: Error message display */}
-            {shouldShowFieldError('parking') && (
-              <p className="text-sm text-red-600 mt-0.5">
-                {getFieldValidation('parking').error}
-              </p>
-            )}
-            {getFieldError('parking') && (
-              <p className="text-sm text-destructive mt-1">{getFieldError('parking')?.message as string}</p>
-            )}
+          {/* Empty column to maintain layout */}
+          <div className="invisible">
+            {/* Empty placeholder */}
           </div>
         </div>
 

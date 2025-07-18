@@ -142,11 +142,11 @@ export function useStepValidation({
        'isSmokingAllowed',       // Smoking Allowed (Yes/No)
        'isDrinkingAllowed',      // Drinking Allowed (Yes/No)
        // Contact & Utilities Fields
-       'propertyShowPerson',     // Who Will Show the Property?
        'waterSupply',            // Water Supply
        // Additional Details Field (made optional to fix progression issue)
        // 'about' - removed from required as it's optional field
        // Note: 'directions' is optional and only shown when user clicks "Add Directions"
+       // Note: 'propertyShowPerson' moved to Features section
      ],
      
      // ✅ FIXED: PG details - REMOVED mealOption (now handled in Room Details tab)

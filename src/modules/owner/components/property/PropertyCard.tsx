@@ -24,6 +24,7 @@ import { supabase } from '@/lib/supabase';
 interface Property extends Partial<PropertyType> {
   property_details: any;
   images?: Array<{id: string, url: string, isPrimary?: boolean}>;
+  primaryImageUrl?: string;
 }
 
 interface PropertyCardProps {
@@ -61,12 +62,18 @@ const getPropertyImages = async (propertyId: string) => {
     }
 
     console.log(`Found ${data.length} images for property ${propertyId}:`, data);
-    return data.map(file => ({
-      name: file.name,
-      url: `${supabase.storageUrl}/object/public/property-images-v2/${propertyId}/${file.name}`,
-      size: file.metadata?.size || 0,
-      type: file.metadata?.mimetype || '',
-    }));
+    return data.map(file => {
+      const { data: urlData } = supabase.storage
+        .from('property-images-v2')
+        .getPublicUrl(`${propertyId}/${file.name}`);
+      
+      return {
+        name: file.name,
+        url: urlData.publicUrl,
+        size: file.metadata?.size || 0,
+        type: file.metadata?.mimetype || '',
+      };
+    });
   } catch (error) {
     console.error(`Error in getPropertyImages for ${propertyId}:`, error);
     return [];
@@ -78,27 +85,27 @@ const extractPropertyImages = (property: Property) => {
   try {
     if (!property) return [];
     
-    // Check for images array
+    // First check for the images array that's provided by the service
     if (property.images && Array.isArray(property.images) && property.images.length > 0) {
       console.log(`Found ${property.images.length} images in property.images`, property.images);
       return property.images;
     }
     
-    // Check in property_details.media
-    const mediaImages = property.property_details?.media?.photos?.images;
-    if (mediaImages && Array.isArray(mediaImages) && mediaImages.length > 0) {
-      console.log(`Found ${mediaImages.length} images in property_details.media.photos.images`, mediaImages);
-      return mediaImages;
-    }
-    
-    // Check for imageFiles (new optimization format)
+    // Check for imageFiles (new optimization format) in property_details
     const imageFiles = property.property_details?.imageFiles;
     if (imageFiles && Array.isArray(imageFiles) && imageFiles.length > 0) {
       console.log(`Found ${imageFiles.length} images in property_details.imageFiles`, imageFiles);
       return imageFiles;
     }
     
-    // Check for other possible image locations
+    // Check in property_details.media (legacy format)
+    const mediaImages = property.property_details?.media?.photos?.images;
+    if (mediaImages && Array.isArray(mediaImages) && mediaImages.length > 0) {
+      console.log(`Found ${mediaImages.length} images in property_details.media.photos.images`, mediaImages);
+      return mediaImages;
+    }
+    
+    // Check for other possible image locations (legacy)
     const legacyImages = property.property_details?.images;
     if (legacyImages && Array.isArray(legacyImages) && legacyImages.length > 0) {
       console.log(`Found ${legacyImages.length} images in property_details.images`, legacyImages);
@@ -129,15 +136,19 @@ const buildImageUrl = (propertyId: string, imageUrl: string): string => {
   
   // If imageUrl has the property ID in it, handle that case
   if (imageUrl.includes(propertyId)) {
-    const fullUrl = `${supabase.storageUrl}/object/public/property-images-v2/${imageUrl}`;
-    console.log('Built URL with included property ID:', fullUrl);
-    return fullUrl;
+    const { data } = supabase.storage
+      .from('property-images-v2')
+      .getPublicUrl(imageUrl);
+    console.log('Built URL with included property ID:', data.publicUrl);
+    return data.publicUrl;
   }
   
   // Otherwise, construct URL with propertyId/filename pattern
-  const fullUrl = `${supabase.storageUrl}/object/public/property-images-v2/${propertyId}/${imageUrl}`;
-  console.log('Built URL with property ID folder:', fullUrl);
-  return fullUrl;
+  const { data } = supabase.storage
+    .from('property-images-v2')
+    .getPublicUrl(`${propertyId}/${imageUrl}`);
+  console.log('Built URL with property ID folder:', data.publicUrl);
+  return data.publicUrl;
 };
 
 // Helper function to safely get price from new property structure
@@ -344,11 +355,19 @@ export function PropertyCard({
         id: property.id,
         hasImages: !!property.images,
         imagesLength: property.images?.length || 0,
+        primaryImageUrl: property.primaryImageUrl,
         hasPropertyDetails: !!property.property_details,
         hasMedia: !!property.property_details?.media,
         flowCategory: property.property_details?.flow?.category,
         flowListingType: property.property_details?.flow?.listingType,
       });
+      
+      // First check if we have a pre-computed primaryImageUrl from the service
+      if (property.primaryImageUrl && property.primaryImageUrl.startsWith('http')) {
+        console.log('Using primaryImageUrl from service:', property.primaryImageUrl);
+        setImageUrl(property.primaryImageUrl);
+        return;
+      }
       
       // Get images from the property data
       const extractedImages = extractPropertyImages(property);
@@ -479,19 +498,25 @@ export function PropertyCard({
       <div className="relative h-48 overflow-hidden bg-muted">
         {(asyncImageUrl || imageUrl) ? (
           <img 
-            src={asyncImageUrl || imageUrl} 
+            src={asyncImageUrl || imageUrl || '/noimage.png'} 
             alt={title}
             className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
-            onLoad={() => console.log('Image loaded successfully:', imageUrl)}
+            onLoad={() => console.log('Image loaded successfully:', asyncImageUrl || imageUrl)}
             onError={(e) => {
-              console.error('Failed to load image:', imageUrl);
-              // Set fallback image on error
-              (e.target as HTMLImageElement).src = '/noimage.png';
+              console.error('Failed to load image:', asyncImageUrl || imageUrl);
+              // Set fallback image on error if not already set
+              const target = e.target as HTMLImageElement;
+              if (!target.src.includes('/noimage.png')) {
+                target.src = '/noimage.png';
+              }
             }}
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center">
-            <Home className="h-16 w-16 text-muted-foreground/40" />
+          <div className="flex h-full w-full items-center justify-center bg-gray-100 dark:bg-gray-800">
+            <div className="text-center">
+              <Home className="h-12 w-12 text-muted-foreground/40 mx-auto mb-2" />
+              <p className="text-xs text-muted-foreground">No Image</p>
+            </div>
           </div>
         )}
       </div>

@@ -15,6 +15,7 @@ import { PropertyType } from './PropertyFormTypes';
 interface Property extends Partial<PropertyType> {
   property_details: any;
   images?: Array<{id: string, url: string, isPrimary?: boolean}>;
+  primaryImageUrl?: string;
 }
 
 interface PropertyListProps {

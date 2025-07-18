@@ -17,8 +17,9 @@ export const COMMERCIAL_MAINTENANCE_OPTIONS = [
 
 export const COMMERCIAL_PARKING_OPTIONS = [
   'Reserved Parking',
-  'Shared Parking',
   'Paid Parking',
+  'Shared Parking',
+  'Public Parking',
   'No Parking'
 ] as const;
 

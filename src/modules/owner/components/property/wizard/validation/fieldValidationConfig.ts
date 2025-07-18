@@ -431,7 +431,7 @@ const getRequiredFieldsForStep = (stepId: string): string[] => {
     // Commercial rent
     'com_rent_basic_details': ['commercialPropertyType', 'builtUpArea', 'rentAmount', 'securityDeposit', 'leaseDuration', 'maintenance', 'furnishing', 'parking', 'powerBackup', 'lockInPeriod', 'availableFrom'],
     'com_rent_location': ['address', 'city', 'state', 'pinCode', 'locality'],
-    'com_rent_rental': ['rentalType', 'rentAmount', 'securityDeposit', 'advanceRent', 'maintenance', 'camCharges', 'availableFrom', 'parking', 'operatingHours', 'businessPreferences'],
+    'com_rent_rental': ['rentalType', 'rentAmount', 'securityDeposit', 'advanceRent', 'maintenance', 'camCharges', 'availableFrom', 'operatingHours', 'businessPreferences'],
     'com_rent_features': ['powerBackup', 'lift', 'parkingType', 'washroomType', 'propertyCondition'],
     
     // Commercial sale

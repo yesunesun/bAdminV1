@@ -7,7 +7,13 @@ export const PROPERTY_SHOW_OPTIONS = [
   'Owner',
   'Caretaker',
   'Security',
-  'Agent'
+  'Agent',
+  'Need help',
+  'I will show',
+  'Neighbours',
+  'Friends/Relatives',
+  'Tenants',
+  'Others'
 ] as const;
 
 export const PROPERTY_CONDITION_OPTIONS = [

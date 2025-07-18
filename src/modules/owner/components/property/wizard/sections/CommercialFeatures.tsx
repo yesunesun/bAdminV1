@@ -71,7 +71,7 @@ const INFRASTRUCTURE_FEATURES = [
 // Required dropdown options
 const POWER_BACKUP_OPTIONS = ['Full', 'DG Backup', 'Need to Arrange'] as const;
 const LIFT_OPTIONS = ['None', 'Personal', 'Common'] as const;
-const PARKING_TYPE_OPTIONS = ['None', 'Public And Reserved', 'Public', 'Reserved'] as const;
+const PARKING_TYPE_OPTIONS = ['Reserved Parking', 'Paid Parking', 'Shared Parking', 'Public Parking', 'No Parking'] as const;
 const WASHROOM_OPTIONS = ['Shared', 'No Washroom', 'Private'] as const;
 const WATER_STORAGE_OPTIONS = ['Yes', 'No'] as const;
 const SECURITY_OPTIONS = ['Yes', 'No'] as const;

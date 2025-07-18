@@ -21,7 +21,6 @@ const FlatmateDetails: React.FC<FormSectionProps> = ({
   const [showDirectionsField, setShowDirectionsField] = useState(false);
   
   // States for custom select components
-  const [showPersonOptionsOpen, setShowPersonOptionsOpen] = useState(false);
   const [waterSupplyOptionsOpen, setWaterSupplyOptionsOpen] = useState(false);
 
   // ✅ ADDED: Initialize validation system
@@ -59,7 +58,6 @@ const FlatmateDetails: React.FC<FormSectionProps> = ({
   }, [form, stepId]);
   
   // Initialize values from existing data
-  const [selectedShowPerson, setSelectedShowPerson] = useState(getField('propertyShowPerson', ''));
   const [selectedWaterSupply, setSelectedWaterSupply] = useState(getField('waterSupply', ''));
 
   // Ensure step structure exists
@@ -74,7 +72,6 @@ const FlatmateDetails: React.FC<FormSectionProps> = ({
     }
     
     // Load existing values
-    setSelectedShowPerson(getField('propertyShowPerson', ''));
     setSelectedWaterSupply(getField('waterSupply', ''));
   }, [stepId, form]);
 
@@ -116,12 +113,6 @@ const FlatmateDetails: React.FC<FormSectionProps> = ({
   };
 
   // Helper function for option selection
-  const handleShowPersonSelect = (value: string) => {
-    setSelectedShowPerson(value);
-    saveField('propertyShowPerson', value);
-    setShowPersonOptionsOpen(false);
-  };
-
   const handleWaterSupplySelect = (value: string) => {
     setSelectedWaterSupply(value);
     saveField('waterSupply', value);
@@ -203,33 +194,8 @@ const FlatmateDetails: React.FC<FormSectionProps> = ({
 
         {/* Contact & Utilities Info - More Compact */}
         <div className="space-y-2">
-          <h3 className="text-base font-semibold">Contact & Utilities</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-3 bg-blue-50 dark:bg-blue-900/10 rounded-lg">
-            {/* Who Will Show the Property? */}
-            <div>
-              <p className="text-sm font-medium mb-1">Who Will Show the Property?</p>
-              <div className="relative">
-                <div 
-                  className="p-2 border border-gray-200 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 cursor-pointer text-sm"
-                  onClick={() => setShowPersonOptionsOpen(!showPersonOptionsOpen)}
-                >
-                  {selectedShowPerson || "Select who will show the property"}
-                </div>
-                
-                <DropdownOptions 
-                  isOpen={showPersonOptionsOpen}
-                  options={['Need help', 'I will show', 'Neighbours', 'Friends/Relatives', 'Security', 'Tenants', 'Others']}
-                  onSelect={handleShowPersonSelect}
-                />
-              </div>
-              {/* ✅ ADDED: Validation error display */}
-              {shouldShowFieldError('propertyShowPerson') && (
-                <p className="text-sm text-red-600 mt-0.5">
-                  {getFieldValidation('propertyShowPerson').error}
-                </p>
-              )}
-            </div>
-
+          <h3 className="text-base font-semibold">Utilities</h3>
+          <div className="p-3 bg-blue-50 dark:bg-blue-900/10 rounded-lg">
             {/* Water Supply */}
             <div>
               <p className="text-sm font-medium mb-1">Water Supply</p>

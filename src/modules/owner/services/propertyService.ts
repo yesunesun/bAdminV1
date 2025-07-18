@@ -295,21 +295,49 @@ const ensureCompleteStructure = (data: any): any => {
 /**
  * Gets the primary image URL from imageFiles array
  */
-const getPrimaryImageUrl = (imageFiles: any[]): string | null => {
+const getPrimaryImageUrl = (imageFiles: any[], propertyId?: string): string | null => {
   if (!Array.isArray(imageFiles) || imageFiles.length === 0) {
     return null;
   }
 
   // Find primary image
   const primaryImage = imageFiles.find(img => img.isPrimary);
-  if (primaryImage && primaryImage.url) {
-    return primaryImage.url;
+  if (primaryImage) {
+    // If url exists and is not empty, use it
+    if (primaryImage.url && primaryImage.url !== '') {
+      return primaryImage.url;
+    }
+    
+    // If url is empty but fileName exists, generate public URL
+    if (primaryImage.fileName && propertyId) {
+      const { data } = supabase.storage
+        .from('property-images-v2')
+        .getPublicUrl(`${propertyId}/${primaryImage.fileName}`);
+      
+      if (data.publicUrl) {
+        return data.publicUrl;
+      }
+    }
   }
 
   // Fallback to first image
   const firstImage = imageFiles[0];
-  if (firstImage && firstImage.url) {
-    return firstImage.url;
+  if (firstImage) {
+    // If url exists and is not empty, use it
+    if (firstImage.url && firstImage.url !== '') {
+      return firstImage.url;
+    }
+    
+    // If url is empty but fileName exists, generate public URL
+    if (firstImage.fileName && propertyId) {
+      const { data } = supabase.storage
+        .from('property-images-v2')
+        .getPublicUrl(`${propertyId}/${firstImage.fileName}`);
+      
+      if (data.publicUrl) {
+        return data.publicUrl;
+      }
+    }
   }
 
   return null;
@@ -351,7 +379,7 @@ export const propertyService = {
         
         // Get images from new structure
         const images = organizedData.imageFiles || [];
-        const primaryImageUrl = getPrimaryImageUrl(images);
+        const primaryImageUrl = getPrimaryImageUrl(images, property.id);
         
         return {
           id: property.id,
@@ -410,7 +438,7 @@ export const propertyService = {
       
       // Get images from new structure
       const images = organizedData.imageFiles || [];
-      const primaryImageUrl = getPrimaryImageUrl(images);
+      const primaryImageUrl = getPrimaryImageUrl(images, data.id);
       
       return {
         id: data.id,
@@ -507,7 +535,7 @@ export const propertyService = {
       
       // Get images from new structure
       const images = organizedData.imageFiles || [];
-      const primaryImageUrl = getPrimaryImageUrl(images);
+      const primaryImageUrl = getPrimaryImageUrl(images, data[0].id);
       
       return {
         id: data[0].id,
@@ -603,7 +631,7 @@ export const propertyService = {
       
       // Get images from new structure
       const images = organizedData.imageFiles || [];
-      const primaryImageUrl = getPrimaryImageUrl(images);
+      const primaryImageUrl = getPrimaryImageUrl(images, data.id);
       
       return {
         id: data.id,
