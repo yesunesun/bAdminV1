@@ -154,7 +154,7 @@ export class BtServiceClient {
     filters: SearchFilters,
     pagination?: SearchPaginationOptions
   ): Promise<SearchResponse> {
-    const endpoint = `/v3/search/search-all-properties`;
+    const endpoint = `/api/v3/search/search-all-properties`;
     
     // Transform filters to v3 format
     const v3Params = this.transformFiltersToV3Format(filters, pagination);
@@ -172,7 +172,7 @@ export class BtServiceClient {
     filters: SearchFilters,
     pagination?: SearchPaginationOptions
   ): Promise<SearchResponse> {
-    const endpoint = `/v3/search/smart`;
+    const endpoint = `/api/v3/search/smart`;
     
     // Transform filters to v3 format
     const v3Params = this.transformFiltersToV3Format(filters, pagination);
@@ -191,7 +191,7 @@ export class BtServiceClient {
       exact: exact.toString()
     });
 
-    const endpoint = `/v3/search/code/${code}?${queryParams.toString()}`;
+    const endpoint = `/api/v3/search/code/${code}?${queryParams.toString()}`;
     
     return this.makeRequest<SearchResponse>(endpoint, {
       method: 'GET',
@@ -207,7 +207,7 @@ export class BtServiceClient {
       offset: offset.toString()
     });
 
-    const endpoint = `/v3/search/latest?${queryParams.toString()}`;
+    const endpoint = `/api/v3/search/latest?${queryParams.toString()}`;
     
     return this.makeRequest<SearchResponse>(endpoint, {
       method: 'GET',
@@ -222,7 +222,7 @@ export class BtServiceClient {
       q: query
     });
 
-    const endpoint = `/search/suggestions?${queryParams.toString()}`;
+    const endpoint = `/api/search/suggestions?${queryParams.toString()}`;
     
     const response = await this.makeRequest<{ suggestions: string[] }>(endpoint, {
       method: 'GET',
@@ -236,7 +236,7 @@ export class BtServiceClient {
    */
   async validatePropertyCode(code: string): Promise<boolean> {
     try {
-      const endpoint = `/v3/search/validate-code/${code}`;
+      const endpoint = `/api/v3/search/validate-code/${code}`;
       const response = await this.makeRequest<{ isValid: boolean }>(endpoint, {
         method: 'GET',
       });

@@ -58,23 +58,23 @@ export default function MCPSearchPage() {
       // Map MCP tools to btService endpoints
       switch (toolName) {
         case 'property_search':
-          btServiceUrl = 'http://localhost:3001/api/search';
+          btServiceUrl = `${import.meta.env.VITE_BTSERVICE_URL}/api/search`;
           btServiceBody = args;
           break;
         case 'nlp_property_search':
-          btServiceUrl = 'http://localhost:3001/api/search/nlp';
+          btServiceUrl = `${import.meta.env.VITE_BTSERVICE_URL}/api/search/nlp`;
           btServiceBody = { query: args.query };
           break;
         case 'get_property_by_code':
-          btServiceUrl = `http://localhost:3001/api/search/code/${args.propertyCode}`;
+          btServiceUrl = `${import.meta.env.VITE_BTSERVICE_URL}/api/search/code/${args.propertyCode}`;
           btServiceBody = {};
           break;
         case 'search_suggestions':
-          btServiceUrl = `http://localhost:3001/api/search/suggestions?query=${encodeURIComponent(args.query)}`;
+          btServiceUrl = `${import.meta.env.VITE_BTSERVICE_URL}/api/search/suggestions?query=${encodeURIComponent(args.query)}`;
           btServiceBody = {};
           break;
         case 'latest_properties':
-          btServiceUrl = `http://localhost:3001/api/search/latest?limit=${args.limit || 20}&offset=${args.offset || 0}`;
+          btServiceUrl = `${import.meta.env.VITE_BTSERVICE_URL}/api/search/latest?limit=${args.limit || 20}&offset=${args.offset || 0}`;
           btServiceBody = {};
           break;
         default:
@@ -118,7 +118,7 @@ export default function MCPSearchPage() {
   const checkMCPServerStatus = async () => {
     try {
       // For now, check btService directly since we're bypassing MCP
-      const response = await fetch('http://localhost:3001/api/health');
+      const response = await fetch(`${import.meta.env.VITE_BTSERVICE_URL}/api/health`);
       if (response.ok) {
         setMcpServerStatus('connected');
       } else {
