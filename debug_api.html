@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Debug Test</title>
+</head>
+<body>
+    <h1>API Debug Test</h1>
+    <button onclick="testAPI()">Test API Call</button>
+    <button onclick="testHealth()">Test Health Check</button>
+    <pre id="result"></pre>
+
+    <script>
+        async function testAPI() {
+            const result = document.getElementById('result');
+            try {
+                console.log('Testing API call...');
+                const response = await fetch('https://5h325rzyk2.execute-api.ap-south-1.amazonaws.com/prod/api/v3/search/latest?limit=5&offset=0');
+                console.log('Response status:', response.status);
+                const data = await response.json();
+                console.log('Response data:', data);
+                result.textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                console.error('API Error:', error);
+                result.textContent = 'Error: ' + error.message;
+            }
+        }
+
+        async function testHealth() {
+            const result = document.getElementById('result');
+            try {
+                console.log('Testing health check...');
+                const response = await fetch('https://5h325rzyk2.execute-api.ap-south-1.amazonaws.com/prod/health');
+                console.log('Response status:', response.status);
+                const data = await response.json();
+                console.log('Response data:', data);
+                result.textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                console.error('Health Error:', error);
+                result.textContent = 'Error: ' + error.message;
+            }
+        }
+    </script>
+</body>
+</html>

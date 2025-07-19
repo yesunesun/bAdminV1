@@ -41,7 +41,9 @@ export class BtServiceClient {
       console.log(`🌐 btService API Request [Attempt ${attempt}]:`, {
         url,
         method: options.method || 'GET',
-        body: options.body ? JSON.parse(options.body as string) : undefined
+        body: options.body ? JSON.parse(options.body as string) : undefined,
+        timestamp: new Date().toISOString(),
+        baseUrl: this.baseUrl
       });
 
       const response = await fetch(url, {
@@ -346,6 +348,14 @@ const defaultConfig: BtServiceConfig = {
   retryAttempts: 3,
   retryDelay: 1000,
 };
+
+// Debug configuration to console
+console.log('🔧 BtService Configuration:', {
+  VITE_BTSERVICE_URL: import.meta.env.VITE_BTSERVICE_URL,
+  VITE_SKIP_BTSERVICE: import.meta.env.VITE_SKIP_BTSERVICE,
+  configuredBaseUrl: defaultConfig.baseUrl,
+  expectedUrl: 'https://5h325rzyk2.execute-api.ap-south-1.amazonaws.com/prod'
+});
 
 // Export singleton instance
 export const btServiceClient = new BtServiceClient(defaultConfig);

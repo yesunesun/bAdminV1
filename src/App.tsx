@@ -26,6 +26,7 @@ import ListYourProperty from './modules/owner/pages/ListYourProperty';
 import PropertyDetailPage from './modules/seeker/pages/PropertyDetailPage';
 import AllProperties from './modules/seeker/pages/AllProperties/index';
 import MCPSearchPage from './pages/MCPSearchPage';
+import ApiTestPage from './components/ApiTestPage';
 
 // Route Configurations
 import { authRoutes } from './routes/authRoutes';
@@ -325,6 +326,16 @@ function App() {
                       <ProtectedRoute>
                         <MCPSearchPage />
                       </ProtectedRoute>
+                    } 
+                  />
+                  
+                  {/* API Test Page - Development only */}
+                  <Route 
+                    path="/api-test" 
+                    element={
+                      <PublicOrProtectedRoute>
+                        <ApiTestPage />
+                      </PublicOrProtectedRoute>
                     } 
                   />
                   

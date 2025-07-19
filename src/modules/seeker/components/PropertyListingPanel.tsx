@@ -105,8 +105,8 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
   // Debug logging for count issues
   useEffect(() => {
     if (properties.length > totalCount && totalCount > 0) {
-      console.warn(`⚠️ Property count mismatch: displaying ${properties.length} but total is ${totalCount}`);
-      console.warn('Properties:', properties.map(p => p.id));
+      // console.warn(`⚠️ Property count mismatch: displaying ${properties.length} but total is ${totalCount}`);
+      // console.warn('Properties:', properties.map(p => p.id));
     }
   }, [properties.length, totalCount]);
 
@@ -114,8 +114,8 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
   useEffect(() => {
     if (properties.length > 0) {
       const renderCompleteTime = performance.now();
-      console.log(`🏁 [PERFORMANCE] PropertyListingPanel: ${properties.length} properties rendered in DOM at:`, new Date().toISOString());
-      console.log(`🏁 [PERFORMANCE] PropertyListingPanel: Total properties in state: ${properties.length}`);
+      // console.log(`🏁 [PERFORMANCE] PropertyListingPanel: ${properties.length} properties rendered in DOM at:`, new Date().toISOString());
+      // console.log(`🏁 [PERFORMANCE] PropertyListingPanel: Total properties in state: ${properties.length}`);
       
       // Calculate total time from page start
       const pageStartTime = (window as any).seekerPageStartTime;
@@ -127,7 +127,7 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
       // Schedule a check to see when the DOM has been updated
       setTimeout(() => {
         const domUpdateTime = performance.now();
-        console.log('✅ [PERFORMANCE] PropertyListingPanel: DOM update completed at:', new Date().toISOString());
+        // console.log('✅ [PERFORMANCE] PropertyListingPanel: DOM update completed at:', new Date().toISOString());
         
         // Final total time calculation
         if (pageStartTime) {
@@ -223,7 +223,7 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
   const renderContent = () => {
     // DEBUG: Start timing property rendering
     const renderStartTime = performance.now();
-    console.log('🎨 [PERFORMANCE] PropertyListingPanel: Starting render at:', new Date().toISOString());
+    // console.log('🎨 [PERFORMANCE] PropertyListingPanel: Starting render at:', new Date().toISOString());
     
     if (loading) {
       // Enhanced loading placeholders with better visual hierarchy
@@ -320,8 +320,8 @@ const PropertyListingPanel: React.FC<PropertyListingPanelProps> = ({
       // DEBUG: End timing property rendering
       const renderEndTime = performance.now();
       const renderDuration = renderEndTime - renderStartTime;
-      console.log(`🎨 [PERFORMANCE] PropertyListingPanel: Render completed in ${renderDuration.toFixed(2)}ms`);
-      console.log('🎨 [PERFORMANCE] PropertyListingPanel: Properties rendered at:', new Date().toISOString());
+      // console.log(`🎨 [PERFORMANCE] PropertyListingPanel: Render completed in ${renderDuration.toFixed(2)}ms`);
+      // console.log('🎨 [PERFORMANCE] PropertyListingPanel: Properties rendered at:', new Date().toISOString());
       
       return result;
     }

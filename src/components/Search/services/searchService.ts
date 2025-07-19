@@ -67,6 +67,14 @@ class BtSearchService implements SearchService {
     // Check if btService should be skipped
     const skipBtService = import.meta.env.VITE_SKIP_BTSERVICE === 'true';
     
+    console.log('🔍 SEARCH SERVICE DEBUG:', {
+      skipBtService,
+      VITE_SKIP_BTSERVICE: import.meta.env.VITE_SKIP_BTSERVICE,
+      VITE_BTSERVICE_URL: import.meta.env.VITE_BTSERVICE_URL,
+      filters,
+      pagination
+    });
+    
     if (skipBtService) {
       console.log('⚡ Skipping btService - using Supabase directly');
       return this.searchPropertiesFromSupabase(filters, pagination);
