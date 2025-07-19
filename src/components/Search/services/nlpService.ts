@@ -49,25 +49,19 @@ class NLPService {
    * NLP is triggered for natural language patterns, not simple property codes
    */
   shouldUseNLP(query: string): boolean {
-    console.log('🔍 NLP shouldUseNLP called with:', { query, type: typeof query, length: query?.length });
-    
     if (!query || query.trim().length < 3) {
-      console.log('❌ NLP rejected: too short or empty');
       return false;
     }
 
     const cleanQuery = query.trim().toLowerCase();
-    console.log('🔍 NLP cleanQuery:', { cleanQuery, length: cleanQuery.length });
 
     // Don't use NLP for simple property codes (6 alphanumeric chars)
     if (/^[a-z0-9]{6}$/i.test(cleanQuery)) {
-      console.log('❌ NLP rejected: property code detected');
       return false;
     }
 
     // Don't use NLP for very short queries
     if (cleanQuery.length < 5) {
-      console.log('❌ NLP rejected: length < 5');
       return false;
     }
 
@@ -82,17 +76,7 @@ class NLPService {
       /\s+/                                // Multiple words
     ];
 
-    const patternResults = nlpPatterns.map((pattern, index) => {
-      const result = pattern.test(cleanQuery);
-      const patternNames = ['location', 'bhk', 'price', 'transaction', 'property', 'intent', 'multiword'];
-      console.log(`🔍 Pattern ${patternNames[index]}: ${result}`);
-      return result;
-    });
-
-    const shouldUse = nlpPatterns.some(pattern => pattern.test(cleanQuery));
-    console.log('🎯 NLP shouldUseNLP result:', { shouldUse, patternResults });
-    
-    return shouldUse;
+    return nlpPatterns.some(pattern => pattern.test(cleanQuery));
   }
 
   /**

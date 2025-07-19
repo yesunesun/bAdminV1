@@ -215,14 +215,6 @@ export const useSearch = (onSearchCallback?: (filters: SearchFilters) => void) =
       let response;
       const query = searchFilters.filters.searchQuery?.trim();
       
-      console.log('🔍 SEARCH FLOW DEBUG:', {
-        rawQuery: searchFilters.filters.searchQuery,
-        trimmedQuery: query,
-        queryLength: query?.length,
-        isPropertyCode: query ? searchService.isPropertyCode(query) : false,
-        shouldUseNLP: query ? nlpService.shouldUseNLP(query) : false
-      });
-      
       // Check if the search query is exactly a 6-character alphanumeric property code
       if (query && searchService.isPropertyCode(query)) {
         console.log('🎯 Detected 6-character property code in search, using smart search');
