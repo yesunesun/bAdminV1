@@ -217,6 +217,18 @@ export class BtServiceClient {
   }
 
   /**
+   * NLP Search - Direct natural language processing search
+   */
+  async nlpSearch(query: string): Promise<SearchResponse> {
+    const endpoint = `/api/v3/search/nlp`;
+    
+    return this.makeRequest<SearchResponse>(endpoint, {
+      method: 'POST',
+      body: JSON.stringify({ query }),
+    });
+  }
+
+  /**
    * Get search suggestions
    */
   async getSearchSuggestions(query: string): Promise<string[]> {

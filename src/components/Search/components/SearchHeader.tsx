@@ -33,24 +33,33 @@ const SearchHeader: React.FC<SearchHeaderProps> = ({
     }
   }, [searchQuery]);
 
-  // Get search suggestions
+  // Get search suggestions - DISABLED to prevent interference with NLP search
+  // This was causing API calls on every keystroke, interfering with NLP search integration
   useEffect(() => {
     const getSuggestions = async () => {
-      if (searchQuery.length >= 2) {
-        try {
-          const results = await searchService.getSearchSuggestions(searchQuery);
-          setSuggestions(results);
-          setShowSuggestions(true);
-        } catch (error) {
-          console.error('Error getting suggestions:', error);
-          setSuggestions([]);
-        }
-      } else {
-        setSuggestions([]);
-        setShowSuggestions(false);
-      }
+      // DISABLED: Local search suggestions that interfere with NLP search
+      // Keeping the structure but disabling the actual API calls
+      console.log('🚫 Search suggestions disabled to prevent interference with NLP search');
+      setSuggestions([]);
+      setShowSuggestions(false);
+      
+      // OLD CODE (commented out):
+      // if (searchQuery.length >= 2) {
+      //   try {
+      //     const results = await searchService.getSearchSuggestions(searchQuery);
+      //     setSuggestions(results);
+      //     setShowSuggestions(true);
+      //   } catch (error) {
+      //     console.error('Error getting suggestions:', error);
+      //     setSuggestions([]);
+      //   }
+      // } else {
+      //   setSuggestions([]);
+      //   setShowSuggestions(false);
+      // }
     };
 
+    // Still keep the debounce structure but with disabled functionality
     const timeoutId = setTimeout(getSuggestions, 300);
     return () => clearTimeout(timeoutId);
   }, [searchQuery]);

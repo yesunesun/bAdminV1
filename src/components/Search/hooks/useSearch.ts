@@ -1,12 +1,13 @@
 // src/components/Search/hooks/useSearch.ts
-// Version: 2.1.0
-// Last Modified: 02-06-2025 15:30 IST
-// Purpose: Fixed Buy/Rent filter logic to properly handle action type mapping and search across all transaction types
+// Version: 3.0.0
+// Last Modified: 19-07-2025 12:00 IST
+// Purpose: Integrated NLP query processing with btService for natural language search capabilities
 
 import { useState, useCallback, useEffect } from 'react';
 import { SearchFilters, SearchResult, SearchState } from '../types/search.types';
 import { useSearchFilters } from './useSearchFilters';
 import { searchService } from '../services/searchService';
+import { nlpService, NLPResponse } from '../services/nlpService';
 
 export const useSearch = (onSearchCallback?: (filters: SearchFilters) => void) => {
   const searchFilters = useSearchFilters();
@@ -25,6 +26,14 @@ export const useSearch = (onSearchCallback?: (filters: SearchFilters) => void) =
 
   // Track if filters were just cleared to trigger default search
   const [wasCleared, setWasCleared] = useState(false);
+
+  // NLP processing state
+  const [nlpState, setNlpState] = useState({
+    isProcessing: false,
+    lastNlpResponse: null as NLPResponse | null,
+    extractedEntities: null as any,
+    queryInterpretation: null as string | null
+  });
 
   // Check if all filters are empty/default
   const areFiltersEmpty = useCallback(() => {
@@ -104,8 +113,85 @@ export const useSearch = (onSearchCallback?: (filters: SearchFilters) => void) =
   };
 
   /**
-   * ENHANCED: Smart search that detects 6-character property codes and uses appropriate search method
-   * Now with improved Buy/Rent filter handling
+   * NEW: Process natural language query using NLP service
+   */
+  const processNLPQuery = useCallback(async (query: string): Promise<SearchFilters | null> => {
+    console.log('🧠 useSearch: Processing NLP query:', query);
+    
+    // Check if query should use NLP processing
+    if (!nlpService.shouldUseNLP(query)) {
+      console.log('🔍 useSearch: Query doesn\'t require NLP processing');
+      return null;
+    }
+
+    try {
+      setNlpState(prev => ({
+        ...prev,
+        isProcessing: true,
+        queryInterpretation: null
+      }));
+
+      // Process query with NLP service
+      const nlpResponse = await nlpService.processQuery(query);
+      
+      console.log('🧠 useSearch: NLP response:', nlpResponse);
+
+      if (nlpResponse.success && nlpResponse.data.entities) {
+        // Convert NLP entities to search filters
+        const nlpFilters = nlpService.entitiesToFilters(nlpResponse.data.entities, query);
+        
+        // Merge with current filters, giving priority to NLP-detected values
+        const mergedFilters = {
+          ...searchFilters.filters,
+          ...nlpFilters
+        };
+
+        // Update NLP state with results
+        setNlpState(prev => ({
+          ...prev,
+          isProcessing: false,
+          lastNlpResponse: nlpResponse,
+          extractedEntities: nlpResponse.data.entities,
+          queryInterpretation: nlpResponse.data.preprocessedQuery
+        }));
+
+        console.log('✅ useSearch: NLP processing successful, applying filters:', nlpFilters);
+        
+        // Apply the NLP-detected filters
+        Object.entries(nlpFilters).forEach(([key, value]) => {
+          if (key !== 'searchQuery' && value) {
+            searchFilters.updateFilter(key as keyof SearchFilters, value);
+          }
+        });
+
+        return mergedFilters;
+      } else {
+        console.log('⚠️ useSearch: NLP processing failed or no entities detected');
+        setNlpState(prev => ({
+          ...prev,
+          isProcessing: false,
+          lastNlpResponse: nlpResponse,
+          extractedEntities: null,
+          queryInterpretation: null
+        }));
+        return null;
+      }
+    } catch (error) {
+      console.error('❌ useSearch: NLP processing error:', error);
+      setNlpState(prev => ({
+        ...prev,
+        isProcessing: false,
+        lastNlpResponse: null,
+        extractedEntities: null,
+        queryInterpretation: null
+      }));
+      return null;
+    }
+  }, [searchFilters]);
+
+  /**
+   * ENHANCED: Smart search that detects 6-character property codes, NLP queries, and uses appropriate search method
+   * Now with NLP integration and improved Buy/Rent filter handling
    */
   const handleSearch = useCallback(async () => {
     console.log('🔍 useSearch.handleSearch: Search initiated with actionType:', searchFilters.filters.actionType);
@@ -129,49 +215,73 @@ export const useSearch = (onSearchCallback?: (filters: SearchFilters) => void) =
       let response;
       const query = searchFilters.filters.searchQuery?.trim();
       
-      // Transform filters for backend compatibility
-      const backendFilters = transformFiltersForBackend(searchFilters.filters);
-      
-      console.log('🎯 Backend filters after transformation:', backendFilters);
+      console.log('🔍 SEARCH FLOW DEBUG:', {
+        rawQuery: searchFilters.filters.searchQuery,
+        trimmedQuery: query,
+        queryLength: query?.length,
+        isPropertyCode: query ? searchService.isPropertyCode(query) : false,
+        shouldUseNLP: query ? nlpService.shouldUseNLP(query) : false
+      });
       
       // Check if the search query is exactly a 6-character alphanumeric property code
       if (query && searchService.isPropertyCode(query)) {
         console.log('🎯 Detected 6-character property code in search, using smart search');
+        // Transform filters for backend compatibility
+        const backendFilters = transformFiltersForBackend(searchFilters.filters);
+        
         // Use smart search which tries code search first, then falls back to regular search
         response = await searchService.smartSearch(backendFilters, {
           page: 1,
           limit: pageSize
         });
-      } else {
-        // ENHANCED: Handle 'any' action type by searching across all property types if no specific transaction type
-        console.log('🔍 DEBUG: Checking search path conditions:', {
-          hasTransactionType: !!backendFilters.transactionType,
-          transactionType: backendFilters.transactionType,
-          hasPropertyType: !!backendFilters.selectedPropertyType,
-          selectedPropertyType: backendFilters.selectedPropertyType,
-          condition1: !backendFilters.transactionType,
-          condition2: (!backendFilters.selectedPropertyType || backendFilters.selectedPropertyType === 'any'),
-          overallCondition: !backendFilters.transactionType && (!backendFilters.selectedPropertyType || backendFilters.selectedPropertyType === 'any')
-        });
+      } else if (query && nlpService.shouldUseNLP(query)) {
+        // FIXED: Use direct NLP search for natural language queries
+        console.log('🧠 useSearch: Using direct NLP search for query:', query);
         
-        // SIMPLIFIED: Always use regular search when we have filters
-        console.log('🔍 Using regular search with specific filters');
+        setNlpState(prev => ({
+          ...prev,
+          isProcessing: true,
+          queryInterpretation: query
+        }));
+        
+        try {
+          // Use the new direct NLP search endpoint
+          response = await searchService.nlpSearch(query);
+          
+          console.log('✅ useSearch: Direct NLP search successful');
+          setNlpState(prev => ({
+            ...prev,
+            isProcessing: false,
+            lastNlpResponse: { success: true, data: { preprocessedQuery: query } },
+            extractedEntities: null,
+            queryInterpretation: query
+          }));
+        } catch (nlpError) {
+          console.log('⚠️ useSearch: Direct NLP search failed, falling back to regular search');
+          setNlpState(prev => ({
+            ...prev,
+            isProcessing: false,
+            lastNlpResponse: { success: false, error: 'NLP search failed' },
+            extractedEntities: null,
+            queryInterpretation: null
+          }));
+          
+          // Fallback to regular search
+          const backendFilters = transformFiltersForBackend(searchFilters.filters);
+          response = await searchService.search(backendFilters, {
+            page: 1,
+            limit: pageSize
+          });
+        }
+      } else {
+        // Use regular filter-based search
+        console.log('🔍 Using regular filter-based search');
+        const backendFilters = transformFiltersForBackend(searchFilters.filters);
+        
         response = await searchService.search(backendFilters, {
           page: 1,
           limit: pageSize
         });
-        
-        // OLD LOGIC - commenting out for debugging
-        // if (!backendFilters.transactionType && (!backendFilters.selectedPropertyType || backendFilters.selectedPropertyType === 'any')) {
-        //   console.log('🌐 Action type is "any" and no specific property type - using getLatestProperties');
-        //   response = await searchService.getLatestProperties(pageSize, 0);
-        // } else {
-        //   console.log('🔍 Using regular search with specific filters');
-        //   response = await searchService.search(backendFilters, {
-        //     page: 1,
-        //     limit: pageSize
-        //   });
-        // }
       }
       
       console.log('📊 Search completed:', {
@@ -381,6 +491,14 @@ export const useSearch = (onSearchCallback?: (filters: SearchFilters) => void) =
     clearResults,
     getSearchSuggestions, // Enhanced suggestions with code support
     isValidPropertyCode, // NEW: Utility to check if query is valid property code
+    
+    // NEW: NLP processing functions and state
+    processNLPQuery,
+    nlpState,
+    isNLPProcessing: nlpState.isProcessing,
+    extractedEntities: nlpState.extractedEntities,
+    queryInterpretation: nlpState.queryInterpretation,
+    lastNLPResponse: nlpState.lastNlpResponse,
     
     // Pagination actions
     loadMoreResults,

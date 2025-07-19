@@ -47,6 +47,7 @@ export interface SearchService {
   search(filters: SearchFilters, pagination?: SearchPaginationOptions): Promise<SearchResponse>;
   smartSearch(filters: SearchFilters, pagination?: SearchPaginationOptions): Promise<SearchResponse>;
   searchByCode(code: string, exact?: boolean): Promise<SearchResponse>;
+  nlpSearch(query: string): Promise<SearchResponse>;
   getLatestProperties(limit?: number, offset?: number): Promise<SearchResponse>;
   getSearchSuggestions(query: string): Promise<string[]>;
   isPropertyCode(query: string): boolean;
@@ -418,6 +419,43 @@ class BtSearchService implements SearchService {
     } catch (error) {
       console.error('❌ SearchService.searchByCode (v3) error, falling back to Supabase:', error);
       return this.searchByCodeFromSupabase(code, exact);
+    }
+  }
+
+  /**
+   * NLP Search - Direct natural language processing search
+   */
+  async nlpSearch(query: string): Promise<SearchResponse> {
+    console.log('🧠 SearchService.nlpSearch called with:', query);
+    
+    // Check if btService should be skipped
+    const skipBtService = import.meta.env.VITE_SKIP_BTSERVICE === 'true';
+    
+    if (skipBtService) {
+      console.log('⚡ Skipping btService - NLP search not available with Supabase fallback');
+      // Fallback to regular search with the query as searchQuery
+      return this.searchPropertiesFromSupabase({ searchQuery: query }, { limit: 50, offset: 0 });
+    }
+    
+    try {
+      const response = await btServiceClient.nlpSearch(query);
+      
+      // ENHANCEMENT: Add property_details to btService results for image extraction
+      const enhancedResults = await this.enhanceResultsWithPropertyDetails(response.results);
+      
+      console.log('✅ SearchService.nlpSearch completed:', {
+        resultCount: enhancedResults.length,
+        totalCount: response.totalCount
+      });
+      
+      return {
+        ...response,
+        results: enhancedResults
+      };
+    } catch (error) {
+      console.error('❌ SearchService.nlpSearch error, falling back to regular search:', error);
+      // Fallback to regular search with the query as searchQuery
+      return this.searchPropertiesFromSupabase({ searchQuery: query }, { limit: 50, offset: 0 });
     }
   }
 
